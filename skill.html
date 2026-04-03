@@ -229,6 +229,7 @@ const SKILLS = {
   DR: {
     maxRank: 4,
     rankLabels: ['教わった','やってみた','1人でできる','教えられる'],
+    cumulative: true, // 累積選択モード
     categories: {"模型練習": ["模型練習"], "小児歯科": ["口腔内診査", "シーラント", "CR(乳歯)", "トレーニング", "乳歯抜歯", "乳歯RCT"], "C処置": ["麻酔", "診断", "除去", "単治"], "メタルインレー": ["KP印象", "SET"], "CADインレー": ["KP印象", "SET"], "根管治療": ["抜髄", "感染根管処置", "レジンコア"], "メタルクラウン": ["PZ印象", "SET"], "ブリッジ": ["形成"], "CADクラウン": ["KP印象", "PZ印象"], "義歯": ["設計　印象", "BT", "TF", "SET", "調整", "リベース", "増歯"], "外科処置": ["永久歯普通抜歯", "埋伏抜歯", "sp", "抜糸", "電気メス"]}
   },
   DH: {
@@ -456,13 +457,14 @@ function renderSkills() {
         const btn = document.createElement('button');
         const cur = currentData[key] || 0;
 
-        if (def.maxRank <= 3) {
-          // 星ボタン
-          btn.className = `star-btn${cur >= r ? (r === 3 ? ' active active-3' : ' active') : ''}`;
+        if (def.maxRank <= 3 || def.cumulative) {
+          // 累積選択ボタン（星方式）
+          const isActive = cur >= r;
+          btn.className = `rank-btn r${Math.min(r,6)}${isActive ? ' active' : ''}`;
           btn.textContent = def.rankLabels[r-1];
           btn.onclick = () => toggleStar(key, r, def.maxRank);
         } else {
-          // ランクボタン
+          // 単一選択ボタン
           btn.className = `rank-btn r${r}${cur === r ? ' active' : ''}`;
           btn.textContent = def.rankLabels[r-1];
           btn.onclick = () => toggleRank(key, r);
@@ -499,7 +501,13 @@ function refreshButtons(key, max) {
   const val = currentData[key] || 0;
   document.querySelectorAll(`[data-key="${CSS.escape(key)}"]`).forEach(btn => {
     const r = parseInt(btn.dataset.rank);
-    btn.className = `star-btn${val >= r ? (r === 3 ? ' active active-3' : ' active') : ''}`;
+    const isActive = val >= r;
+    // rank-btn方式かstar-btn方式か判定
+    if (btn.className.includes('rank-btn')) {
+      btn.className = `rank-btn r${Math.min(r,6)}${isActive ? ' active' : ''}`;
+    } else {
+      btn.className = `star-btn${isActive ? (r === 3 ? ' active active-3' : ' active') : ''}`;
+    }
   });
 }
 
