@@ -521,7 +521,7 @@ function refreshRankButtons(key) {
 
 function updateProgress() {
   const sheets = ROLE_SHEETS[currentRoleKey] || [currentRoleKey];
-  let total = 0, done = 0;
+  let totalScore = 0, totalMax = 0;
   for (const sheetKey of sheets) {
     const def = SKILLS[sheetKey];
     if (!def) continue;
@@ -530,12 +530,12 @@ function updateProgress() {
         const cats = Object.keys(def.categories);
         const cat  = cats.find(c => def.categories[c].includes(item));
         const key  = `${cat}__${item}`;
-        total++;
-        if ((currentData[key] || 0) > 0) done++;
+        totalScore += (currentData[key] || 0);
+        totalMax   += def.maxRank;
       }
     }
   }
-  const pct = total ? Math.round(done / total * 100) : 0;
+  const pct = totalMax ? Math.round(totalScore / totalMax * 100) : 0;
   document.getElementById('progressNum').textContent = `${pct}%`;
   document.getElementById('progressBar').style.width = `${pct}%`;
 }
