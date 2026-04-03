@@ -355,7 +355,7 @@
       <span class="tool-icon">⚙️</span>
       <span class="tool-name">管理者画面</span>
     </a>
-    <a class="tool-item fu d2" id="skillToolBtn" href="https://kalmia-dc.github.io/portal/skill.html" target="_blank" rel="noopener" style="display:none;background:linear-gradient(135deg,#f3f0ff,#e8e0ff);border:2px solid #c8b8ff;">
+    <a class="tool-item fu d2" id="skillToolBtn" href="#" onclick="goToSkillApp();return false;" style="display:none;background:linear-gradient(135deg,#f3f0ff,#e8e0ff);border:2px solid #c8b8ff;">
       <span class="tool-icon">📋</span>
       <span class="tool-name">スキル<br>チェック</span>
     </a>
@@ -577,6 +577,21 @@ function submitPwChange() {
 // ─────────────────────────────────────────
 const ADMIN_STAFF = ['sugihira', 'momo']; // 管理者アクセス可能なstaffId
 
+function goToSkillApp() {
+  if (!currentUser) return;
+  const roleMap = {
+    sugihira:'DR', shimanaka:'DR', hokari:'DR', shinoda:'DR',
+    tsuruta:'DH', yoshida:'DH', takagi:'DH', matsumoto:'DH', nozaki:'DH', yamada:'DH',
+    tamiya:'DA受付', tanaka:'DA受付', momo:'DA助手'
+  };
+  const role = roleMap[currentUser.staffId] || 'DH';
+  // 院長・百々・山田は管理者モード
+  const SKILL_ADMINS = ['sugihira', 'momo', 'yamada'];
+  const isAdmin = SKILL_ADMINS.includes(currentUser.staffId) ? '1' : '0';
+  const params = new URLSearchParams({ sid: currentUser.staffId, name: currentUser.name, role, isAdmin });
+  window.open(`https://kalmia-dc.github.io/portal/skill.html?${params}`, '_blank');
+}
+
 function goToShiftApp(asAdmin = false) {
   if (!currentUser) return;
   if (asAdmin) {
@@ -670,13 +685,10 @@ function initApp() {
   // 管理者リンクを表示（杉平・百々のみ）
   const adminBtn = document.getElementById('adminToolBtn');
   const skillBtn = document.getElementById('skillToolBtn');
-  if (ADMIN_STAFF.includes(u.staffId)) {
-    adminBtn.style.display = 'block';
-    skillBtn.style.display = 'block';
-  } else {
-    adminBtn.style.display = 'none';
-    skillBtn.style.display = 'none';
-  }
+  // 管理者画面は管理者のみ
+  adminBtn.style.display = ADMIN_STAFF.includes(u.staffId) ? 'block' : 'none';
+  // スキルチェックは全スタッフ表示
+  skillBtn.style.display = 'block';
 
   // 今週カレンダー
   buildWeek(now, u.name);
