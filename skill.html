@@ -303,7 +303,7 @@ const SKILLS = {
 // ロール別シート対応
 const ROLE_SHEETS = {
   DR:    ['DR', 'カウンセリング'],
-  DH:    ['DH', 'カウンセリング'],
+  DH:    ['DH', 'DA助手', 'カウンセリング'],
   DA受付: ['DA受付', 'DA助手', 'カウンセリング'],
   DA助手: ['DA受付', 'DA助手', 'カウンセリング'],
 };
@@ -412,9 +412,9 @@ function renderSkills() {
       sheetHead.style.cssText = 'font-family:Nunito,sans-serif;font-weight:900;font-size:16px;margin:16px 0 8px;padding:8px 12px;background:linear-gradient(135deg,var(--mint),var(--sky));color:white;border-radius:12px;';
       sheetHead.textContent = sheetKey === 'カウンセリング' ? '📣 カウンセリング' :
         sheetKey === 'DR' ? '🦷 歯科医師' :
-        sheetKey === 'DH' ? '🪥 歯科衛生士' :
-        sheetKey === 'DA受付' ? '💼 受付' :
-        sheetKey === 'DA助手' ? '🔧 歯科助手' : sheetKey;
+        sheetKey === 'DH' ? '🪥 衛生士業務' :
+        sheetKey === 'DA受付' ? '💼 受付業務' :
+        sheetKey === 'DA助手' ? '🔧 アシスト業務' : sheetKey;
       body.appendChild(sheetHead);
     }
 
