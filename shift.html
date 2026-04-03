@@ -1,0 +1,4359 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>カルミアデンタルクリニック｜シフト自動作成</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&family=DM+Mono:wght@400;500&display=swap');
+
+  /* ── LOGIN SCREEN ── */
+  #loginScreen {
+    min-height: 100vh;
+    background: linear-gradient(145deg, #004D40 0%, #00897B 50%, #26A69A 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+  .login-card {
+    background: #fff;
+    border-radius: 24px;
+    padding: 40px 32px;
+    width: 100%;
+    max-width: 380px;
+    box-shadow: 0 24px 64px rgba(0,0,0,.22);
+    animation: loginFadeIn .4s ease;
+  }
+  @keyframes loginFadeIn {
+    from { opacity:0; transform:translateY(20px); }
+    to   { opacity:1; transform:translateY(0); }
+  }
+  .login-logo {
+    text-align: center;
+    margin-bottom: 28px;
+  }
+  .login-logo .icon {
+    font-size: 2.4rem;
+    display: block;
+    margin-bottom: 8px;
+  }
+  .login-logo .clinic-name {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--teal-dk);
+    line-height: 1.4;
+  }
+  .login-logo .system-name {
+    font-size: .75rem;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+  .login-role-tabs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 24px;
+    background: var(--bg);
+    border-radius: 12px;
+    padding: 4px;
+  }
+  .login-role-tab {
+    padding: 10px;
+    border: none;
+    border-radius: 9px;
+    font-family: inherit;
+    font-size: .85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all .2s;
+    background: transparent;
+    color: var(--muted);
+  }
+  .login-role-tab.active {
+    background: #fff;
+    color: var(--teal);
+    box-shadow: 0 2px 8px rgba(0,0,0,.1);
+  }
+  .login-field {
+    margin-bottom: 16px;
+  }
+  .login-field label {
+    display: block;
+    font-size: .78rem;
+    color: var(--muted);
+    margin-bottom: 6px;
+    font-weight: 500;
+  }
+  .login-field select,
+  .login-field input {
+    width: 100%;
+    padding: 12px 14px;
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    font-family: inherit;
+    font-size: .9rem;
+    outline: none;
+    transition: border-color .15s;
+    background: #fff;
+    -webkit-appearance: none;
+  }
+  .login-field select:focus,
+  .login-field input:focus {
+    border-color: var(--teal);
+  }
+  .login-btn {
+    width: 100%;
+    padding: 14px;
+    background: var(--teal);
+    color: #fff;
+    border: none;
+    border-radius: 12px;
+    font-family: inherit;
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background .15s, transform .1s;
+    margin-top: 8px;
+  }
+  .login-btn:hover { background: var(--teal-dk); }
+  .login-btn:active { transform: scale(.98); }
+  .login-error {
+    color: var(--red);
+    font-size: .8rem;
+    text-align: center;
+    margin-top: 10px;
+    min-height: 20px;
+  }
+  .login-hint {
+    margin-top: 20px;
+    padding: 12px;
+    background: var(--teal-lt);
+    border-radius: 10px;
+    font-size: .75rem;
+    color: var(--teal-dk);
+    line-height: 1.7;
+  }
+
+  /* ── STAFF VIEW (mobile-first) ── */
+  /* ══════════════════════════════════════
+     STAFF SCREEN — スマホ最適化
+  ══════════════════════════════════════ */
+  #staffScreen {
+    display: none;
+    min-height: 100vh;
+    min-height: 100dvh; /* Dynamic viewport height for mobile */
+    background: var(--bg);
+    padding-bottom: calc(68px + env(safe-area-inset-bottom));
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* ヘッダー */
+  .staff-header {
+    background: linear-gradient(135deg, var(--teal-dk) 0%, var(--teal) 100%);
+    color: #fff;
+    padding: 16px 20px;
+    padding-top: calc(16px + env(safe-area-inset-top));
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: 0 2px 12px rgba(0,137,123,.4);
+  }
+  .staff-header .greeting { font-size: .75rem; opacity: .75; letter-spacing: .03em; }
+  .staff-header .name     { font-size: 1.15rem; font-weight: 700; margin-top: 1px; }
+  .staff-header .logout-btn {
+    position: absolute; right: 16px; top: 50%;
+    transform: translateY(-50%);
+    margin-top: calc(env(safe-area-inset-top) / 2);
+    background: rgba(255,255,255,.18); border: 1px solid rgba(255,255,255,.25);
+    color: #fff; padding: 7px 14px; border-radius: 20px;
+    font-size: .78rem; cursor: pointer; font-family: inherit;
+    -webkit-tap-highlight-color: transparent;
+    transition: background .15s;
+  }
+  .staff-header .logout-btn:active { background: rgba(255,255,255,.3); }
+
+  /* セクション */
+  .staff-section { padding: 16px 16px 8px; }
+  .staff-section h3 {
+    font-size: .68rem; text-transform: uppercase; letter-spacing: .12em;
+    color: var(--muted); margin-bottom: 10px; font-weight: 600;
+  }
+
+  /* ── 今日のシフトカード（大きめ・見やすい） ── */
+  .today-card {
+    background: #fff;
+    border-radius: 20px;
+    padding: 0;
+    box-shadow: 0 4px 20px rgba(0,137,123,.12);
+    margin-bottom: 16px;
+    overflow: hidden;
+  }
+  .today-card-top {
+    background: linear-gradient(135deg, var(--teal) 0%, #26A69A 100%);
+    color: #fff;
+    padding: 20px 20px 16px;
+  }
+  .today-card-top .tc-date  { font-size: .78rem; opacity: .85; margin-bottom: 6px; }
+  .today-card-top .tc-shift {
+    font-size: 2rem; font-weight: 700; line-height: 1;
+    letter-spacing: -.01em;
+  }
+  .today-card-top .tc-badge {
+    display: inline-block; margin-top: 8px;
+    background: rgba(255,255,255,.2); border-radius: 20px;
+    padding: 3px 12px; font-size: .75rem;
+  }
+  .today-card-bottom {
+    padding: 14px 20px;
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+  .tc-info-item { display: flex; flex-direction: column; gap: 2px; }
+  .tc-info-item .tc-label { font-size: .65rem; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .08em; }
+  .tc-info-item .tc-val   { font-size: .9rem; font-weight: 600; color: var(--text); }
+
+  /* ── 月間カレンダー（スマホ最適化） ── */
+  .staff-month-wrap {
+    background: #fff;
+    border-radius: 20px;
+    padding: 16px;
+    box-shadow: 0 2px 12px rgba(0,0,0,.06);
+    margin-bottom: 8px;
+  }
+  .staff-month-nav {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 12px;
+  }
+  .staff-month-nav .smn-title { font-size: .95rem; font-weight: 700; }
+  .staff-month-nav button {
+    background: var(--bg); border: none; border-radius: 8px;
+    width: 32px; height: 32px; font-size: 1rem; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .staff-month-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 3px;
+  }
+  .staff-month-grid .dow-label {
+    text-align: center; font-size: .62rem;
+    font-weight: 700; padding: 4px 0 6px;
+    letter-spacing: .02em;
+  }
+  .staff-day-cell {
+    aspect-ratio: 1;
+    border-radius: 10px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-size: .6rem;
+    cursor: default;
+    -webkit-tap-highlight-color: transparent;
+    transition: transform .1s;
+  }
+  .staff-day-cell:active { transform: scale(.92); }
+  .staff-day-cell .d-num   { font-size: .8rem; font-weight: 700; line-height: 1; }
+  .staff-day-cell .d-shift { font-size: .5rem; margin-top: 2px; opacity: .85; }
+  .staff-day-cell.early  { background: #E8F5E9; color: #2E7D32; }
+  .staff-day-cell.late   { background: #DCEEFB; color: #1565C0; }
+  .staff-day-cell.off    { background: #FFEBEE; color: #C62828; }
+  .staff-day-cell.paid   { background: #F3E5F5; color: #6A1B9A; }
+  .staff-day-cell.wish   { background: #FFF8E1; color: #E65100; }
+  .staff-day-cell.fixed  { background: #E0F7FA; color: #006064; }
+  .staff-day-cell.admin  { background: #F5F5F5; color: #616161; }
+  .staff-day-cell.hanowa { background: #FCE4EC; color: #880E4F; }
+  .staff-day-cell.none   { background: #F5F5F5; color: #BDBDBD; }
+  .staff-day-cell.empty  { background: transparent; }
+  .staff-day-cell.today-cell {
+    outline: 2.5px solid var(--teal);
+    outline-offset: -1px;
+    box-shadow: 0 0 0 4px rgba(0,137,123,.1);
+  }
+
+  /* 凡例 */
+  .legend {
+    display: flex; flex-wrap: wrap; gap: 6px;
+    padding: 12px 16px;
+    background: #fff; border-radius: 14px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.05);
+    margin-bottom: 16px;
+  }
+  .legend-item {
+    display: flex; align-items: center; gap: 4px;
+    font-size: .68rem; color: var(--muted);
+  }
+  .legend-dot {
+    width: 10px; height: 10px; border-radius: 3px;
+  }
+
+  /* ── 申請フォーム（スマホ最適化） ── */
+  .request-card {
+    background: #fff;
+    border-radius: 20px;
+    padding: 20px;
+    box-shadow: 0 2px 12px rgba(0,0,0,.06);
+    margin-bottom: 16px;
+  }
+  .request-card h4 { font-size: .95rem; font-weight: 700; margin-bottom: 18px; }
+
+  .req-type-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 18px;
+  }
+  .req-type-btn {
+    padding: 14px 8px; border-radius: 14px; border: 2px solid var(--border);
+    font-family: inherit; font-size: .85rem; font-weight: 600;
+    cursor: pointer; background: #fff; transition: all .15s; text-align: center;
+    line-height: 1.5;
+    -webkit-tap-highlight-color: transparent;
+    min-height: 56px;
+  }
+  .req-type-btn:active { transform: scale(.97); }
+  .req-type-btn.selected {
+    border-color: var(--teal); background: var(--teal-lt); color: var(--teal-dk);
+  }
+
+  /* 申請履歴 */
+  .req-item {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    padding: 12px 14px; border-radius: 12px;
+    background: var(--bg); margin-bottom: 8px;
+    font-size: .82rem;
+  }
+  .req-item .req-date { font-weight: 700; min-width: 48px; font-size: .85rem; }
+  .req-item .req-type-badge {
+    font-size: .68rem; padding: 3px 10px; border-radius: 20px; font-weight: 700;
+  }
+  .req-item .req-status {
+    margin-left: auto; font-size: .7rem; padding: 3px 10px;
+    border-radius: 20px; font-weight: 600;
+  }
+  .req-status.pending  { background: #FFF8E1; color: #E65100; }
+  .req-status.approved { background: #E8F5E9; color: #2E7D32; }
+  .req-status.rejected { background: #FFEBEE; color: var(--red); }
+
+  /* ── ボトムナビ（スマホ最適化） ── */
+  .staff-bottom-nav {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    background: rgba(255,255,255,.95);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-top: 1px solid rgba(0,0,0,.07);
+    display: flex;
+    z-index: 200;
+    padding-bottom: env(safe-area-inset-bottom);
+    box-shadow: 0 -4px 20px rgba(0,0,0,.06);
+  }
+  .staff-nav-item {
+    flex: 1; display: flex; flex-direction: column; align-items: center;
+    padding: 10px 0 8px; font-size: .65rem; color: var(--muted);
+    cursor: pointer; border: none; background: none; font-family: inherit;
+    transition: color .15s; position: relative;
+    -webkit-tap-highlight-color: transparent;
+    min-height: 56px;
+  }
+  .staff-nav-item .nav-icon {
+    font-size: 1.45rem; margin-bottom: 3px;
+    transition: transform .2s;
+  }
+  .staff-nav-item.active { color: var(--teal); }
+  .staff-nav-item.active .nav-icon { transform: translateY(-2px); }
+  .staff-nav-item.active::after {
+    content: '';
+    position: absolute; bottom: calc(env(safe-area-inset-bottom) + 6px); left: 50%;
+    transform: translateX(-50%);
+    width: 4px; height: 4px; border-radius: 2px;
+    background: var(--teal);
+  }
+
+  /* プルリフレッシュ防止 */
+  #staffScreen { overscroll-behavior-y: contain; }
+
+  /* Admin logout button in header */
+  .admin-logout {
+    background: rgba(255,255,255,.15); border: none; color: #fff;
+    padding: 6px 12px; border-radius: 8px; font-size: .78rem;
+    cursor: pointer; font-family: inherit; margin-left: 8px;
+  }
+
+  /* Hide app by default (login first) */
+  #mainApp { display: none; }
+
+  :root {
+    --teal:    #00897B;
+    --teal-lt: #E0F2F1;
+    --teal-dk: #00564e;
+    --coral:   #FF7043;
+    --amber:   #FFB300;
+    --blue:    #1976D2;
+    --red:     #D32F2F;
+    --purple:  #7B1FA2;
+    --bg:      #F5F7FA;
+    --surface: #FFFFFF;
+    --border:  #E0E4EA;
+    --text:    #1A2233;
+    --muted:   #6B7A99;
+    --shadow:  0 2px 12px rgba(0,0,0,.07);
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Noto Sans JP', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+
+  /* ── HEADER ── */
+  header {
+    background: var(--teal);
+    color: #fff;
+    padding: 0 24px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    height: 56px;
+    position: sticky;
+    top: 0;
+    z-index: 200;
+    box-shadow: 0 2px 8px rgba(0,137,123,.35);
+  }
+  header .logo { font-size: 1.1rem; font-weight: 700; letter-spacing: .04em; }
+  header .sub  { font-size: .78rem; opacity: .8; }
+  header .spacer { flex: 1; }
+  header .month-nav {
+    display: flex; align-items: center; gap: 8px;
+    background: rgba(255,255,255,.12);
+    border-radius: 8px; padding: 4px 12px;
+  }
+  header .month-nav button {
+    background: none; border: none; color: #fff; cursor: pointer;
+    font-size: 1rem; padding: 2px 6px; border-radius: 4px;
+    transition: background .15s;
+  }
+  header .month-nav button:hover { background: rgba(255,255,255,.2); }
+  header .month-nav span { font-weight: 700; font-size: .95rem; min-width: 90px; text-align: center; }
+
+  /* ── MAIN LAYOUT ── */
+  .app { display: flex; height: calc(100vh - 56px); }
+
+  /* ── SIDEBAR ── */
+  aside {
+    width: 260px;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .sidebar-section { padding: 16px; border-bottom: 1px solid var(--border); }
+  .sidebar-section h3 { font-size: .72rem; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); margin-bottom: 10px; }
+
+  /* Staff list */
+  .staff-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 0; font-size: .85rem; cursor: pointer;
+    border-radius: 6px; transition: background .1s;
+  }
+  .staff-item:hover { background: var(--teal-lt); }
+  .badge {
+    font-size: .65rem; font-weight: 700; padding: 2px 6px;
+    border-radius: 4px; min-width: 32px; text-align: center;
+  }
+  .badge.DR { background: #E3F2FD; color: #1565C0; }
+  .badge.DH { background: #E8F5E9; color: #2E7D32; }
+  .badge.DA { background: #FFF3E0; color: #E65100; }
+
+  .staff-name { flex: 1; }
+  .staff-type { font-size: .7rem; color: var(--muted); }
+
+  /* Action buttons */
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 8px 16px; border-radius: 8px; border: none;
+    cursor: pointer; font-family: inherit; font-size: .85rem;
+    font-weight: 500; transition: all .15s; white-space: nowrap;
+  }
+  .btn-primary { background: var(--teal); color: #fff; }
+  .btn-primary:hover { background: var(--teal-dk); }
+  .btn-secondary { background: var(--teal-lt); color: var(--teal); }
+  .btn-secondary:hover { background: #b2dfdb; }
+  .btn-danger { background: #FFEBEE; color: var(--red); }
+  .btn-danger:hover { background: #FFCDD2; }
+  .btn-amber { background: #FFF8E1; color: #F57F17; }
+  .btn-amber:hover { background: #FFECB3; }
+  .btn-full { width: 100%; justify-content: center; }
+  .btn-sm { padding: 4px 10px; font-size: .78rem; }
+  .btn:disabled { opacity: .45; cursor: not-allowed; }
+
+  .sidebar-actions { padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+
+  /* ── CALENDAR AREA ── */
+  .calendar-wrapper { flex: 1; overflow: auto; padding: 16px; }
+
+  .calendar-grid {
+    display: grid;
+    grid-template-columns: 100px repeat(var(--days), minmax(40px, 1fr));
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    background: var(--surface);
+    box-shadow: var(--shadow);
+    min-width: 900px;
+  }
+
+  /* Header row */
+  .cal-header {
+    display: contents;
+  }
+  .cal-corner {
+    background: #F0F4F8;
+    padding: 10px 8px;
+    font-size: .72rem;
+    color: var(--muted);
+    font-weight: 600;
+    border-right: 1px solid var(--border);
+    border-bottom: 2px solid var(--border);
+    text-align: center;
+  }
+  .cal-day-header {
+    background: #F0F4F8;
+    padding: 8px 4px;
+    text-align: center;
+    border-right: 1px solid var(--border);
+    border-bottom: 2px solid var(--border);
+    cursor: default;
+  }
+  .cal-day-header .day-num { font-size: .9rem; font-weight: 700; }
+  .cal-day-header .day-name { font-size: .65rem; color: var(--muted); }
+  .cal-day-header.sunday  .day-num { color: var(--red); }
+  .cal-day-header.saturday .day-num { color: var(--blue); }
+  .cal-day-header.holiday .day-num { color: var(--red); }
+  .cal-day-header.off-day { background: #FFF5F5; }
+  .cal-day-header.today .day-num {
+    background: var(--teal); color: #fff;
+    border-radius: 50%; width: 26px; height: 26px;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+
+  /* Staff rows */
+  .cal-staff-name {
+    padding: 8px;
+    font-size: .8rem;
+    font-weight: 500;
+    border-right: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 2px;
+    position: sticky;
+    left: 0;
+    z-index: 10;
+  }
+  .cal-staff-name .sname { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cal-staff-name .shours { font-size: .68rem; color: var(--muted); font-family: 'DM Mono', monospace; }
+
+  .cal-cell {
+    border-right: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    padding: 3px;
+    min-height: 48px;
+    position: relative;
+    cursor: pointer;
+    transition: background .1s;
+  }
+  .cal-cell:hover { background: #F0FBF9; }
+  .cal-cell.off-day { background: #FAFAFA; cursor: default; }
+  .cal-cell.off-day:hover { background: #FAFAFA; }
+
+  /* Shift chips */
+  .shift-chip {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    font-size: .68rem;
+    font-weight: 600;
+    padding: 3px 4px;
+    height: 100%;
+    min-height: 38px;
+    text-align: center;
+    line-height: 1.2;
+    user-select: none;
+    position: relative;
+  }
+  .shift-chip.early  { background: #E8F5E9; color: #2E7D32; border: 1.5px solid #A5D6A7; }
+  .shift-chip.late   { background: #E3F2FD; color: #1565C0; border: 1.5px solid #90CAF9; }
+  .shift-chip.off    { background: #FFEBEE; color: var(--red); border: 1.5px solid #FFCDD2; }
+  .shift-chip.paid   { background: #F3E5F5; color: #6A1B9A; border: 1.5px solid #CE93D8; }
+  .shift-chip.wish   { background: #FFF8E1; color: #F57F17; border: 1.5px solid #FFE082; }
+  .shift-chip.fixed  { background: #E0F7FA; color: #006064; border: 1.5px solid #80DEEA; }
+  .shift-chip.admin  { background: #F5F5F5; color: #616161; border: 1.5px solid #BDBDBD; }
+  .shift-chip.hanowa { background: #FCE4EC; color: #880E4F; border: 1.5px solid #F48FB1; }
+  .shift-chip.empty  { background: transparent; border: 1.5px dashed var(--border); color: var(--muted); }
+
+  /* Summary bar */
+  .summary-bar {
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    padding: 8px 16px;
+    display: flex;
+    gap: 24px;
+    font-size: .8rem;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .summary-bar .label { color: var(--muted); }
+  .summary-bar .value { font-weight: 700; color: var(--teal); font-family: 'DM Mono', monospace; }
+  .summary-bar .alert { color: var(--red); font-weight: 700; }
+
+  /* Daily summary row */
+  .cal-day-summary {
+    background: #F8FAFC;
+    border-right: 1px solid var(--border);
+    border-bottom: 2px solid var(--border);
+    padding: 4px 2px;
+    font-size: .62rem;
+    text-align: center;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+  }
+  .cal-day-summary.ok { color: var(--teal); }
+  .cal-day-summary.ng { color: var(--red); font-weight: 700; }
+  .cal-day-summary.off-day { background: #FAFAFA; }
+
+  /* ── MODAL ── */
+  .modal-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,.4);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 500;
+    opacity: 0; pointer-events: none;
+    transition: opacity .2s;
+  }
+  .modal-overlay.open { opacity: 1; pointer-events: all; }
+  .modal {
+    background: var(--surface);
+    border-radius: 16px;
+    padding: 28px;
+    width: 380px;
+    max-width: 95vw;
+    box-shadow: 0 20px 60px rgba(0,0,0,.2);
+    transform: translateY(12px);
+    transition: transform .2s;
+  }
+  .modal-overlay.open .modal { transform: translateY(0); }
+  .modal h2 { font-size: 1rem; margin-bottom: 16px; }
+  .modal-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+  .modal-grid button {
+    padding: 12px;
+    border-radius: 10px;
+    border: 2px solid transparent;
+    cursor: pointer;
+    font-size: .82rem;
+    font-weight: 600;
+    font-family: inherit;
+    transition: all .15s;
+    text-align: center;
+  }
+  .modal-grid button:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,.1); }
+  .modal-grid button.selected { border-color: var(--teal) !important; }
+  .modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
+
+  /* Alert log */
+  .alert-log {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px;
+    margin-top: 12px;
+    max-height: 160px;
+    overflow-y: auto;
+  }
+  .alert-log h4 { font-size: .75rem; color: var(--muted); margin-bottom: 8px; text-transform: uppercase; letter-spacing: .08em; }
+  .log-item {
+    font-size: .76rem;
+    padding: 5px 8px;
+    border-radius: 5px;
+    margin-bottom: 4px;
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+  }
+  .log-item.warn { background: #FFF8E1; color: #F57F17; }
+  .log-item.error { background: #FFEBEE; color: var(--red); }
+  .log-item.info  { background: var(--teal-lt); color: var(--teal-dk); }
+
+  /* Progress */
+  .progress-ring { position: relative; display: inline-flex; align-items: center; justify-content: center; }
+  .hours-bar { height: 6px; background: #E0E4EA; border-radius: 3px; overflow: hidden; margin-top: 3px; }
+  .hours-bar-fill { height: 100%; border-radius: 3px; transition: width .3s; }
+
+  /* Tooltip */
+  [data-tip] { position: relative; }
+  [data-tip]::after {
+    content: attr(data-tip);
+    position: absolute; bottom: 110%; left: 50%; transform: translateX(-50%);
+    background: #1A2233; color: #fff; font-size: .7rem;
+    padding: 4px 8px; border-radius: 5px; white-space: nowrap;
+    opacity: 0; pointer-events: none; transition: opacity .15s;
+    z-index: 100;
+  }
+  [data-tip]:hover::after { opacity: 1; }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 3px; }
+
+  /* ── TABS ── */
+  .tabs { display: flex; gap: 4px; padding: 12px 12px 0; }
+  .tab {
+    padding: 6px 12px; border-radius: 8px 8px 0 0;
+    font-size: .78rem; font-weight: 600; cursor: pointer;
+    border: 1px solid transparent; border-bottom: none;
+    background: transparent; color: var(--muted);
+    font-family: inherit;
+    transition: all .15s;
+  }
+  .tab.active {
+    background: var(--surface); color: var(--teal);
+    border-color: var(--border);
+  }
+
+  /* Rules panel */
+  .rules-panel {
+    padding: 16px;
+    font-size: .8rem;
+    line-height: 1.7;
+  }
+  .rules-panel h4 { font-size: .72rem; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); margin: 12px 0 6px; }
+  .rule-item { display: flex; gap: 6px; align-items: flex-start; margin-bottom: 4px; }
+  .rule-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--teal); margin-top: 6px; flex-shrink: 0; }
+
+  .spinner {
+    width: 20px; height: 20px;
+    border: 2.5px solid rgba(255,255,255,.3);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: spin .6s linear infinite;
+    display: inline-block;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .chip-label { font-size: .58rem; display: block; }
+  .late-dot {
+    position: absolute; top: 3px; right: 3px;
+    width: 6px; height: 6px; border-radius: 50%; background: var(--blue);
+  }
+
+  .input-row { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
+  .input-row label { font-size: .78rem; color: var(--muted); }
+  .input-row input, .input-row select {
+    padding: 7px 10px; border: 1px solid var(--border); border-radius: 7px;
+    font-family: inherit; font-size: .85rem; outline: none;
+    transition: border-color .15s;
+  }
+  .input-row input:focus, .input-row select:focus { border-color: var(--teal); }
+
+  .status-pill {
+    font-size: .65rem; padding: 1px 7px; border-radius: 10px;
+    display: inline-block; font-weight: 600;
+  }
+  .status-pill.ok { background: #E8F5E9; color: #2E7D32; }
+  .status-pill.ng { background: #FFEBEE; color: var(--red); }
+  /* ── 印刷スタイル ── */
+  @media print {
+    body { margin:0; padding:0; }
+    #loginScreen, #mainApp, #staffScreen { display:none !important; }
+    #printArea {
+      display:block !important;
+      width:100%;
+      font-family:'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif;
+    }
+    .print-header {
+      font-size:15pt; font-weight:800;
+      margin-bottom:6px; text-align:center;
+      letter-spacing:.08em; color:#1a2e44;
+    }
+    .print-legend {
+      display:flex; gap:12px; justify-content:center;
+      margin-bottom:6px; font-size:7.5pt;
+    }
+    .print-legend-item {
+      display:flex; align-items:center; gap:3px;
+    }
+    .print-legend-dot {
+      width:10px; height:10px; border-radius:2px; display:inline-block;
+    }
+    .print-table {
+      border-collapse:collapse; width:100%;
+      table-layout:fixed;
+    }
+    .print-table th {
+      background:#2C5F82 !important;
+      color:#fff !important;
+      font-size:8pt; font-weight:700;
+      padding:4px 1px; text-align:center;
+      border:1px solid #1a4060;
+      line-height:1.3;
+      -webkit-print-color-adjust:exact;
+      print-color-adjust:exact;
+    }
+    .print-table th.print-sunday,
+    .print-table th.print-holiday { background:#B71C1C !important; color:#fff !important; }
+    .print-table th.print-saturday { background:#1565C0 !important; color:#fff !important; }
+    .print-table th.print-off-day  { background:#78909C !important; color:#fff !important; }
+    .print-table td {
+      font-size:8.5pt; font-weight:600;
+      padding:5px 1px; text-align:center;
+      border:1px solid #ccc;
+      line-height:1.2;
+    }
+    .print-table .staff-col {
+      text-align:left; font-weight:700;
+      font-size:9pt; padding:5px 5px;
+      width:48px; background:#F0F4F8 !important;
+      color:#1a2e44;
+      border-right:2px solid #2C5F82;
+      -webkit-print-color-adjust:exact;
+      print-color-adjust:exact;
+    }
+    /* シフト種別カラー */
+    .print-early {
+      background:#FFFFFF !important; color:#1a2e44 !important;
+      -webkit-print-color-adjust:exact; print-color-adjust:exact;
+    }
+    .print-late {
+      background:#FFF3CD !important; color:#7B4F00 !important;
+      -webkit-print-color-adjust:exact; print-color-adjust:exact;
+    }
+    .print-paid {
+      background:#E2D9F3 !important; color:#4A148C !important;
+      -webkit-print-color-adjust:exact; print-color-adjust:exact;
+    }
+    .print-wish {
+      background:#FFE5CC !important; color:#7B3100 !important;
+      -webkit-print-color-adjust:exact; print-color-adjust:exact;
+    }
+    .print-off {
+      background:#F8F9FA !important; color:#AAAAAA !important;
+      -webkit-print-color-adjust:exact; print-color-adjust:exact;
+    }
+    .print-off-day {
+      background:#ECEFF1 !important; color:#B0BEC5 !important;
+      -webkit-print-color-adjust:exact; print-color-adjust:exact;
+    }
+    @page { size:A4 landscape; margin:6mm 8mm; }
+  }
+</style>
+</head>
+<!-- Firebase SDK -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getDatabase, ref, set, get, onValue, push, remove } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyDdMe7feUF6CKPHH0YIx7Suk-WnXtOYUu8",
+    authDomain: "kalmia-shift.firebaseapp.com",
+    databaseURL: "https://kalmia-shift-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId: "kalmia-shift",
+    storageBucket: "kalmia-shift.firebasestorage.app",
+    messagingSenderId: "714175473480",
+    appId: "1:714175473480:web:7d6626a46e4a9dcb1fb57d"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getDatabase(app);
+
+  // ── Firebase API をグローバルに公開 ──
+  window._fb = { db, ref, set, get, onValue, push, remove };
+  window.dispatchEvent(new Event('firebaseReady'));
+  // 初期表示
+  setTimeout(renderLoginHint, 100);
+  // ポータルからの自動ログインチェック
+  setTimeout(checkPortalAutoLogin, 200);
+</script>
+<body>
+
+<!-- ════════ LOGIN SCREEN ════════ -->
+<div id="loginScreen">
+  <div class="login-card">
+    <div class="login-logo">
+      <span class="icon">🦷</span>
+      <div class="clinic-name">カルミアデンタルクリニック</div>
+      <div class="system-name">シフト管理システム</div>
+    </div>
+    <!-- スタッフはポータルからログイン。このページは管理者専用 -->
+    <div style="text-align:center;margin-bottom:14px;color:#666;font-size:13px;">
+      👩‍💼 管理者ログイン
+    </div>
+    <div id="adminLoginForm">
+      <div class="login-field">
+        <label>パスワード</label>
+        <input type="password" id="adminPass" placeholder="管理者パスワードを入力" onkeydown="if(event.key==='Enter')doLogin()">
+      </div>
+    </div>
+    <!-- スタッフ用（非表示・DOM維持で既存コードのエラー防止） -->
+    <div id="staffLoginForm" style="display:none">
+      <select id="staffSelect"><option value=""></option></select>
+      <input type="password" id="staffPass">
+    </div>
+    <button class="login-btn" onclick="doLogin()">ログイン</button>
+    <div class="login-error" id="loginError"></div>
+    <div style="margin-top:14px;text-align:center;font-size:12px;color:#aaa;">
+      スタッフの方は<br><a href="https://kalmia-dc.github.io/portal/" style="color:var(--teal-dk);font-weight:700;">スタッフポータル</a>からログインしてください
+    </div>
+    <div id="loginHint" style="display:none"></div>
+  </div>
+</div>
+
+<!-- ════════ STAFF SCREEN ════════ -->
+<div id="staffScreen">
+  <div class="staff-header">
+    <div class="greeting">おつかれさまです 👋</div>
+    <div class="name" id="staffGreetName">---</div>
+    <button class="logout-btn" onclick="doLogout()">ログアウト</button>
+  </div>
+
+  <!-- ① シフト確認タブ -->
+  <div id="staffTabShift">
+    <div class="staff-section">
+      <h3>📅 今日のシフト</h3>
+      <div class="today-card">
+        <div class="today-card-top">
+          <div class="tc-date" id="todayLabel">---</div>
+          <div class="tc-shift" id="todayShiftBig">-</div>
+          <div class="tc-badge" id="todayShiftBadge"></div>
+        </div>
+        <div class="today-card-bottom">
+          <div class="tc-info-item">
+            <span class="tc-label">出勤</span>
+            <span class="tc-val" id="tcStart">-</span>
+          </div>
+          <div class="tc-info-item">
+            <span class="tc-label">退勤</span>
+            <span class="tc-val" id="tcEnd">-</span>
+          </div>
+          <div class="tc-info-item">
+            <span class="tc-label">休憩</span>
+            <span class="tc-val" id="tcBreak">-</span>
+          </div>
+          <div class="tc-info-item">
+            <span class="tc-label">実働</span>
+            <span class="tc-val" id="tcHours">-</span>
+          </div>
+        </div>
+      </div>
+
+      <h3>📆 今月のカレンダー</h3>
+      <div class="staff-month-wrap">
+        <div class="staff-month-nav">
+          <button onclick="staffChangeMonth(-1)">‹</button>
+          <span class="smn-title" id="staffMonthTitle"></span>
+          <button onclick="staffChangeMonth(1)">›</button>
+        </div>
+        <div class="staff-month-grid" id="staffMonthGrid"></div>
+      </div>
+
+      <!-- 凡例 -->
+      <div class="legend">
+        <div class="legend-item"><div class="legend-dot" style="background:#A5D6A7"></div>通常</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#90CAF9"></div>遅出</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#CE93D8"></div>有給</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#FFE082"></div>希望休</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#FFCDD2"></div>公休</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#E0E0E0"></div>休診</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ② 申請タブ -->
+  <div id="staffTabRequest" style="display:none">
+    <div class="staff-section">
+      <h3 id="reqSectionTitle">📝 休暇申請</h3>
+      <div class="request-card">
+        <h4>新しい申請</h4>
+        <div class="login-field">
+          <label>申請タイプ</label>
+          <div class="req-type-grid" id="reqTypeGrid">
+            <button class="req-type-btn selected" id="reqTypeWish" onclick="selectReqType('wish',this)">
+              🌸<br>希望休
+            </button>
+            <button class="req-type-btn" id="reqTypePaid" onclick="selectReqType('paid',this)">
+              💚<br>有給休暇
+            </button>
+            <!-- 田宮のみ出勤申請ボタンを表示 -->
+            <button class="req-type-btn" id="reqTypeWork" onclick="selectReqType('work',this)" style="display:none;">
+              📅<br>出勤希望
+            </button>
+          </div>
+        </div>
+        <div class="login-field">
+          <label>申請日（複数選択可）</label>
+          <div id="reqDateList" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;min-height:32px;"></div>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <input type="date" id="reqDate" style="font-size:1rem;flex:1;">
+            <button class="btn" style="padding:8px 16px;font-size:.9rem;white-space:nowrap;" onclick="addReqDate()">＋追加</button>
+          </div>
+        </div>
+        <div class="login-field">
+          <label id="reqCommentLabel">コメント（任意）</label>
+          <input type="text" id="reqComment" placeholder="例：私用のため" style="font-size:1rem;">
+        </div>
+        <button class="login-btn" onclick="submitRequest()">申請する</button>
+        <div id="reqResult" style="font-size:.85rem;text-align:center;margin-top:12px;min-height:20px;color:var(--teal);font-weight:600;"></div>
+      </div>
+
+      <h3>📋 申請履歴</h3>
+      <div id="requestHistory">
+        <div style="font-size:.82rem;color:var(--muted);padding:8px 0;">申請履歴がありません</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ③ マイページタブ -->
+  <div id="staffTabProfile" style="display:none">
+    <div class="staff-section">
+      <h3>👤 マイページ</h3>
+
+      <!-- プロフィールカード -->
+      <div class="today-card" style="margin-bottom:16px;">
+        <div class="today-card-top" style="display:flex;align-items:center;gap:16px;">
+          <div style="width:56px;height:56px;border-radius:50%;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;font-size:1.8rem;flex-shrink:0;">👤</div>
+          <div>
+            <div style="font-size:1.2rem;font-weight:700;" id="profileName">---</div>
+            <div style="font-size:.8rem;opacity:.8;margin-top:2px;" id="profileRole">---</div>
+          </div>
+        </div>
+        <div class="today-card-bottom">
+          <div class="tc-info-item">
+            <span class="tc-label">今月の労働時間</span>
+            <span class="tc-val" id="profileHours" style="font-size:1.3rem;color:var(--teal);font-family:'DM Mono',monospace;">-h</span>
+          </div>
+          <div class="tc-info-item">
+            <span class="tc-label">目標まで</span>
+            <span class="tc-val" id="profileRemain" style="font-size:1.3rem;color:var(--amber);font-family:'DM Mono',monospace;">-h</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 進捗バー -->
+      <div style="background:#fff;border-radius:16px;padding:16px;box-shadow:0 2px 10px rgba(0,0,0,.06);margin-bottom:16px;">
+        <div style="display:flex;justify-content:space-between;font-size:.78rem;color:var(--muted);margin-bottom:8px;">
+          <span>160h目標達成率</span>
+          <span id="profilePct" style="font-weight:700;color:var(--teal);">0%</span>
+        </div>
+        <div class="hours-bar" style="height:10px;">
+          <div class="hours-bar-fill" id="profileBar" style="width:0%;background:var(--teal);"></div>
+        </div>
+      </div>
+
+      <button class="login-btn" style="background:var(--teal-lt);color:var(--teal-dk);font-size:.95rem;" onclick="doLogout()">
+        🚪 ログアウト
+      </button>
+    </div>
+  </div>
+
+  <!-- ボトムナビ -->
+  <nav class="staff-bottom-nav">
+    <button class="staff-nav-item active" onclick="switchStaffTab('shift',this)">
+      <span class="nav-icon">📅</span>シフト
+    </button>
+    <button class="staff-nav-item" onclick="switchStaffTab('request',this)">
+      <span class="nav-icon">📝</span>申請
+    </button>
+    <button class="staff-nav-item" onclick="switchStaffTab('profile',this)">
+      <span class="nav-icon">👤</span>マイページ
+    </button>
+  </nav>
+</div>
+
+<!-- ════════ ADMIN APP ════════ -->
+<div id="mainApp">
+
+<!-- HEADER -->
+<header>
+  <div>
+    <div class="logo">🦷 カルミアデンタルクリニック</div>
+    <div class="sub">シフト自動作成システム</div>
+  </div>
+  <div class="spacer"></div>
+  <div class="month-nav">
+    <button id="btnPrevMonth" onclick="changeMonth(-1)">‹</button>
+    <span id="monthLabel"></span>
+    <button id="btnNextMonth" onclick="changeMonth(1)">›</button>
+  </div>
+  <button class="admin-logout" onclick="doLogout()">ログアウト</button>
+</header>
+
+<div class="app">
+  <!-- SIDEBAR -->
+  <aside>
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('staff',this)">スタッフ</button>
+      <button class="tab" onclick="switchTab('rules',this)">ルール</button>
+    </div>
+
+    <div id="tab-staff">
+      <div class="sidebar-section" id="staffList"></div>
+      <div class="sidebar-section">
+        <h3>今月の集計</h3>
+        <div id="summaryList" style="font-size:.78rem;line-height:2;"></div>
+      </div>
+    </div>
+
+    <div id="tab-rules" style="display:none">
+      <div class="rules-panel">
+        <h4>診療人数ライン</h4>
+        <div class="rule-item"><span class="rule-dot"></span>9:00〜13:30 & 15:00〜18:00: DR+DH ≧ 5名</div>
+        <div class="rule-item"><span class="rule-dot"></span>DH + 現場DA = 6名</div>
+        <div class="rule-item"><span class="rule-dot"></span>受付は診療時間中必ず1名以上</div>
+        <h4>勤務パターン</h4>
+        <div class="rule-item"><span class="rule-dot"></span>通常: 8:30〜18:30 (実働9h)</div>
+        <div class="rule-item"><span class="rule-dot"></span>遅出: 9:00〜18:30 (実働8.5h) ×月4回</div>
+        <h4>自動補完</h4>
+        <div class="rule-item"><span class="rule-dot"></span>DH不足 → ハノワ(午後)自動生成</div>
+        <div class="rule-item"><span class="rule-dot"></span>DA不足 → 百々を現場アサイン</div>
+        <div class="rule-item"><span class="rule-dot"></span>土曜受付空 → 百々の固定休を解除</div>
+        <div class="rule-item"><span class="rule-dot"></span>有給は絶対優先・却下不可</div>
+      </div>
+    </div>
+
+    <div class="sidebar-actions">
+      <button class="btn btn-primary btn-full" id="genBtn" onclick="generateShift()">
+        <span id="genBtnText">✨ シフト自動生成</span>
+      </button>
+      <button class="btn btn-secondary btn-full" onclick="openApprovalModal()">📋 申請確認</button>
+      <button class="btn btn-amber btn-full" onclick="exportCSV()">📥 CSVエクスポート</button>
+      <button class="btn btn-full" style="background:#E3F2FD;color:#1565C0;" onclick="printShift()">🖨️ 印刷</button>
+      <button class="btn btn-full" style="background:#E8F5E9;color:#2E7D32;" onclick="openStaffMgr()">👥 スタッフ管理</button>
+      <button class="btn btn-danger btn-full" onclick="clearShift()">🗑 クリア</button>
+    </div>
+
+    <div style="padding:12px;">
+      <div class="alert-log">
+        <h4>⚠ アラートログ</h4>
+        <div id="alertLog"><div style="font-size:.75rem;color:var(--muted);">ログなし</div></div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- CALENDAR -->
+  <main class="calendar-wrapper">
+    <div class="summary-bar" id="topSummary">
+      <span><span class="label">診療日数: </span><span class="value" id="s-workdays">-</span></span>
+      <span><span class="label">DH不足日: </span><span class="value" id="s-dhshort">-</span></span>
+      <span><span class="label">人数NG日: </span><span class="value" id="s-ngdays">-</span></span>
+      <span><span class="label">有給取得: </span><span class="value" id="s-paid">-</span></span>
+      <span><span class="label">ハノワ出動: </span><span class="value" id="s-hanowa">-</span></span>
+    </div>
+    <div style="padding-top:12px;">
+      <div class="calendar-grid" id="calGrid" style="--days:31"></div>
+    </div>
+  </main>
+</div>
+
+<!-- SHIFT EDIT MODAL -->
+<div class="modal-overlay" id="editModal">
+  <div class="modal">
+    <h2 id="modalTitle">シフト編集</h2>
+    <div class="modal-grid" id="shiftChoices"></div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal()">キャンセル</button>
+      <button class="btn btn-primary" onclick="applyModal()">適用</button>
+    </div>
+  </div>
+</div>
+
+<!-- 申請承認モーダル (管理者用) -->
+<div class="modal-overlay" id="approvalModal">
+  <div class="modal" style="width:500px">
+    <h2>📋 スタッフ申請一覧</h2>
+    <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+      <select id="approvalFilter" onchange="renderApprovalList()" style="font-size:.85rem;padding:6px 10px;border-radius:8px;border:1.5px solid #ddd;flex:1;">
+        <option value="all">すべて</option>
+        <option value="pending">承認待ちのみ</option>
+        <option value="approved">承認済み</option>
+        <option value="rejected">却下済み</option>
+      </select>
+      <select id="approvalStaffFilter" onchange="renderApprovalList()" style="font-size:.85rem;padding:6px 10px;border-radius:8px;border:1.5px solid #ddd;flex:1;">
+        <option value="all">全スタッフ</option>
+      </select>
+    </div>
+    <div id="approvalList" style="max-height:400px;overflow-y:auto;margin-bottom:16px;"></div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="document.getElementById('approvalModal').classList.remove('open')">閉じる</button>
+    </div>
+  </div>
+</div>
+<!-- スタッフ管理モーダル -->
+<div class="modal-overlay" id="staffMgrModal">
+  <div class="modal" style="max-height:85vh;overflow-y:auto;">
+    <h2 style="margin-bottom:12px;">👥 スタッフ管理</h2>
+
+    <!-- スタッフ一覧 -->
+    <div id="staffMgrList" style="margin-bottom:16px;"></div>
+
+    <!-- 新規登録 / 編集フォーム -->
+    <div style="border-top:1px solid #eee;padding-top:14px;">
+      <h3 id="staffMgrFormTitle" style="font-size:.95rem;margin-bottom:10px;">➕ 新規登録</h3>
+      <input type="hidden" id="editStaffId">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+        <div class="login-field" style="margin:0;">
+          <label>名前 *</label>
+          <input type="text" id="newStaffName" placeholder="例：山田" style="font-size:.95rem;">
+        </div>
+        <div class="login-field" style="margin:0;">
+          <label>役職</label>
+          <select id="newStaffRole" onchange="autoGenPassword()" style="font-size:.95rem;padding:10px;border-radius:8px;border:1.5px solid #ddd;width:100%;">
+            <option value="DR">DR（歯科医師）</option>
+            <option value="DH">DH（歯科衛生士）</option>
+            <option value="DA">DA（歯科助手）</option>
+          </select>
+        </div>
+        <div class="login-field" style="margin:0;">
+          <label>雇用形態</label>
+          <select id="newStaffType" style="font-size:.95rem;padding:10px;border-radius:8px;border:1.5px solid #ddd;width:100%;">
+            <option value="full">常勤（160h）</option>
+            <option value="part">非常勤</option>
+            <option value="spot">スポット</option>
+          </select>
+        </div>
+        <div class="login-field" style="margin:0;">
+          <label>パスワード <span id="passAutoLabel" style="font-size:.75rem;color:var(--teal);font-weight:400;">（自動採番）</span></label>
+          <input type="text" id="newStaffPass" placeholder="自動で入力されます" style="font-size:.95rem;background:#f9f9f9;" readonly>
+        </div>
+        <div class="login-field" style="margin:0;grid-column:span 2;">
+          <label>オプション</label>
+          <div style="display:flex;gap:10px;padding-top:4px;">
+            <button type="button" id="btnNewStaffSat" onclick="toggleStaffOpt('newStaffSat','btnNewStaffSat')"
+              style="flex:1;padding:10px;border-radius:10px;border:2px solid #ddd;background:#f5f5f5;color:#888;font-size:.85rem;font-weight:600;cursor:pointer;transition:.2s;">
+              🗓 土曜固定出勤
+            </button>
+            <button type="button" id="btnNewStaffUketsuke" onclick="toggleStaffOpt('newStaffUketsuke','btnNewStaffUketsuke')"
+              style="flex:1;padding:10px;border-radius:10px;border:2px solid #ddd;background:#f5f5f5;color:#888;font-size:.85rem;font-weight:600;cursor:pointer;transition:.2s;">
+              📋 受付担当
+            </button>
+          </div>
+          <input type="hidden" id="newStaffSat" value="0">
+          <input type="hidden" id="newStaffUketsuke" value="0">
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn" style="flex:1;background:#E8F5E9;color:#2E7D32;font-weight:700;padding:12px;" onclick="submitStaffForm()">保存する</button>
+        <button class="btn btn-secondary" style="padding:12px 16px;" onclick="resetStaffForm()">クリア</button>
+      </div>
+      <div id="staffMgrResult" style="font-size:.85rem;text-align:center;margin-top:8px;min-height:20px;font-weight:600;"></div>
+    </div>
+
+    <div class="modal-actions" style="margin-top:12px;">
+      <button class="btn btn-secondary" onclick="document.getElementById('staffMgrModal').classList.remove('open')">閉じる</button>
+    </div>
+  </div>
+</div>
+
+</div><!-- /#mainApp -->
+
+<script>
+// ──────────────────────────────────────────────
+//  DATA DEFINITIONS
+// ──────────────────────────────────────────────
+const SHIFT = {
+  EARLY:  { key:'early',  label:'通常\n8:30-',  hours:9,   shortLabel:'通常' },
+  LATE:   { key:'late',   label:'遅出\n9:00-',  hours:8.5, shortLabel:'遅出' },
+  OFF:    { key:'off',    label:'公休',           hours:0,   shortLabel:'公休' },
+  PAID:   { key:'paid',   label:'有給',           hours:8,   shortLabel:'有給' },
+  WISH:   { key:'wish',   label:'希望休',         hours:0,   shortLabel:'希望休' },
+  FIXED:  { key:'fixed',  label:'固定出勤\n(固)', hours:9,   shortLabel:'固定' },
+  ADMIN:  { key:'admin',  label:'事務',           hours:9,   shortLabel:'事務' },
+  HANOWA: { key:'hanowa', label:'ハノワ\n午後',   hours:4,   shortLabel:'HW' },
+  NONE:   { key:'none',   label:'休診',           hours:0,   shortLabel:'-' },
+};
+
+// デフォルトスタッフ（変更不可）
+const DEFAULT_STAFF = [
+  { id:'sugihira', name:'杉平', role:'DR', type:'director', fixedDays:[1,3,4,5,6], kyosei:true },
+  { id:'shimanaka',name:'嶋中', role:'DR', type:'full',  satMandatory:true },
+  { id:'hokari',   name:'保刈', role:'DR', type:'part',  fixedDays:[2] },
+  { id:'shinoda',  name:'篠田', role:'DR', type:'part',  fixedDays:[4] },
+  { id:'kyosei',   name:'矯正医',role:'DR', type:'part', kyoseiDoc:true },
+  { id:'tsuruta',  name:'鶴田', role:'DH', type:'full' },
+  { id:'yoshida',  name:'吉田', role:'DH', type:'full' },
+  { id:'takagi',   name:'高木', role:'DH', type:'full' },
+  { id:'matsumoto',name:'松本', role:'DH', type:'full' },
+  { id:'nozaki',   name:'野崎', role:'DH', type:'full' },
+  { id:'yamada',   name:'山田', role:'DH', type:'part', fixedDays:[1,2,4,5] },
+  { id:'hanowa',   name:'ハノワ',role:'DH', type:'spot' },
+  { id:'tamiya',   name:'田宮', role:'DA', type:'full', uketsuke:true, satFixed:true },
+  { id:'tanaka',   name:'田中', role:'DA', type:'full', uketsuke:true },
+  { id:'momo',     name:'百々', role:'DA', type:'full', admin:true, noSaturday:true },
+];
+// 追加スタッフ（Firebaseから読み込み）
+let extraStaff = [];
+// 実際に使うSTAFF配列（DEFAULT + extra）
+let STAFF = [...DEFAULT_STAFF];
+
+// 祝日 (2025年 & 2026年 主要祝日)
+const HOLIDAYS = {
+  '2025-01-01':1,'2025-01-13':1,'2025-02-11':1,'2025-02-23':1,
+  '2025-03-20':1,'2025-04-29':1,'2025-05-03':1,'2025-05-04':1,
+  '2025-05-05':1,'2025-05-06':1,'2025-07-21':1,'2025-08-11':1,
+  '2025-09-15':1,'2025-09-22':1,'2025-09-23':1,'2025-10-13':1,
+  '2025-11-03':1,'2025-11-24':1,'2025-12-23':1,
+  '2026-01-01':1,'2026-01-12':1,'2026-02-11':1,'2026-02-23':1,
+  '2026-03-20':1,'2026-04-29':1,'2026-05-03':1,'2026-05-04':1,
+  '2026-05-05':1,'2026-05-06':1,'2026-07-20':1,'2026-08-11':1,
+  '2026-09-21':1,'2026-09-22':1,'2026-10-12':1,'2026-11-03':1,
+  '2026-11-23':1,
+};
+
+// ──────────────────────────────────────────────
+//  STATE
+// ──────────────────────────────────────────────
+const today = new Date();
+let currentYear  = today.getFullYear();
+let currentMonth = today.getMonth(); // 0-indexed
+let shiftData = {};      // shiftData[staffId][dateStr] = shiftKey
+// 複数月のシフトデータを保存
+let allShiftData = {};   // allShiftData['2026-03'][staffId][dateStr] = shiftKey
+
+function monthKey(y, m){ return `${y}-${String(m+1).padStart(2,'0')}`; }
+function saveCurrentShift(){
+  const key=monthKey(currentYear, currentMonth);
+  allShiftData[key] = JSON.parse(JSON.stringify(shiftData));
+  // Firebaseに保存
+  if(window._fb){
+    const { db, ref, set } = window._fb;
+    set(ref(db, 'shifts/'+key), allShiftData[key]);
+  }
+}
+function loadShiftForMonth(y, m){
+  const key=monthKey(y, m);
+  shiftData = allShiftData[key] ? JSON.parse(JSON.stringify(allShiftData[key])) : {};
+}
+let wishData  = {};      // wishData[staffId][dateStr] = true  (希望休)
+let paidData  = {};      // paidData[staffId][dateStr] = true  (有給)
+let alertMessages = [];
+
+// modal state
+let modalStaffId = null;
+let modalDateStr = null;
+let modalSelected = null;
+
+// ──────────────────────────────────────────────
+//  HELPERS
+// ──────────────────────────────────────────────
+function dateStr(y,m,d){ return `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`; }
+function isOffDay(y,m,d){
+  const ds = dateStr(y,m,d);
+  const dow = new Date(y,m,d).getDay();
+  return dow===0 || HOLIDAYS[ds];
+}
+function isSaturday(y,m,d){ return new Date(y,m,d).getDay()===6; }
+
+// 土曜日固定出勤スタッフ（有給以外は必ず出勤）
+const SAT_MANDATORY=['shimanaka','tamiya','tanaka','yoshida','tsuruta','takagi','matsumoto','nozaki'];
+function isSatMandatoryDay(sid, ds){
+  // 土曜固定スタッフの土曜日かどうか
+  if(!SAT_MANDATORY.includes(sid)) return false;
+  const d=parseInt(ds.slice(8,10));
+  const y=parseInt(ds.slice(0,4));
+  const m=parseInt(ds.slice(5,7))-1;
+  return isSaturday(y,m,d);
+}
+function daysInMonth(y,m){ return new Date(y,m+1,0).getDate(); }
+function dow(y,m,d){ return new Date(y,m,d).getDay(); }
+function dowName(d){ return ['日','月','火','水','木','金','土'][d]; }
+
+function addAlert(type, msg){
+  alertMessages.push({ type, msg, time: new Date().toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'}) });
+}
+function clearAlerts(){ alertMessages = []; }
+
+function getHours(staffId, y, m){
+  const days = daysInMonth(y, m);
+  let h = 0;
+  for(let d=1; d<=days; d++){
+    const ds = dateStr(y,m,d);
+    const k  = shiftData[staffId]?.[ds];
+    if(!k) continue;
+    const sh = SHIFT[Object.keys(SHIFT).find(s=>SHIFT[s].key===k)];
+    if(sh) h += sh.hours;
+  }
+  return h;
+}
+
+// ──────────────────────────────────────────────
+//  MONTH NAVIGATION
+// ──────────────────────────────────────────────
+function changeMonth(delta){
+  // 現在月のシフトを保存
+  saveCurrentShift();
+
+  currentMonth += delta;
+  if(currentMonth > 11){ currentMonth = 0; currentYear++; }
+  if(currentMonth < 0) { currentMonth = 11; currentYear--; }
+
+  // 移動先のシフトを読み込み
+  loadShiftForMonth(currentYear, currentMonth);
+  alertMessages = [];
+  render();
+  updateMonthNavButtons();
+}
+
+function updateMonthNavButtons(){
+  // 今月〜3ヶ月後まで移動可能
+  const now = new Date();
+  const minY = now.getFullYear(), minM = now.getMonth();
+  const maxDate = new Date(now.getFullYear(), now.getMonth()+3, 1);
+  const maxY = maxDate.getFullYear(), maxM = maxDate.getMonth();
+
+  const prevBtn = document.getElementById('btnPrevMonth');
+  const nextBtn = document.getElementById('btnNextMonth');
+  if(prevBtn) prevBtn.disabled = (currentYear < minY || (currentYear===minY && currentMonth<=minM));
+  if(nextBtn) nextBtn.disabled = (currentYear > maxY || (currentYear===maxY && currentMonth>=maxM));
+}
+
+// ──────────────────────────────────────────────
+//  TAB SWITCH
+// ──────────────────────────────────────────────
+function switchTab(name, el){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('tab-staff').style.display = name==='staff' ? '' : 'none';
+  document.getElementById('tab-rules').style.display = name==='rules' ? '' : 'none';
+}
+
+// ──────────────────────────────────────────────
+//  CONSTANTS & HELPERS
+// ──────────────────────────────────────────────
+const H_EARLY = 9.0;
+const H_LATE  = 8.5;
+const H_PAID  = 8.0;
+const TARGET_WORKDAYS = 18;
+const TARGET_LATE     = 4;
+const TARGET_EARLY    = 14;
+const TARGET_HOURS    = 160.0;
+
+function isWorking(id, ds){
+  const k=shiftData[id]?.[ds]||'';
+  return k==='early'||k==='late'||k==='fixed'||k==='admin'||k==='hanowa';
+}
+function isOff(id, ds){
+  const k=shiftData[id]?.[ds]||'';
+  return !k||k==='off'||k==='wish'||k==='paid'||k==='none';
+}
+function shuffle(arr){
+  const a=[...arr];
+  for(let i=a.length-1;i>0;i--){
+    const j=Math.floor(Math.random()*(i+1));
+    [a[i],a[j]]=[a[j],a[i]];
+  }
+  return a;
+}
+function calcHours(id, y, m, days){
+  let h=0;
+  for(let d=1;d<=days;d++){
+    const k=shiftData[id]?.[dateStr(y,m,d)]||'';
+    h+=k==='early'?H_EARLY:k==='late'?H_LATE:k==='paid'?H_PAID:
+       k==='fixed'?H_EARLY:k==='admin'?H_EARLY:k==='hanowa'?4:0;
+  }
+  return Math.round(h*10)/10;
+}
+function countWorkdays(id, wds){
+  return wds.filter(ds=>{
+    const k=shiftData[id]?.[ds]||'';
+    return k==='early'||k==='late'||k==='paid'||k==='fixed';
+  }).length;
+}
+
+// ──────────────────────────────────────────────
+//  AUTO GENERATE SHIFT
+// ──────────────────────────────────────────────
+function generateShift(){
+  clearAlerts();
+  const y=currentYear, m=currentMonth;
+  const days=daysInMonth(y,m);
+  const btn=document.getElementById('genBtn');
+  const txt=document.getElementById('genBtnText');
+  btn.disabled=true;
+  txt.innerHTML='<span class="spinner"></span> 生成中...';
+
+  setTimeout(()=>{
+    STAFF.forEach(s=>{ if(!shiftData[s.id]) shiftData[s.id]={}; });
+
+    const allDays=Array.from({length:days},(_,i)=>i+1);
+    const workDays=allDays.filter(d=>!isOffDay(y,m,d));
+    const wds=workDays.map(d=>dateStr(y,m,d)); // 診療日の日付文字列リスト
+
+    // ══ STEP 1: 有給・希望休・固定スタッフを先に確定 ══
+    for(const d of allDays){
+      const ds=dateStr(y,m,d);
+      const dd=dow(y,m,d);
+      const off=isOffDay(y,m,d);
+      const sat=isSaturday(y,m,d);
+
+      STAFF.forEach(s=>{
+        const cur=shiftData[s.id][ds];
+        if(cur==='paid'||cur==='wish') return; // 有給・希望休は絶対優先
+
+        if(off){ shiftData[s.id][ds]='none'; return; }
+        if(s.id==='hanowa'){ shiftData[s.id][ds]='none'; return; }
+
+        if(s.kyoseiDoc){
+          // 矯正日: 第4日曜の翌週の金・土に出勤
+          let fourthSunday=0, sunCount=0;
+          for(let dd2=1; dd2<=31; dd2++){
+            if(new Date(y,m,dd2).getMonth()!==m) break;
+            if(new Date(y,m,dd2).getDay()===0){ sunCount++; if(sunCount===4){ fourthSunday=dd2; break; } }
+          }
+          const kyoseiDays=[];
+          if(fourthSunday>0){
+            for(let dd2=fourthSunday+1; dd2<=fourthSunday+7; dd2++){
+              const dw=new Date(y,m,dd2).getDay();
+              if(dw===5||dw===6) kyoseiDays.push(dd2);
+            }
+          }
+          shiftData[s.id][ds]=kyoseiDays.includes(d)?'fixed':'none'; return;
+        }
+        if(s.id==='sugihira'){
+          // まず矯正日（第4日曜の翌週の金・土）を計算
+          let fourthSunday=0, sunCount=0;
+          for(let dd2=1; dd2<=31; dd2++){
+            if(new Date(y,m,dd2).getMonth()!==m) break;
+            if(new Date(y,m,dd2).getDay()===0){ sunCount++; if(sunCount===4){ fourthSunday=dd2; break; } }
+          }
+          const kyoseiDays=[];
+          if(fourthSunday>0){
+            for(let dd2=fourthSunday+1; dd2<=fourthSunday+7; dd2++){
+              const dw=new Date(y,m,dd2).getDay();
+              if(dw===5||dw===6) kyoseiDays.push(dd2);
+            }
+          }
+          // 矯正日は祝日でも院長公休（診療は行われる）
+          if(kyoseiDays.includes(d)){
+            shiftData[s.id][ds]='off'; return;
+          }
+          // 日(0)・祝日 → 休診
+          if(dd===0||isOffDay(y,m,d)){ shiftData[s.id][ds]='none'; return; }
+          // 火(2) → 診療日だが院長は公休
+          if(dd===2){ shiftData[s.id][ds]='off'; return; }
+          // 月(1)水(3)木(4)金(5)土(6) → 出勤
+          if([1,3,4,5,6].includes(dd)){ shiftData[s.id][ds]='early'; return; }
+          shiftData[s.id][ds]='none'; return;
+        }
+        if(s.id==='hokari'){
+          shiftData[s.id][ds]=dd===2?'fixed':'none'; return;
+        }
+        if(s.id==='shinoda'){
+          // 木曜固定出勤
+          shiftData[s.id][ds]=dd===4?'fixed':'none'; return;
+        }
+        if(s.id==='yamada'){
+          shiftData[s.id][ds]=[1,2,4,5].includes(dd)?'fixed':'none'; return;
+        }
+        if(s.id==='momo'){
+          shiftData[s.id][ds]=sat?'off':''; return;
+        }
+        if(s.type==='full'){
+          // 土曜固定出勤スタッフ: 土曜はearlyで設定（isSatMandatoryDayで削除保護）
+          const satMandatory=['shimanaka','tamiya','tanaka','yoshida','tsuruta','takagi','matsumoto','nozaki'];
+          if(sat && satMandatory.includes(s.id)){
+            if(cur==='paid'){ return; }
+            shiftData[s.id][ds]='early'; return;
+          }
+          shiftData[s.id][ds]=''; return;
+        }
+      });
+    }
+
+    const fullStaff=STAFF.filter(s=>s.type==='full'&&s.id!=='momo');
+
+    // ══ STEP 2: 公休日を等間隔に分散（最大3連勤保証・連休防止） ══
+    const paidOnWds = s => wds.filter(ds=>shiftData[s.id][ds]==='paid').length;
+    const needOff   = s => Math.max(0, wds.length - TARGET_WORKDAYS + paidOnWds(s));
+
+    // 田宮・田中を先に処理、その後DH→残りの順で処理
+    const daOrder=['tamiya','tanaka'];
+    const dhOrder=fullStaff.filter(s=>s.role==='DH').map(s=>s.id);
+    const restOrder=fullStaff.filter(s=>s.role!=='DH'&&s.id!=='tamiya'&&s.id!=='tanaka').map(s=>s.id);
+    const processOrder=[...daOrder,...dhOrder,...restOrder];
+
+    // 日付ごとのDH公休数を追跡（全スタッフ横断）
+    const dhOffCount={}; // { dateStr: count }
+    wds.forEach(ds=>{ dhOffCount[ds]=0; });
+
+    for(const sid of processOrder){
+      const s=STAFF.find(x=>x.id===sid);
+      const offQ=needOff(s);
+      if(offQ<=0) continue;
+
+      const satMandatory=['shimanaka','tamiya','tanaka','yoshida','tsuruta','takagi','matsumoto','nozaki'];
+      const freeDays=wds.filter(ds=>{
+        const k=shiftData[sid][ds];
+        if(!k||k===''){
+          // 土曜固定出勤スタッフは土曜日を公休候補から除外
+          if(satMandatory.includes(sid)&&isSaturday(y,m,parseInt(ds.slice(8,10)))) return false;
+          return true;
+        }
+        return false;
+      });
+      if(freeDays.length===0) continue;
+
+      // wdsインデックスで前後隣に公休がないかチェック
+      const chosenOff=new Set();
+      const adjOff=(ds)=>{
+        const wi=wds.indexOf(ds);
+        return (wi>0&&chosenOff.has(wds[wi-1]))||(wi<wds.length-1&&chosenOff.has(wds[wi+1]));
+      };
+
+      // 等間隔で公休を配置（同日にDH公休が集中しないよう制限）
+      const interval=freeDays.length/(offQ+1);
+      for(let i=1; i<=offQ; i++){
+        const ideal=Math.round(interval*i)-1;
+        let chosen='';
+
+        // 理想位置に近い順で探す（DHは同日公休2名以下に制限）
+        const searchOrder=freeDays.map((ds,idx)=>({ds,idx}))
+          .sort((a,b)=>Math.abs(a.idx-ideal)-Math.abs(b.idx-ideal));
+
+        for(const {ds} of searchOrder){
+          if(chosenOff.has(ds)) continue;
+          if(adjOff(ds)) continue;
+
+          if(s.role==='DH'){
+            const drN=STAFF.filter(x=>x.role==='DR').filter(x=>isWorking(x.id,ds)).length;
+            const dhN=STAFF.filter(x=>x.role==='DH'&&x.id!=='hanowa'&&x.id!==sid)
+              .filter(x=>isWorking(x.id,ds)).length;
+            if(drN+dhN<5) continue;
+
+            // 全スタッフ横断のDH公休数チェック（同日最大2名まで）
+            const currentDhOff=(dhOffCount[ds]||0);
+            if(currentDhOff>=2) continue;
+
+            // 自分が公休になった後のDH出勤見込み数（4名のDH - 既に公休の人数）
+            const dhAfterOff=4-currentDhOff; // DH5名のうち自分除く4名から公休数を引く
+
+            // DA出勤見込み（確実に出勤する人数）
+            // 田中：常勤、空白か出勤状態なら出勤見込み
+            const tanakaK=shiftData['tanaka']?.[ds]||'';
+            const tanakaOn=tanakaK!=='off'&&tanakaK!=='wish'&&tanakaK!=='none'&&tanakaK!=='paid';
+            // 田宮：wishOnly、土曜のみ出勤確定。平日は申請がなければoff
+            const tamiyaK=shiftData['tamiya']?.[ds]||'';
+            const tamiyaOn=tamiyaK==='early'||tamiyaK==='paid';
+            // 百々：空白（STEP2.5前）→出勤見込み、offなら不出勤
+            const momoK=shiftData['momo']?.[ds]||'';
+            const momoOn=momoK!=='off'&&momoK!=='wish'&&momoK!=='none';
+            const daExpected=(tanakaOn?1:0)+(tamiyaOn?1:0)+(momoOn?1:0);
+
+            if(dhAfterOff+daExpected<6) continue;
+          }
+
+          if(sid==='tamiya'||sid==='tanaka'){
+            const partner=sid==='tamiya'?'tanaka':'tamiya';
+            const pK=shiftData[partner][ds]||'';
+            if(pK==='off'||pK==='wish'){
+              const momoK=shiftData['momo'][ds]||'';
+              if(momoK!=='admin'&&momoK!=='early'&&momoK!=='late') continue;
+            }
+          }
+
+          chosen=ds; break;
+        }
+        if(chosen) chosenOff.add(chosen);
+      }
+
+      freeDays.forEach(ds=>{
+        if(chosenOff.has(ds)){
+          shiftData[sid][ds]='off';
+          // DHの場合はdhOffCountを更新
+          if(s.role==='DH') dhOffCount[ds]=(dhOffCount[ds]||0)+1;
+        }
+      });
+    }
+
+    // ══ STEP 2.1: 遅出シフト分配（月4回・1日最大2名） ══
+    fullStaff.forEach(s=>{
+      const paidC=wds.filter(ds=>shiftData[s.id][ds]==='paid').length;
+      const lateQ=Math.min(TARGET_LATE, TARGET_WORKDAYS-paidC);
+      const cands=shuffle(wds.filter(ds=>{
+        const k=shiftData[s.id][ds];
+        const d=parseInt(ds.slice(8,10));
+        return (!k||k==='')&&!isSaturday(y,m,d);
+      }));
+      let n=0;
+      for(const ds of cands){
+        if(n>=lateQ) break;
+        const lateToday=fullStaff.filter(x=>x.id!==s.id&&shiftData[x.id]?.[ds]==='late').length;
+        if(lateToday<2){ shiftData[s.id][ds]='late'; n++; }
+      }
+    });
+
+    // ══ STEP 2.5: 百々の出勤18日を確定（連勤3日以内を最初から保証） ══
+    {
+      const momoPaidC = wds.filter(ds=>shiftData['momo'][ds]==='paid').length;
+      const momoOffQ = Math.max(0, wds.length - TARGET_WORKDAYS + momoPaidC);
+
+      // 平日のみの空き診療日（wds順）
+      const momoFreeDays = wds.filter(ds=>{
+        const d=parseInt(ds.slice(8,10));
+        const k=shiftData['momo'][ds];
+        return !isSaturday(y,m,d) && (!k||k==='');
+      });
+
+      // 公休を配置：wdsインデックスで「自分の前後に公休が隣接しない」かつ
+      // 「公休間の出勤が3日以下になる」よう等間隔配置
+      const chosenOff=new Set();
+
+      // wdsインデックスで前後に公休が隣接しないかチェック
+      const noAdj=(ds)=>{
+        const wi=wds.indexOf(ds);
+        return !(wi>0&&chosenOff.has(wds[wi-1])) && !(wi<wds.length-1&&chosenOff.has(wds[wi+1]));
+      };
+
+      // 等間隔配置（理想間隔 = freeDays / (offQ+1)）
+      const interval = momoFreeDays.length / (momoOffQ + 1);
+      for(let i=1; i<=momoOffQ; i++){
+        const ideal = Math.round(interval * i) - 1;
+        let chosen = '';
+        for(let delta=0; delta<momoFreeDays.length && !chosen; delta++){
+          for(const sign of (delta===0 ? [0] : [1,-1])){
+            const idx = ideal + sign * delta;
+            if(idx<0 || idx>=momoFreeDays.length) continue;
+            const ds = momoFreeDays[idx];
+            if(chosenOff.has(ds)) continue;
+            if(!noAdj(ds)) continue; // wdsインデックスで隣接NG
+            // この公休を入れると前後の出勤が4日以上になるか確認
+            const wi = wds.indexOf(ds);
+            // 前の連続出勤数
+            let before=0;
+            for(let di=wi-1; di>=Math.max(0,wi-4); di--){
+              if(chosenOff.has(wds[di])) break;
+              before++;
+            }
+            // 後の連続出勤数
+            let after=0;
+            for(let di=wi+1; di<=Math.min(wds.length-1,wi+4); di++){
+              if(chosenOff.has(wds[di])) break;
+              after++;
+            }
+            // 前後の最大連続出勤が5日以内か（百々は5連勤までOK）
+            if(before>5 || after>5) continue;
+            chosen=ds;
+          }
+        }
+        if(chosen) chosenOff.add(chosen);
+      }
+
+      // 公休・admin を設定
+      momoFreeDays.forEach(ds=>{
+        shiftData['momo'][ds] = chosenOff.has(ds) ? 'off' : 'admin';
+      });
+
+      // 遅出4回を割り当て（adminの中からランダムに）
+      const momoLateQ = Math.min(TARGET_LATE, TARGET_WORKDAYS - momoPaidC);
+      let lateN=0;
+      shuffle(wds.filter(ds=>{
+        if(shiftData['momo'][ds]!=='admin') return false;
+        const d=parseInt(ds.slice(8,10));
+        if(isSaturday(y,m,d)) return false;
+        return [...fullStaff].filter(x=>shiftData[x.id]?.[ds]==='late').length<2;
+      })).forEach(ds=>{
+        if(lateN<momoLateQ){ shiftData['momo'][ds]='late'; lateN++; }
+      });
+
+      // 残った空白（土曜等）を公休に
+      wds.forEach(ds=>{
+        if(!shiftData['momo'][ds]||shiftData['momo'][ds]==='')
+          shiftData['momo'][ds]='off';
+      });
+    }
+
+    for(const ds of wds){
+      const pending=fullStaff.filter(s=>{
+        const k=shiftData[s.id][ds];
+        return !k||k==='';
+      }).sort((a,b)=>countWorkdays(a.id,wds)-countWorkdays(b.id,wds));
+
+      for(const s of pending){
+        const wkC=countWorkdays(s.id,wds);
+        if(wkC < TARGET_WORKDAYS){
+          shiftData[s.id][ds]='early';
+        } else {
+          // DHの場合: 公休にするとDH+DA<6になる日は出勤のまま
+          if(s.role==='DH'){
+            const dhOnAfter=STAFF.filter(x=>x.role==='DH'&&x.id!=='hanowa'&&x.id!==s.id)
+              .filter(x=>{ const k2=shiftData[x.id][ds]||''; return k2==='early'||k2==='late'||k2===''; }).length;
+            const daOn=['tamiya','tanaka','momo'].filter(id=>{
+              const k2=shiftData[id]?.[ds]||'';
+              return k2==='early'||k2==='late'||k2==='admin'||k2==='';
+            }).length;
+            if(dhOnAfter+daOn<6){ shiftData[s.id][ds]='early'; continue; }
+          }
+          shiftData[s.id][ds]='off';
+        }
+      }
+    }
+
+
+    // ══ STEP 4: 公休確定 & 超過を確実に18日に削る ══
+    function trimToTarget(sid){
+      wds.forEach(ds=>{
+        if(!shiftData[sid][ds]||shiftData[sid][ds]==='') shiftData[sid][ds]='off';
+      });
+      let total=countWorkdays(sid,wds);
+      if(total<=TARGET_WORKDAYS) return;
+
+      const s=STAFF.find(x=>x.id===sid);
+
+      const satMandatory2=['shimanaka','tamiya','tanaka','yoshida','tsuruta','takagi','matsumoto','nozaki'];
+      const canTrim=(ds,k)=>{
+        if(k!=='early'&&k!=='late') return false;
+        // 土曜固定出勤スタッフは土曜日を削れない（有給以外）
+        if(satMandatory2.includes(sid) && isSaturday(y,m,parseInt(ds.slice(8,10)))){
+          return false;
+        }
+        if(sid==='tamiya'||sid==='tanaka'){
+          const partner=sid==='tamiya'?'tanaka':'tamiya';
+          const partnerK=shiftData[partner][ds]||'';
+          if(partnerK==='off'||partnerK==='wish') return false;
+        }
+        if(s.role!=='DH') return true;
+        const drNow=STAFF.filter(x=>x.role==='DR').filter(x=>isWorking(x.id,ds)).length;
+        const dhNow=STAFF.filter(x=>x.role==='DH'&&x.id!=='hanowa'&&x.id!==sid)
+          .filter(x=>isWorking(x.id,ds)).length;
+        if(drNow+dhNow<5) return false;
+        const daNow=['tamiya','tanaka','momo'].filter(id=>{
+          const k2=shiftData[id]?.[ds]||'';
+          return k2==='early'||k2==='late'||k2==='admin'||k2==='paid';
+        }).length;
+        return dhNow+daNow>=6;
+      };
+
+      // earlyを優先して削る
+      const earlyArr=wds.filter(ds=>canTrim(ds,'early')&&shiftData[sid][ds]==='early')
+        .sort((a,b)=>b.localeCompare(a));
+      for(const ds of earlyArr){
+        if(total<=TARGET_WORKDAYS) break;
+        shiftData[sid][ds]='off'; total--;
+      }
+      if(total>TARGET_WORKDAYS){
+        const lateArr=wds.filter(ds=>canTrim(ds,'late')&&shiftData[sid][ds]==='late')
+          .sort((a,b)=>b.localeCompare(a));
+        for(const ds of lateArr){
+          if(total<=TARGET_WORKDAYS) break;
+          shiftData[sid][ds]='off'; total--;
+        }
+      }
+
+      // DHで制約上削れない場合: スワップ（出勤日を公休にして別の公休日を出勤に）
+      // これで18日を保ちつつ「必要でない日」を公休にできる
+      if(total>TARGET_WORKDAYS&&s.role==='DH'){
+        const workDays2=wds.filter(ds=>{
+          const k=shiftData[sid][ds];
+          return k==='early'||k==='late';
+        }).sort((a,b)=>b.localeCompare(a)); // 月末から
+
+        for(const delDs of workDays2){
+          if(total<=TARGET_WORKDAYS) break;
+          // delDsを公休にする代わりに、今の公休日を1つ出勤にできるか
+          const fillDs=wds.find(x=>{
+            if(shiftData[sid][x]!=='off') return false;
+            if(x===delDs) return false;
+            // xを出勤にしてもDR+DH>=5（xは自分が出勤するのでOK）
+            return true;
+          });
+          if(fillDs){
+            shiftData[sid][delDs]='off';
+            shiftData[sid][fillDs]='early';
+            total--; // 1日削った（fillで+1、delで-1なのでtotalは変わらないが実質スワップ）
+            // ただし19→18にするためにfillなしで削る必要あり
+            // スワップしても総数は変わらないのでfillなしで削る
+            shiftData[sid][fillDs]='off'; // fillを戻す
+            // 単純に削れないDH必要日以外を探して削る
+          }
+        }
+        // 最終手段: 制約を無視して削る（19日出勤よりも18日の方が重要）
+        if(total>TARGET_WORKDAYS){
+          const anyArr=wds.filter(ds=>{
+            const k=shiftData[sid][ds];
+            return k==='early'||k==='late';
+          }).sort((a,b)=>b.localeCompare(a));
+          for(const ds of anyArr){
+            if(total<=TARGET_WORKDAYS) break;
+            shiftData[sid][ds]='off'; total--;
+          }
+        }
+      }
+    }
+    fullStaff.forEach(s=> trimToTarget(s.id));
+
+    // 最終確認
+    fullStaff.forEach(s=>{
+      const t=countWorkdays(s.id,wds);
+      if(t!==TARGET_WORKDAYS) addAlert('warn', s.name+': 出勤'+t+'日(目標18日)');
+    });
+
+    // ══ STEP 4.5: 連勤3日以内 & 公休連続防止（スワップ方式） ══
+    fullStaff.forEach(s=>{
+
+      // スワップ可能か判定: ds を公休にできるか
+      const canOff=(ds)=>{
+        const k=shiftData[s.id][ds];
+        if(k!=='early'&&k!=='late') return false;
+        // 土曜固定スタッフの土曜日は公休にできない
+        if(isSatMandatoryDay(s.id, ds)) return false;
+        if(s.id==='tamiya'||s.id==='tanaka'){
+          const p=s.id==='tamiya'?'tanaka':'tamiya';
+          const pk=shiftData[p][ds]||'';
+          // 相手も公休の場合 → 百々が出勤できるなら許可
+          if(pk==='off'||pk==='wish'){
+            const momoK=shiftData['momo'][ds]||'';
+            const momoCanWork=momoK==='admin'||momoK==='early'||momoK==='late';
+            if(!momoCanWork) return false; // 百々も出勤できなければNG
+          }
+        }
+        if(s.role==='DH'){
+          const drN=STAFF.filter(x=>x.role==='DR').filter(x=>isWorking(x.id,ds)).length;
+          const dhN=STAFF.filter(x=>x.role==='DH'&&x.id!=='hanowa'&&x.id!==s.id)
+            .filter(x=>isWorking(x.id,ds)).length;
+          if(drN+dhN<5) return false;
+          // DH+DA≥6チェック（自分を除いたDH+DA）
+          const daN=['tamiya','tanaka','momo'].filter(id=>{
+            const k2=shiftData[id]?.[ds]||'';
+            return k2==='early'||k2==='late'||k2==='admin'||k2==='paid';
+          }).length;
+          if(dhN+daN<6) return false;
+        }
+        return true;
+      };
+
+      // ds を出勤にできるか
+      const canWork=(ds)=>{
+        const k=shiftData[s.id][ds];
+        if(k!=='off') return false;
+        // 田宮・田中は相手が公休でも出勤可能（連勤解消優先）
+        return true;
+      };
+
+      // 診療日リスト（月順）
+      const myDays=wds.filter(ds=>{
+        const k=shiftData[s.id][ds];
+        return k==='early'||k==='late'||k==='off';
+      });
+
+      // カレンダー上で実際に隣接しているか（wdsリストで隣同士）
+      const isCalAdjacent=(ds1,ds2)=>{
+        const i1=wds.indexOf(ds1);
+        const i2=wds.indexOf(ds2);
+        if(i1<0||i2<0) return false;
+        return i2===i1+1; // wds上で隣 = 実際の次の診療日
+      };
+
+      // 最大30回パスで問題を解消
+      for(let pass=0; pass<30; pass++){
+        let fixed=false;
+
+        // ─ ① 連続公休を解消（カレンダー上で隣接している場合のみ） ─
+        for(let i=0; i<myDays.length-1; i++){
+          const d1=myDays[i], d2=myDays[i+1];
+          if(shiftData[s.id][d1]!=='off'||shiftData[s.id][d2]!=='off') continue;
+          // 実際にカレンダーで隣接していない場合はスキップ
+          if(!isCalAdjacent(d1,d2)) continue;
+          // d1かd2を出勤に変えたい → 代わりの出勤日を公休に
+          for(const target of [d1,d2]){
+            if(!canWork(target)) continue;
+            // 代替公休日を探す（出勤日のうちcanOff かつ前後が公休連続にならない）
+            const altOff=myDays.find(x=>{
+              if(x===d1||x===d2) return false;
+              if(!canOff(x)) return false;
+              // xの前後が実際に隣接する公休でない
+              const xi=myDays.indexOf(x);
+              const prevDs=xi>0?myDays[xi-1]:null;
+              const nextDs=xi<myDays.length-1?myDays[xi+1]:null;
+              const prevOff=prevDs&&shiftData[s.id][prevDs]==='off'&&isCalAdjacent(prevDs,x);
+              const nextOff=nextDs&&shiftData[s.id][nextDs]==='off'&&isCalAdjacent(x,nextDs);
+              return !prevOff&&!nextOff;
+            });
+            if(altOff){
+              shiftData[s.id][target]='early';
+              shiftData[s.id][altOff]='off';
+              fixed=true; break;
+            }
+          }
+          if(fixed) break;
+        }
+        if(fixed) continue;
+
+        // ─ ② 4連勤以上を解消（wdsインデックスで連続判定） ─
+        // wds上で連続して early/late が並んでいる場合を検出
+        {
+          let streakStart=-1, streakLen=0;
+          for(let i=0; i<=wds.length; i++){
+            const ds=i<wds.length?wds[i]:null;
+            const k=ds?shiftData[s.id][ds]:'off';
+            const isWork=k==='early'||k==='late';
+            if(isWork){
+              if(streakStart<0) streakStart=i;
+              streakLen++;
+            } else {
+              if(streakLen>3){
+                // 連勤中のいずれかの日を公休にする（4日目から逆順で試す）
+                let broke=false;
+                for(let bi=streakStart+3; bi>=streakStart+1&&!broke; bi--){
+                  const breakDs=wds[bi];
+                  if(!breakDs||!canOff(breakDs)) continue;
+                  // 代替出勤: wds上で前後に連勤を作らない公休日
+                  const altWork=wds.find(x=>{
+                    if(!canWork(x)) return false;
+                    const xi=wds.indexOf(x);
+                    let before=0, after=0;
+                    for(let dd=xi-1;dd>=Math.max(0,xi-3);dd--){
+                      const ak=shiftData[s.id][wds[dd]];
+                      if(ak==='early'||ak==='late') before++; else break;
+                    }
+                    for(let dd=xi+1;dd<=Math.min(wds.length-1,xi+3);dd++){
+                      const ak=shiftData[s.id][wds[dd]];
+                      if(ak==='early'||ak==='late') after++; else break;
+                    }
+                    return before+1+after<=3;
+                  });
+                  shiftData[s.id][breakDs]='off';
+                  if(altWork) shiftData[s.id][altWork]='early';
+                  fixed=true;
+                  broke=true;
+                }
+              }
+              streakStart=-1; streakLen=0;
+            }
+          }
+        }
+
+        if(!fixed) break;
+      }
+    });
+
+    // ══ STEP 5: Hard Constraint — DR+DH>=5 リトライ ══
+    for(let pass=0; pass<50; pass++){
+      let fixed=false;
+      for(const ds of wds){
+        const drOn=STAFF.filter(s=>s.role==='DR').filter(s=>isWorking(s.id,ds)).length;
+        const dhOn=STAFF.filter(s=>s.role==='DH'&&s.id!=='hanowa').filter(s=>isWorking(s.id,ds)).length;
+        if(drOn+dhOn>=5) continue;
+
+        // 公休中のDHを出勤日数が少ない順に並べる
+        const offDH=fullStaff
+          .filter(s=>s.role==='DH'&&shiftData[s.id]?.[ds]==='off')
+          .sort((a,b)=>countWorkdays(a.id,wds)-countWorkdays(b.id,wds));
+        if(offDH.length===0) continue;
+
+        let resolved=false;
+        for(const target of offDH){
+          const wkC=countWorkdays(target.id,wds);
+          if(wkC>=TARGET_WORKDAYS){
+            // スワップ候補: DR+DH>5の余裕がある日
+            const swapCandidates=wds.filter(x=>{
+              if(x===ds) return false;
+              const k=shiftData[target.id][x];
+              if(k!=='early'&&k!=='late') return false;
+              const drX=STAFF.filter(s=>s.role==='DR').filter(s=>isWorking(s.id,x)).length;
+              const dhX=STAFF.filter(s=>s.role==='DH'&&s.id!=='hanowa').filter(s=>isWorking(s.id,x)).length;
+              return drX+dhX>5;
+            });
+            if(swapCandidates.length>0){
+              const swapDay=swapCandidates.sort((a,b)=>b.localeCompare(a))[0];
+              shiftData[target.id][swapDay]='off';
+              shiftData[target.id][ds]='early';
+              fixed=true; resolved=true;
+              addAlert('warn', ds+': DR+DH不足 → '+target.name+'を'+swapDay.slice(5)+'からスライド');
+              break;
+            }
+            // このDHはスワップ不可 → 次のDHを試す
+          } else {
+            // 18日未満 → そのまま出勤追加
+            shiftData[target.id][ds]='early';
+            trimToTarget(target.id);
+            fixed=true; resolved=true;
+            break;
+          }
+        }
+        // 全DHがスワップ不可 → やむを得ず最初のDHを19日出勤
+        if(!resolved&&offDH.length>0){
+          shiftData[offDH[0].id][ds]='early';
+          fixed=true;
+          addAlert('error', ds+': '+offDH[0].name+' 19日出勤(残業・やむを得ない)');
+        }
+        break;
+      }
+      if(!fixed) break;
+    }
+
+    // ══ STEP 6: 百々 — DA不足補完 ══
+    for(const d of workDays){
+      const ds=dateStr(y,m,d);
+      const sat=isSaturday(y,m,d);
+      const tamiyaOff=isOff('tamiya',ds);
+      const tanakaOff=isOff('tanaka',ds);
+      if(!tamiyaOff||!tanakaOff) continue; // 田宮か田中がいれば何もしない
+
+      if(sat){
+        // 土曜：田宮・田中共に有休 → 百々の固定休を解除（受付死守）
+        if(shiftData['momo'][ds]==='off'){
+          shiftData['momo'][ds]='early';
+          addAlert('warn', ds+'(土): 田宮・田中同時有休 → 百々の固定休を解除');
+        }
+      } else {
+        // 平日：百々が事務 → 現場にスライド（時間変わらず）
+        if(shiftData['momo'][ds]==='admin'){
+          shiftData['momo'][ds]='early';
+          addAlert('warn', ds+': 平日DA不足 → 百々を現場スライド(事務→現場)');
+        }
+        // 百々が公休 → 出勤させる（超過になるが受付死守を優先）
+        else if(shiftData['momo'][ds]==='off'){
+          // 代わりに他の事務日を1日公休に変えて18日を維持
+          const swapDay=wds.find(x=>{
+            if(x===ds) return false;
+            if(shiftData['momo'][x]!=='admin') return false;
+            // そのx日に田宮か田中が出勤している（受付OK）
+            return !isOff('tamiya',x)||!isOff('tanaka',x);
+          });
+          if(swapDay){
+            shiftData['momo'][swapDay]='off';
+            shiftData['momo'][ds]='early';
+            addAlert('warn', ds+': 平日DA不足 → 百々の公休を解除('+swapDay.slice(5)+'と交換)');
+          } else {
+            // 交換不可 → 超過を許容して出勤
+            shiftData['momo'][ds]='early';
+            addAlert('error', ds+': 百々 公休解除(交換先なし・19日出勤)');
+          }
+        }
+      }
+    }
+    // 百々の最終時間チェック
+    {
+      const momoWork=wds.filter(ds=>{
+        const k=shiftData['momo'][ds];
+        return k==='admin'||k==='early';
+      }).length;
+      const momoH=calcHours('momo',y,m,days);
+      if(momoH>TARGET_HOURS+0.1){
+        addAlert('warn','百々: '+momoH+'h/'+momoWork+'日(DA補完による超過)');
+      }
+    }
+
+    // ══ STEP 6.5: DH+DA≥6 保証 ══
+    for(const d of workDays){
+      const ds=dateStr(y,m,d);
+      const dhOn=STAFF.filter(s=>s.role==='DH'&&s.id!=='hanowa').filter(s=>isWorking(s.id,ds)).length;
+      const daOn=(['tamiya','tanaka','momo']).filter(id=>{
+        const k=shiftData[id]?.[ds]||'';
+        return k==='early'||k==='late'||k==='admin'||k==='paid';
+      }).length;
+      if(dhOn+daOn>=6) continue;
+
+      const need=6-(dhOn+daOn);
+      let filled=0;
+
+      // ① 18日未満のDHのみ直接出勤追加
+      const underDH=fullStaff
+        .filter(s=>s.role==='DH'&&shiftData[s.id][ds]==='off'&&countWorkdays(s.id,wds)<TARGET_WORKDAYS)
+        .sort((a,b)=>countWorkdays(a.id,wds)-countWorkdays(b.id,wds));
+      for(const target of underDH){
+        if(filled>=need) break;
+        shiftData[target.id][ds]='early'; filled++;
+        addAlert('warn', ds+': DH+DA不足→'+target.name+'出勤追加');
+      }
+
+      // ② 18日以上のDHはスワップのみ
+      if(filled<need){
+        const fullDH=fullStaff
+          .filter(s=>s.role==='DH'&&shiftData[s.id][ds]==='off'&&countWorkdays(s.id,wds)>=TARGET_WORKDAYS)
+          .sort((a,b)=>countWorkdays(a.id,wds)-countWorkdays(b.id,wds));
+        for(const target of fullDH){
+          if(filled>=need) break;
+          const swapDay=wds.find(x=>{
+            if(x===ds) return false;
+            const k=shiftData[target.id][x];
+            if(k!=='early'&&k!=='late') return false;
+            if(isSatMandatoryDay(target.id,x)) return false;
+            const drX=STAFF.filter(s=>s.role==='DR').filter(s=>isWorking(s.id,x)).length;
+            const dhX=STAFF.filter(s=>s.role==='DH'&&s.id!=='hanowa'&&s.id!==target.id).filter(s=>isWorking(s.id,x)).length;
+            const daX=['tamiya','tanaka','momo'].filter(id=>{ const k2=shiftData[id]?.[x]||''; return k2==='early'||k2==='late'||k2==='admin'; }).length;
+            return drX+dhX>=5 && dhX+daX>=5;
+          });
+          if(swapDay){
+            shiftData[target.id][swapDay]='off';
+            shiftData[target.id][ds]='early';
+            filled++;
+            addAlert('warn', ds+': DH+DA不足→'+target.name+'を'+swapDay.slice(5)+'からスライド');
+          }
+        }
+      }
+
+      // ③ 百々をadmin→earlyにスライド（出勤日数は変わらない）
+      if(filled<need){
+        const momoK=shiftData['momo'][ds]||'';
+        if(momoK==='admin'){ shiftData['momo'][ds]='early'; filled++; addAlert('warn',ds+': DH+DA不足→百々事務→現場'); }
+        else if(momoK==='off'){
+          const swapDay=wds.find(x=>{
+            if(x===ds) return false;
+            if(shiftData['momo'][x]!=='admin') return false;
+            return !isOff('tamiya',x)||!isOff('tanaka',x);
+          });
+          if(swapDay){ shiftData['momo'][swapDay]='off'; shiftData['momo'][ds]='early'; filled++; addAlert('warn',ds+': DH+DA不足→百々出勤('+swapDay.slice(5)+'と交換)'); }
+          else { shiftData['momo'][ds]='early'; filled++; addAlert('warn',ds+': DH+DA不足→百々緊急出勤'); }
+        }
+      }
+    }
+
+    // ══ STEP 7: 希望休競合 → 申請順（早い順が優先）で却下 ══
+    // 申請日時でソート: 早い申請ほど希望休が守られる（遅い申請が取り消される）
+    const getSubmittedAt=(staffId, ds)=>{
+      const req=requestData
+        .filter(r=>r.staffId===staffId&&r.date===ds&&r.status==='approved'&&!r.cancelled)
+        .sort((a,b)=>a.id-b.id)[0]; // idは申請順
+      return req ? req.id : Infinity; // 申請データがない場合は最後に
+    };
+
+    for(const ds of wds){
+      // DR+DH競合チェック（5名未満なら申請が遅い順に取り消す）
+      const drDhOn=STAFF.filter(s=>s.role==='DR'||s.role==='DH')
+        .filter(s=>isWorking(s.id,ds)).length;
+      if(drDhOn<5){
+        // 申請が遅い順（id降順）にソート → 遅い申請から取り消す
+        const wishers=STAFF.filter(s=>
+          (s.role==='DR'||s.role==='DH')&&shiftData[s.id]?.[ds]==='wish'
+        ).sort((a,b)=>getSubmittedAt(b.id,ds)-getSubmittedAt(a.id,ds)); // 遅い順
+        let cur=drDhOn;
+        for(const s of wishers){
+          if(cur>=5) break;
+          shiftData[s.id][ds]='early'; cur++;
+          addAlert('warn', ds+': 希望休競合(DR+DH) → '+s.name+'の希望休を取消（申請が遅いため）');
+        }
+      }
+
+      // DA競合チェック（田宮・田中・百々のうち最低2名出勤）
+      const daOn=(['tamiya','tanaka','momo']).filter(id=>{
+        const k=shiftData[id]?.[ds]||'';
+        return k==='early'||k==='late'||k==='admin';
+      }).length;
+      if(daOn<2){
+        const need=2-daOn;
+        // 申請が遅い順に希望休を取り消す
+        const daWishers=['tamiya','tanaka','momo']
+          .filter(id=>shiftData[id]?.[ds]==='wish')
+          .sort((a,b)=>getSubmittedAt(b,ds)-getSubmittedAt(a,ds));
+        let fixed=0;
+        for(const id of daWishers){
+          if(fixed>=need) break;
+          shiftData[id][ds]='early'; fixed++;
+          addAlert('warn', ds+': DA2名未満 → '+STAFF.find(s=>s.id===id)?.name+'の希望休を取消（申請が遅いため）');
+        }
+      }
+    }
+
+    // ══ STEP 8: ハノワ配置（木曜必ず出勤・他は不足時のみ） ══
+    for(const d of workDays){
+      const ds=dateStr(y,m,d);
+      const dd=dow(y,m,d);
+      const isThu=dd===4; // 木曜日
+
+      if(isThu){
+        // 木曜は無条件で出勤
+        shiftData['hanowa'][ds]='hanowa';
+        addAlert('info', ds+'(木): ハノワ固定出勤');
+      } else {
+        // 木曜以外: 17時以降DH不足の場合のみ出勤
+        const dhAll=STAFF.filter(s=>s.role==='DH'&&s.id!=='hanowa')
+          .filter(s=>isWorking(s.id,ds)).length;
+        const yamadaOn=shiftData['yamada']?.[ds]==='fixed'&&[1,2,4,5].includes(dd);
+        const dhAfter17=dhAll-(yamadaOn?1:0);
+        const drOn=STAFF.filter(s=>s.role==='DR').filter(s=>isWorking(s.id,ds)).length;
+        if(dhAfter17+drOn<5){
+          shiftData['hanowa'][ds]='hanowa';
+          addAlert('info', ds+': 17時以降DH不足 → ハノワを配置');
+        } else {
+          shiftData['hanowa'][ds]='none';
+        }
+      }
+    }
+
+    // ══ STEP 9: 最終強制クリーンアップ（18日・160h保証） ══
+    fullStaff.forEach(s=>{
+      wds.forEach(ds=>{
+        if(!shiftData[s.id][ds]||shiftData[s.id][ds]==='') shiftData[s.id][ds]='off';
+      });
+
+      let total=countWorkdays(s.id,wds);
+
+      // 超過: 削れる日を月末から削る
+      if(total>TARGET_WORKDAYS){
+        const canDel=(ds,k)=>{
+          if(k!=='early'&&k!=='late') return false;
+          if(s.id==='tamiya'||s.id==='tanaka'){
+            const partner=s.id==='tamiya'?'tanaka':'tamiya';
+            const pK=shiftData[partner][ds]||'';
+            if(pK==='off'||pK==='wish') return false;
+          }
+          if(s.role!=='DH') return true;
+          const drN=STAFF.filter(x=>x.role==='DR').filter(x=>isWorking(x.id,ds)).length;
+          const dhN=STAFF.filter(x=>x.role==='DH'&&x.id!=='hanowa'&&x.id!==s.id)
+            .filter(x=>isWorking(x.id,ds)).length;
+          return drN+dhN>=5;
+        };
+
+        // DHの場合: 削った後に補填可能日があるか確認してから削る
+        const canFill=(exceptDs)=>{
+          if(s.role!=='DH') return true;
+          // exceptDsを公休にした後、補填できる公休日があるか
+          return wds.some(x=>{
+            if(shiftData[s.id][x]!=='off') return false;
+            if(x===exceptDs) return false;
+            // xを出勤にしてDR+DH>=5が維持できるか（DHが増えるので必ずOK）
+            return true;
+          });
+        };
+
+        const earlyArr=wds.filter(ds=>canDel(ds,'early')&&canFill(ds)&&shiftData[s.id][ds]==='early')
+          .sort((a,b)=>b.localeCompare(a));
+        for(const ds of earlyArr){
+          if(total<=TARGET_WORKDAYS) break;
+          shiftData[s.id][ds]='off'; total--;
+        }
+        // earlyで足りない場合はlateも（ただし遅出4回を維持するため後で補正）
+        if(total>TARGET_WORKDAYS){
+          const lateArr=wds.filter(ds=>canDel(ds,'late')&&canFill(ds)&&shiftData[s.id][ds]==='late')
+            .sort((a,b)=>b.localeCompare(a));
+          for(const ds of lateArr){
+            if(total<=TARGET_WORKDAYS) break;
+            shiftData[s.id][ds]='off'; total--;
+          }
+        }
+        // DH制約で削れない場合は制約を緩めて削る（19日出勤より17日の方が問題）
+        if(total>TARGET_WORKDAYS){
+          const anyArr=wds.filter(ds=>{
+            const k=shiftData[s.id][ds];
+            return (k==='early'||k==='late');
+          }).sort((a,b)=>b.localeCompare(a));
+          for(const ds of anyArr){
+            if(total<=TARGET_WORKDAYS) break;
+            shiftData[s.id][ds]='off'; total--;
+          }
+        }
+      }
+
+      // 不足: 公休を月初から出勤に（18日確保まで追加）
+      if(total<TARGET_WORKDAYS){
+        const offArr=wds.filter(ds=>shiftData[s.id][ds]==='off')
+          .sort((a,b)=>a.localeCompare(b));
+        for(const ds of offArr){
+          if(total>=TARGET_WORKDAYS) break;
+          shiftData[s.id][ds]='early'; total++;
+        }
+      }
+
+      // 遅出4回に補正（先に18日を確保してから）
+      const lateCount=wds.filter(ds=>shiftData[s.id][ds]==='late').length;
+      if(lateCount<TARGET_LATE){
+        const need=TARGET_LATE-lateCount;
+        const earlyDays=wds.filter(ds=>{
+          if(shiftData[s.id][ds]!=='early') return false;
+          const d=parseInt(ds.slice(8,10));
+          if(isSaturday(y,m,d)) return false;
+          return fullStaff.filter(x=>x.id!==s.id&&shiftData[x.id]?.[ds]==='late').length<2;
+        });
+        shuffle(earlyDays).slice(0,need).forEach(ds=>{ shiftData[s.id][ds]='late'; });
+      }
+      const lateFinal=wds.filter(ds=>shiftData[s.id][ds]==='late').length;
+      if(lateFinal>TARGET_LATE){
+        wds.filter(ds=>shiftData[s.id][ds]==='late')
+          .sort((a,b)=>b.localeCompare(a))
+          .slice(0,lateFinal-TARGET_LATE)
+          .forEach(ds=>{ shiftData[s.id][ds]='early'; });
+      }
+
+      // 最終時間確認・補正（必ず160hになるよう）
+      {
+        const h=calcHours(s.id,y,m,days);
+        if(h<TARGET_HOURS-0.1){
+          // 公休を出勤に変えて補填
+          const offArr2=wds.filter(ds=>shiftData[s.id][ds]==='off')
+            .sort((a,b)=>a.localeCompare(b));
+          for(const ds of offArr2){
+            shiftData[s.id][ds]='early';
+            if(calcHours(s.id,y,m,days)>=TARGET_HOURS-0.1) break;
+          }
+        }
+      }
+    });
+
+    // 百々の最終クリーンアップ（late4回+admin14回=160h保証）
+    {
+      let momoTotal=wds.filter(ds=>{
+        const k=shiftData['momo'][ds];
+        return k==='admin'||k==='early'||k==='late'||k==='paid';
+      }).length;
+
+      if(momoTotal>TARGET_WORKDAYS){
+        // 削れる日: admin or early だが、受付死守で必要な日は削らない
+        const trimArr=wds.filter(ds=>{
+          const k=shiftData['momo'][ds];
+          if(k!=='admin'&&k!=='early') return false;
+          // 土曜に田宮・田中が両方不在の場合は削れない（受付死守）
+          const sat=isSaturday(y,m,parseInt(ds.slice(8,10)));
+          if(sat && isOff('tamiya',ds) && isOff('tanaka',ds)) return false;
+          // 平日に田宮・田中が両方不在の場合も削れない
+          if(!sat && isOff('tamiya',ds) && isOff('tanaka',ds)) return false;
+          return true;
+        }).sort((a,b)=>b.localeCompare(a));
+
+        for(const ds of trimArr){
+          if(momoTotal<=TARGET_WORKDAYS) break;
+          shiftData['momo'][ds]='off'; momoTotal--;
+        }
+      }
+
+      // late回数チェック・補正
+      const momoLate=wds.filter(ds=>shiftData['momo'][ds]==='late').length;
+      if(momoLate>TARGET_LATE){
+        wds.filter(ds=>shiftData['momo'][ds]==='late')
+          .sort((a,b)=>b.localeCompare(a))
+          .slice(0, momoLate-TARGET_LATE)
+          .forEach(ds=>{ shiftData['momo'][ds]='admin'; });
+      }
+    }
+
+    // ══ STEP 9.5: STEP9後の再DR+DHチェック（クリーンアップで崩れた場合を修正） ══
+    for(let pass=0; pass<30; pass++){
+      let fixed=false;
+      for(const ds of wds){
+        const drOn=STAFF.filter(s=>s.role==='DR').filter(s=>isWorking(s.id,ds)).length;
+        const dhOn=STAFF.filter(s=>s.role==='DH'&&s.id!=='hanowa').filter(s=>isWorking(s.id,ds)).length;
+        if(drOn+dhOn>=5) continue;
+
+        // 公休DHを探してスワップ
+        const offDH=fullStaff
+          .filter(s=>s.role==='DH'&&shiftData[s.id]?.[ds]==='off')
+          .sort((a,b)=>countWorkdays(a.id,wds)-countWorkdays(b.id,wds));
+        if(offDH.length===0) continue;
+
+        const target=offDH[0];
+        const swapCands=wds.filter(x=>{
+          if(x===ds) return false;
+          const k=shiftData[target.id][x];
+          if(k!=='early'&&k!=='late') return false;
+          const drX=STAFF.filter(s=>s.role==='DR').filter(s=>isWorking(s.id,x)).length;
+          const dhX=STAFF.filter(s=>s.role==='DH'&&s.id!=='hanowa').filter(s=>isWorking(s.id,x)).length;
+          return drX+dhX>5;
+        }).sort((a,b)=>b.localeCompare(a));
+
+        if(swapCands.length>0){
+          shiftData[target.id][swapCands[0]]='off';
+          shiftData[target.id][ds]='early';
+          // late数を維持
+          const lateCnt=wds.filter(x=>shiftData[target.id][x]==='late').length;
+          if(lateCnt<TARGET_LATE && shiftData[target.id][ds]==='early'){
+            const lateToday=fullStaff.filter(x=>x.id!==target.id&&shiftData[x.id]?.[ds]==='late').length;
+            if(lateToday<2) shiftData[target.id][ds]='late';
+          }
+          fixed=true;
+          addAlert('warn', ds+': STEP9後DR+DH修正 → '+target.name);
+        } else {
+          // スワップ不可 → やむを得ず19日出勤
+          shiftData[target.id][ds]='early';
+          fixed=true;
+          addAlert('error', ds+': DR+DH不足(スワップ不可) → '+target.name+' 残業');
+        }
+        break;
+      }
+      if(!fixed) break;
+    }
+
+    // ══ STEP 9.8: 最終連勤チェック（4連勤を強制解消） ══
+    fullStaff.forEach(s=>{
+      for(let pass=0; pass<20; pass++){
+        let fixed=false;
+        let streakStart=-1, streakLen=0;
+        for(let i=0; i<=wds.length; i++){
+          const ds=i<wds.length?wds[i]:null;
+          const k=ds?shiftData[s.id][ds]:'off';
+          const isWork=k==='early'||k==='late';
+          if(isWork){
+            if(streakStart<0) streakStart=i;
+            streakLen++;
+          } else {
+            if(streakLen>3){
+              // 連勤中のいずれかの日を公休に（4日目→3日目→2日目の順で試す）
+              for(let bi=streakStart+3; bi>=streakStart+1; bi--){
+                const breakDs=wds[bi];
+                if(!breakDs) continue;
+                const bk=shiftData[s.id][breakDs];
+                if(bk!=='early'&&bk!=='late') continue;
+                // 土曜固定スタッフの土曜日は削れない
+                if(isSatMandatoryDay(s.id, breakDs)) continue;
+                // 受付確保チェック
+                if(s.id==='tamiya'||s.id==='tanaka'){
+                  const p=s.id==='tamiya'?'tanaka':'tamiya';
+                  const pk=shiftData[p][breakDs]||'';
+                  if(pk==='off'||pk==='wish'){
+                    const momoK=shiftData['momo'][breakDs]||'';
+                    if(momoK!=='admin'&&momoK!=='early'&&momoK!=='late') continue;
+                  }
+                }
+                // DH制約
+                if(s.role==='DH'){
+                  const drN=STAFF.filter(x=>x.role==='DR').filter(x=>isWorking(x.id,breakDs)).length;
+                  const dhN=STAFF.filter(x=>x.role==='DH'&&x.id!=='hanowa'&&x.id!==s.id)
+                    .filter(x=>isWorking(x.id,breakDs)).length;
+                  if(drN+dhN<5) continue;
+                  const daN2=['tamiya','tanaka','momo'].filter(id=>{
+                    const k2=shiftData[id]?.[breakDs]||'';
+                    return k2==='early'||k2==='late'||k2==='admin'||k2==='paid';
+                  }).length;
+                  if(dhN+daN2<6) continue;
+                }
+                // 代替出勤日を探す
+                const altWork=wds.find(x=>{
+                  if(shiftData[s.id][x]!=='off') return false;
+                  const xi=wds.indexOf(x);
+                  let before=0,after=0;
+                  for(let di=xi-1;di>=Math.max(0,xi-3);di--){
+                    const ak=shiftData[s.id][wds[di]];
+                    if(ak==='early'||ak==='late') before++; else break;
+                  }
+                  for(let di=xi+1;di<=Math.min(wds.length-1,xi+3);di++){
+                    const ak=shiftData[s.id][wds[di]];
+                    if(ak==='early'||ak==='late') after++; else break;
+                  }
+                  return before+1+after<=3;
+                });
+                shiftData[s.id][breakDs]='off';
+                if(altWork) shiftData[s.id][altWork]='early';
+                fixed=true;
+                break;
+              }
+            }
+            streakStart=-1; streakLen=0;
+          }
+        }
+        if(!fixed) break;
+      }
+    });
+
+    // ══ STEP 9.9: 最終補正（18日・160h・連勤3日以内を同時保証） ══
+    fullStaff.forEach(s=>{
+      // 最大10回ループで収束させる
+      for(let pass=0; pass<10; pass++){
+        let changed=false;
+
+        // ① 出勤日数が18日未満 → 連勤を作らない公休日を出勤に
+        let total=countWorkdays(s.id,wds);
+        if(total<TARGET_WORKDAYS){
+          const offArr=wds.filter(ds=>{
+            if(shiftData[s.id][ds]!=='off') return false;
+            const xi=wds.indexOf(ds);
+            let before=0,after=0;
+            for(let di=xi-1;di>=Math.max(0,xi-3);di--){
+              const ak=shiftData[s.id][wds[di]];
+              if(ak==='early'||ak==='late') before++; else break;
+            }
+            for(let di=xi+1;di<=Math.min(wds.length-1,xi+3);di++){
+              const ak=shiftData[s.id][wds[di]];
+              if(ak==='early'||ak==='late') after++; else break;
+            }
+            return before+1+after<=3;
+          }).sort((a,b)=>a.localeCompare(b));
+
+          for(const ds of offArr){
+            if(total>=TARGET_WORKDAYS) break;
+            shiftData[s.id][ds]='early'; total++; changed=true;
+          }
+
+          // それでも足りなければ制約なしで追加
+          if(total<TARGET_WORKDAYS){
+            const offArr2=wds.filter(ds=>shiftData[s.id][ds]==='off')
+              .sort((a,b)=>a.localeCompare(b));
+            for(const ds of offArr2){
+              if(total>=TARGET_WORKDAYS) break;
+              shiftData[s.id][ds]='early'; total++; changed=true;
+            }
+          }
+        }
+
+        // ② 4連勤以上 → 最小限の変更で解消
+        let streakStart=-1, streakLen=0;
+        for(let i=0; i<=wds.length; i++){
+          const ds=i<wds.length?wds[i]:null;
+          const k=ds?shiftData[s.id][ds]:'off';
+          if(k==='early'||k==='late'){
+            if(streakStart<0) streakStart=i;
+            streakLen++;
+          } else {
+            if(streakLen>3){
+              for(let bi=streakStart+3; bi>=streakStart+1; bi--){
+                const breakDs=wds[bi];
+                if(!breakDs) continue;
+                const bk=shiftData[s.id][breakDs];
+                if(bk!=='early'&&bk!=='late') continue;
+                // 土曜固定スタッフの土曜日は削れない
+                if(isSatMandatoryDay(s.id, breakDs)) continue;
+                if(s.role==='DH'){
+                  const drN=STAFF.filter(x=>x.role==='DR').filter(x=>isWorking(x.id,breakDs)).length;
+                  const dhN=STAFF.filter(x=>x.role==='DH'&&x.id!=='hanowa'&&x.id!==s.id)
+                    .filter(x=>isWorking(x.id,breakDs)).length;
+                  if(drN+dhN<5) continue;
+                  const daN2=['tamiya','tanaka','momo'].filter(id=>{
+                    const k2=shiftData[id]?.[breakDs]||'';
+                    return k2==='early'||k2==='late'||k2==='admin'||k2==='paid';
+                  }).length;
+                  if(dhN+daN2<6) continue;
+                }
+                if(s.id==='tamiya'||s.id==='tanaka'){
+                  const p=s.id==='tamiya'?'tanaka':'tamiya';
+                  const pk=shiftData[p][breakDs]||'';
+                  if(pk==='off'||pk==='wish'){
+                    const mk=shiftData['momo'][breakDs]||'';
+                    if(mk!=='admin'&&mk!=='early'&&mk!=='late') continue;
+                  }
+                }
+                // 代替出勤（連勤を作らない公休日）
+                const altWork=wds.find(x=>{
+                  if(shiftData[s.id][x]!=='off') return false;
+                  const xi=wds.indexOf(x);
+                  let before=0,after=0;
+                  for(let di=xi-1;di>=Math.max(0,xi-3);di--){
+                    const ak=shiftData[s.id][wds[di]];
+                    if(ak==='early'||ak==='late') before++; else break;
+                  }
+                  for(let di=xi+1;di<=Math.min(wds.length-1,xi+3);di++){
+                    const ak=shiftData[s.id][wds[di]];
+                    if(ak==='early'||ak==='late') after++; else break;
+                  }
+                  return before+1+after<=3;
+                });
+                shiftData[s.id][breakDs]='off';
+                if(altWork) shiftData[s.id][altWork]='early';
+                changed=true; break;
+              }
+            }
+            streakStart=-1; streakLen=0;
+          }
+        }
+
+        if(!changed) break;
+      }
+
+      // 遅出4回に最終補正
+      const lateCount=wds.filter(ds=>shiftData[s.id][ds]==='late').length;
+      if(lateCount<TARGET_LATE){
+        const need=TARGET_LATE-lateCount;
+        const earlyDays=wds.filter(ds=>{
+          if(shiftData[s.id][ds]!=='early') return false;
+          const d=parseInt(ds.slice(8,10));
+          if(isSaturday(y,m,d)) return false;
+          return fullStaff.filter(x=>x.id!==s.id&&shiftData[x.id]?.[ds]==='late').length<2;
+        });
+        shuffle(earlyDays).slice(0,need).forEach(ds=>{ shiftData[s.id][ds]='late'; });
+      }
+      if(lateCount>TARGET_LATE){
+        wds.filter(ds=>shiftData[s.id][ds]==='late')
+          .sort((a,b)=>b.localeCompare(a))
+          .slice(0,lateCount-TARGET_LATE)
+          .forEach(ds=>{ shiftData[s.id][ds]='early'; });
+      }
+    });
+
+    // ══ 最終強制補正: 絶対に18日・160hにする ══
+    fullStaff.forEach(s=>{
+      // 何があっても最終的に18日・遅出4回を保証
+      let total=countWorkdays(s.id,wds);
+
+      // 不足 → 制約を一切無視して公休を出勤に変える
+      if(total<TARGET_WORKDAYS){
+        const offArr=wds.filter(ds=>shiftData[s.id][ds]==='off')
+          .sort((a,b)=>a.localeCompare(b));
+        for(const ds of offArr){
+          if(total>=TARGET_WORKDAYS) break;
+          shiftData[s.id][ds]='early'; total++;
+        }
+      }
+
+      // 超過 → fixed(土曜固定)を除いて月末から削る
+      if(total>TARGET_WORKDAYS){
+        const workArr=wds.filter(ds=>{
+          const k=shiftData[s.id][ds];
+          if(k!=='early'&&k!=='late') return false;
+          if(isSatMandatoryDay(s.id, ds)) return false;
+          // DHの場合: 削ってもDH+DA≥6が保たれる日のみ
+          if(s.role==='DH'){
+            const dhN=STAFF.filter(x=>x.role==='DH'&&x.id!=='hanowa'&&x.id!==s.id).filter(x=>isWorking(x.id,ds)).length;
+            const daN=['tamiya','tanaka','momo'].filter(id=>{ const k2=shiftData[id]?.[ds]||''; return k2==='early'||k2==='late'||k2==='admin'; }).length;
+            if(dhN+daN<6) return false;
+          }
+          return true;
+        }).sort((a,b)=>b.localeCompare(a));
+        for(const ds of workArr){
+          if(total<=TARGET_WORKDAYS) break;
+          shiftData[s.id][ds]='off'; total--;
+        }
+      }
+
+      // 遅出4回に確定
+      const lateCount=wds.filter(ds=>shiftData[s.id][ds]==='late').length;
+      if(lateCount<TARGET_LATE){
+        const need=TARGET_LATE-lateCount;
+        const earlyDays=shuffle(wds.filter(ds=>{
+          if(shiftData[s.id][ds]!=='early') return false;
+          const d=parseInt(ds.slice(8,10));
+          if(isSaturday(y,m,d)) return false;
+          return fullStaff.filter(x=>x.id!==s.id&&shiftData[x.id]?.[ds]==='late').length<2;
+        }));
+        earlyDays.slice(0,need).forEach(ds=>{ shiftData[s.id][ds]='late'; });
+      }
+      if(lateCount>TARGET_LATE){
+        wds.filter(ds=>shiftData[s.id][ds]==='late')
+          .sort((a,b)=>b.localeCompare(a))
+          .slice(0,lateCount-TARGET_LATE)
+          .forEach(ds=>{ shiftData[s.id][ds]='early'; });
+      }
+    });
+
+    // ══ 百々の最終強制補正（160h保証） ══
+    {
+      // 出勤日数カウント（admin/early/late/paid）
+      let momoTotal=wds.filter(ds=>{
+        const k=shiftData['momo'][ds];
+        return k==='admin'||k==='early'||k==='late'||k==='paid';
+      }).length;
+
+      // 不足 → 平日の公休をadminに変えて補填
+      if(momoTotal<TARGET_WORKDAYS){
+        const offArr=wds.filter(ds=>{
+          if(shiftData['momo'][ds]!=='off') return false;
+          return !isSaturday(y,m,parseInt(ds.slice(8,10)));
+        }).sort((a,b)=>a.localeCompare(b));
+        for(const ds of offArr){
+          if(momoTotal>=TARGET_WORKDAYS) break;
+          shiftData['momo'][ds]='admin'; momoTotal++;
+        }
+      }
+
+      // 超過 → 月末のadmin/earlyを削る（lateは保持）
+      if(momoTotal>TARGET_WORKDAYS){
+        const trimArr=wds.filter(ds=>{
+          const k=shiftData['momo'][ds];
+          if(k!=='admin'&&k!=='early') return false;
+          const sat=isSaturday(y,m,parseInt(ds.slice(8,10)));
+          if(sat&&isOff('tamiya',ds)&&isOff('tanaka',ds)) return false;
+          if(!sat&&isOff('tamiya',ds)&&isOff('tanaka',ds)) return false;
+          return true;
+        }).sort((a,b)=>b.localeCompare(a));
+        for(const ds of trimArr){
+          if(momoTotal<=TARGET_WORKDAYS) break;
+          shiftData['momo'][ds]='off'; momoTotal--;
+        }
+      }
+
+      // 遅出4回に確定
+      const momoLate=wds.filter(ds=>shiftData['momo'][ds]==='late').length;
+      if(momoLate<TARGET_LATE){
+        const need=TARGET_LATE-momoLate;
+        shuffle(wds.filter(ds=>{
+          if(shiftData['momo'][ds]!=='admin') return false;
+          const d=parseInt(ds.slice(8,10));
+          if(isSaturday(y,m,d)) return false;
+          return [...fullStaff].filter(x=>shiftData[x.id]?.[ds]==='late').length<2;
+        })).slice(0,need).forEach(ds=>{ shiftData['momo'][ds]='late'; });
+      }
+      if(momoLate>TARGET_LATE){
+        wds.filter(ds=>shiftData['momo'][ds]==='late')
+          .sort((a,b)=>b.localeCompare(a))
+          .slice(0,momoLate-TARGET_LATE)
+          .forEach(ds=>{ shiftData['momo'][ds]='admin'; });
+      }
+    }
+
+    // ══ 最終連勤チェック（最終強制補正後） ══
+    // fullStaffのみ（百々は5連勤までOKのため除外）
+    const allCheckStaff=[...fullStaff];
+    for(let pass=0; pass<15; pass++){
+      let anyFixed=false;
+      for(const s of allCheckStaff){
+        const isMomo=s.id==='momo';
+        let streakStart=-1, streakLen=0;
+        for(let i=0; i<=wds.length; i++){
+          const ds=i<wds.length?wds[i]:null;
+          const k=ds?shiftData[s.id][ds]:'off';
+          const isWork=isMomo
+            ?(k==='early'||k==='late'||k==='admin')
+            :(k==='early'||k==='late');
+          if(isWork){
+            if(streakStart<0) streakStart=i;
+            streakLen++;
+          } else {
+            if(streakLen>3){
+              // 4日目を公休に
+              for(let bi=streakStart+3; bi>=streakStart+1; bi--){
+                const breakDs=wds[bi];
+                if(!breakDs) continue;
+                const bk=shiftData[s.id][breakDs];
+                const canBreak=isMomo
+                  ?(bk==='early'||bk==='admin')
+                  :(bk==='early'||bk==='late');
+                if(!canBreak) continue;
+                // 土曜固定スタッフの土曜日は削れない
+                if(!isMomo && isSatMandatoryDay(s.id, breakDs)) continue;
+                // DA制約: 田宮・田中が両方不在の日は変更不可
+                if(s.id==='tamiya'||s.id==='tanaka'||isMomo){
+                  if(isOff('tamiya',breakDs)&&isOff('tanaka',breakDs)){
+                    if(!isMomo) continue;
+                    if(isMomo&&bk!=='off') continue;
+                  }
+                }
+                // DH制約
+                if(s.role==='DH'){
+                  const drN=STAFF.filter(x=>x.role==='DR').filter(x=>isWorking(x.id,breakDs)).length;
+                  const dhN=STAFF.filter(x=>x.role==='DH'&&x.id!=='hanowa'&&x.id!==s.id)
+                    .filter(x=>isWorking(x.id,breakDs)).length;
+                  if(drN+dhN<5) continue;
+                  const daN2=['tamiya','tanaka','momo'].filter(id=>{
+                    const k2=shiftData[id]?.[breakDs]||'';
+                    return k2==='early'||k2==='late'||k2==='admin'||k2==='paid';
+                  }).length;
+                  if(dhN+daN2<6) continue;
+                }
+                const altWork=wds.find(x=>{
+                  const xk=shiftData[s.id][x];
+                  if(isMomo?xk!=='off':xk!=='off') return false;
+                  if(isMomo&&isSaturday(y,m,parseInt(x.slice(8,10)))) return false;
+                  const xi=wds.indexOf(x);
+                  let before=0,after=0;
+                  for(let di=xi-1;di>=Math.max(0,xi-3);di--){
+                    const ak=shiftData[s.id][wds[di]];
+                    const w=isMomo?(ak==='early'||ak==='late'||ak==='admin'):(ak==='early'||ak==='late');
+                    if(w) before++; else break;
+                  }
+                  for(let di=xi+1;di<=Math.min(wds.length-1,xi+3);di++){
+                    const ak=shiftData[s.id][wds[di]];
+                    const w=isMomo?(ak==='early'||ak==='late'||ak==='admin'):(ak==='early'||ak==='late');
+                    if(w) after++; else break;
+                  }
+                  return before+1+after<=3;
+                });
+                shiftData[s.id][breakDs]='off';
+                if(altWork) shiftData[s.id][altWork]=isMomo?bk:'early';
+                anyFixed=true; break;
+              }
+            }
+            streakStart=-1; streakLen=0;
+          }
+        }
+      }
+      if(!anyFixed) break;
+    }
+
+    // ══ 最終連勤チェック後の160h再保証（fullStaff） ══
+    fullStaff.forEach(s=>{
+      let total=countWorkdays(s.id,wds);
+      // 不足: 連勤を作らない公休日を優先して補填
+      if(total<TARGET_WORKDAYS){
+        const offArr=wds.filter(ds=>{
+          if(shiftData[s.id][ds]!=='off') return false;
+          const xi=wds.indexOf(ds);
+          let b=0,a=0;
+          for(let di=xi-1;di>=Math.max(0,xi-3);di--){
+            const ak=shiftData[s.id][wds[di]];
+            if(ak==='early'||ak==='late') b++; else break;
+          }
+          for(let di=xi+1;di<=Math.min(wds.length-1,xi+3);di++){
+            const ak=shiftData[s.id][wds[di]];
+            if(ak==='early'||ak==='late') a++; else break;
+          }
+          return b+1+a<=3;
+        }).sort((a,b)=>a.localeCompare(b));
+        for(const ds of offArr){
+          if(total>=TARGET_WORKDAYS) break;
+          shiftData[s.id][ds]='early'; total++;
+        }
+        // それでも足りなければ制約なしで補填
+        if(total<TARGET_WORKDAYS){
+          wds.filter(ds=>shiftData[s.id][ds]==='off')
+            .sort((a,b)=>a.localeCompare(b))
+            .forEach(ds=>{ if(total<TARGET_WORKDAYS){ shiftData[s.id][ds]='early'; total++; } });
+        }
+      }
+      // 遅出4回に確定
+      const lc=wds.filter(ds=>shiftData[s.id][ds]==='late').length;
+      if(lc<TARGET_LATE){
+        shuffle(wds.filter(ds=>{
+          if(shiftData[s.id][ds]!=='early') return false;
+          const d=parseInt(ds.slice(8,10));
+          if(isSaturday(y,m,d)) return false;
+          return fullStaff.filter(x=>x.id!==s.id&&shiftData[x.id]?.[ds]==='late').length<2;
+        })).slice(0,TARGET_LATE-lc).forEach(ds=>{ shiftData[s.id][ds]='late'; });
+      }
+      if(lc>TARGET_LATE){
+        wds.filter(ds=>shiftData[s.id][ds]==='late')
+          .sort((a,b)=>b.localeCompare(a))
+          .slice(0,lc-TARGET_LATE)
+          .forEach(ds=>{ shiftData[s.id][ds]='early'; });
+      }
+    });
+
+    // ══ 百々の最終統合補正（連勤5日以内 + 160h = 18日を同時保証） ══
+    for(let pass=0; pass<20; pass++){
+      let changed=false;
+
+      // ① 連勤6日以上を解消（5連勤までOK）
+      let streakStart=-1, streakLen=0;
+      for(let i=0; i<=wds.length; i++){
+        const ds=i<wds.length?wds[i]:null;
+        const k=ds?shiftData['momo'][ds]:'off';
+        const isWork=k==='early'||k==='late'||k==='admin';
+        if(isWork){
+          if(streakStart<0) streakStart=i;
+          streakLen++;
+        } else {
+          if(streakLen>5){
+            for(let bi=streakStart+5; bi>=streakStart+1; bi--){
+              const breakDs=wds[bi];
+              if(!breakDs) continue;
+              const bk=shiftData['momo'][breakDs];
+              if(bk!=='admin'&&bk!=='early') continue;
+              if(isOff('tamiya',breakDs)&&isOff('tanaka',breakDs)) continue;
+              // 代替出勤日（連勤5日以内 + 土曜除外）
+              const alt=wds.find(x=>{
+                if(shiftData['momo'][x]!=='off') return false;
+                if(isSaturday(y,m,parseInt(x.slice(8,10)))) return false;
+                const xi=wds.indexOf(x);
+                let b=0,a=0;
+                for(let di=xi-1;di>=Math.max(0,xi-5);di--){
+                  const ak=shiftData['momo'][wds[di]];
+                  if(ak==='early'||ak==='late'||ak==='admin') b++; else break;
+                }
+                for(let di=xi+1;di<=Math.min(wds.length-1,xi+5);di++){
+                  const ak=shiftData['momo'][wds[di]];
+                  if(ak==='early'||ak==='late'||ak==='admin') a++; else break;
+                }
+                return b+1+a<=5;
+              });
+              shiftData['momo'][breakDs]='off';
+              if(alt) shiftData['momo'][alt]=bk;
+              changed=true; break;
+            }
+          }
+          streakStart=-1; streakLen=0;
+        }
+      }
+
+      // ② 出勤日数が18日未満 → 連勤を作らない日に補填
+      let momoTotal=wds.filter(ds=>{
+        const k=shiftData['momo'][ds];
+        return k==='admin'||k==='early'||k==='late'||k==='paid';
+      }).length;
+
+      if(momoTotal<TARGET_WORKDAYS){
+        const offArr=wds.filter(ds=>{
+          if(shiftData['momo'][ds]!=='off') return false;
+          if(isSaturday(y,m,parseInt(ds.slice(8,10)))) return false;
+          const xi=wds.indexOf(ds);
+          let b=0,a=0;
+          for(let di=xi-1;di>=Math.max(0,xi-5);di--){
+            const ak=shiftData['momo'][wds[di]];
+            if(ak==='early'||ak==='late'||ak==='admin') b++; else break;
+          }
+          for(let di=xi+1;di<=Math.min(wds.length-1,xi+5);di++){
+            const ak=shiftData['momo'][wds[di]];
+            if(ak==='early'||ak==='late'||ak==='admin') a++; else break;
+          }
+          return b+1+a<=5;
+        }).sort((a,b)=>a.localeCompare(b));
+        for(const ds of offArr){
+          if(momoTotal>=TARGET_WORKDAYS) break;
+          shiftData['momo'][ds]='admin'; momoTotal++; changed=true;
+        }
+        // 制約なしで補填
+        if(momoTotal<TARGET_WORKDAYS){
+          wds.filter(ds=>shiftData['momo'][ds]==='off'&&!isSaturday(y,m,parseInt(ds.slice(8,10))))
+            .sort((a,b)=>a.localeCompare(b))
+            .forEach(ds=>{ if(momoTotal<TARGET_WORKDAYS){ shiftData['momo'][ds]='admin'; momoTotal++; changed=true; } });
+        }
+      }
+
+      if(!changed) break;
+    }
+
+    // 百々の遅出4回最終確定
+    {
+      const ml=wds.filter(ds=>shiftData['momo'][ds]==='late').length;
+      if(ml<TARGET_LATE){
+        shuffle(wds.filter(ds=>{
+          if(shiftData['momo'][ds]!=='admin') return false;
+          const d=parseInt(ds.slice(8,10));
+          if(isSaturday(y,m,d)) return false;
+          return [...fullStaff].filter(x=>shiftData[x.id]?.[ds]==='late').length<2;
+        })).slice(0,TARGET_LATE-ml).forEach(ds=>{ shiftData['momo'][ds]='late'; });
+      }
+      if(ml>TARGET_LATE){
+        wds.filter(ds=>shiftData['momo'][ds]==='late')
+          .sort((a,b)=>b.localeCompare(a))
+          .slice(0,ml-TARGET_LATE)
+          .forEach(ds=>{ shiftData['momo'][ds]='admin'; });
+      }
+    }
+
+    // ══ 最終DH+DAチェック（全補正後にDH+DA≥6を再保証・時間超過補正と交互に実行） ══
+    for(let outerPass=0; outerPass<5; outerPass++){
+      // DH+DA≥6 補正
+      let anyFixed=false;
+      for(let pass=0; pass<10; pass++){
+        let fixed=false;
+        for(const d of workDays){
+          const ds=dateStr(y,m,d);
+          const dhOn=STAFF.filter(s=>s.role==='DH'&&s.id!=='hanowa').filter(s=>isWorking(s.id,ds)).length;
+          const daOn=(['tamiya','tanaka','momo']).filter(id=>{
+            const k=shiftData[id]?.[ds]||'';
+            return k==='early'||k==='late'||k==='admin'||k==='paid';
+          }).length;
+          if(dhOn+daOn>=6) continue;
+
+          const need=6-(dhOn+daOn);
+          let filled=0;
+
+          // スワップで対応（土曜固定保護）
+          const offDH=fullStaff
+            .filter(s=>s.role==='DH'&&shiftData[s.id][ds]==='off')
+            .sort((a,b)=>countWorkdays(a.id,wds)-countWorkdays(b.id,wds));
+
+          for(const target of offDH){
+            if(filled>=need) break;
+            const wkC=countWorkdays(target.id,wds);
+            if(wkC<TARGET_WORKDAYS){
+              // 18日未満なら直接追加
+              shiftData[target.id][ds]='early'; filled++; fixed=true;
+              addAlert('warn', ds+': DH+DA最終補正→'+target.name+'出勤追加');
+            } else {
+              // スワップ候補: DR+DH>=5 かつ DH+DA>=6 の余裕がある日（条件緩和）
+              const swapDay=wds.find(x=>{
+                if(x===ds) return false;
+                const k=shiftData[target.id][x];
+                if(k!=='early'&&k!=='late') return false;
+                if(isSatMandatoryDay(target.id,x)) return false;
+                const drX=STAFF.filter(s=>s.role==='DR').filter(s=>isWorking(s.id,x)).length;
+                const dhX=STAFF.filter(s=>s.role==='DH'&&s.id!=='hanowa'&&s.id!==target.id).filter(s=>isWorking(s.id,x)).length;
+                const daX=['tamiya','tanaka','momo'].filter(id=>{ const k2=shiftData[id]?.[x]||''; return k2==='early'||k2==='late'||k2==='admin'; }).length;
+                // DR+DH>=5 かつ DH+DA>=6（自分を除いても）
+                return drX+dhX>=5 && dhX+daX>=6;
+              }) || wds.find(x=>{
+                // 条件緩和: DR+DH>=5 のみ
+                if(x===ds) return false;
+                const k=shiftData[target.id][x];
+                if(k!=='early'&&k!=='late') return false;
+                if(isSatMandatoryDay(target.id,x)) return false;
+                const drX=STAFF.filter(s=>s.role==='DR').filter(s=>isWorking(s.id,x)).length;
+                const dhX=STAFF.filter(s=>s.role==='DH'&&s.id!=='hanowa'&&s.id!==target.id).filter(s=>isWorking(s.id,x)).length;
+                return drX+dhX>=5;
+              });
+              if(swapDay){
+                shiftData[target.id][swapDay]='off';
+                shiftData[target.id][ds]='early';
+                filled++; fixed=true;
+                addAlert('warn', ds+': DH+DA最終補正→'+target.name+'スワップ('+swapDay.slice(5)+')');
+              } else {
+                // スワップ不可 → 19日出勤を許容
+                shiftData[target.id][ds]='early';
+                filled++; fixed=true;
+                addAlert('warn', ds+': DH+DA最終補正→'+target.name+'19日出勤(やむを得ない)');
+              }
+            }
+          }
+
+          // 百々をadmin→earlyにスライド
+          if(filled<need){
+            const mk=shiftData['momo'][ds]||'';
+            if(mk==='admin'){ shiftData['momo'][ds]='early'; filled++; fixed=true; addAlert('warn',ds+': DH+DA最終補正→百々事務→現場'); }
+            else if(mk==='off'){
+              const swapDay=wds.find(x=>{
+                if(x===ds) return false;
+                if(shiftData['momo'][x]!=='admin') return false;
+                return !isOff('tamiya',x)||!isOff('tanaka',x);
+              });
+              if(swapDay){ shiftData['momo'][swapDay]='off'; shiftData['momo'][ds]='early'; filled++; fixed=true; }
+              else { shiftData['momo'][ds]='early'; filled++; fixed=true; addAlert('error',ds+': DH+DA最終補正→百々緊急出勤'); }
+            }
+          }
+        }
+        if(!fixed) break;
+        anyFixed=true;
+      }
+
+      // 時間超過補正（スワップで超過した場合に削る）
+      fullStaff.forEach(s=>{
+        let total=countWorkdays(s.id,wds);
+        if(total>TARGET_WORKDAYS){
+          const workArr=wds.filter(ds=>{
+            const k=shiftData[s.id][ds];
+            if(k!=='early'&&k!=='late') return false;
+            if(isSatMandatoryDay(s.id,ds)) return false;
+            if(s.role==='DH'){
+              const drN=STAFF.filter(x=>x.role==='DR').filter(x=>isWorking(x.id,ds)).length;
+              const dhN=STAFF.filter(x=>x.role==='DH'&&x.id!=='hanowa'&&x.id!==s.id).filter(x=>isWorking(x.id,ds)).length;
+              const daN=['tamiya','tanaka','momo'].filter(id=>{ const k2=shiftData[id]?.[ds]||''; return k2==='early'||k2==='late'||k2==='admin'; }).length;
+              return drN+dhN>=5 && dhN+daN>=6;
+            }
+            return true;
+          }).sort((a,b)=>b.localeCompare(a));
+          for(const ds of workArr){
+            if(total<=TARGET_WORKDAYS) break;
+            shiftData[s.id][ds]='off'; total--;
+          }
+        }
+        // 遅出4回に最終確定
+        const lc=wds.filter(ds=>shiftData[s.id][ds]==='late').length;
+        if(lc<TARGET_LATE){
+          shuffle(wds.filter(ds=>{
+            if(shiftData[s.id][ds]!=='early') return false;
+            const d=parseInt(ds.slice(8,10));
+            if(isSaturday(y,m,d)) return false;
+            return fullStaff.filter(x=>x.id!==s.id&&shiftData[x.id]?.[ds]==='late').length<2;
+          })).slice(0,TARGET_LATE-lc).forEach(ds=>{ shiftData[s.id][ds]='late'; });
+        }
+        if(lc>TARGET_LATE){
+          wds.filter(ds=>shiftData[s.id][ds]==='late')
+            .sort((a,b)=>b.localeCompare(a))
+            .slice(0,lc-TARGET_LATE)
+            .forEach(ds=>{ shiftData[s.id][ds]='early'; });
+        }
+      });
+
+      if(!anyFixed) break;
+    }
+    const checked=new Set();
+    for(const d of workDays){
+      const ds=dateStr(y,m,d);
+      const drDhOn=STAFF.filter(s=>s.role==='DR'||s.role==='DH')
+        .filter(s=>isWorking(s.id,ds)).length;
+      if(drDhOn<5) addAlert('error', ds+': DR+DH='+drDhOn+'名(5名未満)');
+
+      const uketsukeOk=isWorking('tamiya',ds)||isWorking('tanaka',ds)||
+        shiftData['momo']?.[ds]==='early';
+      if(!uketsukeOk) addAlert('error', ds+': 受付DA不在');
+
+      const dhF=STAFF.filter(s=>s.role==='DH').filter(s=>isWorking(s.id,ds)).length;
+      const daF=(isWorking('tamiya',ds)?1:0)+(isWorking('tanaka',ds)?1:0)
+        +(shiftData['momo']?.[ds]==='early'?1:0);
+      if(dhF+daF!==6){
+        if(dhF>=5&&daF===1) addAlert('info', ds+': DH兼任モード(DH'+dhF+'+DA'+daF+')');
+        else if(dhF+daF<6)  addAlert('warn', ds+': 現場='+(dhF+daF)+'名(目標6名)');
+      }
+    }
+    // 160h達成確認（1スタッフ1回のみ）
+    fullStaff.forEach(s=>{
+      const h=calcHours(s.id,y,m,days);
+      if(h>TARGET_HOURS+0.1)      addAlert('error', s.name+': '+h+'h 160h超過 残業警告');
+      else if(h<TARGET_HOURS-0.1) addAlert('warn',  s.name+': '+h+'h(目標160h差異あり)');
+    });
+
+    renderAlerts();
+    btn.disabled=false;
+    txt.textContent='✨ シフト自動生成';
+    render();
+    saveCurrentShift(); // 生成したシフトを月別に保存
+  }, 600);
+}
+
+function printShift(){
+  const y=currentYear, m=currentMonth;
+  const days=daysInMonth(y,m);
+  const dowNames=['日','月','火','水','木','金','土'];
+  const monthStr=`${y}年${m+1}月 シフト表`;
+
+  // 印刷対象スタッフ（役職グループ別）
+  const drStaff=STAFF.filter(s=>s.role==='DR'&&(s.type==='full'||s.type==='director'||s.type==='part'));
+  const dhStaff=STAFF.filter(s=>s.role==='DH'&&s.type!=='spot');
+  const daStaff=STAFF.filter(s=>s.role==='DA'&&(s.type==='full'||s.type==='part'));
+
+  // ヘッダー行生成
+  const makeHeader=()=>{
+    let h=`<tr><th class="staff-col">スタッフ</th>`;
+    for(let d=1;d<=days;d++){
+      const dd=dow(y,m,d);
+      const ds=dateStr(y,m,d);
+      const off=isOffDay(y,m,d);
+      const cls=off?'print-off-day':HOLIDAYS[ds]||dd===0?'print-sunday':dd===6?'print-saturday':'';
+      h+=`<th class="${cls}">${d}<br><small>${dowNames[dd]}</small></th>`;
+    }
+    return h+`</tr>`;
+  };
+
+  // スタッフ行生成
+  const makeRow=(s)=>{
+    let r=`<tr><td class="staff-col">${s.name}</td>`;
+    for(let d=1;d<=days;d++){
+      const ds=dateStr(y,m,d);
+      const off=isOffDay(y,m,d);
+      if(off){ r+=`<td class="print-off-day">─</td>`; continue; }
+      const k=shiftData[s.id]?.[ds]||'';
+      const label={
+        'early':'通常','late':'遅出','off':'公休',
+        'paid':'有給','wish':'希望','fixed':'通常',
+        'admin':'事務','hanowa':'HW','none':'─'
+      }[k]||'─';
+      const cls2={
+        'early':'print-early','late':'print-late','off':'print-off',
+        'paid':'print-paid','wish':'print-wish','fixed':'print-early',
+        'admin':'print-early','none':'print-off-day'
+      }[k]||'print-off';
+      r+=`<td class="${cls2}">${label}</td>`;
+    }
+    return r+`</tr>`;
+  };
+
+  // グループ区切り行
+  const makeGroupRow=(label)=>
+    `<tr><td class="staff-col" style="background:#2C5F82!important;color:#fff!important;font-size:7.5pt;padding:2px 4px;" colspan="${days+1}">${label}</td></tr>`;
+
+  // 凡例
+  const legend=`
+    <div class="print-legend">
+      <div class="print-legend-item"><div class="print-legend-dot" style="background:#FFFFFF;border:1px solid #ccc"></div>通常</div>
+      <div class="print-legend-item"><div class="print-legend-dot" style="background:#FFF3CD;border:1px solid #7B4F00"></div>遅出</div>
+      <div class="print-legend-item"><div class="print-legend-dot" style="background:#E2D9F3;border:1px solid #4A148C"></div>有給</div>
+      <div class="print-legend-item"><div class="print-legend-dot" style="background:#FFE5CC;border:1px solid #7B3100"></div>希望休</div>
+      <div class="print-legend-item"><div class="print-legend-dot" style="background:#F8F9FA;border:1px solid #ccc"></div>公休</div>
+    </div>`;
+
+  // DH・DA人数集計行の生成
+  const makeCountRow=(label, roleIds)=>{
+    let r=`<tr><td class="staff-col" style="font-size:7.5pt;font-weight:700;background:#EEF2F7!important;color:#2C5F82!important;">${label}</td>`;
+    for(let d=1;d<=days;d++){
+      const ds=dateStr(y,m,d);
+      const off=isOffDay(y,m,d);
+      if(off){ r+=`<td class="print-off-day" style="font-size:8pt;">─</td>`; continue; }
+      const count=roleIds.filter(id=>{
+        const k=shiftData[id]?.[ds]||'';
+        return k==='early'||k==='late'||k==='fixed'||k==='admin'||k==='paid';
+      }).length;
+      const color=count>=5?'#155724':count>=3?'#004085':'#7B3100';
+      r+=`<td style="font-size:9pt;font-weight:800;color:${color};background:#EEF2F7!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;">${count}</td>`;
+    }
+    return r+`</tr>`;
+  };
+
+  const dhIds=dhStaff.map(s=>s.id);
+  const daIds=daStaff.map(s=>s.id);
+
+  let html=`<div class="print-header">🦷 ${monthStr}</div>${legend}`;
+  html+=`<table class="print-table"><thead>${makeHeader()}</thead><tbody>`;
+  html+=makeGroupRow('DR（歯科医師）');
+  drStaff.forEach(s=>{ html+=makeRow(s); });
+  html+=makeGroupRow('DH（歯科衛生士）');
+  dhStaff.forEach(s=>{ html+=makeRow(s); });
+  html+=makeGroupRow('DA（歯科助手/事務）');
+  daStaff.forEach(s=>{ html+=makeRow(s); });
+  html+=makeGroupRow('集計');
+  html+=makeCountRow('DH人数', dhIds);
+  html+=makeCountRow('DA人数', daIds);
+  html+=`</tbody></table>`;
+
+  const area=document.getElementById('printArea');
+  area.innerHTML=html;
+  area.style.display='block';
+  setTimeout(()=>{
+    window.print();
+    area.style.display='none';
+  }, 150);
+}
+
+function adjustHours(){}  // 新ロジックでは不使用
+
+// ──────────────────────────────────────────────
+//  RENDER
+// ──────────────────────────────────────────────
+function render(){
+  const y = currentYear, m = currentMonth;
+  document.getElementById('monthLabel').textContent =
+    `${y}年 ${m+1}月`;
+
+  renderStaffList();
+  renderCalendar();
+  renderSummary();
+  renderAlerts();
+  updateMonthNavButtons();
+}
+
+function renderStaffList(){
+  const el = document.getElementById('staffList');
+  el.innerHTML = '<h3>スタッフ一覧</h3>';
+  const groups = { DR:'DR（歯科医師）', DH:'DH（歯科衛生士）', DA:'DA（歯科助手/事務）' };
+  Object.keys(groups).forEach(role=>{
+    const div = document.createElement('div');
+    div.style.marginBottom = '8px';
+    div.innerHTML = `<div style="font-size:.68rem;color:var(--muted);margin-bottom:4px;">${groups[role]}</div>`;
+    STAFF.filter(s=>s.role===role).forEach(s=>{
+      const h = getHours(s.id, currentYear, currentMonth);
+      const pct = Math.min(100, Math.round(h/160*100));
+      div.innerHTML += `
+        <div class="staff-item">
+          <span class="badge ${role}">${role}</span>
+          <span class="staff-name">${s.name}</span>
+          ${s.type==='full' ? `<span style="font-size:.65rem;color:${h>=155?'var(--teal)':h>=140?'var(--amber)':'var(--red)'};font-family:'DM Mono',monospace;">${h}h</span>` : `<span class="staff-type">${s.type==='director'?'院長':s.type==='part'?'非常勤':s.type==='spot'?'スポット':''}</span>`}
+        </div>
+        ${s.type==='full'?`<div class="hours-bar" style="margin:-4px 0 6px 40px;"><div class="hours-bar-fill" style="width:${pct}%;background:${h>=155?'var(--teal)':h>=140?'var(--amber)':'var(--red)'};"></div></div>`:''}
+      `;
+    });
+    el.appendChild(div);
+  });
+}
+
+function renderCalendar(){
+  const y = currentYear, m = currentMonth;
+  const days = daysInMonth(y, m);
+  const grid = document.getElementById('calGrid');
+  grid.style.setProperty('--days', days);
+  grid.innerHTML = '';
+
+  // ヘッダー行
+  const corner = document.createElement('div');
+  corner.className = 'cal-corner';
+  corner.textContent = 'スタッフ';
+  grid.appendChild(corner);
+
+  for(let d=1; d<=days; d++){
+    const ds = dateStr(y,m,d);
+    const dayDow = dow(y,m,d);
+    const off = isOffDay(y,m,d);
+    const isTod = (y===today.getFullYear() && m===today.getMonth() && d===today.getDate());
+    const el = document.createElement('div');
+    el.className = 'cal-day-header' +
+      (dayDow===0?' sunday':dayDow===6?' saturday':'') +
+      (HOLIDAYS[ds]?' holiday':'') +
+      (off?' off-day':'') +
+      (isTod?' today':'');
+    el.innerHTML = `<div class="day-num">${d}</div><div class="day-name">${dowName(dayDow)}</div>`;
+    grid.appendChild(el);
+  }
+
+  // 各スタッフ行
+  STAFF.forEach(s=>{
+    const nameEl = document.createElement('div');
+    nameEl.className = 'cal-staff-name';
+    const h = getHours(s.id, y, m);
+    nameEl.innerHTML = `<span class="sname">${s.name}</span>
+      ${s.type==='full'?`<span class="shours">${h}h/${160}h</span>`:
+        `<span class="shours" style="color:var(--muted)">${s.type==='director'?'院長':s.type==='part'?'非常勤':'スポット'}</span>`}`;
+    grid.appendChild(nameEl);
+
+    for(let d=1; d<=days; d++){
+      const ds = dateStr(y,m,d);
+      const off = isOffDay(y,m,d);
+      const cell = document.createElement('div');
+      cell.className = 'cal-cell' + (off?' off-day':'');
+
+      if(!off){
+        const k = shiftData[s.id]?.[ds] || '';
+        if(k && k !== 'none'){
+          const chip = document.createElement('div');
+          chip.className = `shift-chip ${k}`;
+          const sh = Object.values(SHIFT).find(x=>x.key===k);
+          chip.innerHTML = sh ? sh.shortLabel.replace('\n','<br>') : k;
+          if(k==='late'){
+            const dot = document.createElement('span');
+            dot.className = 'late-dot';
+            chip.appendChild(dot);
+          }
+          cell.appendChild(chip);
+        } else if(!off) {
+          const chip = document.createElement('div');
+          chip.className = 'shift-chip empty';
+          chip.textContent = '+';
+          cell.appendChild(chip);
+        }
+
+        if(s.id !== 'hanowa' || k==='hanowa'){
+          cell.onclick = () => openModal(s.id, ds);
+        }
+      }
+      grid.appendChild(cell);
+    }
+  });
+
+  // 日別サマリー行（DR+DH）
+  const summaryLabel = document.createElement('div');
+  summaryLabel.className = 'cal-corner';
+  summaryLabel.style.fontSize = '.65rem';
+  summaryLabel.textContent = 'DR+DH';
+  grid.appendChild(summaryLabel);
+
+  for(let d=1; d<=days; d++){
+    const ds = dateStr(y,m,d);
+    const off = isOffDay(y,m,d);
+    const el = document.createElement('div');
+    el.className = 'cal-day-summary' + (off?' off-day':'');
+    if(!off){
+      const drDh = STAFF.filter(s=>(s.role==='DR'||s.role==='DH')).filter(s=>{
+        const k = shiftData[s.id]?.[ds]||'';
+        return k==='early'||k==='late'||k==='fixed'||k==='hanowa';
+      }).length;
+      el.className += drDh >= 5 ? ' ok' : ' ng';
+      el.textContent = drDh;
+    } else {
+      el.textContent = '-';
+    }
+    grid.appendChild(el);
+  }
+
+  // 日別サマリー行（DH+DA）
+  const dhDaLabel = document.createElement('div');
+  dhDaLabel.className = 'cal-corner';
+  dhDaLabel.style.fontSize = '.65rem';
+  dhDaLabel.textContent = 'DH+DA';
+  grid.appendChild(dhDaLabel);
+
+  for(let d=1; d<=days; d++){
+    const ds = dateStr(y,m,d);
+    const off = isOffDay(y,m,d);
+    const el = document.createElement('div');
+    el.className = 'cal-day-summary' + (off?' off-day':'');
+    if(!off){
+      const dhN = STAFF.filter(s=>s.role==='DH'&&s.id!=='hanowa').filter(s=>isWorking(s.id,ds)).length;
+      const daN = ['tamiya','tanaka','momo'].filter(id=>{
+        const k=shiftData[id]?.[ds]||'';
+        return k==='early'||k==='late'||k==='admin'||k==='paid';
+      }).length;
+      const total = dhN + daN;
+      el.className += total >= 6 ? ' ok' : ' ng';
+      el.textContent = total;
+    } else {
+      el.textContent = '-';
+    }
+    grid.appendChild(el);
+  }
+}
+
+function renderSummary(){
+  const y = currentYear, m = currentMonth;
+  const days = daysInMonth(y, m);
+  let workdays=0, dhshort=0, ngdays=0, paid=0, hanowa=0;
+
+  for(let d=1; d<=days; d++){
+    const ds = dateStr(y,m,d);
+    if(isOffDay(y,m,d)) continue;
+    workdays++;
+
+    const drDh = STAFF.filter(s=>(s.role==='DR'||s.role==='DH')).filter(s=>{
+      const k = shiftData[s.id]?.[ds]||'';
+      return k==='early'||k==='late'||k==='fixed'||k==='hanowa';
+    }).length;
+    if(drDh < 5) ngdays++;
+
+    if(shiftData['hanowa']?.[ds]==='hanowa') hanowa++;
+  }
+
+  STAFF.forEach(s=>{
+    for(let d=1; d<=days; d++){
+      const ds = dateStr(y,m,d);
+      if(shiftData[s.id]?.[ds]==='paid') paid++;
+    }
+  });
+
+  document.getElementById('s-workdays').textContent = `${workdays}日`;
+  document.getElementById('s-dhshort').textContent = `${dhshort}日`;
+  document.getElementById('s-ngdays').textContent = `${ngdays}日`;
+  document.getElementById('s-paid').textContent = `${paid}件`;
+  document.getElementById('s-hanowa').textContent = `${hanowa}日`;
+  document.getElementById('s-ngdays').className = ngdays>0?'value alert':'value';
+
+  // sidebar summary
+  const sl = document.getElementById('summaryList');
+  sl.innerHTML = '';
+  STAFF.filter(s=>s.type==='full').forEach(s=>{
+    const h = getHours(s.id, y, m);
+    const pct = Math.round(h/160*100);
+    const color = h>=155?'var(--teal)':h>=140?'var(--amber)':'var(--red)';
+    sl.innerHTML += `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+      <span>${s.name}</span>
+      <span style="font-family:'DM Mono',monospace;font-size:.8rem;color:${color};">${h}h <span style="color:var(--muted);font-size:.7rem;">(${pct}%)</span></span>
+    </div>`;
+  });
+}
+
+function renderAlerts(){
+  const el = document.getElementById('alertLog');
+  if(alertMessages.length===0){
+    el.innerHTML = '<div style="font-size:.75rem;color:var(--muted);">ログなし</div>';
+    return;
+  }
+  el.innerHTML = alertMessages.slice(-20).reverse().map(a=>`
+    <div class="log-item ${a.type}">
+      <span style="opacity:.6;font-size:.65rem;white-space:nowrap;">${a.time}</span>
+      <span>${a.msg}</span>
+    </div>`).join('');
+}
+
+// ──────────────────────────────────────────────
+//  MODAL
+// ──────────────────────────────────────────────
+function openModal(staffId, ds){
+  modalStaffId = staffId;
+  modalDateStr = ds;
+  const staff = STAFF.find(s=>s.id===staffId);
+  const current = shiftData[staffId]?.[ds] || '';
+
+  document.getElementById('modalTitle').textContent =
+    `${staff.name} ─ ${ds.slice(5).replace('-','/')}`;
+
+  const choices = document.getElementById('shiftChoices');
+  choices.innerHTML = '';
+
+  const options = staff.role==='DA' && staff.admin
+    ? [SHIFT.EARLY, SHIFT.LATE, SHIFT.ADMIN, SHIFT.OFF, SHIFT.PAID, SHIFT.WISH]
+    : staff.type==='spot'
+    ? [SHIFT.HANOWA, SHIFT.NONE]
+    : [SHIFT.EARLY, SHIFT.LATE, SHIFT.OFF, SHIFT.PAID, SHIFT.WISH];
+
+  options.forEach(sh=>{
+    const btn = document.createElement('button');
+    const colors = {
+      early:'#E8F5E9;color:#2E7D32',
+      late:'#E3F2FD;color:#1565C0',
+      off:'#FFEBEE;color:#C62828',
+      paid:'#F3E5F5;color:#6A1B9A',
+      wish:'#FFF8E1;color:#F57F17',
+      fixed:'#E0F7FA;color:#006064',
+      admin:'#F5F5F5;color:#616161',
+      hanowa:'#FCE4EC;color:#880E4F',
+      none:'#F8F8F8;color:#9E9E9E',
+    };
+    btn.style.cssText = `background:${(colors[sh.key]||'#eee').split(';')[0]};${colors[sh.key]?.split(';')[1]||''}`;
+    btn.innerHTML = sh.label.replace('\n','<br>') + `<br><span style="font-size:.62rem;opacity:.7;">${sh.hours}h</span>`;
+    if(sh.key===current) btn.classList.add('selected');
+    btn.onclick = ()=>{
+      choices.querySelectorAll('button').forEach(b=>b.classList.remove('selected'));
+      btn.classList.add('selected');
+      modalSelected = sh.key;
+    };
+    choices.appendChild(btn);
+  });
+
+  modalSelected = current;
+  document.getElementById('editModal').classList.add('open');
+}
+
+function closeModal(){
+  document.getElementById('editModal').classList.remove('open');
+  modalStaffId = modalDateStr = modalSelected = null;
+}
+
+function applyModal(){
+  if(!modalStaffId || !modalDateStr) return;
+  if(!shiftData[modalStaffId]) shiftData[modalStaffId] = {};
+  shiftData[modalStaffId][modalDateStr] = modalSelected;
+
+  // 有給フラグ同期
+  if(modalSelected==='paid'){
+    if(!paidData[modalStaffId]) paidData[modalStaffId] = {};
+    paidData[modalStaffId][modalDateStr] = true;
+  }
+  if(modalSelected==='wish'){
+    if(!wishData[modalStaffId]) wishData[modalStaffId] = {};
+    wishData[modalStaffId][modalDateStr] = true;
+  }
+
+  closeModal();
+  render();
+  saveCurrentShift(); // 手動編集後も保存
+}
+
+// Close modal on overlay click
+document.getElementById('editModal').addEventListener('click', function(e){
+  if(e.target===this) closeModal();
+});
+
+// ──────────────────────────────────────────────
+//  EXPORT CSV
+// ──────────────────────────────────────────────
+function exportCSV(){
+  const y = currentYear, m = currentMonth;
+  const days = daysInMonth(y, m);
+  const headers = ['スタッフ','役職','雇用'].concat(
+    Array.from({length:days},(_,i)=>`${m+1}/${i+1}`)
+  ).concat(['合計時間']);
+
+  const rows = STAFF.map(s=>{
+    const cells = [s.name, s.role, s.type==='full'?'常勤':s.type==='director'?'院長':s.type==='part'?'非常勤':'スポット'];
+    for(let d=1; d<=days; d++){
+      const ds = dateStr(y,m,d);
+      const k = shiftData[s.id]?.[ds]||'-';
+      const sh = Object.values(SHIFT).find(x=>x.key===k);
+      cells.push(sh?sh.shortLabel:k==='none'?'休診':'-');
+    }
+    cells.push(getHours(s.id, y, m));
+    return cells;
+  });
+
+  const csv = [headers, ...rows].map(r=>r.map(c=>`"${c}"`).join(',')).join('\n');
+  const blob = new Blob(['\uFEFF'+csv], {type:'text/csv;charset=utf-8;'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `シフト_${y}年${m+1}月.csv`;
+  a.click();
+}
+
+// ──────────────────────────────────────────────
+//  CLEAR
+// ──────────────────────────────────────────────
+function clearShift(){
+  if(!confirm('シフトデータをすべてクリアしますか？')) return;
+  shiftData = {};
+  wishData = {};
+  paidData = {};
+  clearAlerts();
+  render();
+}
+
+// ──────────────────────────────────────────────
+//  INIT  (呼ばれるのはログイン後)
+// ──────────────────────────────────────────────
+// render() はログイン後に呼ぶ → ここでは呼ばない
+
+// ══════════════════════════════════════════════
+//  ADMIN: 申請承認
+// ══════════════════════════════════════════════
+// ══════════════════════════════════════════════
+//  スタッフ管理（Firebase連携）
+// ══════════════════════════════════════════════
+function openStaffMgr(){
+  resetStaffForm();
+  renderStaffMgrList();
+  document.getElementById('staffMgrModal').classList.add('open');
+}
+
+function renderStaffMgrList(){
+  const el = document.getElementById('staffMgrList');
+  const typeLabel = { full:'常勤160h', part:'非常勤', spot:'スポット', director:'院長' };
+  const roleColor = { DR:'#E3F2FD', DH:'#E8F5E9', DA:'#FFF3E0' };
+  el.innerHTML = `<div style="font-size:.8rem;color:#888;margin-bottom:6px;">登録スタッフ ${STAFF.length}名</div>` +
+    STAFF.map(s=>{
+      const isDefault = !!DEFAULT_STAFF.find(d=>d.id===s.id);
+      const initPass = DEFAULT_PASSWORDS[s.id] || (extraStaff.find(x=>x.id===s.id)?.password) || '----';
+      const currentPass = STAFF_PASSWORDS[s.id] || initPass;
+      const isChanged = currentPass !== initPass;
+      return `
+      <div style="display:flex;align-items:center;gap:6px;padding:7px 10px;border-radius:10px;background:${roleColor[s.role]||'#f5f5f5'};margin-bottom:5px;">
+        <span style="font-weight:700;font-size:.8rem;min-width:22px;color:#555;">${s.role}</span>
+        <span style="font-weight:700;flex:1;font-size:.9rem;">${s.name}</span>
+        <span style="font-size:.7rem;color:#aaa;font-family:monospace;">${currentPass}${isChanged?'🔄':''}</span>
+        ${s.satFixed||s.satMandatory?'<span style="font-size:.68rem;background:#fff3e0;color:#e65100;padding:1px 5px;border-radius:8px;">土曜固定</span>':''}
+        <button onclick="resetPassword('${s.id}')" style="font-size:.72rem;padding:3px 8px;border-radius:6px;border:1px solid #ffe0b2;background:#fff3e0;color:#e65100;cursor:pointer;">リセット</button>
+        ${isDefault
+          ? ''
+          : `<button onclick="editStaff('${s.id}')" style="font-size:.72rem;padding:3px 8px;border-radius:6px;border:1px solid #bbdefb;background:#e3f2fd;color:#1565c0;cursor:pointer;">編集</button>
+             <button onclick="removeStaff('${s.id}')" style="font-size:.72rem;padding:3px 8px;border-radius:6px;border:1px solid #ffcdd2;background:#ffebee;color:#c62828;cursor:pointer;">削除</button>`
+        }
+      </div>`;
+    }).join('');
+}
+
+function resetPassword(id){
+  const s = STAFF.find(x=>x.id===id);
+  if(!s) return;
+  const initPass = DEFAULT_PASSWORDS[id] || extraStaff.find(x=>x.id===id)?.password;
+  if(!initPass){ alert('初期パスワードが見つかりません'); return; }
+  if(!confirm(`${s.name} のパスワードを初期値（${initPass}）に戻しますか？`)) return;
+  STAFF_PASSWORDS[id] = initPass;
+  savePasswords();
+  renderStaffMgrList();
+  renderLoginHint();
+  // 結果表示
+  const result = document.getElementById('staffMgrResult');
+  result.textContent = `✅ ${s.name} のパスワードを ${initPass} にリセットしました`;
+  result.style.color = 'var(--teal)';
+  setTimeout(()=>{ result.textContent=''; }, 4000);
+}
+
+function renderLoginHint(){
+  const el = document.getElementById('loginHint');
+  if(!el) return;
+  const groups = { DR:[], DH:[], DA:[] };
+  STAFF.filter(s=>!s.kyoseiDoc && s.type!=='spot').forEach(s=>{
+    if(groups[s.role]) groups[s.role].push(`${s.name}:${STAFF_PASSWORDS[s.id]||'----'}`);
+  });
+  el.innerHTML = `🔑 <strong>初期パスワード</strong><br>
+    <strong>DR</strong>　${groups.DR.join('　')}<br>
+    <strong>DH</strong>　${groups.DH.slice(0,3).join('　')}<br>
+    ${groups.DH.length>3?'　　'+groups.DH.slice(3).join('　')+'<br>':''}
+    <strong>DA</strong>　${groups.DA.join('　')}<br><br>
+    <span style="color:#888;font-size:.8rem;">パスワードはログイン後に変更してください</span>`;
+}
+
+function autoGenPassword(){
+  // 編集中は変更しない
+  if(document.getElementById('editStaffId').value) return;
+  const role = document.getElementById('newStaffRole').value;
+  const prefix = role==='DR' ? 1000 : role==='DH' ? 2000 : 3000;
+  // 既存パスワードから同じ帯の最大番号を取得
+  const used = Object.values(STAFF_PASSWORDS)
+    .map(p=>parseInt(p)||0)
+    .filter(n=>n>=prefix && n<prefix+1000);
+  const max = used.length > 0 ? Math.max(...used) : prefix;
+  const next = max + 1;
+  document.getElementById('newStaffPass').value = String(next);
+}
+
+function toggleStaffOpt(inputId, btnId){
+  const inp = document.getElementById(inputId);
+  const btn = document.getElementById(btnId);
+  const on = inp.value === '1';
+  inp.value = on ? '0' : '1';
+  btn.style.background = on ? '#f5f5f5' : '#E8F5E9';
+  btn.style.color = on ? '#888' : '#2E7D32';
+  btn.style.borderColor = on ? '#ddd' : '#81C784';
+}
+
+function setStaffOpt(inputId, btnId, val){
+  const inp = document.getElementById(inputId);
+  const btn = document.getElementById(btnId);
+  inp.value = val ? '1' : '0';
+  btn.style.background = val ? '#E8F5E9' : '#f5f5f5';
+  btn.style.color = val ? '#2E7D32' : '#888';
+  btn.style.borderColor = val ? '#81C784' : '#ddd';
+}
+
+function editStaff(id){
+  const s = STAFF.find(x=>x.id===id);
+  if(!s) return;
+  document.getElementById('staffMgrFormTitle').textContent = '✏️ 編集: '+s.name;
+  document.getElementById('editStaffId').value = id;
+  document.getElementById('newStaffName').value = s.name;
+  document.getElementById('newStaffRole').value = s.role;
+  document.getElementById('newStaffType').value = s.type;
+  document.getElementById('newStaffPass').value = STAFF_PASSWORDS[id]||'';
+  document.getElementById('newStaffPass').readOnly = false;
+  document.getElementById('newStaffPass').style.background = '#fff';
+  document.getElementById('passAutoLabel').style.display = 'none';
+  setStaffOpt('newStaffSat','btnNewStaffSat', !!(s.satFixed||s.satMandatory));
+  setStaffOpt('newStaffUketsuke','btnNewStaffUketsuke', !!s.uketsuke);
+}
+
+function resetStaffForm(){
+  document.getElementById('staffMgrFormTitle').textContent = '➕ 新規登録';
+  document.getElementById('editStaffId').value = '';
+  document.getElementById('newStaffName').value = '';
+  document.getElementById('newStaffRole').value = 'DH';
+  document.getElementById('newStaffType').value = 'full';
+  document.getElementById('newStaffPass').readOnly = true;
+  document.getElementById('newStaffPass').style.background = '#f9f9f9';
+  document.getElementById('passAutoLabel').style.display = '';
+  setStaffOpt('newStaffSat','btnNewStaffSat', false);
+  setStaffOpt('newStaffUketsuke','btnNewStaffUketsuke', false);
+  document.getElementById('staffMgrResult').textContent = '';
+  autoGenPassword();
+}
+
+function submitStaffForm(){
+  const result  = document.getElementById('staffMgrResult');
+  const editId  = document.getElementById('editStaffId').value;
+  const name    = document.getElementById('newStaffName').value.trim();
+  const role    = document.getElementById('newStaffRole').value;
+  const type    = document.getElementById('newStaffType').value;
+  const pass    = document.getElementById('newStaffPass').value.trim();
+  const sat     = document.getElementById('newStaffSat').value === '1';
+  const uke     = document.getElementById('newStaffUketsuke').value === '1';
+
+  if(!name){ result.textContent='名前を入力してください'; result.style.color='var(--red)'; return; }
+  if(!pass){ result.textContent='パスワードを入力してください'; result.style.color='var(--red)'; return; }
+
+  // IDは編集時はそのまま、新規はタイムスタンプから自動生成
+  const id = editId || 'staff_' + Date.now();
+
+  const staffObj = { id, name, role, type, password: pass };
+  if(sat) staffObj.satFixed = true;
+  if(uke) staffObj.uketsuke = true;
+
+  // Firebaseに保存
+  if(window._fb){
+    const { db, ref, set } = window._fb;
+    set(ref(db, 'extra_staff/'+id), staffObj);
+  }
+  // パスワードを即時反映
+  STAFF_PASSWORDS[id] = pass;
+  savePasswords();
+
+  result.textContent = `✅ ${name} を${editId?'更新':'登録'}しました`;
+  result.style.color = 'var(--teal)';
+  setTimeout(()=>{ result.textContent=''; }, 3000);
+  resetStaffForm();
+  renderStaffMgrList();
+  renderStaffList();
+}
+
+function removeStaff(id){
+  const s = STAFF.find(x=>x.id===id);
+  if(!s) return;
+  if(!confirm(`${s.name} を削除しますか？\nこの操作は取り消せません。`)) return;
+  if(window._fb){
+    const { db, ref, remove } = window._fb;
+    remove(ref(db, 'extra_staff/'+id));
+  }
+  delete STAFF_PASSWORDS[id];
+  savePasswords();
+  renderStaffMgrList();
+  renderStaffList();
+}
+
+function openApprovalModal(){
+  // スタッフフィルターを初期化
+  const sel = document.getElementById('approvalStaffFilter');
+  sel.innerHTML = '<option value="all">全スタッフ</option>';
+  STAFF.filter(s=>s.type==='full'||s.type==='director').forEach(s=>{
+    sel.innerHTML += `<option value="${s.id}">${s.name}</option>`;
+  });
+  renderApprovalList();
+  document.getElementById('approvalModal').classList.add('open');
+}
+
+function renderApprovalList(){
+  const el   = document.getElementById('approvalList');
+  const filterStatus = document.getElementById('approvalFilter')?.value || 'all';
+  const filterStaff  = document.getElementById('approvalStaffFilter')?.value || 'all';
+
+  let list = requestData.filter(r=>!r.cancelled).slice().reverse();
+  if(filterStatus!=='all') list=list.filter(r=>r.status===filterStatus);
+  if(filterStaff!=='all')  list=list.filter(r=>r.staffId===filterStaff);
+
+  if(list.length===0){
+    el.innerHTML = '<div style="font-size:.82rem;color:var(--muted);padding:8px;">該当する申請がありません</div>';
+    return;
+  }
+  const typeLabel   = { wish:'🌸 希望休', paid:'💚 有給', work:'📅 出勤希望' };
+  const statusLabel = { pending:'承認待ち', approved:'承認済み', rejected:'却下' };
+  const staffName   = id => STAFF.find(s=>s.id===id)?.name || id;
+
+  // 未承認件数
+  const pendingCount = requestData.filter(r=>r.status==='pending'&&!r.cancelled).length;
+  el.innerHTML = (pendingCount>0
+    ? `<div style="font-size:.8rem;background:#FFF3E0;color:#E65100;padding:8px 12px;border-radius:8px;margin-bottom:10px;font-weight:600;">⚠️ 承認待ちが${pendingCount}件あります</div>`
+    : '') +
+  list.map(r=>`
+    <div class="req-item" style="flex-wrap:wrap;gap:8px;padding:10px 12px;">
+      <span style="font-weight:700;min-width:52px;">${staffName(r.staffId)}</span>
+      <span class="req-date">${r.date.slice(5).replace('-','/')}</span>
+      <span class="req-type-badge" style="background:${r.type==='paid'?'#F3E5F5':'#FFF8E1'};color:${r.type==='paid'?'#6A1B9A':'#F57F17'}">${typeLabel[r.type]}</span>
+      ${r.comment?`<span style="color:var(--muted);font-size:.75rem;flex:1;">${r.comment}</span>`:'<span style="flex:1"></span>'}
+      ${`<span class="req-status ${r.status}">${statusLabel[r.status]||r.status}</span>`}
+      <div style="width:100%;font-size:.72rem;color:#bbb;text-align:right;">${r.submittedAt}</div>
+    </div>`).join('');
+}
+
+function approveReq(id){
+  const r = requestData.find(x=>x.id===id);
+  if(!r) return;
+  r.status = 'approved';
+  if(!shiftData[r.staffId]) shiftData[r.staffId]={};
+  shiftData[r.staffId][r.date] = r.type;
+  if(r.type==='paid'){
+    if(!paidData[r.staffId]) paidData[r.staffId]={};
+    paidData[r.staffId][r.date]=true;
+  } else {
+    if(!wishData[r.staffId]) wishData[r.staffId]={};
+    wishData[r.staffId][r.date]=true;
+  }
+  addAlert('info',`${r.date} ${STAFF.find(s=>s.id===r.staffId)?.name}の${r.type==='paid'?'有給':'希望休'}を承認`);
+  renderApprovalList(); render();
+}
+
+function rejectReq(id){
+  const r = requestData.find(x=>x.id===id);
+  if(!r) return;
+  r.status='rejected';
+  addAlert('warn',`${r.date} ${STAFF.find(s=>s.id===r.staffId)?.name}の申請を却下`);
+  renderApprovalList();
+}
+
+// ══════════════════════════════════════════════
+//  AUTH / LOGIN
+// ══════════════════════════════════════════════
+
+// スタッフの初期パスワード（数字4桁）
+const DEFAULT_PASSWORDS = {
+  sugihira:'1001', shimanaka:'1002', hokari:'1003', shinoda:'1004',
+  tsuruta:'2001',  yoshida:'2002',   takagi:'2003', matsumoto:'2004',
+  nozaki:'2005',   yamada:'2006',
+  tamiya:'3001',   tanaka:'3002',    momo:'3003',
+};
+// デフォルト＋localStorageの変更をマージ（Firebase同期前の暫定値）
+let STAFF_PASSWORDS = Object.assign({}, DEFAULT_PASSWORDS,
+  JSON.parse(localStorage.getItem('carmia_passwords')||'{}'));
+
+function savePasswords(){
+  // FirebaseとlocalStorage両方に保存
+  localStorage.setItem('carmia_passwords', JSON.stringify(STAFF_PASSWORDS));
+  if(window._fb){
+    const { db, ref, set } = window._fb;
+    set(ref(db, 'passwords'), STAFF_PASSWORDS);
+  }
+}
+
+let loginRole = 'staff'; // 'admin' | 'staff'
+let currentUser = null;  // { role, staffId, name }
+
+// 申請データ（Firebaseからリアルタイム同期）
+let requestData = [];
+
+// Firebase準備完了後にリアルタイム同期を開始
+window.addEventListener('firebaseReady', ()=>{
+  const { db, ref, onValue } = window._fb;
+
+  // パスワードのリアルタイム同期
+  onValue(ref(db, 'passwords'), (snapshot)=>{
+    const data = snapshot.val();
+    if(data){
+      // FirebaseのデータでSTAFF_PASSWORDSを更新
+      Object.assign(STAFF_PASSWORDS, data);
+      localStorage.setItem('carmia_passwords', JSON.stringify(STAFF_PASSWORDS));
+      renderLoginHint();
+    }
+  });
+
+  // 申請データのリアルタイム同期
+  onValue(ref(db, 'requests'), (snapshot)=>{
+    const data = snapshot.val();
+    requestData = data ? Object.values(data) : [];
+    if(currentUser){
+      if(currentUser.role==='admin') renderApprovalList();
+      else renderStaffRequestList();
+    }
+  });
+
+  // シフトデータのリアルタイム同期
+  onValue(ref(db, 'shifts'), (snapshot)=>{
+    const data = snapshot.val();
+    if(data){
+      allShiftData = data;
+      loadShiftForMonth(currentYear, currentMonth);
+      if(currentUser?.role==='admin') render();
+      else if(currentUser?.role==='staff') renderStaffMonthGrid(currentUser.staffId);
+    }
+  });
+
+  // スタッフデータのリアルタイム同期
+  onValue(ref(db, 'extra_staff'), (snapshot)=>{
+    const data = snapshot.val();
+    extraStaff = data ? Object.values(data) : [];
+    STAFF = [...DEFAULT_STAFF, ...extraStaff];
+    // パスワードも反映
+    extraStaff.forEach(s=>{ if(s.password) STAFF_PASSWORDS[s.id]=s.password; });
+    renderLoginHint();
+    if(currentUser?.role==='admin'){
+      renderStaffList();
+      if(document.getElementById('staffMgrModal')?.classList.contains('open')) renderStaffMgrList();
+    }
+  });
+});
+
+function setLoginRole(role, el){
+  loginRole = role;
+  document.querySelectorAll('.login-role-tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('adminLoginForm').style.display = role==='admin' ? '' : 'none';
+  document.getElementById('staffLoginForm').style.display = role==='staff' ? '' : 'none';
+  document.getElementById('loginError').textContent = '';
+}
+
+// ── ポータルからの自動ログイン ──────────────────────────────
+function checkPortalAutoLogin(){
+  try {
+    const params = new URLSearchParams(window.location.search);
+    window.history.replaceState({}, '', window.location.pathname);
+
+    // 管理者自動ログイン
+    if(params.get('admin') === '1'){
+      currentUser = { role:'admin', name:'管理者' };
+      showAdminApp();
+      return;
+    }
+
+    // スタッフ自動ログイン
+    const sid  = params.get('sid');
+    const pass = params.get('p');
+    if(!sid || !pass) return;
+    if(pass !== STAFF_PASSWORDS[sid]) return;
+    const s = STAFF.find(x => x.id === sid);
+    if(!s) return;
+    currentUser = { role:'staff', staffId:s.id, name:s.name };
+    showStaffApp();
+  } catch(e) { /* 失敗時は管理者ログイン画面のまま */ }
+}
+
+function doLogin(){
+  // 管理者専用（スタッフはポータルから自動ログイン）
+  const err = document.getElementById('loginError');
+  err.textContent = '';
+  const pass = document.getElementById('adminPass').value;
+  if(pass === 'admin'){
+    currentUser = { role:'admin', name:'管理者' };
+    showAdminApp();
+  } else {
+    err.textContent = 'パスワードが違います';
+    document.getElementById('adminPass').value = '';
+  }
+}
+
+function doLogout(){
+  const wasStaff = currentUser?.role === 'staff';
+  currentUser = null;
+  document.getElementById('loginScreen').style.display = 'flex';
+  document.getElementById('mainApp').style.display    = 'none';
+  document.getElementById('staffScreen').style.display = 'none';
+  document.getElementById('adminPass').value  = '';
+  document.getElementById('staffPass').value  = '';
+  document.getElementById('staffSelect').value = '';
+  document.getElementById('loginError').textContent = '';
+  // スタッフはポータルに戻る
+  if(wasStaff){
+    window.location.href = 'https://kalmia-dc.github.io/portal/';
+  }
+}
+
+function showAdminApp(){
+  document.getElementById('loginScreen').style.display  = 'none';
+  document.getElementById('staffScreen').style.display  = 'none';
+  document.getElementById('mainApp').style.display      = 'block';
+  render();
+}
+
+function showStaffApp(){
+  document.getElementById('loginScreen').style.display  = 'none';
+  document.getElementById('mainApp').style.display      = 'none';
+  document.getElementById('staffScreen').style.display  = 'block';
+
+  // 田宮のみ「出勤希望」ボタンを表示、セクションタイトルも変更
+  const isTamiya = currentUser?.staffId === 'tamiya';
+  const workBtn = document.getElementById('reqTypeWork');
+  if(workBtn) workBtn.style.display = isTamiya ? '' : 'none';
+  const title = document.getElementById('reqSectionTitle');
+  if(title) title.textContent = isTamiya ? '📝 出勤・休暇申請' : '📝 休暇申請';
+
+  // 田宮の初期選択は「出勤希望」
+  if(isTamiya){
+    selectReqType('work', document.getElementById('reqTypeWork'));
+  } else {
+    selectReqType('wish', document.getElementById('reqTypeWish'));
+  }
+
+  renderStaffScreen();
+}
+
+// ══════════════════════════════════════════════
+//  STAFF SCREEN
+// ══════════════════════════════════════════════
+function renderStaffScreen(){
+  if(!currentUser || currentUser.role !== 'staff') return;
+  const sid = currentUser.staffId;
+  const s   = STAFF.find(x=>x.id===sid);
+
+  document.getElementById('staffGreetName').textContent = s.name + ' さん';
+  document.getElementById('profileName').textContent = s.name;
+  document.getElementById('profileRole').textContent =
+    s.role + '（' + (s.type==='full'?'常勤':s.type==='director'?'院長':s.type==='part'?'非常勤':'スポット') + '）';
+
+  // 今日のシフト
+  const td = today;
+  const ds = dateStr(td.getFullYear(), td.getMonth(), td.getDate());
+  const k  = shiftData[sid]?.[ds] || '';
+  const dayNames = ['日','月','火','水','木','金','土'];
+
+  document.getElementById('todayLabel').textContent =
+    `${td.getFullYear()}年${td.getMonth()+1}月${td.getDate()}日（${dayNames[td.getDay()]}）`;
+
+  const shiftInfo = {
+    early: { label:'通常出勤', start:'8:30', end:'18:30', brk:'13:30-15:00', hrs:'9h' },
+    late:  { label:'遅出',     start:'9:00', end:'18:30', brk:'13:30-15:00', hrs:'8.5h' },
+    fixed: { label:'固定勤務', start:'9:00', end:'17:00', brk:'13:30-14:30', hrs:'7h' },
+    admin: { label:'事務勤務', start:'8:30', end:'18:30', brk:'13:30-15:00', hrs:'9h' },
+    hanowa:{ label:'午後出勤', start:'15:00',end:'18:30', brk:'-',           hrs:'3.5h' },
+    off:   { label:'公休日',   start:'-',    end:'-',     brk:'-',           hrs:'-' },
+    paid:  { label:'有給休暇', start:'-',    end:'-',     brk:'-',           hrs:'-' },
+    wish:  { label:'希望休',   start:'-',    end:'-',     brk:'-',           hrs:'-' },
+    none:  { label:'休診日',   start:'-',    end:'-',     brk:'-',           hrs:'-' },
+  };
+  const info = shiftInfo[k] || { label:'未設定', start:'-', end:'-', brk:'-', hrs:'-' };
+
+  const shiftEl = document.getElementById('todayShiftBig');
+  shiftEl.textContent = info.label;
+
+  const badgeEl = document.getElementById('todayShiftBadge');
+  badgeEl.textContent = k==='early'||k==='late'||k==='fixed'||k==='admin'||k==='hanowa'
+    ? '出勤日' : k==='paid' ? '有給休暇' : k==='off' ? '公休' : k==='wish' ? '希望休' : '休診';
+
+  document.getElementById('tcStart').textContent  = info.start;
+  document.getElementById('tcEnd').textContent    = info.end;
+  document.getElementById('tcBreak').textContent  = info.brk;
+  document.getElementById('tcHours').textContent  = info.hrs;
+
+  // 月間カレンダー
+  renderStaffMonthGrid(sid);
+
+  // 労働時間
+  const h = getHours(sid, currentYear, currentMonth);
+  const remain = Math.max(0, 160 - h);
+  const pct = Math.min(100, Math.round(h/160*100));
+  document.getElementById('profileHours').textContent  = h + 'h';
+  document.getElementById('profileRemain').textContent = remain + 'h';
+  document.getElementById('profilePct').textContent    = pct + '%';
+  document.getElementById('profileBar').style.width    = pct + '%';
+
+  // 申請履歴
+  renderRequestHistory(sid);
+}
+
+function renderStaffMonthGrid(sid){
+  const y = currentYear, m = currentMonth;
+  const days = daysInMonth(y, m);
+  const firstDow = new Date(y, m, 1).getDay();
+  const grid = document.getElementById('staffMonthGrid');
+  const title = document.getElementById('staffMonthTitle');
+  if(title) title.textContent = `${y}年${m+1}月`;
+
+  const shiftShort = {
+    early:'通常', late:'遅出', fixed:'固定', admin:'事務',
+    hanowa:'HW', off:'公休', paid:'有給', wish:'希望', none:'-'
+  };
+
+  grid.innerHTML = ['日','月','火','水','木','金','土'].map((d,i)=>
+    `<div class="dow-label" style="color:${i===0?'var(--red)':i===6?'var(--blue)':'var(--muted)'}">${d}</div>`
+  ).join('');
+
+  for(let i=0; i<firstDow; i++){
+    grid.innerHTML += `<div class="staff-day-cell empty"></div>`;
+  }
+
+  for(let d=1; d<=days; d++){
+    const ds  = dateStr(y,m,d);
+    const k   = shiftData[sid]?.[ds] || 'none';
+    const off = isOffDay(y,m,d);
+    const isTod = (y===today.getFullYear() && m===today.getMonth() && d===today.getDate());
+    grid.innerHTML += `
+      <div class="staff-day-cell ${off?'none':k} ${isTod?'today-cell':''}">
+        <span class="d-num">${d}</span>
+        <span class="d-shift">${off?'休':shiftShort[k]||''}</span>
+      </div>`;
+  }
+}
+
+function staffChangeMonth(delta){
+  currentMonth += delta;
+  if(currentMonth > 11){ currentMonth = 0; currentYear++; }
+  if(currentMonth < 0) { currentMonth = 11; currentYear--; }
+  if(currentUser?.role === 'staff'){
+    renderStaffMonthGrid(currentUser.staffId);
+  }
+}
+
+function switchStaffTab(name, el){
+  ['shift','request','profile'].forEach(t=>{
+    document.getElementById('staffTab'+t.charAt(0).toUpperCase()+t.slice(1)).style.display =
+      t===name ? '' : 'none';
+  });
+  document.querySelectorAll('.staff-nav-item').forEach(b=>b.classList.remove('active'));
+  el.classList.add('active');
+  if(name==='profile') renderStaffScreen(); // 時間更新
+}
+
+// ── 申請フォーム ──
+let selectedReqType = 'wish';
+function selectReqType(type, el){
+  selectedReqType = type;
+  document.querySelectorAll('.req-type-btn').forEach(b=>b.classList.remove('selected'));
+  el.classList.add('selected');
+  // コメントラベルと必須表示を切り替え
+  const label = document.getElementById('reqCommentLabel');
+  const input = document.getElementById('reqComment');
+  if(type === 'paid'){
+    label.innerHTML = 'コメント <span style="color:var(--red);font-size:.8rem;">（必須）</span>';
+    input.placeholder = '有給の理由を入力してください';
+  } else {
+    label.textContent = 'コメント（任意）';
+    input.placeholder = '例：私用のため';
+  }
+}
+
+// 選択した申請日リスト
+let reqDateList = [];
+
+function addReqDate(){
+  const input = document.getElementById('reqDate');
+  const date = input.value;
+  if(!date) return;
+  if(reqDateList.includes(date)){
+    document.getElementById('reqResult').textContent = 'すでに追加されています';
+    document.getElementById('reqResult').style.color = 'var(--amber)';
+    return;
+  }
+  // 希望休の場合、土曜日は受け付けない
+  if(selectedReqType==='wish'){
+    const d=new Date(date);
+    if(d.getDay()===6){
+      document.getElementById('reqResult').textContent = '土曜日は希望休を申請できません';
+      document.getElementById('reqResult').style.color = 'var(--red)';
+      setTimeout(()=>{ document.getElementById('reqResult').textContent=''; }, 3000);
+      return;
+    }
+  }
+  reqDateList.push(date);
+  reqDateList.sort();
+  renderReqDateList();
+  input.value = '';
+  document.getElementById('reqResult').textContent = '';
+}
+
+function removeReqDate(date){
+  reqDateList = reqDateList.filter(d=>d!==date);
+  renderReqDateList();
+}
+
+function renderReqDateList(){
+  const el = document.getElementById('reqDateList');
+  if(reqDateList.length===0){ el.innerHTML='<span style="font-size:.8rem;color:var(--muted);">日付を追加してください</span>'; return; }
+  el.innerHTML = reqDateList.map(d=>`
+    <span style="display:inline-flex;align-items:center;gap:4px;background:#E8F5E9;color:#2E7D32;border-radius:20px;padding:4px 10px;font-size:.82rem;font-weight:600;">
+      ${d.slice(5).replace('-','/')}
+      <span onclick="removeReqDate('${d}')" style="cursor:pointer;font-size:1rem;line-height:1;color:#999;margin-left:2px;">✕</span>
+    </span>`).join('');
+}
+
+function submitRequest(){
+  if(!currentUser) return;
+  const result = document.getElementById('reqResult');
+  const comment = document.getElementById('reqComment').value;
+
+  // 日付リストの確認
+  const singleDate = document.getElementById('reqDate').value;
+  if(reqDateList.length===0 && singleDate) reqDateList = [singleDate];
+  if(reqDateList.length===0){
+    result.textContent='日付を追加してください'; result.style.color='var(--red)'; return;
+  }
+
+  // 有給の場合、コメント必須チェック
+  if(selectedReqType==='paid' && !comment.trim()){
+    result.textContent='有給休暇はコメント（理由）が必須です'; result.style.color='var(--red)'; return;
+  }
+
+  // 希望休の場合、土曜日を除外
+  let targetDates = reqDateList;
+  if(selectedReqType==='wish'){
+    const satDates = reqDateList.filter(d=>new Date(d).getDay()===6);
+    targetDates = reqDateList.filter(d=>new Date(d).getDay()!==6);
+    if(satDates.length>0 && targetDates.length===0){
+      result.textContent='土曜日は希望休を申請できません'; result.style.color='var(--red)';
+      return;
+    }
+    if(satDates.length>0){
+      result.textContent=`土曜日(${satDates.length}日)は除外されました`;
+      result.style.color='var(--amber)';
+    }
+  }
+
+  let count=0;
+  for(const date of targetDates){
+    const status = 'approved'; // 有給・希望休ともに即承認
+    const req = {
+      id: Date.now()+count,
+      staffId: currentUser.staffId,
+      date, type: selectedReqType, comment,
+      status,
+      submittedAt: new Date().toLocaleString('ja-JP'),
+      cancelled: false
+    };
+    requestData.push(req);
+    // Firebaseに保存
+    if(window._fb){
+      const { db, ref, set } = window._fb;
+      set(ref(db, 'requests/'+req.id), req);
+    }
+
+    if(!shiftData[currentUser.staffId]) shiftData[currentUser.staffId]={};
+    if(selectedReqType==='paid'){
+      shiftData[currentUser.staffId][date]='paid';
+      if(!paidData[currentUser.staffId]) paidData[currentUser.staffId]={};
+      paidData[currentUser.staffId][date]=true;
+    } else if(selectedReqType==='work'){
+      // 田宮の出勤申請: shiftDataに'early'を設定、wishDataに登録
+      shiftData[currentUser.staffId][date]='early';
+      if(!wishData[currentUser.staffId]) wishData[currentUser.staffId]={};
+      wishData[currentUser.staffId][date]=true;
+    } else {
+      shiftData[currentUser.staffId][date]='wish';
+      if(!wishData[currentUser.staffId]) wishData[currentUser.staffId]={};
+      wishData[currentUser.staffId][date]=true;
+    }
+    count++;
+  }
+
+  result.textContent = selectedReqType==='paid'
+    ? `✅ ${targetDates.length}日分の有給申請を受け付けました（自動承認）`
+    : selectedReqType==='work'
+    ? `✅ ${targetDates.length}日分の出勤希望を受け付けました（自動承認）`
+    : `✅ ${targetDates.length}日分の希望休を受け付けました（自動承認）`;
+  result.style.color='var(--teal)';
+
+  reqDateList=[];
+  renderReqDateList();
+  document.getElementById('reqDate').value='';
+  document.getElementById('reqComment').value='';
+
+  renderRequestHistory(currentUser.staffId);
+  renderStaffMonthGrid(currentUser.staffId);
+  setTimeout(()=>{ result.textContent=''; }, 4000);
+}
+
+function cancelRequest(id){
+  const r = requestData.find(x=>x.id===id);
+  if(!r||r.cancelled) return;
+  r.cancelled=true;
+  r.status='cancelled';
+  // Firebaseに反映
+  if(window._fb){
+    const { db, ref, set } = window._fb;
+    set(ref(db, 'requests/'+r.id), r);
+  }
+  // シフトデータから削除
+  if(shiftData[r.staffId]?.[r.date]===r.type) delete shiftData[r.staffId][r.date];
+  if(r.type==='paid') delete paidData[r.staffId]?.[r.date];
+  else delete wishData[r.staffId]?.[r.date];
+  renderRequestHistory(currentUser.staffId);
+  renderStaffMonthGrid(currentUser.staffId);
+}
+
+function renderRequestHistory(sid){
+  const el   = document.getElementById('requestHistory');
+  const reqs = requestData.filter(r=>r.staffId===sid&&!r.cancelled).reverse();
+  if(reqs.length===0){
+    el.innerHTML = '<div style="font-size:.8rem;color:var(--muted);padding:8px 0;">申請履歴がありません</div>';
+    return;
+  }
+  const typeLabel   = { wish:'🌸 希望休', paid:'💚 有給', work:'📅 出勤希望' };
+  const statusLabel = { pending:'承認待ち', approved:'承認済み', rejected:'却下', cancelled:'取消済' };
+  const statusColor = { pending:'#F57F17', approved:'#2E7D32', rejected:'#C62828', cancelled:'#999' };
+  el.innerHTML = reqs.map(r=>`
+    <div class="req-item" style="gap:8px;">
+      <span class="req-date">${r.date.slice(5).replace('-','/')}</span>
+      <span class="req-type-badge" style="background:${r.type==='paid'?'#F3E5F5':'#FFF8E1'};color:${r.type==='paid'?'#6A1B9A':'#F57F17'}">${typeLabel[r.type]}</span>
+      ${r.comment?`<span style="color:var(--muted);font-size:.75rem;flex:1;">${r.comment}</span>`:'<span style="flex:1"></span>'}
+      <span style="font-size:.75rem;font-weight:600;color:${statusColor[r.status]||'#999'}">${statusLabel[r.status]||r.status}</span>
+      ${r.status==='pending'?`<button onclick="cancelRequest(${r.id})" style="font-size:.72rem;padding:3px 8px;border-radius:8px;border:1px solid #ddd;background:#fff;color:var(--red);cursor:pointer;">取消</button>`:''}
+    </div>`).join('');
+}
+</script>
+<div id="printArea" style="display:none;"></div>
+</body>
+</html>

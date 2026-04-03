@@ -1,0 +1,950 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>カルミアデンタル スタッフポータル</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Zen+Maru+Gothic:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --mint: #4ecdc4;
+    --coral: #ff6b6b;
+    --yellow: #ffd93d;
+    --lavender: #a29bfe;
+    --sky: #74b9ff;
+    --pink: #fd79a8;
+    --bg: #f0f8ff;
+    --white: #ffffff;
+    --dark: #2d3436;
+    --gray: #636e72;
+    --light-gray: #dfe6e9;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Zen Maru Gothic',sans-serif; background:var(--bg); color:var(--dark); min-height:100vh; overflow-x:hidden; }
+
+  /* ── LOGIN ── */
+  #loginScreen {
+    min-height:100vh;
+    background:linear-gradient(135deg,#667eea 0%,#764ba2 40%,#f64f59 80%,#f7971e 100%);
+    display:flex; flex-direction:column; align-items:center; justify-content:center; padding:32px 24px;
+  }
+  .login-logo { font-size:52px; margin-bottom:12px; }
+  .login-title { font-family:'Nunito',sans-serif; font-weight:900; font-size:22px; color:white; margin-bottom:4px; text-align:center; }
+  .login-sub { font-size:12px; color:rgba(255,255,255,0.7); margin-bottom:32px; letter-spacing:0.1em; }
+  .login-card { background:white; border-radius:24px; padding:28px 24px; width:100%; max-width:360px; box-shadow:0 20px 60px rgba(0,0,0,0.2); }
+  .login-label { font-size:12px; font-weight:700; color:var(--gray); margin-bottom:8px; display:block; }
+  .login-select, .login-input {
+    width:100%; padding:12px 14px; border:2px solid var(--light-gray); border-radius:12px;
+    font-family:'Zen Maru Gothic',sans-serif; font-size:14px; margin-bottom:16px;
+    outline:none; transition:border-color .2s; background:white;
+  }
+  .login-select:focus, .login-input:focus { border-color:var(--mint); }
+  .login-btn {
+    width:100%; padding:14px;
+    background:linear-gradient(135deg,var(--mint),var(--sky));
+    color:white; border:none; border-radius:14px;
+    font-family:'Nunito',sans-serif; font-weight:800; font-size:16px;
+    cursor:pointer; transition:transform .2s, box-shadow .2s;
+  }
+  .login-btn:hover { transform:translateY(-2px); box-shadow:0 6px 20px rgba(78,205,196,.4); }
+  .login-error { color:var(--coral); font-size:12px; text-align:center; margin-top:10px; display:none; }
+
+  /* ── APP ── */
+  #app { display:none; }
+
+  /* ── HEADER ── */
+  header {
+    background:white; padding:0 24px; height:64px;
+    display:flex; align-items:center; justify-content:space-between;
+    box-shadow:0 2px 12px rgba(0,0,0,.08); position:sticky; top:0; z-index:100;
+  }
+  .logo { display:flex; align-items:center; gap:10px; text-decoration:none; }
+  .logo-icon { width:40px; height:40px; background:linear-gradient(135deg,var(--mint),var(--sky)); border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:22px; }
+  .logo-text { font-family:'Nunito',sans-serif; font-weight:900; font-size:18px; color:var(--dark); line-height:1.1; }
+  .logo-sub { font-size:10px; color:var(--gray); font-weight:600; letter-spacing:.05em; }
+  .header-right { display:flex; align-items:center; gap:12px; }
+  .today-badge { background:linear-gradient(135deg,var(--mint),var(--sky)); color:white; font-family:'Nunito',sans-serif; font-weight:700; font-size:13px; padding:6px 14px; border-radius:20px; }
+  .avatar { width:36px; height:36px; background:linear-gradient(135deg,var(--coral),var(--pink)); border-radius:50%; display:flex; align-items:center; justify-content:center; color:white; font-weight:700; font-size:14px; cursor:pointer; }
+
+  /* ── HERO ── */
+  .hero {
+    background:linear-gradient(135deg,#667eea 0%,#764ba2 30%,#f64f59 70%,#f7971e 100%);
+    padding:28px 24px 24px; position:relative; overflow:hidden;
+  }
+  .hero::before { content:''; position:absolute; top:-40px; right:-40px; width:200px; height:200px; background:rgba(255,255,255,.08); border-radius:50%; }
+  .hero::after  { content:''; position:absolute; bottom:-60px; left:30%; width:160px; height:160px; background:rgba(255,255,255,.06); border-radius:50%; }
+  .hero-greeting { color:rgba(255,255,255,.85); font-size:14px; margin-bottom:4px; }
+  .hero-title { color:white; font-family:'Nunito',sans-serif; font-size:26px; font-weight:900; margin-bottom:14px; }
+  .hero-title span { background:rgba(255,255,255,.25); padding:2px 10px; border-radius:8px; }
+
+  /* 今日のシフトカード */
+  .hero-shift-card {
+    background:rgba(255,255,255,.18); backdrop-filter:blur(8px);
+    border-radius:16px; padding:14px 16px; color:white;
+    position:relative; z-index:1; margin-bottom:10px;
+  }
+  .hero-shift-label { font-size:11px; font-weight:700; opacity:.8; letter-spacing:.05em; margin-bottom:8px; }
+  .hero-shift-main { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+  .hero-shift-type { font-family:'Nunito',sans-serif; font-weight:900; font-size:20px; }
+  .hero-shift-type.dim { opacity:.65; font-size:16px; }
+  .hero-shift-time { font-size:13px; opacity:.9; background:rgba(255,255,255,.2); padding:3px 10px; border-radius:20px; }
+  .hero-shift-go {
+    margin-left:auto; background:white; color:var(--mint);
+    font-family:'Nunito',sans-serif; font-weight:800; font-size:12px;
+    padding:7px 16px; border-radius:20px; border:none; cursor:pointer;
+    transition:transform .15s; white-space:nowrap; text-decoration:none; display:inline-block;
+  }
+  .hero-shift-go:hover { transform:scale(1.05); }
+
+  .notice-strip { background:rgba(255,255,255,.15); backdrop-filter:blur(8px); border-radius:12px; padding:10px 14px; color:white; font-size:13px; display:flex; align-items:center; gap:8px; position:relative; z-index:1; }
+  .notice-dot { width:8px; height:8px; background:var(--yellow); border-radius:50%; flex-shrink:0; animation:pulse 1.5s ease-in-out infinite; }
+  @keyframes pulse { 0%,100%{transform:scale(1);opacity:1} 50%{transform:scale(1.3);opacity:.7} }
+
+  /* ── MAIN ── */
+  main { padding:20px 16px 32px; max-width:480px; margin:0 auto; }
+  .section-title { font-family:'Nunito',sans-serif; font-weight:800; font-size:15px; color:var(--gray); letter-spacing:.05em; text-transform:uppercase; margin-bottom:12px; display:flex; align-items:center; gap:6px; }
+
+  /* ── TOOLS ── */
+  .tools-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:12px; margin-bottom:28px; }
+  .tool-item {
+    background:white; border-radius:20px; padding:20px 16px; text-align:center;
+    cursor:pointer; transition:transform .2s, box-shadow .2s;
+    box-shadow:0 2px 8px rgba(0,0,0,.05); text-decoration:none; color:var(--dark);
+    display:block; position:relative;
+  }
+  .tool-item:hover { transform:translateY(-3px); box-shadow:0 8px 24px rgba(0,0,0,.1); }
+  .tool-item.shift-tool { background:linear-gradient(135deg,#e8fdfb,#d4f5f1); border:2px solid #a8ede8; }
+  .tool-icon { font-size:28px; margin-bottom:8px; display:block; }
+  .tool-name { font-size:13px; font-weight:700; line-height:1.3; }
+  .tool-linked-badge { position:absolute; top:10px; right:10px; background:var(--mint); color:white; font-size:9px; font-weight:700; padding:2px 7px; border-radius:8px; }
+
+  /* ── WEEK CALENDAR ── */
+  .shift-preview { background:white; border-radius:20px; padding:18px; margin-bottom:28px; box-shadow:0 2px 12px rgba(0,0,0,.06); }
+  .shift-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
+  .shift-title-text { font-family:'Nunito',sans-serif; font-weight:800; font-size:16px; }
+  .shift-link { font-size:12px; color:var(--mint); font-weight:700; text-decoration:none; cursor:pointer; border:none; background:none; padding:0; }
+  .week-days { display:grid; grid-template-columns:repeat(7,1fr); gap:4px; }
+  .day-col { text-align:center; }
+  .day-name { font-size:10px; color:var(--gray); font-weight:600; margin-bottom:4px; }
+  .day-num { font-family:'Nunito',sans-serif; font-weight:800; font-size:15px; width:32px; height:32px; display:flex; align-items:center; justify-content:center; border-radius:50%; margin:0 auto 4px; }
+  .day-num.today { background:linear-gradient(135deg,var(--mint),var(--sky)); color:white; }
+  .day-num.sat { color:var(--sky); }
+  .day-num.sun { color:var(--coral); }
+  .shift-pill { font-size:9px; font-weight:700; padding:2px 4px; border-radius:6px; display:inline-block; }
+  .shift-pill.on   { background:#d4f5f2; color:#2b7a75; }
+  .shift-pill.off  { background:#f5f5f5; color:#aaa; }
+  .shift-pill.paid { background:#ffe8f0; color:#d63575; }
+  .shift-pill.late { background:#fff3cd; color:#856404; }
+  .shift-pill.hope { background:#fde8ff; color:#8e24aa; }
+
+  /* ── STAFF TODAY ── */
+  .staff-section { background:white; border-radius:20px; padding:18px; margin-bottom:28px; box-shadow:0 2px 12px rgba(0,0,0,.06); }
+  .staff-grid { display:flex; flex-wrap:wrap; gap:8px; margin-top:6px; }
+  .staff-chip { display:flex; align-items:center; gap:6px; padding:6px 12px 6px 6px; border-radius:24px; font-size:12px; font-weight:700; }
+  .staff-chip.dr { background:#e8f9f8; color:#2b7a75; }
+  .staff-chip.dh { background:#f3f0ff; color:#5f49c7; }
+  .staff-chip.da { background:#fff3e8; color:#b35c00; }
+  .staff-avatar-sm { width:24px; height:24px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:800; color:white; }
+  .dr .staff-avatar-sm { background:linear-gradient(135deg,var(--mint),var(--sky)); }
+  .dh .staff-avatar-sm { background:linear-gradient(135deg,var(--lavender),var(--pink)); }
+  .da .staff-avatar-sm { background:linear-gradient(135deg,var(--yellow),var(--coral)); }
+  .role-label { font-size:11px; font-weight:600; color:var(--gray); margin-top:10px; margin-bottom:4px; }
+  .no-data-msg { color:var(--gray); font-size:13px; padding:8px 0; line-height:1.6; }
+
+  /* ── NOTICE ── */
+  .notice-board { background:white; border-radius:20px; padding:18px; box-shadow:0 2px 12px rgba(0,0,0,.06); }
+  .notice-item { display:flex; gap:12px; padding:10px 0; border-bottom:1px solid var(--light-gray); align-items:flex-start; }
+  .notice-item:last-child { border-bottom:none; }
+  .notice-tag { font-size:10px; font-weight:800; padding:3px 8px; border-radius:8px; flex-shrink:0; margin-top:2px; }
+  .notice-tag.info  { background:#e8f4fd; color:#1a73c1; }
+  .notice-tag.alert { background:#ffeaea; color:#c0392b; }
+  .notice-tag.event { background:#e8faf0; color:#1a7a4a; }
+  .notice-text { font-size:13px; line-height:1.5; flex:1; }
+  .notice-date { font-size:11px; color:var(--gray); flex-shrink:0; }
+
+  /* ── BOTTOM NAV ── */
+  .bottom-nav { position:fixed; bottom:0; left:0; right:0; background:white; display:flex; border-top:1px solid var(--light-gray); padding-bottom:env(safe-area-inset-bottom); z-index:100; }
+  .nav-item { flex:1; display:flex; flex-direction:column; align-items:center; padding:10px 4px 6px; cursor:pointer; gap:3px; text-decoration:none; color:var(--gray); transition:color .2s; border:none; background:none; }
+  .nav-item.active { color:var(--mint); }
+  .nav-icon { font-size:20px; }
+  .nav-label { font-size:10px; font-weight:700; }
+  .bottom-spacer { height:80px; }
+
+  /* ── PASSWORD MODAL ── */
+  .modal-overlay {
+    position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:200;
+    display:none; align-items:flex-end; justify-content:center;
+  }
+  .modal-overlay.open { display:flex; }
+  .modal-sheet {
+    background:white; border-radius:24px 24px 0 0; padding:28px 24px 40px;
+    width:100%; max-width:480px;
+    animation:slideUp .3s ease;
+  }
+  @keyframes slideUp { from{transform:translateY(100%)} to{transform:translateY(0)} }
+  .modal-handle { width:40px; height:4px; background:var(--light-gray); border-radius:2px; margin:0 auto 20px; }
+  .modal-title { font-family:'Nunito',sans-serif; font-weight:900; font-size:18px; margin-bottom:20px; }
+  .pw-field { margin-bottom:14px; }
+  .pw-field label { font-size:12px; font-weight:700; color:var(--gray); display:block; margin-bottom:6px; }
+  .pw-field input {
+    width:100%; padding:12px 14px; border:2px solid var(--light-gray); border-radius:12px;
+    font-family:'Zen Maru Gothic',sans-serif; font-size:16px; outline:none;
+    transition:border-color .2s; letter-spacing:.15em;
+  }
+  .pw-field input:focus { border-color:var(--mint); }
+  .pw-btn {
+    width:100%; padding:14px; border:none; border-radius:14px;
+    font-family:'Nunito',sans-serif; font-weight:800; font-size:16px; cursor:pointer;
+    margin-top:4px; transition:transform .15s;
+  }
+  .pw-btn.primary { background:linear-gradient(135deg,var(--mint),var(--sky)); color:white; }
+  .pw-btn.secondary { background:var(--light-gray); color:var(--gray); margin-top:10px; }
+  .pw-btn:hover { transform:translateY(-1px); }
+  .pw-msg { font-size:13px; text-align:center; margin-top:12px; min-height:18px; }
+  .pw-msg.ok  { color:var(--mint); font-weight:700; }
+  .pw-msg.err { color:var(--coral); }
+
+  /* ── NOTICE CARD (hero内) ── */
+  .hero-notice-card {
+    background:rgba(255,255,255,.22); backdrop-filter:blur(8px);
+    border-radius:16px; padding:14px 16px; color:white;
+    position:relative; z-index:1; margin-bottom:10px;
+    display:none;
+  }
+  .hero-notice-card.has-items { display:block; }
+  .hero-notice-label { font-size:11px; font-weight:700; opacity:.8; letter-spacing:.05em; margin-bottom:8px; display:flex; align-items:center; justify-content:space-between; }
+  .hero-notice-post-btn {
+    background:rgba(255,255,255,.25); border:none; color:white;
+    font-size:11px; font-weight:700; padding:3px 10px; border-radius:10px;
+    cursor:pointer; display:none;
+  }
+  .hero-notice-post-btn.visible { display:inline-block; }
+  .hero-notice-item { display:flex; align-items:flex-start; gap:8px; padding:5px 0; border-bottom:1px solid rgba(255,255,255,.15); }
+  .hero-notice-item:last-child { border-bottom:none; padding-bottom:0; }
+  .hero-notice-text { font-size:13px; flex:1; line-height:1.4; }
+  .hero-notice-del {
+    background:none; border:none; color:rgba(255,255,255,.6);
+    font-size:14px; cursor:pointer; padding:0 2px; flex-shrink:0;
+    display:none;
+  }
+  .hero-notice-del.visible { display:inline; }
+
+  /* お知らせ投稿モーダル */
+  #noticeModal .modal-sheet { padding-bottom:32px; }
+  .notice-textarea {
+    width:100%; padding:12px 14px; border:2px solid var(--light-gray); border-radius:12px;
+    font-family:'Zen Maru Gothic',sans-serif; font-size:14px; outline:none;
+    transition:border-color .2s; resize:none; height:100px;
+  }
+  .notice-textarea:focus { border-color:var(--mint); }
+
+  /* ── ANIMATIONS ── */
+  @keyframes fadeUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
+  .fu { animation:fadeUp .4s ease forwards; opacity:0; }
+  .d1{animation-delay:.05s} .d2{animation-delay:.10s} .d3{animation-delay:.15s}
+  .d4{animation-delay:.20s} .d5{animation-delay:.25s} .d6{animation-delay:.30s}
+</style>
+</head>
+<body>
+
+<!-- ════════════════════════════
+     LOGIN SCREEN
+════════════════════════════ -->
+<div id="loginScreen">
+  <div class="login-logo">🦷</div>
+  <div class="login-title">カルミアデンタルクリニック</div>
+  <div class="login-sub">STAFF PORTAL</div>
+  <div class="login-card">
+    <label class="login-label">スタッフを選択</label>
+    <select class="login-select" id="loginStaff">
+      <option value="">── 選択してください ──</option>
+      <optgroup label="DR（歯科医師）">
+        <option value="院長|DR|1001|sugihira">院長</option>
+        <option value="嶋中|DR|1002|shimanaka">嶋中</option>
+        <option value="保刈|DR|1003|hokari">保刈</option>
+        <option value="篠田|DR|1004|shinoda">篠田</option>
+      </optgroup>
+      <optgroup label="DH（歯科衛生士）">
+        <option value="鶴田|DH|2001|tsuruta">鶴田</option>
+        <option value="吉田|DH|2002|yoshida">吉田</option>
+        <option value="高木|DH|2003|takagi">高木</option>
+        <option value="松本|DH|2004|matsumoto">松本</option>
+        <option value="野崎|DH|2005|nozaki">野崎</option>
+        <option value="山田|DH|2006|yamada">山田</option>
+
+      <optgroup label="DA（受付・歯科助手）">
+        <option value="田宮|DA|3001|tamiya">田宮</option>
+        <option value="田中|DA|3002|tanaka">田中</option>
+        <option value="百々|DA|3003|momo">百々</option>
+      </optgroup>
+    </select>
+    <label class="login-label">パスワード（数字4桁）</label>
+    <input class="login-input" type="password" id="loginPass" inputmode="numeric" maxlength="4" placeholder="●●●●">
+    <button class="login-btn" onclick="doLogin()">ログイン</button>
+    <div class="login-error" id="loginError">パスワードが違います</div>
+    <div style="margin-top:16px;padding:12px;background:#f8f9fa;border-radius:12px;font-size:11px;color:#636e72;line-height:1.8;">
+      🔑 <strong>初期パスワード</strong><br>
+      <strong>DR</strong>　院長:1001　嶋中:1002　保刈:1003　篠田:1004<br>
+      <strong>DH</strong>　鶴田:2001　吉田:2002　高木:2003　松本:2004<br>
+      　　　野崎:2005　山田:2006<br>
+      <strong>DA</strong>　田宮:3001　田中:3002　百々:3003<br>
+      <span style="color:#aaa;">※ シフトアプリで変更した場合は新パスワードを使用</span>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════
+     MAIN APP
+════════════════════════════ -->
+<div id="app">
+
+<header>
+  <a class="logo" href="#">
+    <div class="logo-icon">🦷</div>
+    <div>
+      <div class="logo-text">カルミア</div>
+      <div class="logo-sub">DENTAL CLINIC STAFF PORTAL</div>
+    </div>
+  </a>
+  <div class="header-right">
+    <div class="today-badge" id="todayBadge">...</div>
+    <div class="avatar" id="avatarLabel">?</div>
+  </div>
+</header>
+
+<div class="hero">
+  <div class="hero-greeting" id="greeting">おはようございます 👋</div>
+  <div class="hero-title" id="heroTitle">さん</div>
+
+  <!-- お知らせ（Firebase連携） -->
+  <div class="hero-notice-card" id="heroNoticeCard">
+    <div class="hero-notice-label">
+      <span>📢 お知らせ</span>
+      <button class="hero-notice-post-btn" id="noticePostBtn" onclick="openNoticeModal()">＋ 投稿</button>
+    </div>
+    <div id="heroNoticeList"></div>
+  </div>
+
+  <!-- 今日のシフト（localStorage連携） -->
+  <div class="hero-shift-card">
+    <div class="hero-shift-label">📅 今日のシフト</div>
+    <div class="hero-shift-main">
+      <div class="hero-shift-type" id="heroShiftType">読込中...</div>
+      <div class="hero-shift-time" id="heroShiftTime" style="display:none"></div>
+      <button class="hero-shift-go" onclick="goToShiftApp()">シフトアプリ →</button>
+    </div>
+  </div>
+
+  <div class="notice-strip">
+    <div class="notice-dot"></div>
+    <span id="deadlineNotice">...</span>
+  </div>
+</div>
+
+<main>
+
+  <!-- 業務ツール（重複なし） -->
+  <div class="section-title fu d1">🛠️ 業務ツール</div>
+  <div class="tools-grid">
+    <a class="tool-item shift-tool fu d1" href="#" onclick="goToShiftApp();return false;">
+      <span class="tool-linked-badge">連携中</span>
+      <span class="tool-icon">📅</span>
+      <span class="tool-name">シフト管理</span>
+    </a>
+    <a class="tool-item fu d1" id="adminToolBtn" href="#" onclick="goToShiftApp(true);return false;" style="display:none;background:linear-gradient(135deg,#fff8e0,#ffefc8);border:2px solid #ffd97a;">
+      <span class="tool-icon">⚙️</span>
+      <span class="tool-name">管理者画面</span>
+    </a>
+    <a class="tool-item fu d2" id="skillToolBtn" href="https://kalmia-dc.github.io/portal/skill.html" target="_blank" rel="noopener" style="display:none;background:linear-gradient(135deg,#f3f0ff,#e8e0ff);border:2px solid #c8b8ff;">
+      <span class="tool-icon">📋</span>
+      <span class="tool-name">スキル<br>チェック</span>
+    </a>
+    <a class="tool-item fu d2" href="https://kalmia-dc.doctor-hr.com/" target="_blank" rel="noopener">
+      <span class="tool-icon">👨‍⚕️</span>
+      <span class="tool-name">Doctor HR</span>
+    </a>
+    <a class="tool-item fu d3" href="https://ssl.jobcan.jp/employee" target="_blank" rel="noopener">
+      <span class="tool-icon">🕐</span>
+      <span class="tool-name">ジョブカン勤怠</span>
+    </a>
+    <a class="tool-item fu d4" href="https://apo-toolboxes.stransa.co.jp/calendar/" target="_blank" rel="noopener">
+      <span class="tool-icon">🗓️</span>
+      <span class="tool-name">予約カレンダー</span>
+    </a>
+  </div>
+
+  <!-- 今週のシフト（localStorage連携） -->
+  <div class="section-title fu d3">🗓️ 今週のシフト</div>
+  <div class="shift-preview fu d3">
+    <div class="shift-header">
+      <div class="shift-title-text" id="weekTitle">...</div>
+      <button class="shift-link" onclick="goToShiftApp()">詳細を見る →</button>
+    </div>
+    <div class="week-days" id="weekDays"></div>
+  </div>
+
+  <!-- 本日の出勤（localStorage連携） -->
+  <div class="section-title fu d4">👥 本日の出勤</div>
+  <div class="staff-section fu d4" id="todayStaffSection">
+    <div class="no-data-msg">読込中...</div>
+  </div>
+
+  <!-- 院長の予定 -->
+  <div class="section-title fu d5">📅 院長の予定</div>
+  <div class="notice-board fu d5" id="calendarBoard">
+    <div class="no-data-msg" style="text-align:center;padding:16px 0;">📡 読込中...</div>
+  </div>
+
+  <div class="bottom-spacer"></div>
+</main>
+
+<!-- ボトムナビ（重複なし・4ツール＋マイページ） -->
+<nav class="bottom-nav">
+  <button class="nav-item active" onclick="goToShiftApp()"><span class="nav-icon">📅</span><span class="nav-label">シフト</span></button>
+  <a class="nav-item" href="https://kalmia-dc.doctor-hr.com/" target="_blank"><span class="nav-icon">👨‍⚕️</span><span class="nav-label">DR-HR</span></a>
+  <a class="nav-item" href="https://ssl.jobcan.jp/employee" target="_blank"><span class="nav-icon">🕐</span><span class="nav-label">勤怠</span></a>
+  <a class="nav-item" href="https://apo-toolboxes.stransa.co.jp/calendar/" target="_blank"><span class="nav-icon">🗓️</span><span class="nav-label">予約</span></a>
+  <button class="nav-item" onclick="openPwModal()"><span class="nav-icon">👤</span><span class="nav-label">マイページ</span></button>
+</nav>
+
+<!-- パスワード変更モーダル -->
+<div class="modal-overlay" id="pwModal" onclick="closePwModalIfBg(event)">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title">🔑 パスワード変更</div>
+    <div class="pw-field">
+      <label>現在のパスワード</label>
+      <input type="password" id="pwOld" inputmode="numeric" maxlength="4" placeholder="●●●●">
+    </div>
+    <div class="pw-field">
+      <label>新しいパスワード（数字4桁）</label>
+      <input type="password" id="pwNew" inputmode="numeric" maxlength="4" placeholder="●●●●">
+    </div>
+    <div class="pw-field">
+      <label>新しいパスワード（確認）</label>
+      <input type="password" id="pwNew2" inputmode="numeric" maxlength="4" placeholder="●●●●">
+    </div>
+    <div class="pw-msg" id="pwMsg"></div>
+    <button class="pw-btn primary" onclick="submitPwChange()">変更する</button>
+    <button class="pw-btn secondary" onclick="closePwModal()">キャンセル</button>
+    <div style="margin-top:20px;border-top:1px solid var(--light-gray);padding-top:16px;text-align:center;">
+      <button class="pw-btn secondary" onclick="doLogout()" style="background:#fff0f0;color:var(--coral);">🚪 ログアウト</button>
+    </div>
+  </div>
+</div>
+
+<!-- お知らせ投稿モーダル -->
+<div class="modal-overlay" id="noticeModal" onclick="closeNoticeModalIfBg(event)">
+  <div class="modal-sheet" id="noticeModal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">📢 お知らせを投稿</div>
+    <div class="pw-field">
+      <label>内容</label>
+      <textarea class="notice-textarea" id="noticeText" placeholder="お知らせ内容を入力..."></textarea>
+    </div>
+    <div class="pw-msg" id="noticeMsg"></div>
+    <button class="pw-btn primary" onclick="submitNotice()">投稿する</button>
+</div><!-- /#app -->
+
+<script type="module">
+// ─────────────────────────────────────────
+// スタッフ定義（シフトアプリと同じ）
+// ─────────────────────────────────────────
+const STAFF_ROLES = {
+  DR: ['杉平','嶋中','保刈','篠田'],
+  DH: ['鶴田','吉田','高木','松本','野崎','山田','ハノワ'],
+  DA: ['田宮','田中','百々']
+};
+
+const ROLE_LABELS = { DR:'歯科医師', DH:'歯科衛生士', DA:'受付・歯科助手' };
+
+const SHIFT_INFO = {
+  '通常':   { label:'通常出勤', time:'8:30〜18:30', cls:'on'   },
+  '遅出':   { label:'遅出',     time:'9:00〜18:30',  cls:'late' },
+  '有給':   { label:'有給休暇', time:'',             cls:'paid' },
+  '希望休': { label:'希望休',   time:'',             cls:'hope' },
+  '公休':   { label:'公休',     time:'',             cls:'off'  },
+  '休診':   { label:'休診',     time:'',             cls:'off'  },
+};
+
+const ON_SHIFTS = ['通常','遅出'];
+
+// ─────────────────────────────────────────
+// セッション
+// ─────────────────────────────────────────
+let currentUser = null;
+
+function doLogin() {
+  const sel  = document.getElementById('loginStaff').value;
+  const pass = document.getElementById('loginPass').value;
+  const err  = document.getElementById('loginError');
+  if (!sel) { err.style.display='block'; err.textContent='スタッフを選択してください'; return; }
+  // value形式: "名前|役職|初期PW|staffId"
+  const [name, role, defaultPass, staffId] = sel.split('|');
+  // パスワード照合：localStorage変更分を優先、なければ初期値
+  const storedPasswords = JSON.parse(localStorage.getItem('carmia_passwords') || '{}');
+  const correct = storedPasswords[staffId] || defaultPass;
+  if (pass !== correct) { err.style.display='block'; err.textContent='パスワードが違います'; return; }
+  currentUser = { name, role, pass, staffId };
+  sessionStorage.setItem('portalUser', JSON.stringify(currentUser));
+  err.style.display = 'none';
+  showApp();
+}
+
+function doLogout() {
+  sessionStorage.removeItem('portalUser');
+  currentUser = null;
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('loginScreen').style.display = 'flex';
+  document.getElementById('loginPass').value = '';
+}
+
+// ─────────────────────────────────────────
+// パスワード変更モーダル
+// carmia_passwords（localStorage）に保存 → シフトアプリと共有
+// ─────────────────────────────────────────
+function openPwModal() {
+  document.getElementById('pwOld').value  = '';
+  document.getElementById('pwNew').value  = '';
+  document.getElementById('pwNew2').value = '';
+  document.getElementById('pwMsg').textContent = '';
+  document.getElementById('pwMsg').className   = 'pw-msg';
+  document.getElementById('pwModal').classList.add('open');
+}
+
+function closePwModal() {
+  document.getElementById('pwModal').classList.remove('open');
+}
+
+function closePwModalIfBg(e) {
+  if (e.target === document.getElementById('pwModal')) closePwModal();
+}
+
+function submitPwChange() {
+  const oldVal = document.getElementById('pwOld').value;
+  const newVal = document.getElementById('pwNew').value;
+  const newVal2= document.getElementById('pwNew2').value;
+  const msg    = document.getElementById('pwMsg');
+
+  // 現在パスワード取得（localStorageの変更分 or 初期値）
+  const stored   = JSON.parse(localStorage.getItem('carmia_passwords') || '{}');
+  const sid      = currentUser.staffId;
+  const DEFAULTS = {
+    sugihira:'1001', shimanaka:'1002', hokari:'1003', shinoda:'1004',
+    tsuruta:'2001',  yoshida:'2002',   takagi:'2003', matsumoto:'2004',
+    nozaki:'2005',   yamada:'2006',    hanowa:'2007',
+    tamiya:'3001',   tanaka:'3002',    momo:'3003'
+  };
+  const current = stored[sid] || DEFAULTS[sid] || '';
+
+  if (oldVal !== current) {
+    msg.textContent = '現在のパスワードが違います';
+    msg.className = 'pw-msg err'; return;
+  }
+  if (!/^\d{4}$/.test(newVal)) {
+    msg.textContent = '新しいパスワードは数字4桁で入力してください';
+    msg.className = 'pw-msg err'; return;
+  }
+  if (newVal !== newVal2) {
+    msg.textContent = '新しいパスワードが一致しません';
+    msg.className = 'pw-msg err'; return;
+  }
+  if (newVal === current) {
+    msg.textContent = '現在と同じパスワードは使えません';
+    msg.className = 'pw-msg err'; return;
+  }
+
+  // 保存（シフトアプリと共有のlocalStorageキー）
+  stored[sid] = newVal;
+  localStorage.setItem('carmia_passwords', JSON.stringify(stored));
+
+  // セッションのパスワードも更新
+  currentUser.pass = newVal;
+  sessionStorage.setItem('portalUser', JSON.stringify(currentUser));
+
+  msg.textContent = '✅ パスワードを変更しました';
+  msg.className = 'pw-msg ok';
+  document.getElementById('pwOld').value  = '';
+  document.getElementById('pwNew').value  = '';
+  document.getElementById('pwNew2').value = '';
+
+  setTimeout(closePwModal, 1500);
+}
+
+// ─────────────────────────────────────────
+// シフトアプリへシングルクリックで移動
+// 杉平・百々は管理者リンクも表示
+// ─────────────────────────────────────────
+const ADMIN_STAFF = ['sugihira', 'momo']; // 管理者アクセス可能なstaffId
+
+function goToShiftApp(asAdmin = false) {
+  if (!currentUser) return;
+  if (asAdmin) {
+    // 管理者パスワードをパラメータで渡す
+    window.open(`https://kalmia-dc.github.io/portal/shift.html?admin=1`, '_blank');
+  } else {
+    const params = new URLSearchParams({ sid: currentUser.staffId, p: currentUser.pass });
+    window.open(`https://kalmia-dc.github.io/portal/shift.html?${params}`, '_blank');
+  }
+}
+
+// ─────────────────────────────────────────
+// localStorage からシフトデータを読む
+// シフトアプリのキー: "shifts_YYYY_M"
+//   値: { "杉平": { "1":"通常", "2":"遅出", ... }, ... }
+// ─────────────────────────────────────────
+function getMonthShifts(year, month) {
+  try {
+    const raw = localStorage.getItem(`shifts_${year}_${month}`);
+    return raw ? JSON.parse(raw) : null;
+  } catch(e) { return null; }
+}
+
+function getShift(staffName, date) {
+  const data = getMonthShifts(date.getFullYear(), date.getMonth()+1);
+  return data?.[staffName]?.[String(date.getDate())] ?? null;
+}
+
+// ─────────────────────────────────────────
+// アプリ初期化
+// ─────────────────────────────────────────
+function showApp() {
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  initApp();
+}
+
+function initApp() {
+  const u   = currentUser;
+  const now = new Date();
+  const DAY_NAMES = ['日','月','火','水','木','金','土'];
+
+  // ヘッダー日付
+  const m=now.getMonth()+1, d=now.getDate(), dow=DAY_NAMES[now.getDay()];
+  document.getElementById('todayBadge').textContent = `${m}月${d}日（${dow}）`;
+  document.getElementById('avatarLabel').textContent = u.name[0];
+
+  // 挨拶
+  const h = now.getHours();
+  document.getElementById('greeting').textContent =
+    h<11 ? 'おはようございます 👋' : h<18 ? 'こんにちは ☀️' : 'お疲れ様です 🌙';
+
+  // ヒーロータイトル
+  const rl = u.role==='DR' ? '院長' : u.role;
+  const titleHtml = u.staffId === 'sugihira'
+    ? `<span>${rl}</span> さん`
+    : `<span>${rl}</span> ${u.name} さん`;
+  document.getElementById('heroTitle').innerHTML = titleHtml;
+
+  // 今日のシフト
+  const s = getShift(u.name, now);
+  const typeEl = document.getElementById('heroShiftType');
+  const timeEl = document.getElementById('heroShiftTime');
+  if (s) {
+    const info = SHIFT_INFO[s] || { label:s, time:'', cls:'on' };
+    typeEl.textContent = info.label;
+    typeEl.className = 'hero-shift-type' + (info.cls==='off'||info.cls==='hope' ? ' dim' : '');
+    if (info.time) { timeEl.textContent=info.time; timeEl.style.display='block'; }
+  } else {
+    typeEl.textContent = 'データなし（シフトアプリで確認）';
+    typeEl.className = 'hero-shift-type dim';
+  }
+
+  // 締切バナー（毎月25日までに翌々月分を提出）
+  // 例：4/25までに8月分、5/25までに9月分
+  const deadline = new Date(now.getFullYear(), now.getMonth(), 25);
+  const targetMonth = now.getMonth() + 4; // 翌々々月（0始まり+4=翌々月の月名）
+  const targetYear  = now.getFullYear() + Math.floor((now.getMonth() + 4) / 12);
+  const targetMonthName = ((now.getMonth() + 4) % 12) + 1;
+  const deadlineEl = document.getElementById('deadlineNotice');
+  if (now <= deadline) {
+    const daysLeft = Math.ceil((deadline - now) / 86400000);
+    deadlineEl.innerHTML = `シフト提出締切：<strong>${targetMonthName}月分</strong> ／ ${now.getMonth()+1}月25日まで（残り${daysLeft}日）`;
+  } else {
+    // 25日を過ぎたら翌月分を案内
+    const nextDeadlineMonth = now.getMonth() + 2;
+    const nextTargetMonth   = ((now.getMonth() + 5) % 12) + 1;
+    deadlineEl.innerHTML = `次回締切：<strong>${nextTargetMonth}月分</strong> ／ ${nextDeadlineMonth > 12 ? nextDeadlineMonth-12 : nextDeadlineMonth}月25日まで`;
+  }
+
+  // 管理者リンクを表示（杉平・百々のみ）
+  const adminBtn = document.getElementById('adminToolBtn');
+  const skillBtn = document.getElementById('skillToolBtn');
+  if (ADMIN_STAFF.includes(u.staffId)) {
+    adminBtn.style.display = 'block';
+    skillBtn.style.display = 'block';
+  } else {
+    adminBtn.style.display = 'none';
+    skillBtn.style.display = 'none';
+  }
+
+  // 今週カレンダー
+  buildWeek(now, u.name);
+
+  // 本日出勤スタッフ
+  buildTodayStaff(now);
+
+  // お知らせ（Firebase同期）
+  startNoticeSync();
+
+  // 院長の予定（Googleカレンダー）
+  loadCalendar();
+}
+
+function buildWeek(now, staffName) {
+  const el = document.getElementById('weekDays');
+  el.innerHTML = '';
+  const jsDay = now.getDay();
+  const offset = jsDay===0 ? -6 : 1-jsDay;
+  const mon = new Date(now); mon.setDate(now.getDate()+offset);
+  const sun = new Date(mon); sun.setDate(mon.getDate()+6);
+  document.getElementById('weekTitle').textContent =
+    `${mon.getMonth()+1}/${mon.getDate()} 〜 ${sun.getMonth()+1}/${sun.getDate()}`;
+
+  const DAY_NAMES = ['月','火','水','木','金','土','日'];
+  for (let i=0; i<7; i++) {
+    const dt = new Date(mon); dt.setDate(mon.getDate()+i);
+    const isToday = dt.toDateString()===now.toDateString();
+    const isSat=i===5, isSun=i===6;
+    const s = getShift(staffName, dt);
+    let pill = '';
+    if (s) {
+      const info = SHIFT_INFO[s]||{label:s,cls:'on'};
+      const short = s==='通常'?'出勤':s==='希望休'?'希望':s==='有給'?'有給':s==='遅出'?'遅出':s==='公休'?'公休':'休診';
+      pill = `<span class="shift-pill ${info.cls}">${short}</span>`;
+    } else {
+      pill = isSun ? `<span class="shift-pill off">休</span>` : `<span style="font-size:9px;color:#ccc">—</span>`;
+    }
+    const col = document.createElement('div');
+    col.className = 'day-col';
+    col.innerHTML = `
+      <div class="day-name" style="color:${isSat?'var(--sky)':isSun?'var(--coral)':'var(--gray)'}">${DAY_NAMES[i]}</div>
+      <div class="day-num ${isToday?'today':''} ${isSat&&!isToday?'sat':''} ${isSun&&!isToday?'sun':''}">${dt.getDate()}</div>
+      <div>${pill}</div>`;
+    el.appendChild(col);
+  }
+}
+
+function buildTodayStaff(now) {
+  const sec = document.getElementById('todayStaffSection');
+  const data = getMonthShifts(now.getFullYear(), now.getMonth()+1);
+  let html = '';
+
+  for (const [role, members] of Object.entries(STAFF_ROLES)) {
+    const attending = members.filter(name => {
+      const s = data?.[name]?.[String(now.getDate())];
+      return s && ON_SHIFTS.includes(s);
+    });
+    if (!attending.length) continue;
+    html += `<div class="role-label">${role}（${ROLE_LABELS[role]}）</div><div class="staff-grid">`;
+    for (const name of attending) {
+      html += `<div class="staff-chip ${role.toLowerCase()}"><div class="staff-avatar-sm">${name[0]}</div>${name}</div>`;
+    }
+    html += `</div>`;
+  }
+
+  sec.innerHTML = html || `<div class="no-data-msg">シフトデータが見つかりません。<br>シフトアプリでシフトを生成すると、ここに表示されます。</div>`;
+}
+
+// ─────────────────────────────────────────
+// Firebase（シフトアプリと同じプロジェクト）
+// ─────────────────────────────────────────
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import { getDatabase, ref, push, remove, onValue } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
+
+const firebaseConfig = {
+  apiKey:            'AIzaSyDdMe7feUF6CKPHH0YIx7Suk-WnXtOYUu8',
+  authDomain:        'kalmia-shift.firebaseapp.com',
+  databaseURL:       'https://kalmia-shift-default-rtdb.asia-southeast1.firebasedatabase.app',
+  projectId:         'kalmia-shift',
+  storageBucket:     'kalmia-shift.firebasestorage.app',
+  messagingSenderId: '714175473480',
+  appId:             '1:714175473480:web:7d6626a46e4a9dcb1fb57d'
+};
+
+const _app = initializeApp(firebaseConfig);
+const _db  = getDatabase(_app);
+
+// ─────────────────────────────────────────
+// お知らせ（Firebase /notices）
+// ─────────────────────────────────────────
+let _noticesUnsub = null;
+
+function startNoticeSync() {
+  const noticesRef = ref(_db, 'notices');
+  onValue(noticesRef, snap => {
+    const data = snap.val() || {};
+    renderNotices(data);
+  });
+}
+
+function renderNotices(data) {
+  const card    = document.getElementById('heroNoticeCard');
+  const list    = document.getElementById('heroNoticeList');
+  const postBtn = document.getElementById('noticePostBtn');
+  const isAdmin = ADMIN_STAFF.includes(currentUser?.staffId);
+
+  // 管理者には投稿ボタンを表示
+  if (isAdmin) postBtn.classList.add('visible');
+  else         postBtn.classList.remove('visible');
+
+  const items = Object.entries(data).sort((a,b) => b[1].createdAt - a[1].createdAt);
+
+  if (!items.length && !isAdmin) {
+    card.classList.remove('has-items');
+    return;
+  }
+
+  card.classList.add('has-items');
+
+  if (!items.length) {
+    list.innerHTML = '<div style="font-size:12px;opacity:.7;">まだお知らせはありません</div>';
+    return;
+  }
+
+  list.innerHTML = items.map(([key, n]) => `
+    <div class="hero-notice-item">
+      <div class="hero-notice-text">${escHtml(n.text)}</div>
+      <button class="hero-notice-del ${isAdmin?'visible':''}" onclick="deleteNotice('${key}')" title="削除">✕</button>
+    </div>
+  `).join('');
+}
+
+function escHtml(str) {
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+}
+
+async function deleteNotice(key) {
+  if (!confirm('このお知らせを削除しますか？')) return;
+  await remove(ref(_db, `notices/${key}`));
+}
+
+function openNoticeModal() {
+  document.getElementById('noticeText').value = '';
+  document.getElementById('noticeMsg').textContent = '';
+  document.getElementById('noticeModal').classList.add('open');
+}
+
+function closeNoticeModal() {
+  document.getElementById('noticeModal').classList.remove('open');
+}
+
+function closeNoticeModalIfBg(e) {
+  if (e.target === document.getElementById('noticeModal')) closeNoticeModal();
+}
+
+async function submitNotice() {
+  const text = document.getElementById('noticeText').value.trim();
+  const msg  = document.getElementById('noticeMsg');
+  if (!text) { msg.textContent='内容を入力してください'; msg.className='pw-msg err'; return; }
+  try {
+    await push(ref(_db, 'notices'), {
+      text,
+      author:    currentUser.name,
+      createdAt: Date.now()
+    });
+    msg.textContent = '✅ 投稿しました';
+    msg.className = 'pw-msg ok';
+    setTimeout(closeNoticeModal, 800);
+  } catch(e) {
+    msg.textContent = '投稿に失敗しました';
+    msg.className = 'pw-msg err';
+  }
+}
+
+// ─────────────────────────────────────────
+// Googleカレンダー（院長の予定）読み込み
+// ─────────────────────────────────────────
+const GCAL_API_KEY = 'AIzaSyBtz4gPZdDgX6YFsSyVkHwX19jTzxN3aMo';
+const GCAL_ID      = 'chibakenmin.sugihey@gmail.com';
+
+async function loadCalendar() {
+  const board = document.getElementById('calendarBoard');
+  try {
+    const now      = new Date();
+    const timeMin  = now.toISOString();
+    // 今日から60日先まで取得
+    const timeMax  = new Date(now.getTime() + 60 * 86400000).toISOString();
+    const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(GCAL_ID)}/events`
+      + `?key=${GCAL_API_KEY}`
+      + `&timeMin=${timeMin}&timeMax=${timeMax}`
+      + `&singleEvents=true&orderBy=startTime&maxResults=10`;
+
+    const res  = await fetch(url);
+    if (!res.ok) throw new Error(`API error: ${res.status}`);
+    const data = await res.json();
+    const items = data.items || [];
+
+    if (!items.length) {
+      board.innerHTML = '<div class="no-data-msg" style="text-align:center;padding:16px 0;">今後60日間の予定はありません</div>';
+      return;
+    }
+
+    const DAY_JP = ['日','月','火','水','木','金','土'];
+    let html = '';
+    for (const ev of items) {
+      const start = ev.start.dateTime ? new Date(ev.start.dateTime) : new Date(ev.start.date + 'T00:00:00');
+      const end   = ev.end.dateTime   ? new Date(ev.end.dateTime)   : null;
+      const isAllDay = !ev.start.dateTime;
+
+      const md  = `${start.getMonth()+1}/${start.getDate()}（${DAY_JP[start.getDay()]}）`;
+      const isSat = start.getDay()===6, isSun = start.getDay()===0;
+      const dateColor = isSat ? 'var(--sky)' : isSun ? 'var(--coral)' : 'var(--dark)';
+
+      let timeStr = '';
+      if (!isAllDay && end) {
+        const fmt = d => `${d.getHours()}:${String(d.getMinutes()).padStart(2,'0')}`;
+        timeStr = `${fmt(start)}〜${fmt(end)}`;
+      } else {
+        timeStr = '終日';
+      }
+
+      // 今日かどうか
+      const isToday = start.toDateString() === now.toDateString();
+      const tag = isToday
+        ? '<div class="notice-tag alert">今日</div>'
+        : '<div class="notice-tag info">予定</div>';
+
+      html += `
+        <div class="notice-item">
+          ${tag}
+          <div class="notice-text" style="flex:1;">
+            <div style="font-weight:700;margin-bottom:2px;">${ev.summary || '（タイトルなし）'}</div>
+            ${ev.location ? `<div style="font-size:11px;color:var(--gray);">📍 ${ev.location}</div>` : ''}
+          </div>
+          <div style="text-align:right;flex-shrink:0;">
+            <div class="notice-date" style="color:${dateColor};font-weight:700;">${md}</div>
+            <div style="font-size:10px;color:var(--gray);">${timeStr}</div>
+          </div>
+        </div>`;
+    }
+    board.innerHTML = html;
+
+  } catch(e) {
+    board.innerHTML = `<div class="no-data-msg" style="text-align:center;padding:16px 0;color:var(--coral);">予定の読み込みに失敗しました<br><span style="font-size:11px;">${e.message}</span></div>`;
+  }
+}
+
+// ─────────────────────────────────────────
+// onclick属性から呼べるようwindowに公開
+// ─────────────────────────────────────────
+Object.assign(window, {
+  doLogin, doLogout,
+  goToShiftApp,
+  openPwModal, closePwModal, closePwModalIfBg, submitPwChange,
+  openNoticeModal, closeNoticeModal, closeNoticeModalIfBg, submitNotice, deleteNotice
+});
+
+// ─────────────────────────────────────────
+// 起動：セッション復元
+// ─────────────────────────────────────────
+(function() {
+  const saved = sessionStorage.getItem('portalUser');
+  if (saved) {
+    try { currentUser = JSON.parse(saved); showApp(); return; } catch(e) {}
+  }
+  document.getElementById('loginScreen').style.display = 'flex';
+})();
+</script>
+</body>
+</html>
