@@ -377,6 +377,11 @@ window.openSheet = async function(staffId, name, roleKey, avatarClass) {
   document.getElementById('sheetName').textContent = name;
   document.getElementById('sheetRole').textContent = roleKey;
 
+  // 保存バー：自分のシートか管理者なら表示
+  const isSelf = !portalUser || portalUser.sid === staffId;
+  const canEdit = isSelf || portalUser?.isAdmin;
+  _canEdit = canEdit;
+
   // スキル項目を描画（複数シート）
   renderSkills();
   // 読み取り専用時はオーバーレイで操作不可を示す
@@ -384,9 +389,7 @@ window.openSheet = async function(staffId, name, roleKey, avatarClass) {
 
   document.getElementById('staffSelect').style.display = 'none';
   document.getElementById('skillSheet').style.display  = 'block';
-  // 保存バー：自分のシートか管理者なら表示
-  const isSelf = !portalUser || portalUser.sid === staffId;
-  const canEdit = isSelf || portalUser?.isAdmin;
+  // 保存バー表示制御
   if (canEdit) {
     document.getElementById('saveBar').classList.add('visible');
   } else {
@@ -394,8 +397,6 @@ window.openSheet = async function(staffId, name, roleKey, avatarClass) {
   }
   // リセットボタンは管理者のみ
   document.getElementById('resetBtn').style.display = portalUser?.isAdmin ? 'inline-block' : 'none';
-  // 評価ボタンの活性・非活性
-  _canEdit = canEdit;
   updateProgress();
 };
 
