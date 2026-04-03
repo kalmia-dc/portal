@@ -585,11 +585,10 @@ function goToSkillApp() {
     tamiya:'DA受付', tanaka:'DA受付', momo:'DA助手'
   };
   const role = roleMap[currentUser.staffId] || 'DH';
-  // 院長・百々・山田は管理者モード
   const SKILL_ADMINS = ['sugihira', 'momo', 'yamada'];
   const isAdmin = SKILL_ADMINS.includes(currentUser.staffId) ? '1' : '0';
   const params = new URLSearchParams({ sid: currentUser.staffId, name: currentUser.name, role, isAdmin });
-  window.open(`https://kalmia-dc.github.io/portal/skill.html?${params}`, '_blank');
+  window.location.href = `https://kalmia-dc.github.io/portal/skill.html?${params}`;
 }
 
 function goToShiftApp(asAdmin = false) {
