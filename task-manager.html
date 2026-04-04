@@ -593,6 +593,9 @@
   ::-webkit-scrollbar { width: 4px; height: 4px; }
   ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
 </style>
+
+<!-- Google Identity Services -->
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
 
@@ -608,6 +611,11 @@
     <div class="user-badge" id="userBadge"></div>
   </div>
   <div class="header-actions">
+    <!-- Google連携ボタン（院長のみ表示） -->
+    <button class="btn-icon" id="btnGoogleSync" title="Googleタスクと同期" onclick="syncGoogleTasks()" style="display:none;position:relative;">
+      <img src="https://www.google.com/favicon.ico" style="width:14px;height:14px;">
+      <span id="syncDot" style="position:absolute;top:4px;right:4px;width:6px;height:6px;background:#34a853;border-radius:50%;display:none;"></span>
+    </button>
     <button class="btn-icon" id="btn-list" title="リスト" onclick="setView('list')">☰</button>
     <button class="btn-icon active" id="btn-board" title="ボード" onclick="setView('board')">⊞</button>
     <button class="btn-icon" title="印刷" onclick="window.print()">🖨</button>
@@ -633,6 +641,12 @@
 
 <main>
   <div class="stats-bar" id="statsBar"></div>
+  <!-- Google同期バナー（院長用） -->
+  <div id="googleBanner" style="display:none;background:white;border:1px solid #e8e4dc;border-radius:14px;padding:14px 16px;margin-bottom:14px;display:none;align-items:center;gap:12px;">
+    <img src="https://www.google.com/favicon.ico" style="width:18px;height:18px;flex-shrink:0;">
+    <div style="flex:1;font-size:13px;" id="googleBannerText">Googleタスクと連携できます</div>
+    <button onclick="startGoogleAuth()" id="googleSignInBtn" style="background:#4285f4;color:white;border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">Googleでサインイン</button>
+  </div>
   <div id="viewContainer"><div class="loading"><div class="spinner"></div>読み込み中...</div></div>
 </main>
 
@@ -731,8 +745,15 @@ const firebaseConfig = {
   messagingSenderId: '714175473480',
   appId:             '1:714175473480:web:7d6626a46e4a9dcb1fb57d'
 };
-const app = initializeApp(firebaseConfig);
-const db  = getDatabase(app);
+const fbApp = initializeApp(firebaseConfig);
+const db    = getDatabase(fbApp);
+
+// ===== GOOGLE TASKS =====
+const GCLIENT_ID = '218253038073-v3nrmbet629g11ljjd1t0rqbn6t4evpr.apps.googleusercontent.com';
+const GSCOPE     = 'https://www.googleapis.com/auth/tasks';
+let gAccessToken = null;
+let tokenClient  = null;
+let gsiReady     = false;
 
 // ===== STAFF =====
 const STAFF = {
@@ -744,7 +765,6 @@ const ROLE_OF = {};
 Object.entries(STAFF).forEach(([role, names]) => names.forEach(n => ROLE_OF[n] = role));
 
 // ===== ユーザー特定 =====
-// 優先度: 1) ポータルのsessionStorage  2) URLパラメータ  3) セッション内名前入力
 function resolveUser() {
   try {
     const saved = sessionStorage.getItem('portalUser');
@@ -775,7 +795,9 @@ let currentView   = 'board';
 let editingId     = null;
 let saving        = false;
 
-// ===== 名前選択バナー（未認証時のみ） =====
+const isIncho = () => currentUser?.staffId === 'sugihira' || currentUser?.name === '院長';
+
+// ===== 名前選択バナー =====
 function showNameBanner() {
   const ban = document.createElement('div');
   ban.id = 'nameBanner';
@@ -801,16 +823,194 @@ window._setName = function() {
   if (!sel) return;
   const rm = {};
   Object.entries(STAFF).forEach(([r,names]) => names.forEach(n => rm[n]=r));
-  currentUser = { name: sel, role: rm[sel]||'DH', staffId:'' };
+  // staffIdマッピング
+  const sidMap = { '院長':'sugihira','嶋中':'shimanaka','保刈':'hokari','篠田':'shinoda',
+    '鶴田':'tsuruta','吉田':'yoshida','高木':'takagi','松本':'matsumoto','野崎':'nozaki','山田':'yamada','ハノワ':'hanowa',
+    '田宮':'tamiya','田中':'tanaka','百々':'momo' };
+  currentUser = { name: sel, role: rm[sel]||'DH', staffId: sidMap[sel]||'' };
   sessionStorage.setItem('taskUserName', sel);
   document.getElementById('nameBanner').remove();
   document.getElementById('userBadge').textContent = sel;
+  setupGoogleForIncho();
 };
+
+// ===== GOOGLE AUTH SETUP =====
+function setupGoogleForIncho() {
+  if (!isIncho()) return;
+
+  // Google同期ボタンとバナーを表示
+  document.getElementById('btnGoogleSync').style.display = 'flex';
+  const banner = document.getElementById('googleBanner');
+  banner.style.display = 'flex';
+
+  // GSIライブラリの読み込み待ち
+  waitForGsi().then(() => {
+    tokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: GCLIENT_ID,
+      scope: GSCOPE,
+      callback: async (resp) => {
+        if (resp.error) { showToast('Googleサインインに失敗しました'); return; }
+        gAccessToken = resp.access_token;
+        document.getElementById('syncDot').style.display = 'block';
+        document.getElementById('googleBannerText').textContent = 'Googleタスクと連携中';
+        document.getElementById('googleSignInBtn').textContent = '今すぐ同期';
+        document.getElementById('googleSignInBtn').style.background = '#34a853';
+        document.getElementById('googleSignInBtn').onclick = () => syncGoogleTasks();
+        // 認証成功後すぐ同期
+        await syncGoogleTasks();
+      },
+    });
+
+    // トークンがセッションに残っていれば即同期試行（prompt不要）
+    const savedToken = sessionStorage.getItem('gAccessToken');
+    if (savedToken) {
+      gAccessToken = savedToken;
+      document.getElementById('syncDot').style.display = 'block';
+      document.getElementById('googleBannerText').textContent = 'Googleタスクと連携中';
+      document.getElementById('googleSignInBtn').textContent = '今すぐ同期';
+      document.getElementById('googleSignInBtn').style.background = '#34a853';
+      document.getElementById('googleSignInBtn').onclick = () => syncGoogleTasks();
+      syncGoogleTasks();
+    }
+  });
+}
+
+function waitForGsi() {
+  return new Promise(resolve => {
+    if (typeof google !== 'undefined' && google.accounts) { resolve(); return; }
+    const interval = setInterval(() => {
+      if (typeof google !== 'undefined' && google.accounts) { clearInterval(interval); resolve(); }
+    }, 200);
+  });
+}
+
+window.startGoogleAuth = function() {
+  if (!tokenClient) { showToast('少しお待ちください...'); return; }
+  if (gAccessToken) { syncGoogleTasks(); return; }
+  tokenClient.requestAccessToken({ prompt: 'consent' });
+};
+
+// ===== GOOGLE TASKS 同期 =====
+window.syncGoogleTasks = async function() {
+  if (!gAccessToken) { startGoogleAuth(); return; }
+
+  const banner = document.getElementById('googleBannerText');
+  banner.textContent = '同期中...';
+
+  try {
+    // タスクリスト一覧を取得
+    const listRes = await gFetch('https://tasks.googleapis.com/tasks/v1/users/@me/lists?maxResults=20');
+    if (!listRes.ok) {
+      // トークン切れの可能性
+      if (listRes.status === 401) {
+        gAccessToken = null;
+        sessionStorage.removeItem('gAccessToken');
+        document.getElementById('syncDot').style.display = 'none';
+        banner.textContent = 'セッション切れ。再サインインしてください';
+        document.getElementById('googleSignInBtn').textContent = 'Googleでサインイン';
+        document.getElementById('googleSignInBtn').style.background = '#4285f4';
+        document.getElementById('googleSignInBtn').onclick = () => startGoogleAuth();
+        return;
+      }
+      throw new Error(`HTTP ${listRes.status}`);
+    }
+    const listData = await listRes.json();
+    const lists = listData.items || [];
+
+    // 全リストのタスクを取得
+    let allGTasks = [];
+    for (const list of lists) {
+      const taskRes = await gFetch(
+        `https://tasks.googleapis.com/tasks/v1/lists/${list.id}/tasks?showCompleted=false&showHidden=false&maxResults=100`
+      );
+      if (!taskRes.ok) continue;
+      const taskData = await taskRes.json();
+      const items = (taskData.items || []).map(t => ({ ...t, _listId: list.id, _listTitle: list.title }));
+      allGTasks = allGTasks.concat(items);
+    }
+
+    // FirebaseにないGoogleタスクをインポート
+    const existingGIds = new Set(
+      Object.values(tasks).map(t => t.googleTaskId).filter(Boolean)
+    );
+
+    let imported = 0;
+    for (const gt of allGTasks) {
+      if (existingGIds.has(gt.id)) {
+        // 既存タスクの完了状態を同期
+        const fbTask = Object.entries(tasks).find(([,t]) => t.googleTaskId === gt.id);
+        if (fbTask && gt.status === 'completed' && fbTask[1].status !== '完了') {
+          await set(ref(db, `tasks/${fbTask[0]}/status`), '完了');
+        }
+        continue;
+      }
+      // 新規インポート
+      const due = gt.due ? gt.due.split('T')[0] : '';
+      const newTask = {
+        title:        gt.title || '（タイトルなし）',
+        note:         gt.notes || '',
+        category:     'その他',
+        date:         due,
+        priority:     'med',
+        status:       gt.status === 'completed' ? '完了' : '未着手',
+        assignees:    ['院長'],
+        tags:         [`Gタスク`, gt._listTitle].filter(Boolean),
+        googleTaskId: gt.id,
+        googleListId: gt._listId,
+        createdAt:    Date.now(),
+        createdBy:    '院長（Google）',
+        updatedAt:    Date.now(),
+        updatedBy:    '院長（Google）',
+      };
+      await push(ref(db, 'tasks'), newTask);
+      imported++;
+    }
+
+    // トークンをセッションに保存
+    sessionStorage.setItem('gAccessToken', gAccessToken);
+
+    const msg = imported > 0 ? `${imported}件のGoogleタスクを取り込みました` : 'Googleタスクと同期済み';
+    banner.textContent = `✅ ${msg}`;
+    showToast(msg);
+    setTimeout(() => { banner.textContent = 'Googleタスクと連携中'; }, 3000);
+
+  } catch(e) {
+    console.error(e);
+    banner.textContent = '同期に失敗しました';
+    showToast('同期に失敗しました: ' + e.message);
+  }
+};
+
+// Firebase上でタスクを完了にした時、Googleタスクも完了にする
+async function completeGoogleTask(googleTaskId, googleListId) {
+  if (!gAccessToken || !googleTaskId || !googleListId) return;
+  try {
+    await gFetch(
+      `https://tasks.googleapis.com/tasks/v1/lists/${googleListId}/tasks/${googleTaskId}`,
+      {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'completed' })
+      }
+    );
+  } catch(e) { console.warn('Google完了更新失敗:', e); }
+}
+
+function gFetch(url, opts = {}) {
+  return fetch(url, {
+    ...opts,
+    headers: {
+      'Authorization': `Bearer ${gAccessToken}`,
+      ...(opts.headers || {})
+    }
+  });
+}
 
 // ===== INIT =====
 function init() {
   if (currentUser) {
     document.getElementById('userBadge').textContent = currentUser.name;
+    setupGoogleForIncho();
   } else {
     showNameBanner();
   }
@@ -887,13 +1087,14 @@ function taskCardHtml(t) {
   const priLbl={high:'高',med:'中',low:'低'};
   const tags  = (t.tags||[]).map(g=>`<span class="tag">${esc(g)}</span>`).join('');
   const chips = assigneeChips(t.assignees);
+  const gIcon = t.googleTaskId ? `<span title="Googleタスク" style="font-size:10px;margin-left:auto;">G</span>` : '';
   return `
     <div class="task-card pri-${t.priority} ${od?'overdue':''}" onclick="window._openTask('${t.id}')">
       <div class="task-title">${esc(t.title)}</div>
       <div class="task-meta">
         <span class="badge badge-cat">${t.category||'その他'}</span>
         <span class="badge ${priCls[t.priority]}">${priLbl[t.priority]}</span>
-        ${dateLabel}
+        ${dateLabel}${gIcon}
       </div>
       ${chips?`<div class="task-assignees">${chips}</div>`:''}
       ${tags ?`<div class="task-tags">${tags}</div>`:''}
@@ -935,7 +1136,7 @@ function renderList() {
     const chips = assigneeChips(t.assignees);
     return `<div class="list-item pri-${t.priority} ${od?'overdue':''}" onclick="window._openTask('${t.id}')">
       <div class="list-content">
-        <div class="list-title ${t.status==='完了'?'done-title':''}">${esc(t.title)}</div>
+        <div class="list-title ${t.status==='完了'?'done-title':''}">${esc(t.title)}${t.googleTaskId?' <span style="font-size:10px;color:#4285f4;">G</span>':''}</div>
         <div class="list-sub">
           <span>${t.category||'その他'}</span><span>${t.status}</span>
           ${ds?`<span>${ds}</span>`:''}
@@ -989,7 +1190,6 @@ function openModal(id = null) {
     document.querySelector('#pri-med').checked = true;
     document.querySelector('#st-todo').checked  = true;
     document.querySelectorAll('.assignee-checkbox').forEach(cb => cb.checked = false);
-    // 自分を担当者にデフォルト設定
     if (currentUser) {
       const myBox = document.getElementById(`asgn_${currentUser.name}`);
       if (myBox) myBox.checked = true;
@@ -1008,13 +1208,14 @@ async function saveTask() {
   const title = document.getElementById('fTitle').value.trim();
   if (!title) { showToast('タイトルを入力してください'); return; }
   const assignees = [...document.querySelectorAll('.assignee-checkbox:checked')].map(cb => cb.value);
+  const newStatus = document.querySelector('input[name="status"]:checked').value;
   const data = {
     title,
     note:      document.getElementById('fNote').value.trim(),
     category:  document.getElementById('fCat').value,
     date:      document.getElementById('fDate').value,
     priority:  document.querySelector('input[name="priority"]:checked').value,
-    status:    document.querySelector('input[name="status"]:checked').value,
+    status:    newStatus,
     assignees,
     tags:      document.getElementById('fTags').value.split(',').map(t=>t.trim()).filter(Boolean),
     updatedAt: Date.now(),
@@ -1024,7 +1225,12 @@ async function saveTask() {
   document.getElementById('btnSave').disabled = true;
   try {
     if (editingId) {
-      await set(ref(db, `tasks/${editingId}`), { ...tasks[editingId], ...data });
+      const existing = tasks[editingId] || {};
+      await set(ref(db, `tasks/${editingId}`), { ...existing, ...data });
+      // Googleタスクが紐づいていて完了になった場合
+      if (newStatus === '完了' && existing.googleTaskId) {
+        await completeGoogleTask(existing.googleTaskId, existing.googleListId);
+      }
       showToast('更新しました');
     } else {
       data.createdAt = Date.now();
@@ -1060,7 +1266,7 @@ function setView(v) {
 function showToast(msg) {
   const t = document.getElementById('toast');
   t.textContent = msg; t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 2500);
+  setTimeout(() => t.classList.remove('show'), 2800);
 }
 
 function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
