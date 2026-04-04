@@ -703,7 +703,9 @@ async function getShift(staffName, date) {
   if (!data) return null;
   const sid = NAME_TO_ID[staffName];
   if (!sid) return null;
-  const raw = data[sid]?.[String(date.getDate())];
+  // Firebaseのキーは YYYY-MM-DD 形式
+  const dateKey = `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
+  const raw = data[sid]?.[dateKey];
   return raw ? (SHIFT_KEY_MAP[raw] || raw) : null;
 }
 
@@ -837,7 +839,8 @@ async function buildTodayStaff(now) {
     const attending = members.filter(name => {
       const sid = NAME_TO_ID[name];
       if (!sid) return false;
-      const raw = data?.[sid]?.[String(now.getDate())];
+      const dateKey2 = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+      const raw = data?.[sid]?.[dateKey2];
       return raw && ON_SHIFT_KEYS.includes(raw);
     });
     if (!attending.length) continue;
