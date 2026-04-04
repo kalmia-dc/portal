@@ -359,6 +359,10 @@
       <span class="tool-icon">📋</span>
       <span class="tool-name">スキル<br>チェック</span>
     </a>
+    <a class="tool-item fu d2" id="taskToolBtn" href="#" onclick="goToTaskApp();return false;" style="display:none;background:linear-gradient(135deg,#eef7f0,#dff0e8);border:2px solid #a8d8b8;">
+      <span class="tool-icon">📋</span>
+      <span class="tool-name">タスク管理<br><span style="font-size:10px;font-weight:600;color:#5b8a72;">院長専用</span></span>
+    </a>
     <a class="tool-item fu d2" href="https://kalmia-dc.doctor-hr.com/" target="_blank" rel="noopener">
       <span class="tool-icon">👨‍⚕️</span>
       <span class="tool-name">Doctor HR</span>
@@ -591,6 +595,11 @@ function goToSkillApp() {
   window.location.href = `https://kalmia-dc.github.io/portal/skill.html?${params}`;
 }
 
+function goToTaskApp() {
+  if (!currentUser || currentUser.staffId !== 'sugihira') return;
+  window.open('https://kalmia-dc.github.io/portal/task-manager.html', '_blank');
+}
+
 function goToShiftApp(asAdmin = false) {
   if (!currentUser) return;
   if (asAdmin) {
@@ -688,6 +697,9 @@ function initApp() {
   adminBtn.style.display = ADMIN_STAFF.includes(u.staffId) ? 'block' : 'none';
   // スキルチェックは全スタッフ表示
   skillBtn.style.display = 'block';
+  // タスク管理は院長のみ
+  const taskBtn = document.getElementById('taskToolBtn');
+  taskBtn.style.display = u.staffId === 'sugihira' ? 'block' : 'none';
 
   // 今週カレンダー
   buildWeek(now, u.name);
@@ -941,7 +953,7 @@ async function loadCalendar() {
 // ─────────────────────────────────────────
 Object.assign(window, {
   doLogin, doLogout,
-  goToShiftApp, goToSkillApp,
+  goToShiftApp, goToSkillApp, goToTaskApp,
   openPwModal, closePwModal, closePwModalIfBg, submitPwChange,
   openNoticeModal, closeNoticeModal, closeNoticeModalIfBg, submitNotice, deleteNotice
 });
