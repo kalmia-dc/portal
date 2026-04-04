@@ -448,8 +448,7 @@ function renderSkills() {
         <div class="criteria-box">
           ${Array.isArray(criteriaList)
             ? criteriaList.map(c => `<div class="criteria-row"><span class="criteria-bullet">・</span><span class="criteria-text">${c}</span></div>`).join('')
-            : `${criteriaList.detail ? `<div class="criteria-detail">${criteriaList.detail}</div>` : ''}
-               ${(criteriaList.points||[]).map(c => `<div class="criteria-row"><span class="criteria-bullet">・</span><span class="criteria-text">${c}</span></div>`).join('')}`
+            : `${criteriaList.detail ? `<div class="criteria-detail">${criteriaList.detail}</div>` : ''}`
           }
         </div>` : ''}
       `;
