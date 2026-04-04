@@ -723,6 +723,9 @@
 
     <div class="modal-footer">
       <button class="btn-delete" id="btnDelete" style="display:none" onclick="deleteTask()">削除</button>
+      <button class="btn-icon" id="btnExportGoogle" style="display:none;width:auto;padding:0 12px;font-size:12px;color:#4285f4;border-color:#4285f4;gap:4px;" onclick="exportToGoogle()">
+        <img src="https://www.google.com/favicon.ico" style="width:12px;height:12px;">送る
+      </button>
       <button class="btn-save" id="btnSave" onclick="saveTask()">保存</button>
     </div>
   </div>
@@ -996,6 +999,51 @@ async function completeGoogleTask(googleTaskId, googleListId) {
   } catch(e) { console.warn('Google完了更新失敗:', e); }
 }
 
+// アプリのタスクをGoogleタスクに送る
+window.exportToGoogle = async function() {
+  if (!gAccessToken) { showToast('先にGoogleサインインしてください'); return; }
+  if (!editingId || !tasks[editingId]) return;
+  const t = tasks[editingId];
+
+  // すでにGoogleタスクと紐づいている場合はスキップ
+  if (t.googleTaskId) { showToast('すでにGoogleタスクと連携済みです'); return; }
+
+  const btn = document.getElementById('btnExportGoogle');
+  btn.textContent = '送信中...';
+  btn.disabled = true;
+
+  try {
+    // デフォルトリスト（@default）に追加
+    const body = {
+      title: t.title,
+      notes: [t.note, t.category ? `カテゴリ: ${t.category}` : '', (t.tags||[]).length ? `タグ: ${t.tags.join(', ')}` : ''].filter(Boolean).join('\n'),
+    };
+    if (t.date) body.due = `${t.date}T00:00:00.000Z`;
+
+    const res = await gFetch(
+      'https://tasks.googleapis.com/tasks/v1/lists/@default/tasks',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      }
+    );
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const created = await res.json();
+
+    // FirebaseのタスクにGoogleタスクIDを紐づけ保存
+    await set(ref(db, `tasks/${editingId}/googleTaskId`), created.id);
+    await set(ref(db, `tasks/${editingId}/googleListId`), '@default');
+
+    showToast('Googleタスクに送りました ✅');
+    btn.textContent = '✅ 送信済み';
+  } catch(e) {
+    showToast('送信に失敗しました: ' + e.message);
+    btn.textContent = 'Googleタスクに送る';
+    btn.disabled = false;
+  }
+};
+
 function gFetch(url, opts = {}) {
   return fetch(url, {
     ...opts,
@@ -1180,6 +1228,20 @@ function openModal(id = null) {
     document.querySelector(`input[name="status"][value="${t.status||'未着手'}"]`).checked = true;
     document.querySelectorAll('.assignee-checkbox').forEach(cb => { cb.checked = (t.assignees||[]).includes(cb.value); });
     document.getElementById('btnDelete').style.display = '';
+    // Googleエクスポートボタン（院長＋連携済みでない場合）
+    const exportBtn = document.getElementById('btnExportGoogle');
+    if (isIncho() && gAccessToken) {
+      exportBtn.style.display = 'flex';
+      if (t.googleTaskId) {
+        exportBtn.textContent = '✅ G連携済み';
+        exportBtn.disabled = true;
+      } else {
+        exportBtn.innerHTML = '<img src="https://www.google.com/favicon.ico" style="width:12px;height:12px;">送る';
+        exportBtn.disabled = false;
+      }
+    } else {
+      exportBtn.style.display = 'none';
+    }
   } else {
     document.getElementById('modalTitle').textContent = 'タスクを追加';
     document.getElementById('fTitle').value = '';
@@ -1195,6 +1257,7 @@ function openModal(id = null) {
       if (myBox) myBox.checked = true;
     }
     document.getElementById('btnDelete').style.display = 'none';
+    document.getElementById('btnExportGoogle').style.display = 'none';
   }
   document.getElementById('overlay').classList.add('open');
   setTimeout(() => document.getElementById('fTitle').focus(), 300);
