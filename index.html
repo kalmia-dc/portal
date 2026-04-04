@@ -1013,7 +1013,13 @@ async function loadMyTasks(staffName) {
     const today = new Date().toISOString().split('T')[0];
 
     const mine = Object.entries(all)
-      .filter(([, t]) => (t.assignees||[]).includes(staffName) && t.status !== '完了')
+      .filter(([, t]) => {
+        const assignees = t.assignees;
+        // assigneesが配列で、かつstaffNameが含まれる場合のみ
+        if (!Array.isArray(assignees) || assignees.length === 0) return false;
+        if (t.status === '完了') return false;
+        return assignees.includes(staffName);
+      })
       .map(([id, t]) => ({ id, ...t }))
       .sort((a, b) => {
         const da = a.date || '9999-99-99';
@@ -1031,7 +1037,7 @@ async function loadMyTasks(staffName) {
       let dateStr = '';
       if (t.date) {
         const diff = Math.round((new Date(t.date+'T00:00:00') - new Date(today+'T00:00:00')) / 86400000);
-        if (diff < 0)       dateStr = `⚠ 期限切れ`;
+        if (diff < 0)        dateStr = `⚠ 期限切れ`;
         else if (diff === 0) dateStr = `今日`;
         else if (diff <= 3)  dateStr = `あと${diff}日`;
         else {

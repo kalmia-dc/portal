@@ -679,8 +679,8 @@
 
 <!-- ===== FILTER BAR ===== -->
 <div class="filter-bar">
-  <button class="filter-chip active" onclick="setFilter('all',this)">すべて</button>
-  <button class="filter-chip" onclick="setFilter('mine',this)">自分のタスク</button>
+  <button class="filter-chip" onclick="setFilter('all',this)">すべて</button>
+  <button class="filter-chip active" onclick="setFilter('mine',this)">自分のタスク</button>
   <button class="filter-chip" onclick="setFilter('未着手',this)">未着手</button>
   <button class="filter-chip" onclick="setFilter('進行中',this)">進行中</button>
   <button class="filter-chip" onclick="setFilter('完了',this)">完了</button>
@@ -848,7 +848,7 @@ function resolveUser() {
 // ===== STATE =====
 let currentUser = resolveUser();
 let tasks = {};
-let currentFilter = 'all';
+let currentFilter = 'mine';
 let currentView   = 'board';
 let editingId     = null;
 let saving        = false;
