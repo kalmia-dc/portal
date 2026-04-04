@@ -878,8 +878,6 @@
   window.dispatchEvent(new Event('firebaseReady'));
   // 初期表示
   setTimeout(renderLoginHint, 100);
-  // ポータルからの自動ログインチェック
-  setTimeout(checkPortalAutoLogin, 200);
 </script>
 <body>
 
@@ -891,27 +889,57 @@
       <div class="clinic-name">カルミアデンタルクリニック</div>
       <div class="system-name">シフト管理システム</div>
     </div>
-    <!-- スタッフはポータルからログイン。このページは管理者専用 -->
-    <div style="text-align:center;margin-bottom:14px;color:#666;font-size:13px;">
-      👩‍💼 管理者ログイン
+    <div class="login-role-tabs">
+      <button class="login-role-tab" onclick="setLoginRole('admin',this)">👩‍💼 管理者</button>
+      <button class="login-role-tab active" onclick="setLoginRole('staff',this)">👤 スタッフ</button>
     </div>
-    <div id="adminLoginForm">
+    <div id="adminLoginForm" style="display:none">
       <div class="login-field">
         <label>パスワード</label>
         <input type="password" id="adminPass" placeholder="管理者パスワードを入力" onkeydown="if(event.key==='Enter')doLogin()">
       </div>
     </div>
-    <!-- スタッフ用（非表示・DOM維持で既存コードのエラー防止） -->
-    <div id="staffLoginForm" style="display:none">
-      <select id="staffSelect"><option value=""></option></select>
-      <input type="password" id="staffPass">
+    <div id="staffLoginForm">
+      <div class="login-field">
+        <label>スタッフを選択</label>
+        <select id="staffSelect">
+          <option value="">-- 選択してください --</option>
+          <optgroup label="DR（歯科医師）">
+            <option value="sugihira">杉平院長</option>
+            <option value="shimanaka">嶋中</option>
+            <option value="hokari">保刈</option>
+            <option value="shinoda">篠田</option>
+          </optgroup>
+          <optgroup label="DH（歯科衛生士）">
+            <option value="tsuruta">鶴田</option>
+            <option value="yoshida">吉田</option>
+            <option value="takagi">高木</option>
+            <option value="matsumoto">松本</option>
+            <option value="nozaki">野崎</option>
+            <option value="yamada">山田</option>
+          </optgroup>
+          <optgroup label="DA（歯科助手/事務）">
+            <option value="tamiya">田宮</option>
+            <option value="tanaka">田中</option>
+            <option value="momo">百々</option>
+          </optgroup>
+        </select>
+      </div>
+      <div class="login-field">
+        <label>パスワード（数字4桁）</label>
+        <input type="password" id="staffPass" placeholder="例：2001" inputmode="numeric" pattern="[0-9]*" maxlength="4" onkeydown="if(event.key==='Enter')doLogin()">
+      </div>
     </div>
     <button class="login-btn" onclick="doLogin()">ログイン</button>
     <div class="login-error" id="loginError"></div>
-    <div style="margin-top:14px;text-align:center;font-size:12px;color:#aaa;">
-      スタッフの方は<br><a href="https://kalmia-dc.github.io/portal/" style="color:var(--teal-dk);font-weight:700;">スタッフポータル</a>からログインしてください
+    <div class="login-hint" id="loginHint">
+      🔑 <strong>初期パスワード</strong><br>
+      <strong>DR</strong>　杉平:1001　嶋中:1002　保刈:1003　篠田:1004<br>
+      <strong>DH</strong>　鶴田:2001　吉田:2002　高木:2003<br>
+      　　松本:2004　野崎:2005　山田:2006<br>
+      <strong>DA</strong>　田宮:3001　田中:3002　百々:3003<br><br>
+      <span style="color:#888;font-size:.8rem;">パスワードはログイン後に変更してください</span>
     </div>
-    <div id="loginHint" style="display:none"></div>
   </div>
 </div>
 
@@ -1009,6 +1037,9 @@
           <input type="text" id="reqComment" placeholder="例：私用のため" style="font-size:1rem;">
         </div>
         <button class="login-btn" onclick="submitRequest()">申請する</button>
+        <div style="font-size:.78rem;color:#888;text-align:center;margin-top:8px;line-height:1.5;">
+          💡 希望が他のスタッフと重なった場合は、<br>早く申請した方が優先されます
+        </div>
         <div id="reqResult" style="font-size:.85rem;text-align:center;margin-top:12px;min-height:20px;color:var(--teal);font-weight:600;"></div>
       </div>
 
@@ -1059,6 +1090,25 @@
       <button class="login-btn" style="background:var(--teal-lt);color:var(--teal-dk);font-size:.95rem;" onclick="doLogout()">
         🚪 ログアウト
       </button>
+
+      <!-- パスワード変更 -->
+      <h3 style="margin-top:24px;">🔑 パスワード変更</h3>
+      <div class="request-card">
+        <div class="login-field">
+          <label>現在のパスワード</label>
+          <input type="password" id="pwOld" placeholder="現在のパスワード" inputmode="numeric" maxlength="20" style="font-size:1rem;">
+        </div>
+        <div class="login-field">
+          <label>新しいパスワード</label>
+          <input type="password" id="pwNew" placeholder="新しいパスワード（4文字以上）" maxlength="20" style="font-size:1rem;">
+        </div>
+        <div class="login-field">
+          <label>新しいパスワード（確認）</label>
+          <input type="password" id="pwNew2" placeholder="もう一度入力" maxlength="20" style="font-size:1rem;">
+        </div>
+        <button class="login-btn" onclick="submitChangePassword()">変更する</button>
+        <div id="pwResult" style="font-size:.85rem;text-align:center;margin-top:12px;min-height:20px;font-weight:600;"></div>
+      </div>
     </div>
   </div>
 
@@ -3903,6 +3953,17 @@ function savePasswords(){
   }
 }
 
+function changePassword(oldPass, newPass, newPass2){
+  const sid = currentUser?.staffId;
+  if(!sid) return { ok:false, msg:'ログインしていません' };
+  if(oldPass !== STAFF_PASSWORDS[sid]) return { ok:false, msg:'現在のパスワードが違います' };
+  if(newPass.length < 4) return { ok:false, msg:'新しいパスワードは4文字以上にしてください' };
+  if(newPass !== newPass2) return { ok:false, msg:'新しいパスワードが一致しません' };
+  STAFF_PASSWORDS[sid] = newPass;
+  savePasswords();
+  return { ok:true, msg:'パスワードを変更しました' };
+}
+
 let loginRole = 'staff'; // 'admin' | 'staff'
 let currentUser = null;  // { role, staffId, name }
 
@@ -3969,47 +4030,53 @@ function setLoginRole(role, el){
   document.getElementById('loginError').textContent = '';
 }
 
-// ── ポータルからの自動ログイン ──────────────────────────────
-function checkPortalAutoLogin(){
-  try {
-    const params = new URLSearchParams(window.location.search);
-    window.history.replaceState({}, '', window.location.pathname);
-
-    // 管理者自動ログイン
-    if(params.get('admin') === '1'){
-      currentUser = { role:'admin', name:'管理者' };
-      showAdminApp();
-      return;
-    }
-
-    // スタッフ自動ログイン
-    const sid  = params.get('sid');
-    const pass = params.get('p');
-    if(!sid || !pass) return;
-    if(pass !== STAFF_PASSWORDS[sid]) return;
-    const s = STAFF.find(x => x.id === sid);
-    if(!s) return;
-    currentUser = { role:'staff', staffId:s.id, name:s.name };
-    showStaffApp();
-  } catch(e) { /* 失敗時は管理者ログイン画面のまま */ }
-}
-
 function doLogin(){
-  // 管理者専用（スタッフはポータルから自動ログイン）
   const err = document.getElementById('loginError');
   err.textContent = '';
-  const pass = document.getElementById('adminPass').value;
-  if(pass === 'admin'){
-    currentUser = { role:'admin', name:'管理者' };
-    showAdminApp();
+
+  if(loginRole === 'admin'){
+    const pass = document.getElementById('adminPass').value;
+    if(pass === 'admin'){
+      currentUser = { role:'admin', name:'管理者' };
+      showAdminApp();
+    } else {
+      err.textContent = 'パスワードが違います';
+      document.getElementById('adminPass').value = '';
+    }
   } else {
-    err.textContent = 'パスワードが違います';
-    document.getElementById('adminPass').value = '';
+    const sid  = document.getElementById('staffSelect').value;
+    const pass = document.getElementById('staffPass').value;
+    if(!sid){ err.textContent = 'スタッフを選択してください'; return; }
+    if(pass === STAFF_PASSWORDS[sid]){
+      const s = STAFF.find(x=>x.id===sid);
+      currentUser = { role:'staff', staffId:sid, name:s.name };
+      showStaffApp();
+    } else {
+      err.textContent = 'パスワードが違います';
+      document.getElementById('staffPass').value = '';
+    }
+  }
+}
+
+function submitChangePassword(){
+  const oldPass = document.getElementById('pwOld').value;
+  const newPass = document.getElementById('pwNew').value;
+  const newPass2 = document.getElementById('pwNew2').value;
+  const result = document.getElementById('pwResult');
+
+  const res = changePassword(oldPass, newPass, newPass2);
+  result.textContent = res.msg;
+  result.style.color = res.ok ? 'var(--teal)' : 'var(--red)';
+
+  if(res.ok){
+    document.getElementById('pwOld').value = '';
+    document.getElementById('pwNew').value = '';
+    document.getElementById('pwNew2').value = '';
+    setTimeout(()=>{ result.textContent=''; }, 4000);
   }
 }
 
 function doLogout(){
-  const wasStaff = currentUser?.role === 'staff';
   currentUser = null;
   document.getElementById('loginScreen').style.display = 'flex';
   document.getElementById('mainApp').style.display    = 'none';
@@ -4018,10 +4085,6 @@ function doLogout(){
   document.getElementById('staffPass').value  = '';
   document.getElementById('staffSelect').value = '';
   document.getElementById('loginError').textContent = '';
-  // スタッフはポータルに戻る
-  if(wasStaff){
-    window.location.href = 'https://kalmia-dc.github.io/portal/';
-  }
 }
 
 function showAdminApp(){
