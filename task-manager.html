@@ -679,8 +679,9 @@
 
 <!-- ===== FILTER BAR ===== -->
 <div class="filter-bar">
-  <button class="filter-chip" onclick="setFilter('all',this)">すべて</button>
-  <button class="filter-chip active" onclick="setFilter('mine',this)">自分のタスク</button>
+  <button class="filter-chip active" onclick="setFilter('all',this)">自分のタスク</button>
+  <button class="filter-chip" onclick="setFilter('mine',this)">担当のみ</button>
+  <button class="filter-chip" onclick="setFilter('everyone',this)">👥 全員分</button>
   <button class="filter-chip" onclick="setFilter('未着手',this)">未着手</button>
   <button class="filter-chip" onclick="setFilter('進行中',this)">進行中</button>
   <button class="filter-chip" onclick="setFilter('完了',this)">完了</button>
@@ -848,7 +849,7 @@ function resolveUser() {
 // ===== STATE =====
 let currentUser = resolveUser();
 let tasks = {};
-let currentFilter = 'mine';
+let currentFilter = 'all';
 let currentView   = 'board';
 let editingId     = null;
 let saving        = false;
@@ -1141,8 +1142,18 @@ function daysLeft(d) {
 // ===== FILTER =====
 function getFiltered() {
   return Object.entries(tasks).filter(([id, t]) => {
+    // 全員分フィルター：制限なし
+    if (currentFilter === 'everyone') return true;
+
+    // それ以外は自分が作成 or 担当のタスクのみ
+    const isRelated = currentUser && (
+      (t.assignees||[]).includes(currentUser.name) ||
+      t.createdBy === currentUser.name
+    );
+    if (!isRelated) return false;
+
     if (currentFilter === 'all')     return true;
-    if (currentFilter === 'mine')    return currentUser && (t.assignees||[]).includes(currentUser.name);
+    if (currentFilter === 'mine')    return (t.assignees||[]).includes(currentUser.name);
     if (currentFilter === 'overdue') return isOverdue(t.date) && t.status !== '完了';
     if (currentFilter === 'high')    return t.priority === 'high';
     if (['未着手','進行中','完了','保留'].includes(currentFilter)) return t.status === currentFilter;
@@ -1155,13 +1166,19 @@ function getFiltered() {
 function render() { renderStats(); currentView==='board' ? renderBoard() : renderList(); }
 
 function renderStats() {
-  const all  = Object.values(tasks);
-  const mine = currentUser ? all.filter(t => (t.assignees||[]).includes(currentUser.name)) : [];
-  const doing   = all.filter(t => t.status==='進行中').length;
-  const overdue = all.filter(t => isOverdue(t.date) && t.status!=='完了').length;
+  const all = Object.values(tasks);
+  const isEveryone = currentFilter === 'everyone';
+
+  const related = isEveryone ? all : (currentUser ? all.filter(t =>
+    (t.assignees||[]).includes(currentUser.name) || t.createdBy === currentUser.name
+  ) : []);
+  const mine    = currentUser ? related.filter(t => (t.assignees||[]).includes(currentUser.name)) : [];
+  const doing   = related.filter(t => t.status === '進行中').length;
+  const overdue = related.filter(t => isOverdue(t.date) && t.status !== '完了').length;
+
   document.getElementById('statsBar').innerHTML = `
-    <div class="stat-card"><div class="stat-num">${all.length}</div><div class="stat-label">全タスク</div></div>
-    <div class="stat-card"><div class="stat-num" style="color:var(--low)">${mine.length}</div><div class="stat-label">自分担当</div></div>
+    <div class="stat-card"><div class="stat-num">${related.length}</div><div class="stat-label">${isEveryone ? '全タスク' : '自分のタスク'}</div></div>
+    <div class="stat-card"><div class="stat-num" style="color:var(--low)">${mine.length}</div><div class="stat-label">担当中</div></div>
     <div class="stat-card"><div class="stat-num" style="color:var(--med)">${doing}</div><div class="stat-label">進行中</div></div>
     <div class="stat-card"><div class="stat-num" style="color:var(--high)">${overdue}</div><div class="stat-label">期限切れ</div></div>`;
 }
