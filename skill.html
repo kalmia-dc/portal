@@ -327,7 +327,11 @@ if (params.get('admin') === '1') {
 // ポータルから sid・name・role が渡された場合は自動でシートを開く
 let portalUser = null; // { sid, name, role, isAdmin }
 
-(async function checkPortalSkillParams() {
+document.addEventListener('DOMContentLoaded', async () => {
+  await checkPortalSkillParams();
+});
+
+async function checkPortalSkillParams() {
   const sid     = params.get('sid');
   const name    = params.get('name');
   const role    = params.get('role');
@@ -348,9 +352,9 @@ let portalUser = null; // { sid, name, role, isAdmin }
   } else {
     // 一般スタッフ：自分のシートを直接開く
     const avatarMap = { DR:'dr', DH:'dh', 'DA受付':'da', 'DA助手':'da' };
-    await openSheet(sid, name, role, avatarMap[role] || 'dh');
+    await window.openSheet(sid, name, role, avatarMap[role] || 'dh');
   }
-})();
+}
 
 // ─── スキルシートを開く ──────────────────────────────
 window.openSheet = async function(staffId, name, roleKey, avatarClass) {
@@ -423,7 +427,7 @@ function renderSkills() {
       card.className = 'skill-card';
       // 評価基準を取得（カテゴリ名が完全一致しないケースも考慮）
       // 完全一致 → カテゴリ部分一致 → アイテム部分一致 の順で検索
-      const criteriaDict = CRITERIA[currentRoleKey] || {};
+      const criteriaDict = CRITERIA[sheetKey] || CRITERIA[currentRoleKey] || {};
       const criteriaKey = criteriaDict[key] ? key
         : Object.keys(criteriaDict).find(k => {
             const [kCat, kItem] = k.split('__');
@@ -433,7 +437,7 @@ function renderSkills() {
           });
       // DA助手シートは評価ポイント非表示
       const criteriaList = (sheetKey === 'DA助手') ? null
-        : criteriaKey ? CRITERIA[currentRoleKey][criteriaKey] : null;
+        : criteriaKey ? (CRITERIA[sheetKey] || CRITERIA[currentRoleKey])[criteriaKey] : null;
 
       card.innerHTML = `
         <div class="skill-name-row" style="margin-bottom:10px">
