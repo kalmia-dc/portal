@@ -583,6 +583,21 @@
   .btn-save:hover { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(78,205,196,0.45); }
   .btn-save:disabled { background: #b2bec3; box-shadow: none; cursor: not-allowed; transform: none; }
 
+  .btn-done-modal {
+    background: white;
+    border: 2px solid var(--mint);
+    border-radius: var(--radius-sm);
+    padding: 10px 16px;
+    font-family: 'Nunito', sans-serif;
+    font-size: 13px;
+    font-weight: 800;
+    color: var(--mint);
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+  .btn-done-modal:hover { background: #e8fdf8; }
+
   .empty { text-align: center; padding: 28px 12px; color: var(--text-muted); font-size: 12px; }
 
   /* ===== LOADING ===== */
@@ -765,6 +780,7 @@
       <button class="btn-icon" id="btnExportGoogle" style="display:none;width:auto;padding:0 12px;font-size:12px;color:#4285f4;border-color:#4285f4;gap:4px;" onclick="exportToGoogle()">
         <img src="https://www.google.com/favicon.ico" style="width:12px;height:12px;">送る
       </button>
+      <button class="btn-done-modal" id="btnDoneModal" style="display:none" onclick="quickComplete()">✓ 完了</button>
       <button class="btn-save" id="btnSave" onclick="saveTask()">保存</button>
     </div>
   </div>
@@ -1269,6 +1285,15 @@ function openModal(id = null) {
     document.querySelector(`input[name="status"][value="${t.status||'未着手'}"]`).checked = true;
     document.querySelectorAll('.assignee-checkbox').forEach(cb => { cb.checked = (t.assignees||[]).includes(cb.value); });
     document.getElementById('btnDelete').style.display = '';
+    // 完了ボタン：完了以外のタスク編集時のみ表示
+    const doneBtn = document.getElementById('btnDoneModal');
+    if (tasks[id] && tasks[id].status !== '完了') {
+      doneBtn.style.display = '';
+      doneBtn.textContent = '✓ 完了にする';
+    } else if (tasks[id] && tasks[id].status === '完了') {
+      doneBtn.style.display = '';
+      doneBtn.textContent = '↩ 未着手に戻す';
+    }
     // Googleエクスポートボタン（院長＋連携済みでない場合）
     const exportBtn = document.getElementById('btnExportGoogle');
     if (isIncho() && gAccessToken) {
@@ -1299,6 +1324,7 @@ function openModal(id = null) {
     }
     document.getElementById('btnDelete').style.display = 'none';
     document.getElementById('btnExportGoogle').style.display = 'none';
+    document.getElementById('btnDoneModal').style.display = 'none';
   }
   document.getElementById('overlay').classList.add('open');
   setTimeout(() => document.getElementById('fTitle').focus(), 300);
@@ -1380,6 +1406,25 @@ window.openModal = openModal; window.closeModal = closeModal;
 window.handleOverlayClick = handleOverlayClick;
 window.saveTask = saveTask; window.deleteTask = deleteTask;
 window._openTask = (id) => openModal(id);
+
+// 編集モーダルの完了ボタン
+window.quickComplete = async function() {
+  if (!editingId || !tasks[editingId]) return;
+  const current = tasks[editingId].status;
+  const newStatus = current === '完了' ? '未着手' : '完了';
+  try {
+    await set(ref(db, `tasks/${editingId}/status`), newStatus);
+    await set(ref(db, `tasks/${editingId}/updatedAt`), Date.now());
+    await set(ref(db, `tasks/${editingId}/updatedBy`), currentUser?.name || '不明');
+    if (newStatus === '完了' && tasks[editingId].googleTaskId) {
+      await completeGoogleTask(tasks[editingId].googleTaskId, tasks[editingId].googleListId);
+    }
+    showToast(newStatus === '完了' ? '✅ 完了にしました' : '↩ 未着手に戻しました');
+    closeModal();
+  } catch(e) {
+    showToast('更新に失敗しました');
+  }
+};
 
 // カードの完了ボタン
 window._toggleDone = async function(e, id) {
