@@ -665,20 +665,46 @@ function goToShiftApp(asAdmin = false) {
 }
 
 // ─────────────────────────────────────────
-// localStorage からシフトデータを読む
-// シフトアプリのキー: "shifts_YYYY_M"
-//   値: { "杉平": { "1":"通常", "2":"遅出", ... }, ... }
+// Firebaseからシフトデータを読む
+// シフトアプリのキー: shifts/YYYY-MM
+//   値: { staffId: { "1":"early", ... } }
 // ─────────────────────────────────────────
-function getMonthShifts(year, month) {
+
+// staffId → staffName マップ
+const STAFF_ID_MAP = {
+  sugihira:'杉平', shimanaka:'嶋中', hokari:'保刈', shinoda:'篠田',
+  tsuruta:'鶴田',  yoshida:'吉田',  takagi:'高木', matsumoto:'松本',
+  nozaki:'野崎',   yamada:'山田',   hanowa:'ハノワ',
+  tamiya:'田宮',   tanaka:'田中',   momo:'百々'
+};
+// staffName → staffId マップ（逆引き）
+const NAME_TO_ID = Object.fromEntries(Object.entries(STAFF_ID_MAP).map(([id,n])=>[n,id]));
+
+// シフトキー変換（シフトアプリ内部キー→表示名）
+const SHIFT_KEY_MAP = {
+  early:'通常', late:'遅出', fixed:'通常', off:'公休',
+  none:'公休', paid:'有給', wish:'希望休', admin:'通常'
+};
+
+let _shiftCache = {}; // { 'YYYY-MM': { staffId: { day: key } } }
+
+async function getMonthShifts(year, month) {
+  const key = `${year}-${String(month).padStart(2,'0')}`;
+  if (_shiftCache[key] !== undefined) return _shiftCache[key];
   try {
-    const raw = localStorage.getItem(`shifts_${year}_${month}`);
-    return raw ? JSON.parse(raw) : null;
+    const snap = await get(ref(_db, `shifts/${key}`));
+    _shiftCache[key] = snap.exists() ? snap.val() : null;
+    return _shiftCache[key];
   } catch(e) { return null; }
 }
 
-function getShift(staffName, date) {
-  const data = getMonthShifts(date.getFullYear(), date.getMonth()+1);
-  return data?.[staffName]?.[String(date.getDate())] ?? null;
+async function getShift(staffName, date) {
+  const data = await getMonthShifts(date.getFullYear(), date.getMonth()+1);
+  if (!data) return null;
+  const sid = NAME_TO_ID[staffName];
+  if (!sid) return null;
+  const raw = data[sid]?.[String(date.getDate())];
+  return raw ? (SHIFT_KEY_MAP[raw] || raw) : null;
 }
 
 // ─────────────────────────────────────────
@@ -690,7 +716,7 @@ function showApp() {
   initApp();
 }
 
-function initApp() {
+async function initApp() {
   const u   = currentUser;
   const now = new Date();
   const DAY_NAMES = ['日','月','火','水','木','金','土'];
@@ -713,7 +739,7 @@ function initApp() {
   document.getElementById('heroTitle').innerHTML = titleHtml;
 
   // 今日のシフト
-  const s = getShift(u.name, now);
+  const s = await getShift(u.name, now);
   const typeEl = document.getElementById('heroShiftType');
   const timeEl = document.getElementById('heroShiftTime');
   if (s) {
@@ -752,10 +778,10 @@ function initApp() {
   skillBtn.style.display = 'block';
 
   // 今週カレンダー
-  buildWeek(now, u.name);
+  await buildWeek(now, u.name);
 
   // 本日出勤スタッフ
-  buildTodayStaff(now);
+  await buildTodayStaff(now);
 
   // お知らせ（Firebase同期）
   startNoticeSync();
@@ -767,7 +793,7 @@ function initApp() {
   loadMyTasks(u.name);
 }
 
-function buildWeek(now, staffName) {
+async function buildWeek(now, staffName) {
   const el = document.getElementById('weekDays');
   el.innerHTML = '';
   const jsDay = now.getDay();
@@ -782,7 +808,7 @@ function buildWeek(now, staffName) {
     const dt = new Date(mon); dt.setDate(mon.getDate()+i);
     const isToday = dt.toDateString()===now.toDateString();
     const isSat=i===5, isSun=i===6;
-    const s = getShift(staffName, dt);
+    const s = await getShift(staffName, dt);
     let pill = '';
     if (s) {
       const info = SHIFT_INFO[s]||{label:s,cls:'on'};
@@ -801,15 +827,18 @@ function buildWeek(now, staffName) {
   }
 }
 
-function buildTodayStaff(now) {
+async function buildTodayStaff(now) {
   const sec = document.getElementById('todayStaffSection');
-  const data = getMonthShifts(now.getFullYear(), now.getMonth()+1);
+  const data = await getMonthShifts(now.getFullYear(), now.getMonth()+1);
+  const ON_SHIFT_KEYS = ['early','late','fixed','admin']; // シフトアプリの出勤キー
   let html = '';
 
   for (const [role, members] of Object.entries(STAFF_ROLES)) {
     const attending = members.filter(name => {
-      const s = data?.[name]?.[String(now.getDate())];
-      return s && ON_SHIFTS.includes(s);
+      const sid = NAME_TO_ID[name];
+      if (!sid) return false;
+      const raw = data?.[sid]?.[String(now.getDate())];
+      return raw && ON_SHIFT_KEYS.includes(raw);
     });
     if (!attending.length) continue;
     html += `<div class="role-label">${role}（${ROLE_LABELS[role]}）</div><div class="staff-grid">`;
