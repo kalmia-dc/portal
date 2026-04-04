@@ -245,12 +245,30 @@
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
-    padding: 11px;
+    padding: 11px 11px 32px 11px;
     cursor: pointer;
     transition: all 0.15s;
     position: relative;
     overflow: hidden;
   }
+
+  .btn-done {
+    position: absolute;
+    bottom: 8px; right: 8px;
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    border: 2px solid var(--border);
+    background: white;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.15s;
+    color: var(--text-muted);
+    z-index: 2;
+  }
+  .btn-done:hover { border-color: var(--accent); background: var(--accent-light); color: var(--accent); transform: scale(1.1); }
+  .task-card.done-card { opacity: 0.55; }
+  .task-card.done-card .btn-done { background: var(--accent); border-color: var(--accent); color: white; }
 
   .task-card:hover { box-shadow: var(--shadow); transform: translateY(-1px); }
 
@@ -1135,10 +1153,11 @@ function taskCardHtml(t) {
   const priLbl={high:'高',med:'中',low:'低'};
   const tags  = (t.tags||[]).map(g=>`<span class="tag">${esc(g)}</span>`).join('');
   const chips = assigneeChips(t.assignees);
+  const isDone = t.status === '完了';
   const gIcon = t.googleTaskId ? `<span title="Googleタスク" style="font-size:10px;margin-left:auto;">G</span>` : '';
   return `
-    <div class="task-card pri-${t.priority} ${od?'overdue':''}" onclick="window._openTask('${t.id}')">
-      <div class="task-title">${esc(t.title)}</div>
+    <div class="task-card pri-${t.priority} ${od?'overdue':''} ${isDone?'done-card':''}" onclick="window._openTask('${t.id}')">
+      <div class="task-title" style="${isDone?'text-decoration:line-through;color:var(--text-muted);':''}">${esc(t.title)}</div>
       <div class="task-meta">
         <span class="badge badge-cat">${t.category||'その他'}</span>
         <span class="badge ${priCls[t.priority]}">${priLbl[t.priority]}</span>
@@ -1146,6 +1165,7 @@ function taskCardHtml(t) {
       </div>
       ${chips?`<div class="task-assignees">${chips}</div>`:''}
       ${tags ?`<div class="task-tags">${tags}</div>`:''}
+      <button class="btn-done" onclick="window._toggleDone(event,'${t.id}')" title="${isDone?'未着手に戻す':'完了にする'}">${isDone?'✓':'✓'}</button>
     </div>`;
 }
 
@@ -1339,6 +1359,26 @@ window.openModal = openModal; window.closeModal = closeModal;
 window.handleOverlayClick = handleOverlayClick;
 window.saveTask = saveTask; window.deleteTask = deleteTask;
 window._openTask = (id) => openModal(id);
+
+// カードの完了ボタン
+window._toggleDone = async function(e, id) {
+  e.stopPropagation(); // カードのクリックイベントを止める
+  if (!tasks[id]) return;
+  const current = tasks[id].status;
+  const newStatus = current === '完了' ? '未着手' : '完了';
+  try {
+    await set(ref(db, `tasks/${id}/status`), newStatus);
+    await set(ref(db, `tasks/${id}/updatedAt`), Date.now());
+    await set(ref(db, `tasks/${id}/updatedBy`), currentUser?.name||'不明');
+    // Googleタスクと連携していれば完了を反映
+    if (newStatus === '完了' && tasks[id].googleTaskId) {
+      await completeGoogleTask(tasks[id].googleTaskId, tasks[id].googleListId);
+    }
+    showToast(newStatus === '完了' ? '✅ 完了にしました' : '↩ 未着手に戻しました');
+  } catch(err) {
+    showToast('更新に失敗しました');
+  }
+};
 
 document.addEventListener('keydown', e => {
   if (e.key==='Escape') closeModal();
