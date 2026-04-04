@@ -583,67 +583,8 @@
 
   .toast.show { transform: translateX(-50%) translateY(0); }
 
-  /* ===== LOGIN OVERLAY ===== */
-  #loginOverlay {
-    position: fixed;
-    inset: 0;
-    background: linear-gradient(135deg,#667eea,#764ba2,#f64f59,#f7971e);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 500;
-    padding: 20px;
-  }
-
-  .login-card {
-    background: white;
-    border-radius: 20px;
-    padding: 28px 22px;
-    width: 100%;
-    max-width: 340px;
-    box-shadow: 0 20px 60px rgba(0,0,0,0.2);
-    text-align: center;
-  }
-
-  .login-icon { font-size: 40px; margin-bottom: 8px; }
-  .login-title { font-weight: 700; font-size: 16px; margin-bottom: 4px; }
-  .login-sub { font-size: 11px; color: var(--text-muted); margin-bottom: 20px; }
-
-  .login-card select, .login-card input {
-    width: 100%;
-    border: 2px solid var(--border);
-    border-radius: 10px;
-    padding: 10px 12px;
-    font-family: 'Noto Sans JP', sans-serif;
-    font-size: 14px;
-    margin-bottom: 12px;
-    outline: none;
-    -webkit-appearance: none;
-    background: white;
-    transition: border-color 0.2s;
-  }
-
-  .login-card select:focus, .login-card input:focus { border-color: var(--mint); }
-
-  .login-btn {
-    width: 100%;
-    padding: 12px;
-    background: linear-gradient(135deg, var(--mint), var(--sky));
-    color: white;
-    border: none;
-    border-radius: 12px;
-    font-family: 'Noto Sans JP', sans-serif;
-    font-weight: 700;
-    font-size: 15px;
-    cursor: pointer;
-    transition: transform 0.15s;
-  }
-
-  .login-btn:hover { transform: translateY(-2px); }
-  .login-error { color: var(--high); font-size: 12px; margin-top: 8px; min-height: 16px; }
-
   @media print {
-    header, .filter-bar, .stats-bar, .btn-add, .btn-icon, .overlay, #loginOverlay { display: none !important; }
+    header, .filter-bar, .stats-bar, .btn-add, .btn-icon, .overlay { display: none !important; }
     .board { grid-template-columns: repeat(4,1fr); }
     .task-card { break-inside: avoid; }
     body { background: white; }
@@ -655,40 +596,7 @@
 </head>
 <body>
 
-<!-- ===== LOGIN ===== -->
-<div id="loginOverlay">
-  <div class="login-card">
-    <div class="login-icon">📋</div>
-    <div class="login-title">タスク管理</div>
-    <div class="login-sub">カルミアデンタルクリニック</div>
-    <select id="loginStaff">
-      <option value="">── スタッフを選択 ──</option>
-      <optgroup label="DR（歯科医師）">
-        <option value="院長|DR|sugihira">院長</option>
-        <option value="嶋中|DR|shimanaka">嶋中</option>
-        <option value="保刈|DR|hokari">保刈</option>
-        <option value="篠田|DR|shinoda">篠田</option>
-      </optgroup>
-      <optgroup label="DH（歯科衛生士）">
-        <option value="鶴田|DH|tsuruta">鶴田</option>
-        <option value="吉田|DH|yoshida">吉田</option>
-        <option value="高木|DH|takagi">高木</option>
-        <option value="松本|DH|matsumoto">松本</option>
-        <option value="野崎|DH|nozaki">野崎</option>
-        <option value="山田|DH|yamada">山田</option>
-        <option value="ハノワ|DH|hanowa">ハノワ</option>
-      </optgroup>
-      <optgroup label="DA（受付・歯科助手）">
-        <option value="田宮|DA|tamiya">田宮</option>
-        <option value="田中|DA|tanaka">田中</option>
-        <option value="百々|DA|momo">百々</option>
-      </optgroup>
-    </select>
-    <input type="password" id="loginPass" inputmode="numeric" maxlength="4" placeholder="パスワード（数字4桁）">
-    <button class="login-btn" onclick="doLogin()">ログイン</button>
-    <div class="login-error" id="loginError"></div>
-  </div>
-</div>
+<!-- ===== NO LOGIN - ポータルセッション引き継ぎ ===== -->
 
 <!-- ===== HEADER ===== -->
 <header>
@@ -810,7 +718,7 @@
 
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getDatabase, ref, push, set, remove, onValue, serverTimestamp }
+import { getDatabase, ref, push, set, remove, onValue }
   from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 
 // ===== FIREBASE =====
@@ -823,7 +731,6 @@ const firebaseConfig = {
   messagingSenderId: '714175473480',
   appId:             '1:714175473480:web:7d6626a46e4a9dcb1fb57d'
 };
-
 const app = initializeApp(firebaseConfig);
 const db  = getDatabase(app);
 
@@ -833,51 +740,82 @@ const STAFF = {
   DH: ['鶴田','吉田','高木','松本','野崎','山田','ハノワ'],
   DA: ['田宮','田中','百々']
 };
-
 const ROLE_OF = {};
 Object.entries(STAFF).forEach(([role, names]) => names.forEach(n => ROLE_OF[n] = role));
 
-const DEFAULTS = {
-  sugihira:'1001', shimanaka:'1002', hokari:'1003', shinoda:'1004',
-  tsuruta:'2001',  yoshida:'2002',   takagi:'2003', matsumoto:'2004',
-  nozaki:'2005',   yamada:'2006',    hanowa:'2007',
-  tamiya:'3001',   tanaka:'3002',    momo:'3003'
-};
-
-// ===== STATE =====
-let currentUser = null;
-let tasks = {};
-let currentFilter = 'all';
-let currentView = 'board';
-let editingId = null;
-let saving = false;
-
-// ===== LOGIN =====
-function doLogin() {
-  const sel  = document.getElementById('loginStaff').value;
-  const pass = document.getElementById('loginPass').value;
-  const err  = document.getElementById('loginError');
-
-  if (!sel) { err.textContent = 'スタッフを選択してください'; return; }
-  const [name, role, staffId] = sel.split('|');
-  const stored = JSON.parse(localStorage.getItem('carmia_passwords') || '{}');
-  const correct = stored[staffId] || DEFAULTS[staffId] || '';
-
-  if (pass !== correct) { err.textContent = 'パスワードが違います'; return; }
-
-  currentUser = { name, role, staffId };
-  sessionStorage.setItem('taskUser', JSON.stringify(currentUser));
-  err.textContent = '';
-  document.getElementById('loginOverlay').style.display = 'none';
-  document.getElementById('userBadge').textContent = name;
-  initTasks();
+// ===== ユーザー特定 =====
+// 優先度: 1) ポータルのsessionStorage  2) URLパラメータ  3) セッション内名前入力
+function resolveUser() {
+  try {
+    const saved = sessionStorage.getItem('portalUser');
+    if (saved) { const u = JSON.parse(saved); if (u.name) return u; }
+  } catch(e) {}
+  const p = new URLSearchParams(location.search);
+  const name = p.get('name'), sid = p.get('sid');
+  if (name && sid) {
+    const rm = { sugihira:'DR',shimanaka:'DR',hokari:'DR',shinoda:'DR',
+                 tsuruta:'DH',yoshida:'DH',takagi:'DH',matsumoto:'DH',nozaki:'DH',yamada:'DH',hanowa:'DH',
+                 tamiya:'DA',tanaka:'DA',momo:'DA' };
+    return { name, staffId: sid, role: rm[sid]||'DH' };
+  }
+  const cached = sessionStorage.getItem('taskUserName');
+  if (cached) {
+    const rm2 = {};
+    Object.entries(STAFF).forEach(([r,names]) => names.forEach(n => rm2[n]=r));
+    return { name: cached, role: rm2[cached]||'DH', staffId:'' };
+  }
+  return null;
 }
 
+// ===== STATE =====
+let currentUser = resolveUser();
+let tasks = {};
+let currentFilter = 'all';
+let currentView   = 'board';
+let editingId     = null;
+let saving        = false;
+
+// ===== 名前選択バナー（未認証時のみ） =====
+function showNameBanner() {
+  const ban = document.createElement('div');
+  ban.id = 'nameBanner';
+  ban.style.cssText = 'position:fixed;inset:0;background:rgba(44,42,38,0.5);z-index:400;display:flex;align-items:center;justify-content:center;padding:20px;';
+  const opts = Object.entries(STAFF).map(([role, names]) =>
+    `<optgroup label="${role}">${names.map(n=>`<option>${n}</option>`).join('')}</optgroup>`
+  ).join('');
+  ban.innerHTML = `
+    <div style="background:white;border-radius:16px;padding:24px 20px;width:100%;max-width:300px;text-align:center;">
+      <div style="font-size:36px;margin-bottom:10px;">👤</div>
+      <div style="font-weight:700;font-size:15px;margin-bottom:6px;">あなたは？</div>
+      <div style="font-size:12px;color:#9a9590;margin-bottom:16px;">タスクの作成・担当表示に使用します</div>
+      <select id="nameSelect" style="width:100%;border:1px solid #e8e4dc;border-radius:8px;padding:10px;font-size:14px;margin-bottom:12px;-webkit-appearance:none;background:white;outline:none;">
+        <option value="">── 選択してください ──</option>${opts}
+      </select>
+      <button onclick="window._setName()" style="width:100%;padding:11px;background:#5b8a72;color:white;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;">OK</button>
+    </div>`;
+  document.body.appendChild(ban);
+}
+
+window._setName = function() {
+  const sel = document.getElementById('nameSelect').value;
+  if (!sel) return;
+  const rm = {};
+  Object.entries(STAFF).forEach(([r,names]) => names.forEach(n => rm[n]=r));
+  currentUser = { name: sel, role: rm[sel]||'DH', staffId:'' };
+  sessionStorage.setItem('taskUserName', sel);
+  document.getElementById('nameBanner').remove();
+  document.getElementById('userBadge').textContent = sel;
+};
+
 // ===== INIT =====
-function initTasks() {
+function init() {
+  if (currentUser) {
+    document.getElementById('userBadge').textContent = currentUser.name;
+  } else {
+    showNameBanner();
+  }
   buildAssigneeGrid();
-  const tasksRef = ref(db, 'tasks');
-  onValue(tasksRef, snap => {
+  onValue(ref(db, 'tasks'), snap => {
     tasks = snap.val() || {};
     render();
   });
@@ -900,10 +838,10 @@ function daysLeft(d) {
 // ===== FILTER =====
 function getFiltered() {
   return Object.entries(tasks).filter(([id, t]) => {
-    if (currentFilter === 'all')    return true;
-    if (currentFilter === 'mine')   return (t.assignees || []).includes(currentUser.name);
+    if (currentFilter === 'all')     return true;
+    if (currentFilter === 'mine')    return currentUser && (t.assignees||[]).includes(currentUser.name);
     if (currentFilter === 'overdue') return isOverdue(t.date) && t.status !== '完了';
-    if (currentFilter === 'high')   return t.priority === 'high';
+    if (currentFilter === 'high')    return t.priority === 'high';
     if (['未着手','進行中','完了','保留'].includes(currentFilter)) return t.status === currentFilter;
     if (['診療','経営','スタッフ','設備','その他'].includes(currentFilter)) return t.category === currentFilter;
     return true;
@@ -911,49 +849,43 @@ function getFiltered() {
 }
 
 // ===== RENDER =====
-function render() {
-  renderStats();
-  currentView === 'board' ? renderBoard() : renderList();
-}
+function render() { renderStats(); currentView==='board' ? renderBoard() : renderList(); }
 
 function renderStats() {
-  const all = Object.values(tasks);
-  const mine = all.filter(t => (t.assignees||[]).includes(currentUser.name));
-  const doing = all.filter(t => t.status === '進行中').length;
-  const overdue = all.filter(t => isOverdue(t.date) && t.status !== '完了').length;
+  const all  = Object.values(tasks);
+  const mine = currentUser ? all.filter(t => (t.assignees||[]).includes(currentUser.name)) : [];
+  const doing   = all.filter(t => t.status==='進行中').length;
+  const overdue = all.filter(t => isOverdue(t.date) && t.status!=='完了').length;
   document.getElementById('statsBar').innerHTML = `
     <div class="stat-card"><div class="stat-num">${all.length}</div><div class="stat-label">全タスク</div></div>
     <div class="stat-card"><div class="stat-num" style="color:var(--low)">${mine.length}</div><div class="stat-label">自分担当</div></div>
     <div class="stat-card"><div class="stat-num" style="color:var(--med)">${doing}</div><div class="stat-label">進行中</div></div>
-    <div class="stat-card"><div class="stat-num" style="color:var(--high)">${overdue}</div><div class="stat-label">期限切れ</div></div>
-  `;
+    <div class="stat-card"><div class="stat-num" style="color:var(--high)">${overdue}</div><div class="stat-label">期限切れ</div></div>`;
 }
 
 function assigneeChips(assignees) {
-  if (!assignees || !assignees.length) return '';
+  if (!assignees||!assignees.length) return '';
   return assignees.map(name => {
-    const role = ROLE_OF[name] || '';
-    const cls = role === 'DR' ? 'chip-dr' : role === 'DH' ? 'chip-dh' : role === 'DA' ? 'chip-da' : 'chip-other';
+    const r = ROLE_OF[name]||'';
+    const cls = r==='DR'?'chip-dr':r==='DH'?'chip-dh':r==='DA'?'chip-da':'chip-other';
     return `<span class="assignee-chip ${cls}">${name}</span>`;
   }).join('');
 }
 
 function taskCardHtml(t) {
-  const od  = isOverdue(t.date) && t.status !== '完了';
-  const tod = isToday(t.date)   && t.status !== '完了';
-  const dl  = daysLeft(t.date);
+  const od = isOverdue(t.date) && t.status!=='完了';
+  const dl = daysLeft(t.date);
   let dateLabel = '';
   if (t.date) {
-    let cls = 'badge-date';
-    let txt = fmtDate(t.date);
-    if (od)      { cls += ' overdue-date'; txt = `⚠ ${txt}`; }
-    else if (tod){ cls += ' today-date'; txt = `今日`; }
-    else if (dl !== null && dl <= 3) txt = `あと${dl}日`;
+    let cls='badge-date', txt=fmtDate(t.date);
+    if (od)                          { cls+=' overdue-date'; txt=`⚠ ${txt}`; }
+    else if (isToday(t.date))        { cls+=' today-date'; txt='今日'; }
+    else if (dl!==null && dl<=3)     { txt=`あと${dl}日`; }
     dateLabel = `<span class="badge ${cls}">${txt}</span>`;
   }
-  const priCls = { high:'badge-high', med:'badge-med', low:'badge-low' };
-  const priLbl = { high:'高', med:'中', low:'低' };
-  const tags = (t.tags||[]).map(g => `<span class="tag">${esc(g)}</span>`).join('');
+  const priCls={high:'badge-high',med:'badge-med',low:'badge-low'};
+  const priLbl={high:'高',med:'中',low:'低'};
+  const tags  = (t.tags||[]).map(g=>`<span class="tag">${esc(g)}</span>`).join('');
   const chips = assigneeChips(t.assignees);
   return `
     <div class="task-card pri-${t.priority} ${od?'overdue':''}" onclick="window._openTask('${t.id}')">
@@ -963,36 +895,28 @@ function taskCardHtml(t) {
         <span class="badge ${priCls[t.priority]}">${priLbl[t.priority]}</span>
         ${dateLabel}
       </div>
-      ${chips ? `<div class="task-assignees">${chips}</div>` : ''}
-      ${tags  ? `<div class="task-tags">${tags}</div>` : ''}
+      ${chips?`<div class="task-assignees">${chips}</div>`:''}
+      ${tags ?`<div class="task-tags">${tags}</div>`:''}
     </div>`;
 }
 
 function renderBoard() {
   const filtered = getFiltered();
-  const cols = [
-    { status:'未着手', cls:'col-todo'  },
-    { status:'進行中', cls:'col-doing' },
-    { status:'完了',   cls:'col-done'  },
-    { status:'保留',   cls:'col-hold'  },
-  ];
+  const cols = ['未着手','進行中','完了','保留'];
+  const clsMap = {'未着手':'col-todo','進行中':'col-doing','完了':'col-done','保留':'col-hold'};
   let html = '<div class="board">';
-  for (const col of cols) {
-    const items = filtered.filter(t => t.status === col.status);
-    const dot = `<span class="col-dot"></span>`;
-    html += `
-      <div class="column">
-        <div class="column-header ${col.cls}">
-          <div class="column-title">${dot}${col.status}</div>
-          <span class="column-count">${items.length}</span>
-        </div>
-        <div class="column-body">
-          ${items.length ? items.map(taskCardHtml).join('') : '<div class="empty">なし</div>'}
-        </div>
-      </div>`;
+  for (const status of cols) {
+    const items = filtered.filter(t => t.status===status);
+    html += `<div class="column">
+      <div class="column-header ${clsMap[status]}">
+        <div class="column-title"><span class="col-dot"></span>${status}</div>
+        <span class="column-count">${items.length}</span>
+      </div>
+      <div class="column-body">
+        ${items.length ? items.map(taskCardHtml).join('') : '<div class="empty">なし</div>'}
+      </div></div>`;
   }
-  html += '</div>';
-  document.getElementById('viewContainer').innerHTML = html;
+  document.getElementById('viewContainer').innerHTML = html + '</div>';
 }
 
 function renderList() {
@@ -1001,51 +925,43 @@ function renderList() {
     document.getElementById('viewContainer').innerHTML = '<div class="empty" style="padding:60px">タスクがありません</div>';
     return;
   }
-  const priCls = { high:'badge-high', med:'badge-med', low:'badge-low' };
-  const priLbl = { high:'高優先', med:'中優先', low:'低優先' };
+  const priCls={high:'badge-high',med:'badge-med',low:'badge-low'};
+  const priLbl={high:'高優先',med:'中優先',low:'低優先'};
   const html = filtered.map(t => {
-    const od   = isOverdue(t.date) && t.status !== '完了';
-    const dl   = daysLeft(t.date);
-    let dateStr = '';
-    if (t.date) {
-      dateStr = od ? `⚠ ${fmtDate(t.date)} 期限切れ` : isToday(t.date) ? '今日' : dl !== null && dl <= 3 ? `あと${dl}日` : fmtDate(t.date)+'期限';
-    }
+    const od = isOverdue(t.date) && t.status!=='完了';
+    const dl = daysLeft(t.date);
+    let ds = '';
+    if (t.date) ds = od?`⚠ ${fmtDate(t.date)} 期限切れ`:isToday(t.date)?'今日':dl!==null&&dl<=3?`あと${dl}日`:fmtDate(t.date)+'期限';
     const chips = assigneeChips(t.assignees);
-    return `
-      <div class="list-item pri-${t.priority} ${od?'overdue':''}" onclick="window._openTask('${t.id}')">
-        <div class="list-content">
-          <div class="list-title ${t.status==='完了'?'done-title':''}">${esc(t.title)}</div>
-          <div class="list-sub">
-            <span>${t.category||'その他'}</span>
-            <span>${t.status}</span>
-            ${dateStr ? `<span>${dateStr}</span>` : ''}
-          </div>
-          ${chips ? `<div class="task-assignees" style="margin-top:5px">${chips}</div>` : ''}
+    return `<div class="list-item pri-${t.priority} ${od?'overdue':''}" onclick="window._openTask('${t.id}')">
+      <div class="list-content">
+        <div class="list-title ${t.status==='完了'?'done-title':''}">${esc(t.title)}</div>
+        <div class="list-sub">
+          <span>${t.category||'その他'}</span><span>${t.status}</span>
+          ${ds?`<span>${ds}</span>`:''}
+          ${t.createdBy?`<span>作成: ${t.createdBy}</span>`:''}
         </div>
-        <div class="list-right">
-          <span class="badge ${priCls[t.priority]}">${priLbl[t.priority]}</span>
-        </div>
-      </div>`;
+        ${chips?`<div class="task-assignees" style="margin-top:5px">${chips}</div>`:''}
+      </div>
+      <div class="list-right"><span class="badge ${priCls[t.priority]}">${priLbl[t.priority]}</span></div>
+    </div>`;
   }).join('');
   document.getElementById('viewContainer').innerHTML = `<div class="list-view">${html}</div>`;
 }
 
 // ===== ASSIGNEE GRID =====
 function buildAssigneeGrid() {
-  const grid = document.getElementById('assigneeGrid');
   let html = '';
   for (const [role, names] of Object.entries(STAFF)) {
     html += `<div class="assignee-role-group role-${role.toLowerCase()}">
-      <div class="assignee-role-label">${role}</div>
-      <div class="assignee-grid">`;
+      <div class="assignee-role-label">${role}</div><div class="assignee-grid">`;
     for (const name of names) {
-      const id = `asgn_${name}`;
-      html += `<input type="checkbox" class="assignee-checkbox" id="${id}" value="${name}">
-               <label for="${id}" class="assignee-label">${name}</label>`;
+      html += `<input type="checkbox" class="assignee-checkbox" id="asgn_${name}" value="${name}">
+               <label for="asgn_${name}" class="assignee-label">${name}</label>`;
     }
     html += '</div></div>';
   }
-  grid.innerHTML = html;
+  document.getElementById('assigneeGrid').innerHTML = html;
 }
 
 // ===== MODAL =====
@@ -1054,50 +970,44 @@ function openModal(id = null) {
   if (id && tasks[id]) {
     const t = tasks[id];
     document.getElementById('modalTitle').textContent = 'タスクを編集';
-    document.getElementById('fTitle').value = t.title || '';
-    document.getElementById('fNote').value  = t.note  || '';
-    document.getElementById('fCat').value   = t.category || '診療';
-    document.getElementById('fDate').value  = t.date  || '';
+    document.getElementById('fTitle').value = t.title||'';
+    document.getElementById('fNote').value  = t.note||'';
+    document.getElementById('fCat').value   = t.category||'その他';
+    document.getElementById('fDate').value  = t.date||'';
     document.getElementById('fTags').value  = (t.tags||[]).join(', ');
     document.querySelector(`input[name="priority"][value="${t.priority||'med'}"]`).checked = true;
     document.querySelector(`input[name="status"][value="${t.status||'未着手'}"]`).checked = true;
-    // 担当者チェック
-    document.querySelectorAll('.assignee-checkbox').forEach(cb => {
-      cb.checked = (t.assignees||[]).includes(cb.value);
-    });
+    document.querySelectorAll('.assignee-checkbox').forEach(cb => { cb.checked = (t.assignees||[]).includes(cb.value); });
     document.getElementById('btnDelete').style.display = '';
   } else {
     document.getElementById('modalTitle').textContent = 'タスクを追加';
     document.getElementById('fTitle').value = '';
     document.getElementById('fNote').value  = '';
-    document.getElementById('fCat').value   = '診療';
+    document.getElementById('fCat').value   = 'その他';
     document.getElementById('fDate').value  = '';
     document.getElementById('fTags').value  = '';
     document.querySelector('#pri-med').checked = true;
     document.querySelector('#st-todo').checked  = true;
     document.querySelectorAll('.assignee-checkbox').forEach(cb => cb.checked = false);
+    // 自分を担当者にデフォルト設定
+    if (currentUser) {
+      const myBox = document.getElementById(`asgn_${currentUser.name}`);
+      if (myBox) myBox.checked = true;
+    }
     document.getElementById('btnDelete').style.display = 'none';
   }
   document.getElementById('overlay').classList.add('open');
   setTimeout(() => document.getElementById('fTitle').focus(), 300);
 }
 
-function closeModal() {
-  document.getElementById('overlay').classList.remove('open');
-  editingId = null;
-}
-
-function handleOverlayClick(e) {
-  if (e.target === document.getElementById('overlay')) closeModal();
-}
+function closeModal() { document.getElementById('overlay').classList.remove('open'); editingId = null; }
+function handleOverlayClick(e) { if (e.target===document.getElementById('overlay')) closeModal(); }
 
 async function saveTask() {
   if (saving) return;
   const title = document.getElementById('fTitle').value.trim();
   if (!title) { showToast('タイトルを入力してください'); return; }
-
   const assignees = [...document.querySelectorAll('.assignee-checkbox:checked')].map(cb => cb.value);
-
   const data = {
     title,
     note:      document.getElementById('fNote').value.trim(),
@@ -1106,47 +1016,33 @@ async function saveTask() {
     priority:  document.querySelector('input[name="priority"]:checked').value,
     status:    document.querySelector('input[name="status"]:checked').value,
     assignees,
-    tags: document.getElementById('fTags').value.split(',').map(t => t.trim()).filter(Boolean),
+    tags:      document.getElementById('fTags').value.split(',').map(t=>t.trim()).filter(Boolean),
     updatedAt: Date.now(),
-    updatedBy: currentUser.name,
+    updatedBy: currentUser?.name||'不明',
   };
-
   saving = true;
   document.getElementById('btnSave').disabled = true;
-
   try {
     if (editingId) {
       await set(ref(db, `tasks/${editingId}`), { ...tasks[editingId], ...data });
       showToast('更新しました');
     } else {
       data.createdAt = Date.now();
-      data.createdBy = currentUser.name;
+      data.createdBy = currentUser?.name||'不明';
       await push(ref(db, 'tasks'), data);
       showToast('追加しました');
     }
     closeModal();
-  } catch(e) {
-    showToast('保存に失敗しました');
-    console.error(e);
-  } finally {
-    saving = false;
-    document.getElementById('btnSave').disabled = false;
-  }
+  } catch(e) { showToast('保存に失敗しました'); }
+  finally { saving = false; document.getElementById('btnSave').disabled = false; }
 }
 
 async function deleteTask() {
-  if (!editingId) return;
-  if (!confirm('このタスクを削除しますか？')) return;
-  try {
-    await remove(ref(db, `tasks/${editingId}`));
-    closeModal();
-    showToast('削除しました');
-  } catch(e) {
-    showToast('削除に失敗しました');
-  }
+  if (!editingId || !confirm('このタスクを削除しますか？')) return;
+  try { await remove(ref(db, `tasks/${editingId}`)); closeModal(); showToast('削除しました'); }
+  catch(e) { showToast('削除に失敗しました'); }
 }
 
-// ===== UTILS =====
 function setFilter(f, el) {
   currentFilter = f;
   document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
@@ -1156,56 +1052,31 @@ function setFilter(f, el) {
 
 function setView(v) {
   currentView = v;
-  document.getElementById('btn-board').classList.toggle('active', v === 'board');
-  document.getElementById('btn-list').classList.toggle('active', v === 'list');
+  document.getElementById('btn-board').classList.toggle('active', v==='board');
+  document.getElementById('btn-list').classList.toggle('active', v==='list');
   render();
 }
 
 function showToast(msg) {
   const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.classList.add('show');
+  t.textContent = msg; t.classList.add('show');
   setTimeout(() => t.classList.remove('show'), 2500);
 }
 
-function esc(s) {
-  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-}
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
-// ===== EXPOSE TO WINDOW =====
-window.doLogin = doLogin;
-window.setFilter = setFilter;
-window.setView = setView;
-window.openModal = openModal;
-window.closeModal = closeModal;
+window.setFilter = setFilter; window.setView = setView;
+window.openModal = openModal; window.closeModal = closeModal;
 window.handleOverlayClick = handleOverlayClick;
-window.saveTask = saveTask;
-window.deleteTask = deleteTask;
+window.saveTask = saveTask; window.deleteTask = deleteTask;
 window._openTask = (id) => openModal(id);
 
-// ===== KEYBOARD =====
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') closeModal();
-  if ((e.metaKey||e.ctrlKey) && e.key === 'Enter') {
-    if (document.getElementById('overlay').classList.contains('open')) saveTask();
-  }
-});
-document.getElementById('loginPass').addEventListener('keydown', e => {
-  if (e.key === 'Enter') doLogin();
+  if (e.key==='Escape') closeModal();
+  if ((e.metaKey||e.ctrlKey) && e.key==='Enter' && document.getElementById('overlay').classList.contains('open')) saveTask();
 });
 
-// ===== SESSION RESTORE =====
-(function() {
-  const saved = sessionStorage.getItem('taskUser');
-  if (saved) {
-    try {
-      currentUser = JSON.parse(saved);
-      document.getElementById('loginOverlay').style.display = 'none';
-      document.getElementById('userBadge').textContent = currentUser.name;
-      initTasks();
-    } catch(e) {}
-  }
-})();
+init();
 </script>
 </body>
 </html>
