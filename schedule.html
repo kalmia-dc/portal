@@ -250,7 +250,7 @@ function render() {
         <div class="avatar" style="width:30px;height:30px;font-size:11px;${getAvatarStyle(state.user.role)}">${initials(state.user.name)}</div>
         <span style="font-size:13px;font-weight:500">${state.user.name}</span>
         <span class="badge badge-${state.user.role}">${state.user.role}</span>
-        <button class="btn-sm" onclick="doLogout()">← ポータル</button>
+        <button id="btn-logout" style="padding:4px 10px;font-size:12px">← ポータル</button>
       </div>`
     : '';
 
@@ -262,6 +262,15 @@ function render() {
     case 'eventDetail': main.innerHTML = renderEventDetail(); break;
     case 'newEvent':    main.innerHTML = renderNewEvent();    break;
   }
+
+  // ログアウトボタン
+  const logoutBtn = document.getElementById('btn-logout');
+  if (logoutBtn) logoutBtn.addEventListener('click', () => {
+    window.location.href = 'https://kalmia-dc.github.io/portal/';
+  });
+
+  // 作成フォームのハンドラ
+  attachNewEventHandlers();
 }
 
 // ── Staff select ──────────────────────────────────────────
@@ -348,34 +357,22 @@ function renderNewEventForm() {
   const y = state.calYear  || today.getFullYear();
   const m = state.calMonth || (today.getMonth() + 1);
 
-  // カレンダー生成
-  const firstDay = new Date(y, m - 1, 1).getDay(); // 0=日
+  const firstDay = new Date(y, m - 1, 1).getDay();
   const lastDate = new Date(y, m, 0).getDate();
-  const selected = new Set(state.newDates);
 
   let cells = '';
-  // 空白セル
   for (let i = 0; i < firstDay; i++) cells += `<div></div>`;
-  // 日付セル
   for (let d = 1; d <= lastDate; d++) {
     const key = `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
     const dt  = new Date(y, m - 1, d);
     const dow = dt.getDay();
-    const isSel = selected.has(key);
-    const isSun = dow === 0, isSat = dow === 6;
-    const colorStyle = isSel
-      ? 'background:var(--green);color:#fff;'
-      : isSun ? 'color:var(--red);'
-      : isSat ? 'color:var(--sky);'
-      : '';
-    cells += `<div onclick="toggleDate('${key}')" style="
-      aspect-ratio:1;display:flex;align-items:center;justify-content:center;
-      border-radius:50%;font-size:14px;font-weight:${isSel?'700':'400'};
-      cursor:pointer;${colorStyle};-webkit-tap-highlight-color:transparent;
-    ">${d}</div>`;
+    const isSel = state.newDates.has(key);
+    const bg    = isSel ? 'background:var(--green);color:#fff;font-weight:700;' : '';
+    const col   = !isSel && dow === 0 ? 'color:var(--red);' : !isSel && dow === 6 ? 'color:var(--sky);' : '';
+    cells += `<div data-key="${key}" class="cal-day" style="aspect-ratio:1;display:flex;align-items:center;justify-content:center;border-radius:50%;font-size:14px;cursor:pointer;${bg}${col};-webkit-tap-highlight-color:transparent;">${d}</div>`;
   }
 
-  const selList = [...selected].sort();
+  const selList = [...state.newDates].sort();
 
   return `
     <div class="card">
@@ -383,55 +380,44 @@ function renderNewEventForm() {
       <div class="card-body">
         <div class="mb12">
           <label>イベント名</label>
-          <input type="text" id="ev-name" placeholder="例: 忘年会、春の部活動" value="${state.newName}" oninput="state.newName=this.value">
+          <input type="text" id="ev-name" placeholder="例: 忘年会、春の部活動" value="${state.newName}">
         </div>
 
         <label>候補日（タップして選択）</label>
 
-        <!-- 月ナビ -->
         <div class="row flex-between" style="margin:8px 0 6px">
-          <button onclick="calPrev()" style="padding:4px 12px">＜</button>
+          <button id="btn-cal-prev" style="padding:4px 12px">＜</button>
           <span style="font-weight:600">${y}年${m}月</span>
-          <button onclick="calNext()" style="padding:4px 12px">＞</button>
+          <button id="btn-cal-next" style="padding:4px 12px">＞</button>
         </div>
 
-        <!-- 曜日ヘッダー -->
         <div style="display:grid;grid-template-columns:repeat(7,1fr);text-align:center;margin-bottom:4px">
           ${['日','月','火','水','木','金','土'].map((w,i) =>
             `<div style="font-size:11px;font-weight:600;color:${i===0?'var(--red)':i===6?'var(--sky)':'var(--text-sub)'}">${w}</div>`
           ).join('')}
         </div>
 
-        <!-- 日付グリッド -->
-        <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:12px">
+        <div id="cal-grid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:12px">
           ${cells}
         </div>
 
-        <!-- 選択済み一覧 -->
         ${selList.length > 0 ? `
           <div style="background:var(--gray);border-radius:8px;padding:10px 12px;margin-bottom:12px">
             <p style="font-size:11px;color:var(--text-sub);margin-bottom:6px">選択中 ${selList.length}件</p>
             <div style="display:flex;flex-wrap:wrap;gap:6px">
-              ${selList.map(d => `
-                <div style="display:flex;align-items:center;gap:4px;background:#fff;border:1px solid var(--border);border-radius:20px;padding:3px 10px;font-size:12px">
-                  ${fmtDate(d)}
-                  <span onclick="toggleDate('${d}')" style="color:var(--text-hint);cursor:pointer;font-size:14px;line-height:1">×</span>
-                </div>
-              `).join('')}
+              ${selList.map(d => `<div data-rm="${d}" style="display:flex;align-items:center;gap:4px;background:#fff;border:1px solid var(--border);border-radius:20px;padding:3px 10px;font-size:12px">${fmtDate(d)}<span style="color:var(--text-hint);cursor:pointer;font-size:14px;line-height:1">×</span></div>`).join('')}
             </div>
           </div>
         ` : `<p style="font-size:12px;color:var(--text-hint);margin-bottom:12px">カレンダーから候補日を選んでください</p>`}
 
         <div class="mb12">
           <label>回答期限 <span style="color:var(--red);font-size:11px">必須</span></label>
-          <input type="date" id="ev-deadline" value="${state.newDeadline}" oninput="state.newDeadline=this.value" style="max-width:180px" required>
+          <input type="date" id="ev-deadline" value="${state.newDeadline}" style="max-width:180px">
         </div>
 
         <div class="row flex-between mt8">
-          <button onclick="setTab('list')">キャンセル</button>
-          <button class="btn-primary" onclick="createEvent()" ${state.saving?'disabled':''}>
-            ${state.saving ? '作成中...' : '作成する'}
-          </button>
+          <button id="btn-cancel-ev">キャンセル</button>
+          <button class="btn-primary" id="btn-create-ev">作成する</button>
         </div>
       </div>
     </div>`;
@@ -650,54 +636,80 @@ function saveFormState() {
   if (dlEl)   state.newDeadline = dlEl.value;
 }
 
-window.toggleDate = (key) => {
-  saveFormState();
-  if (state.newDates.has(key)) {
-    state.newDates.delete(key);
-  } else {
-    state.newDates.add(key);
-  }
-  render();
-};
+// フォーム描画後にリスナーを付ける
+function attachNewEventHandlers() {
+  if (state.tab !== 'new') return;
 
-window.calPrev = () => {
-  saveFormState();
-  state.calMonth--;
-  if (state.calMonth < 1) { state.calMonth = 12; state.calYear--; }
-  render();
-};
+  // カレンダー日付
+  document.querySelectorAll('.cal-day').forEach(el => {
+    el.addEventListener('click', () => {
+      saveFormState();
+      const key = el.dataset.key;
+      if (state.newDates.has(key)) state.newDates.delete(key);
+      else state.newDates.add(key);
+      render();
+      attachNewEventHandlers();
+    });
+  });
 
-window.calNext = () => {
-  saveFormState();
-  state.calMonth++;
-  if (state.calMonth > 12) { state.calMonth = 1; state.calYear++; }
-  render();
-};
+  // 選択済みタグの × 削除
+  document.querySelectorAll('[data-rm]').forEach(el => {
+    el.addEventListener('click', () => {
+      saveFormState();
+      state.newDates.delete(el.dataset.rm);
+      render();
+      attachNewEventHandlers();
+    });
+  });
 
-window.createEvent = async () => {
-  saveFormState();
-  const nameEl = document.getElementById('ev-name');
-  const dlEl   = document.getElementById('ev-deadline');
-  const name     = nameEl ? nameEl.value.trim() : state.newName.trim();
-  const deadline = dlEl   ? dlEl.value           : state.newDeadline;
-  const dates = [...state.newDates].sort();
-  if (!name) { toast('イベント名を入力してください'); return; }
-  if (dates.length === 0) { toast('候補日を1件以上選んでください'); return; }
-  if (!deadline) { toast('回答期限を設定してください'); return; }
-  state.saving = true;
-  render();
-  const id = 'ev_' + Date.now();
-  const ev = { name, dates, deadline, createdBy: state.user.id, createdAt: Date.now(), responses: {} };
-  await saveEvent(id, ev);
-  state.events[id] = ev;
-  state.saving = false;
-  state.tab = 'list';
-  state.newName     = '';
-  state.newDates    = new Set();
-  state.newDeadline = '';
-  render();
-  toast('イベントを作成しました');
-};
+  // 月ナビ
+  const prev = document.getElementById('btn-cal-prev');
+  const next = document.getElementById('btn-cal-next');
+  if (prev) prev.addEventListener('click', () => {
+    saveFormState();
+    state.calMonth--;
+    if (state.calMonth < 1) { state.calMonth = 12; state.calYear--; }
+    render(); attachNewEventHandlers();
+  });
+  if (next) next.addEventListener('click', () => {
+    saveFormState();
+    state.calMonth++;
+    if (state.calMonth > 12) { state.calMonth = 1; state.calYear++; }
+    render(); attachNewEventHandlers();
+  });
+
+  // キャンセル
+  const cancel = document.getElementById('btn-cancel-ev');
+  if (cancel) cancel.addEventListener('click', () => {
+    state.tab = 'list';
+    render();
+  });
+
+  // 作成
+  const create = document.getElementById('btn-create-ev');
+  if (create) create.addEventListener('click', async () => {
+    saveFormState();
+    const name     = state.newName.trim();
+    const deadline = state.newDeadline;
+    const dates    = [...state.newDates].sort();
+    if (!name)          { toast('イベント名を入力してください'); return; }
+    if (dates.length === 0) { toast('候補日を1件以上選んでください'); return; }
+    if (!deadline)      { toast('回答期限を設定してください'); return; }
+
+    create.disabled = true;
+    create.textContent = '作成中...';
+    const id = 'ev_' + Date.now();
+    const ev = { name, dates, deadline, createdBy: state.user.id, createdAt: Date.now(), responses: {} };
+    await saveEvent(id, ev);
+    state.events[id] = ev;
+    state.tab         = 'list';
+    state.newName     = '';
+    state.newDates    = new Set();
+    state.newDeadline = '';
+    render();
+    toast('イベントを作成しました');
+  });
+}
 
 window.openEvent = async (id) => {
   state.currentEventId = id;
