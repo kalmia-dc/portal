@@ -530,37 +530,7 @@ function attachMemberHandlers(membersSet, prefix) {
 
 
 
-// ── スタッフ選択UI（対象者） ──────────────────────────────
-function renderMemberSelector(selectedSet, prefix) {
-  const roles = ['DR','DH','DA'];
-  const roleLabel = {DR:'歯科医師',DH:'歯科衛生士',DA:'受付・助手'};
-  const allIds = STAFF.map(s => s.id);
-  const allSelected = allIds.every(id => selectedSet.has(id));
 
-  return `
-    <div style="border:1px solid var(--border);border-radius:10px;padding:10px 12px;">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-        <span style="font-size:12px;color:var(--text-sub)">選択中 ${selectedSet.size === 0 || allSelected ? '全員' : selectedSet.size + '名'}</span>
-        <button id="${prefix}-all-btn" style="font-size:11px;padding:2px 8px">${allSelected ? '全解除' : '全員選択'}</button>
-      </div>
-      ${roles.map(role => {
-        const members = STAFF.filter(s => s.role === role);
-        return `
-          <p style="font-size:10px;font-weight:700;color:var(--text-hint);margin:6px 0 4px">${roleLabel[role]}</p>
-          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:4px">
-            ${members.map(s => {
-              const sel = selectedSet.has(s.id);
-              return `<div data-mid="${s.id}" class="${prefix}-member" style="
-                padding:4px 10px;border-radius:20px;font-size:12px;cursor:pointer;
-                background:${sel ? 'var(--green)' : '#f0f0f0'};
-                color:${sel ? '#fff' : 'var(--text-sub)'};
-                font-weight:${sel ? '700' : '400'};
-              ">${s.name}</div>`;
-            }).join('')}
-          </div>`;
-      }).join('')}
-    </div>`;
-}
 
 // ── Event detail ──────────────────────────────────────────
 function renderEventDetail() {
