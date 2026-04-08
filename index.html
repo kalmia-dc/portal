@@ -703,6 +703,8 @@ const STAFF_ID_MAP = {
 };
 // staffName → staffId マップ（逆引き）
 const NAME_TO_ID = Object.fromEntries(Object.entries(STAFF_ID_MAP).map(([id,n])=>[n,id]));
+// 院長表示名も対応
+NAME_TO_ID['院長'] = 'sugihira';
 
 // シフトキー変換（シフトアプリ内部キー→表示名）
 const SHIFT_KEY_MAP = {
@@ -801,21 +803,21 @@ async function initApp() {
     typeEl.className = 'hero-shift-type dim';
   }
 
-  // 締切バナー（毎月25日までに翌々月分を提出）
+  // 締切バナー（毎月20日までに翌々月分を提出）
   // 例：4/25までに8月分、5/25までに9月分
-  const deadline = new Date(now.getFullYear(), now.getMonth(), 25);
+  const deadline = new Date(now.getFullYear(), now.getMonth(), 20);
   const targetMonth = now.getMonth() + 4; // 翌々々月（0始まり+4=翌々月の月名）
   const targetYear  = now.getFullYear() + Math.floor((now.getMonth() + 4) / 12);
   const targetMonthName = ((now.getMonth() + 4) % 12) + 1;
   const deadlineEl = document.getElementById('deadlineNotice');
   if (now <= deadline) {
     const daysLeft = Math.ceil((deadline - now) / 86400000);
-    deadlineEl.innerHTML = `シフト提出締切：<strong>${targetMonthName}月分</strong> ／ ${now.getMonth()+1}月25日まで（残り${daysLeft}日）`;
+    deadlineEl.innerHTML = `シフト提出締切：<strong>${targetMonthName}月分</strong> ／ ${now.getMonth()+1}月20日まで（残り${daysLeft}日）`;
   } else {
-    // 25日を過ぎたら翌月分を案内
+    // 20日を過ぎたら翌月分を案内
     const nextDeadlineMonth = now.getMonth() + 2;
     const nextTargetMonth   = ((now.getMonth() + 5) % 12) + 1;
-    deadlineEl.innerHTML = `次回締切：<strong>${nextTargetMonth}月分</strong> ／ ${nextDeadlineMonth > 12 ? nextDeadlineMonth-12 : nextDeadlineMonth}月25日まで`;
+    deadlineEl.innerHTML = `次回締切：<strong>${nextTargetMonth}月分</strong> ／ ${nextDeadlineMonth > 12 ? nextDeadlineMonth-12 : nextDeadlineMonth}月20日まで`;
   }
 
   // 管理者リンクを表示（杉平・百々のみ）
