@@ -423,8 +423,8 @@ function renderNewEventForm() {
         ` : `<p style="font-size:12px;color:var(--text-hint);margin-bottom:12px">カレンダーから候補日を選んでください</p>`}
 
         <div class="mb12">
-          <label>回答期限（任意）</label>
-          <input type="date" id="ev-deadline" value="${state.newDeadline}" oninput="state.newDeadline=this.value" style="max-width:180px">
+          <label>回答期限 <span style="color:var(--red);font-size:11px">必須</span></label>
+          <input type="date" id="ev-deadline" value="${state.newDeadline}" oninput="state.newDeadline=this.value" style="max-width:180px" required>
         </div>
 
         <div class="row flex-between mt8">
@@ -670,11 +670,11 @@ window.createEvent = async () => {
   const dates = [...state.newDates].sort();
   if (!name) { toast('イベント名を入力してください'); return; }
   if (dates.length === 0) { toast('候補日を1件以上選んでください'); return; }
+  if (!deadline) { toast('回答期限を設定してください'); return; }
   state.saving = true;
   render();
   const id = 'ev_' + Date.now();
-  const ev = { name, dates, createdBy: state.user.id, createdAt: Date.now(), responses: {} };
-  if (deadline) ev.deadline = deadline;
+  const ev = { name, dates, deadline, createdBy: state.user.id, createdAt: Date.now(), responses: {} };
   await saveEvent(id, ev);
   state.events[id] = ev;
   state.saving = false;
