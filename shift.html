@@ -1460,10 +1460,11 @@ function changeMonth(delta){
 }
 
 function updateMonthNavButtons(){
-  // 今月〜3ヶ月後まで移動可能
+  // 3ヶ月前〜12ヶ月後まで移動可能
   const now = new Date();
-  const minY = now.getFullYear(), minM = now.getMonth();
-  const maxDate = new Date(now.getFullYear(), now.getMonth()+3, 1);
+  const minDate = new Date(now.getFullYear(), now.getMonth()-3, 1);
+  const maxDate = new Date(now.getFullYear(), now.getMonth()+12, 1);
+  const minY = minDate.getFullYear(), minM = minDate.getMonth();
   const maxY = maxDate.getFullYear(), maxM = maxDate.getMonth();
 
   const prevBtn = document.getElementById('btnPrevMonth');
