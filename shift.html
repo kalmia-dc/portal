@@ -894,10 +894,7 @@
       <button class="login-role-tab active" onclick="setLoginRole('staff',this)">👤 スタッフ</button>
     </div>
     <div id="adminLoginForm" style="display:none">
-      <div class="login-field">
-        <label>パスワード</label>
-        <input type="password" id="adminPass" placeholder="管理者パスワードを入力" onkeydown="if(event.key==='Enter')doLogin()">
-      </div>
+      <p style="font-size:.85rem;color:#888;text-align:center;margin:8px 0 0;">管理者としてログインします</p>
     </div>
     <div id="staffLoginForm">
       <div class="login-field">
@@ -1464,13 +1461,12 @@ function updateMonthNavButtons(){
   const now = new Date();
   const minDate = new Date(now.getFullYear(), now.getMonth()-3, 1);
   const maxDate = new Date(now.getFullYear(), now.getMonth()+12, 1);
-  const minY = minDate.getFullYear(), minM = minDate.getMonth();
-  const maxY = maxDate.getFullYear(), maxM = maxDate.getMonth();
+  const current = new Date(currentYear, currentMonth, 1);
 
   const prevBtn = document.getElementById('btnPrevMonth');
   const nextBtn = document.getElementById('btnNextMonth');
-  if(prevBtn) prevBtn.disabled = (currentYear < minY || (currentYear===minY && currentMonth<=minM));
-  if(nextBtn) nextBtn.disabled = (currentYear > maxY || (currentYear===maxY && currentMonth>=maxM));
+  if(prevBtn) prevBtn.disabled = current <= minDate;
+  if(nextBtn) nextBtn.disabled = current >= maxDate;
 }
 
 // ──────────────────────────────────────────────
@@ -4036,14 +4032,8 @@ function doLogin(){
   err.textContent = '';
 
   if(loginRole === 'admin'){
-    const pass = document.getElementById('adminPass').value;
-    if(pass === 'admin'){
-      currentUser = { role:'admin', name:'管理者' };
-      showAdminApp();
-    } else {
-      err.textContent = 'パスワードが違います';
-      document.getElementById('adminPass').value = '';
-    }
+    currentUser = { role:'admin', name:'管理者' };
+    showAdminApp();
   } else {
     const sid  = document.getElementById('staffSelect').value;
     const pass = document.getElementById('staffPass').value;
@@ -4082,7 +4072,6 @@ function doLogout(){
   document.getElementById('loginScreen').style.display = 'flex';
   document.getElementById('mainApp').style.display    = 'none';
   document.getElementById('staffScreen').style.display = 'none';
-  document.getElementById('adminPass').value  = '';
   document.getElementById('staffPass').value  = '';
   document.getElementById('staffSelect').value = '';
   document.getElementById('loginError').textContent = '';
