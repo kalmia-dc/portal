@@ -682,11 +682,9 @@ function goToScheduleApp(eventId) {
 function goToShiftApp(asAdmin = false) {
   if (!currentUser) return;
   if (asAdmin) {
-    // 管理者パスワードをパラメータで渡す
-    window.open(`https://kalmia-dc.github.io/portal/shift.html?admin=1`, '_blank');
+    window.open(`https://kalmiashift.netlify.app/?admin`, '_blank');
   } else {
-    const params = new URLSearchParams({ sid: currentUser.staffId, p: currentUser.pass });
-    window.open(`https://kalmia-dc.github.io/portal/shift.html?${params}`, '_blank');
+    window.open(`https://kalmiashift.netlify.app/`, '_blank');
   }
 }
 
@@ -724,11 +722,14 @@ async function getMonthShifts(year, month) {
   } catch(e) { return null; }
 }
 
-async function getShift(staffId, date) {
+async function getShift(staffName, date) {
   const data = await getMonthShifts(date.getFullYear(), date.getMonth()+1);
   if (!data) return null;
+  const sid = NAME_TO_ID[staffName];
+  if (!sid) return null;
+  // Firebaseのキーは YYYY-MM-DD 形式
   const dateKey = `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
-  const raw = data[staffId]?.[dateKey];
+  const raw = data[sid]?.[dateKey];
   return raw ? (SHIFT_KEY_MAP[raw] || raw) : null;
 }
 
@@ -764,7 +765,7 @@ async function initApp() {
   document.getElementById('heroTitle').innerHTML = titleHtml;
 
   // 今日のシフト
-  const s = await getShift(u.staffId, now);
+  const s = await getShift(u.name, now);
   const typeEl = document.getElementById('heroShiftType');
   const timeEl = document.getElementById('heroShiftTime');
   if (s) {
@@ -803,7 +804,7 @@ async function initApp() {
   skillBtn.style.display = 'block';
 
   // 今週カレンダー
-  await buildWeek(now, u.staffId);
+  await buildWeek(now, u.name);
 
   // 本日出勤スタッフ
   await buildTodayStaff(now);
@@ -821,7 +822,7 @@ async function initApp() {
   loadScheduleEvents(u.staffId);
 }
 
-async function buildWeek(now, staffId) {
+async function buildWeek(now, staffName) {
   const el = document.getElementById('weekDays');
   el.innerHTML = '';
   const jsDay = now.getDay();
@@ -836,7 +837,7 @@ async function buildWeek(now, staffId) {
     const dt = new Date(mon); dt.setDate(mon.getDate()+i);
     const isToday = dt.toDateString()===now.toDateString();
     const isSat=i===5, isSun=i===6;
-    const s = await getShift(staffId, dt);
+    const s = await getShift(staffName, dt);
     let pill = '';
     if (s) {
       const info = SHIFT_INFO[s]||{label:s,cls:'on'};
@@ -1166,9 +1167,12 @@ async function loadScheduleEvents(staffId) {
         let dlBadge = '';
         if (ev.deadline) {
           const diff = Math.round((new Date(ev.deadline + 'T00:00:00') - new Date(today + 'T00:00:00')) / 86400000);
+          const dt   = new Date(ev.deadline + 'T00:00:00');
+          const dlStr = `${dt.getMonth()+1}/${dt.getDate()}(${DAY_JP[dt.getDay()]})まで`;
           if (diff < 0)        dlBadge = `<span style="background:rgba(255,107,107,.3);border-radius:8px;padding:1px 6px;font-size:10px;margin-left:4px">期限切れ</span>`;
           else if (diff === 0) dlBadge = `<span style="background:rgba(255,107,107,.3);border-radius:8px;padding:1px 6px;font-size:10px;margin-left:4px">本日締切</span>`;
-          else if (diff <= 3)  dlBadge = `<span style="background:rgba(255,217,61,.4);border-radius:8px;padding:1px 6px;font-size:10px;margin-left:4px">残り${diff}日</span>`;
+          else if (diff <= 3)  dlBadge = `<span style="background:rgba(255,217,61,.4);border-radius:8px;padding:1px 6px;font-size:10px;margin-left:4px">残り${diff}日（${dlStr}）</span>`;
+          else                 dlBadge = `<span style="background:rgba(255,255,255,.2);border-radius:8px;padding:1px 6px;font-size:10px;margin-left:4px">${dlStr}</span>`;
         }
 
         return `

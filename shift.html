@@ -4084,6 +4084,14 @@ function showAdminApp(){
   render();
 }
 
+// URLパラメータ ?admin で管理画面に直接入る
+window.addEventListener('load', ()=>{
+  if(location.search.includes('admin') || location.hash === '#admin'){
+    currentUser = { role:'admin', name:'管理者' };
+    showAdminApp();
+  }
+});
+
 function showStaffApp(){
   document.getElementById('loginScreen').style.display  = 'none';
   document.getElementById('mainApp').style.display      = 'none';
