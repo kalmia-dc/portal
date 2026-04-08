@@ -199,7 +199,35 @@ async function deleteEvent(id) {
   await remove(ref(db, `${DB_PATH}/${id}`));
 }
 
-// ─── Toast ────────────────────────────────────────────────
+// ─── 期限切れ未回答を自動で×に ───────────────────────────
+async function autoFillExpired(staffId) {
+  const today = new Date().toISOString().split('T')[0];
+  const tasks = [];
+
+  for (const [evId, ev] of Object.entries(state.events)) {
+    if (!ev.deadline || ev.deadline >= today) continue; // 期限内はスキップ
+    if (ev.decided) continue; // 決定済みはスキップ
+    const dates  = ev.dates || [];
+    const myRes  = ev.responses?.[staffId] || {};
+    const missing = dates.filter(d => !myRes[d]); // 未回答の日程
+    if (missing.length === 0) continue;
+
+    // 未回答分を×でセット
+    const patch = {};
+    missing.forEach(d => { patch[d] = 'x'; });
+    tasks.push(
+      saveResponse(evId, staffId, patch).then(() => {
+        if (!state.events[evId].responses) state.events[evId].responses = {};
+        if (!state.events[evId].responses[staffId]) state.events[evId].responses[staffId] = {};
+        Object.assign(state.events[evId].responses[staffId], patch);
+      })
+    );
+  }
+
+  if (tasks.length > 0) await Promise.all(tasks);
+}
+
+
 function toast(msg) {
   const el = document.getElementById('toast');
   el.textContent = msg;
@@ -824,6 +852,10 @@ window.doDeleteEvent = async () => {
         state.tab  = 'list';
         render();
         await loadEvents();
+
+        // 期限切れ未回答を自動で×に
+        await autoFillExpired(staff.id);
+
         // 特定イベントへの直接遷移
         const evid = params.get('evid');
         if (evid && state.events[evid]) {
