@@ -172,11 +172,14 @@ let state = {
   pendingRes: {},
   tab: 'list',
   newName: '',
-  newDates: new Set(),   // 選択済み日付のSet（'YYYY-MM-DD'）
-  newDeadline: '',       // 回答期限（'YYYY-MM-DD'）
-  calYear:  null,        // カレンダー表示年
-  calMonth: null,        // カレンダー表示月
+  newDates: new Set(),
+  newDeadline: '',
+  calYear:  null,
+  calMonth: null,
   saving: false,
+  editName: '',
+  editDates: new Set(),
+  editDeadline: '',
 };
 
 // ─── Firebase helpers ─────────────────────────────────────
@@ -289,6 +292,7 @@ function render() {
     case 'main':        main.innerHTML = renderMainView();    break;
     case 'eventDetail': main.innerHTML = renderEventDetail(); break;
     case 'newEvent':    main.innerHTML = renderNewEvent();    break;
+    case 'editEvent':   main.innerHTML = renderEditEventForm(); attachEditEventHandlers(); break;
   }
 
   // ログアウトボタン
@@ -448,7 +452,10 @@ function renderEventDetail() {
   const maxScore = Math.max(...summary.map(s => s.score), 0);
 
   const isOwner = (myId === ev.createdBy) || ADMINS.includes(myId);
-  const decided = ev.decided || null;
+  // decided は配列または旧形式（文字列）を両対応
+  const decidedRaw = ev.decided || null;
+  const decidedDates = Array.isArray(decidedRaw) ? decidedRaw : (decidedRaw ? [decidedRaw] : []);
+  const hasDecided = decidedDates.length > 0;
 
   return `
     <button class="back-btn" onclick="backToMain()">← 一覧に戻る</button>
@@ -459,17 +466,21 @@ function renderEventDetail() {
         <p style="font-size:11px;color:var(--text-hint);margin-top:3px">作成: ${creator?.name||ev.createdBy} ／ ${new Date(ev.createdAt).toLocaleDateString('ja-JP')}</p>
         ${(() => { const dl = deadlineStatus(ev.deadline); return dl ? `<div style="display:inline-block;margin-top:5px;font-size:11px;font-weight:600;padding:3px 10px;border-radius:10px;${dl.style}">⏰ 回答期限 ${dl.label}</div>` : ''; })()}
       </div>
-      ${ADMINS.includes(myId) ? `<button class="btn-danger btn-sm" onclick="doDeleteEvent()">削除</button>` : ''}
+      <div class="row" style="gap:6px">
+        ${isOwner ? `<button class="btn-sm" onclick="openEditEvent()">✏️ 編集</button>` : ''}
+        ${ADMINS.includes(myId) ? `<button class="btn-danger btn-sm" onclick="doDeleteEvent()">削除</button>` : ''}
+      </div>
     </div>
 
-    ${decided ? `
-    <div style="background:var(--green);color:#fff;border-radius:12px;padding:14px 16px;margin-bottom:14px;display:flex;align-items:center;gap:10px">
-      <span style="font-size:22px">✅</span>
-      <div>
-        <p style="font-weight:700;font-size:15px">${fmtDateFull(decided)}に決定！</p>
-        <p style="font-size:11px;opacity:.85;margin-top:2px">みなさん予定に入れてください 🎉</p>
+    ${hasDecided ? `
+    <div style="background:var(--green);color:#fff;border-radius:12px;padding:14px 16px;margin-bottom:14px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:${decidedDates.length>1?'8px':'0'}">
+        <span style="font-size:20px">✅</span>
+        <p style="font-weight:700;font-size:15px">開催日が決定しました！</p>
+        ${isOwner ? `<button onclick="doUndecide()" style="margin-left:auto;background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.4);color:#fff;border-radius:8px;padding:5px 10px;font-size:11px;cursor:pointer">取消</button>` : ''}
       </div>
-      ${isOwner ? `<button onclick="doUndecide()" style="margin-left:auto;background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.4);color:#fff;border-radius:8px;padding:5px 10px;font-size:11px;cursor:pointer">取消</button>` : ''}
+      ${decidedDates.map(d => `<p style="font-size:13px;font-weight:600;margin-left:28px">📅 ${fmtDateFull(d)}</p>`).join('')}
+      <p style="font-size:11px;opacity:.85;margin-top:6px;margin-left:28px">予定に入れてください 🎉</p>
     </div>
     ` : ''}
 
@@ -503,7 +514,10 @@ function renderEventDetail() {
 
     <!-- 集計 -->
     <div class="card mb12">
-      <div class="card-header"><span style="font-weight:600;font-size:13px">集計</span></div>
+      <div class="card-header">
+        <span style="font-weight:600;font-size:13px">集計</span>
+        ${isOwner ? `<span style="font-size:11px;color:var(--text-hint)">${hasDecided ? '✅=決定日' : '「決定」で開催日を選択（複数可）'}</span>` : ''}
+      </div>
       <div class="card-body" style="overflow-x:auto;padding:12px">
         <table class="tbl">
           <thead>
@@ -513,21 +527,21 @@ function renderEventDetail() {
               <th class="c-t">△</th>
               <th class="c-x">×</th>
               <th style="color:var(--text-hint)">未</th>
-              ${isOwner && !decided ? `<th></th>` : ''}
+              ${isOwner ? `<th></th>` : ''}
             </tr>
           </thead>
           <tbody>
             ${summary.map(s => {
               const noAns = STAFF.length - s.o - s.t - s.x;
               const isBest = maxScore > 0 && s.score === maxScore;
-              const isDecided = decided === s.d;
+              const isDecided = decidedDates.includes(s.d);
               return `<tr class="${isDecided ? 'best-row' : isBest ? 'best-row' : ''}">
                 <td class="name-col">${fmtDate(s.d)}${isDecided ? ` <span class="star">✅</span>` : isBest ? ` <span class="star">★</span>` : ''}</td>
                 <td class="c-o">${s.o}</td>
                 <td class="c-t">${s.t}</td>
                 <td class="c-x">${s.x}</td>
                 <td class="c-none">${noAns}</td>
-                ${isOwner && !decided ? `<td><button onclick="doDecide('${s.d}')" style="font-size:11px;padding:3px 8px;background:var(--green);color:#fff;border:none;border-radius:6px;cursor:pointer;white-space:nowrap">決定</button></td>` : ''}
+                ${isOwner ? `<td><button onclick="toggleDecide('${s.d}')" style="font-size:11px;padding:3px 8px;background:${isDecided?'var(--red)':'var(--green)'};color:#fff;border:none;border-radius:6px;cursor:pointer;white-space:nowrap">${isDecided?'取消':'決定'}</button></td>` : ''}
               </tr>`;
             }).join('')}
           </tbody>
@@ -807,20 +821,156 @@ window.doSaveResponse = async () => {
   render();
 };
 
-window.doDecide = async (date) => {
-  if (!confirm(`${fmtDateFull(date)}に決定しますか？`)) return;
-  await update(ref(db, `${DB_PATH}/${state.currentEventId}`), { decided: date });
-  state.events[state.currentEventId].decided = date;
+window.toggleDecide = async (date) => {
+  const ev = state.events[state.currentEventId];
+  const raw = ev.decided || [];
+  const current = Array.isArray(raw) ? [...raw] : (raw ? [raw] : []);
+  let next;
+  if (current.includes(date)) {
+    next = current.filter(d => d !== date); // 取消
+  } else {
+    next = [...current, date].sort();       // 追加
+  }
+  const val = next.length === 0 ? null : next;
+  await update(ref(db, `${DB_PATH}/${state.currentEventId}`), { decided: val });
+  state.events[state.currentEventId].decided = val;
   render();
-  toast('日程を決定しました！');
+  toast(next.includes(date) ? `${fmtDate(date)}を決定に追加しました` : `${fmtDate(date)}の決定を取り消しました`);
 };
 
 window.doUndecide = async () => {
-  if (!confirm('決定を取り消しますか？')) return;
+  if (!confirm('全ての決定を取り消しますか？')) return;
   await update(ref(db, `${DB_PATH}/${state.currentEventId}`), { decided: null });
   state.events[state.currentEventId].decided = null;
   render();
   toast('決定を取り消しました');
+};
+
+// ── イベント編集 ──────────────────────────────────────────
+window.openEditEvent = () => {
+  const ev = state.events[state.currentEventId];
+  if (!ev) return;
+  state.editName     = ev.name;
+  state.editDates    = new Set(ev.dates || []);
+  state.editDeadline = ev.deadline || '';
+  const now = new Date();
+  state.calYear  = now.getFullYear();
+  state.calMonth = now.getMonth() + 1;
+  state.view = 'editEvent';
+  render();
+  attachEditEventHandlers();
+};
+
+function renderEditEventForm() {
+  const y = state.calYear;
+  const m = state.calMonth;
+  return `
+    <button class="back-btn" onclick="cancelEditEvent()">← キャンセル</button>
+    <h2 style="font-size:16px;font-weight:700;margin-bottom:14px">イベントを編集</h2>
+    <div class="card">
+      <div class="card-body">
+        <div class="mb12">
+          <label>イベント名</label>
+          <input type="text" id="edit-ev-name" value="${state.editName||''}">
+        </div>
+        <label>候補日（タップして選択・解除）</label>
+        <div class="row flex-between" style="margin:8px 0 6px">
+          <button id="edit-cal-prev" style="padding:4px 12px">＜</button>
+          <span id="edit-cal-label" style="font-weight:600">${y}年${m}月</span>
+          <button id="edit-cal-next" style="padding:4px 12px">＞</button>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(7,1fr);text-align:center;margin-bottom:4px">
+          ${['日','月','火','水','木','金','土'].map((w,i)=>`<div style="font-size:11px;font-weight:600;color:${i===0?'var(--red)':i===6?'var(--sky)':'var(--text-sub)'}">${w}</div>`).join('')}
+        </div>
+        <div id="edit-cal-grid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:12px"></div>
+        <div id="edit-sel-box" style="margin-bottom:12px"></div>
+        <div class="mb12">
+          <label>回答期限 <span style="color:var(--red);font-size:11px">必須</span></label>
+          <input type="date" id="edit-deadline" value="${state.editDeadline||''}" style="max-width:180px">
+        </div>
+        <div class="row flex-between mt8">
+          <button id="edit-cancel-btn">キャンセル</button>
+          <button class="btn-primary" id="edit-save-btn">保存する</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+function refreshEditCalendar() {
+  const y = state.calYear, m = state.calMonth;
+  const firstDay = new Date(y, m-1, 1).getDay();
+  const lastDate = new Date(y, m, 0).getDate();
+  let cells = '';
+  for (let i = 0; i < firstDay; i++) cells += `<div></div>`;
+  for (let d = 1; d <= lastDate; d++) {
+    const key = `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const dow = new Date(y, m-1, d).getDay();
+    const isSel = state.editDates.has(key);
+    const bg  = isSel ? 'background:var(--green);color:#fff;font-weight:700;' : '';
+    const col = !isSel && dow===0 ? 'color:var(--red);' : !isSel && dow===6 ? 'color:var(--sky);' : '';
+    cells += `<div data-ekey="${key}" class="edit-cal-day" style="aspect-ratio:1;display:flex;align-items:center;justify-content:center;border-radius:50%;font-size:14px;cursor:pointer;${bg}${col}">${d}</div>`;
+  }
+  const grid = document.getElementById('edit-cal-grid');
+  if (grid) grid.innerHTML = cells;
+  const label = document.getElementById('edit-cal-label');
+  if (label) label.textContent = `${y}年${m}月`;
+
+  const selBox = document.getElementById('edit-sel-box');
+  if (selBox) {
+    const selList = [...state.editDates].sort();
+    selBox.innerHTML = selList.length > 0
+      ? `<div style="background:var(--gray);border-radius:8px;padding:10px 12px;">
+           <p style="font-size:11px;color:var(--text-sub);margin-bottom:6px">選択中 ${selList.length}件</p>
+           <div style="display:flex;flex-wrap:wrap;gap:6px">
+             ${selList.map(d=>`<div data-erm="${d}" style="display:flex;align-items:center;gap:4px;background:#fff;border:1px solid var(--border);border-radius:20px;padding:3px 10px;font-size:12px">${fmtDate(d)}<span style="color:var(--text-hint);cursor:pointer;font-size:14px;line-height:1;margin-left:2px">×</span></div>`).join('')}
+           </div>
+         </div>`
+      : `<p style="font-size:12px;color:var(--text-hint);">カレンダーから候補日を選んでください</p>`;
+    selBox.querySelectorAll('[data-erm]').forEach(el => {
+      el.addEventListener('click', () => { state.editDates.delete(el.dataset.erm); refreshEditCalendar(); });
+    });
+  }
+  document.querySelectorAll('.edit-cal-day').forEach(el => {
+    el.addEventListener('click', () => {
+      const key = el.dataset.ekey;
+      if (state.editDates.has(key)) state.editDates.delete(key); else state.editDates.add(key);
+      refreshEditCalendar();
+    });
+  });
+}
+
+function attachEditEventHandlers() {
+  const prev = document.getElementById('edit-cal-prev');
+  const next = document.getElementById('edit-cal-next');
+  if (prev) prev.addEventListener('click', () => { state.calMonth--; if(state.calMonth<1){state.calMonth=12;state.calYear--;} refreshEditCalendar(); });
+  if (next) next.addEventListener('click', () => { state.calMonth++; if(state.calMonth>12){state.calMonth=1;state.calYear++;} refreshEditCalendar(); });
+  refreshEditCalendar();
+
+  const cancel = document.getElementById('edit-cancel-btn');
+  if (cancel) cancel.addEventListener('click', cancelEditEvent);
+
+  const save = document.getElementById('edit-save-btn');
+  if (save) save.addEventListener('click', async () => {
+    const nameEl = document.getElementById('edit-ev-name');
+    const dlEl   = document.getElementById('edit-deadline');
+    const name     = nameEl ? nameEl.value.trim() : '';
+    const deadline = dlEl   ? dlEl.value : '';
+    const dates    = [...state.editDates].sort();
+    if (!name)              { toast('イベント名を入力してください'); return; }
+    if (dates.length === 0) { toast('候補日を1件以上選んでください'); return; }
+    if (!deadline)          { toast('回答期限を設定してください'); return; }
+    save.disabled = true; save.textContent = '保存中...';
+    await update(ref(db, `${DB_PATH}/${state.currentEventId}`), { name, dates, deadline });
+    Object.assign(state.events[state.currentEventId], { name, dates, deadline });
+    state.view = 'eventDetail';
+    render();
+    toast('イベントを更新しました');
+  });
+}
+
+window.cancelEditEvent = () => {
+  state.view = 'eventDetail';
+  render();
 };
 
 window.doDeleteEvent = async () => {
