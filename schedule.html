@@ -1,0 +1,818 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>日程調整 | カルミアデンタルクリニック</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --green:#1D9E75;--green-dark:#0F6E56;--green-light:#E1F5EE;
+    --amber:#BA7517;--amber-light:#FAEEDA;
+    --red:#E24B4A;--red-light:#FCEBEB;
+    --purple-light:#EEEDFE;--purple-dark:#3C3489;
+    --gray:#f5f5f3;--border:#e0e0dc;
+    --text:#1a1a18;--text-sub:#6b6b67;--text-hint:#9b9b97;
+  }
+  body{font-family:-apple-system,BlinkMacSystemFont,'Helvetica Neue',sans-serif;font-size:14px;color:var(--text);background:var(--gray);min-height:100vh}
+
+  /* Header */
+  .header{background:#fff;border-bottom:1px solid var(--border);padding:0 16px;height:52px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+  .header-title{font-size:15px;font-weight:600;color:var(--text)}
+  .header-sub{font-size:11px;color:var(--text-sub);margin-top:1px}
+  .header-user{display:flex;align-items:center;gap:8px}
+
+  /* Main */
+  .main{max-width:480px;margin:0 auto;padding:16px}
+
+  /* Card */
+  .card{background:#fff;border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:12px}
+  .card-body{padding:16px}
+  .card-header{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+
+  /* Buttons */
+  button{cursor:pointer;font-family:inherit;font-size:13px;border:1px solid var(--border);background:#fff;color:var(--text);border-radius:8px;padding:7px 14px;transition:all 0.15s;-webkit-tap-highlight-color:transparent}
+  button:active{transform:scale(0.97)}
+  button:hover{background:var(--gray)}
+  .btn-primary{background:var(--green);color:#fff;border-color:var(--green);font-weight:600}
+  .btn-primary:hover{background:var(--green-dark)}
+  .btn-danger{color:var(--red);border-color:var(--red)}
+  .btn-danger:hover{background:var(--red-light)}
+  .btn-sm{padding:4px 10px;font-size:12px}
+  .btn-icon{width:34px;height:34px;padding:0;display:flex;align-items:center;justify-content:center;font-size:16px;border-radius:8px}
+
+  /* Input */
+  input,select,textarea{font-family:inherit;font-size:14px;border:1px solid var(--border);border-radius:8px;padding:9px 12px;width:100%;color:var(--text);background:#fff;-webkit-appearance:none}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--green);box-shadow:0 0 0 3px rgba(29,158,117,0.1)}
+  label{font-size:12px;color:var(--text-sub);display:block;margin-bottom:5px;font-weight:500}
+
+  /* Circle avatar */
+  .avatar{border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:600;flex-shrink:0}
+
+  /* Badge */
+  .badge{display:inline-block;font-size:11px;padding:2px 7px;border-radius:5px;font-weight:600}
+  .badge-DR{background:var(--purple-light);color:var(--purple-dark)}
+  .badge-DH{background:var(--green-light);color:var(--green-dark)}
+  .badge-DA{background:var(--amber-light);color:var(--amber)}
+
+  /* Tab */
+  .tabs{display:flex;background:var(--gray);padding:4px;border-radius:10px;margin-bottom:16px;gap:4px}
+  .tab-btn{flex:1;padding:8px;border-radius:7px;border:none;background:transparent;font-size:13px;font-weight:500;color:var(--text-sub);transition:all 0.15s}
+  .tab-btn.active{background:#fff;color:var(--green);box-shadow:0 1px 3px rgba(0,0,0,0.08)}
+
+  /* Staff list */
+  .staff-item{display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--border);cursor:pointer;transition:background 0.1s;-webkit-tap-highlight-color:transparent}
+  .staff-item:last-child{border-bottom:none}
+  .staff-item:hover,.staff-item:active{background:var(--gray)}
+
+  /* Event list */
+  .event-item{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border);cursor:pointer;transition:background 0.1s;-webkit-tap-highlight-color:transparent}
+  .event-item:last-child{border-bottom:none}
+  .event-item:active{background:var(--gray)}
+
+  /* PIN */
+  .pin-wrap{text-align:center;padding:24px 16px}
+  .pin-dots{display:flex;gap:12px;justify-content:center;margin:20px 0}
+  .pin-dot{width:16px;height:16px;border-radius:50%;border:2px solid var(--border);background:transparent;transition:all 0.2s}
+  .pin-dot.filled{background:var(--green);border-color:var(--green)}
+  .numpad{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;max-width:220px;margin:0 auto}
+  .numpad button{height:52px;font-size:18px;font-weight:500;border-radius:12px}
+
+  /* Response buttons */
+  .res-btn{width:40px;height:40px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:17px;cursor:pointer;border:1px solid var(--border);background:#fff;transition:all 0.15s;font-family:inherit;-webkit-tap-highlight-color:transparent}
+  .res-btn:active{transform:scale(0.93)}
+  .res-btn.sel-o{background:var(--green-light);border-color:var(--green);color:var(--green-dark);font-weight:700}
+  .res-btn.sel-t{background:var(--amber-light);border-color:var(--amber);color:var(--amber);font-weight:700}
+  .res-btn.sel-x{background:var(--red-light);border-color:var(--red);color:var(--red);font-weight:700}
+
+  /* Table */
+  .tbl{width:100%;border-collapse:collapse;font-size:12px}
+  .tbl th,.tbl td{padding:7px 8px;border:1px solid var(--border);text-align:center}
+  .tbl th{background:var(--gray);font-weight:600;font-size:11px}
+  .tbl .name-col{text-align:left;white-space:nowrap}
+  .c-o{color:var(--green);font-weight:700}
+  .c-t{color:var(--amber);font-weight:700}
+  .c-x{color:var(--red);font-weight:700}
+  .c-none{color:var(--text-hint)}
+  .best-row{background:#f0faf6}
+
+  /* Status pill */
+  .pill{display:inline-block;font-size:11px;padding:3px 9px;border-radius:20px;font-weight:600}
+  .pill-done{background:var(--green-light);color:var(--green-dark)}
+  .pill-pending{background:var(--red-light);color:var(--red)}
+
+  /* Misc */
+  .section-title{font-size:11px;font-weight:700;color:var(--text-hint);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:10px}
+  .empty{text-align:center;padding:32px 16px;color:var(--text-hint);font-size:13px}
+  .row{display:flex;align-items:center;gap:8px}
+  .gap-sm{gap:6px}
+  .flex-between{justify-content:space-between}
+  .mt8{margin-top:8px}
+  .mt12{margin-top:12px}
+  .mt16{margin-top:16px}
+  .mb8{margin-bottom:8px}
+  .mb12{margin-bottom:12px}
+  .divider{border:none;border-top:1px solid var(--border);margin:12px 0}
+  .shake{animation:shake 0.35s}
+  @keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-6px)}40%{transform:translateX(6px)}60%{transform:translateX(-4px)}80%{transform:translateX(4px)}}
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1a1a18;color:#fff;padding:10px 20px;border-radius:20px;font-size:13px;font-weight:500;z-index:999;opacity:0;transition:opacity 0.3s;pointer-events:none}
+  .toast.show{opacity:1}
+  .back-btn{display:flex;align-items:center;gap:4px;font-size:13px;color:var(--text-sub);padding:0;border:none;background:transparent;margin-bottom:14px}
+  .back-btn:hover{color:var(--text)}
+  .star{color:var(--green);font-size:13px}
+</style>
+</head>
+<body>
+
+<!-- Firebase -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getDatabase, ref, get, set, update, remove } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+const firebaseConfig = {
+  apiKey:            'AIzaSyDdMe7feUF6CKPHH0YIx7Suk-WnXtOYUu8',
+  authDomain:        'kalmia-shift.firebaseapp.com',
+  databaseURL:       'https://kalmia-shift-default-rtdb.asia-southeast1.firebasedatabase.app',
+  projectId:         'kalmia-shift',
+  storageBucket:     'kalmia-shift.firebasestorage.app',
+  messagingSenderId: '714175473480',
+  appId:             '1:714175473480:web:7d6626a46e4a9dcb1fb57d'
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+
+// ─── スタッフデータ（ポータルと共通） ───────────────────────
+const STAFF = [
+  {id:'sugihira', name:'院長',  role:'DR', pin:'1001'},
+  {id:'shimanaka',name:'嶋中',  role:'DR', pin:'1002'},
+  {id:'hokari',   name:'保刈',  role:'DR', pin:'1003'},
+  {id:'shinoda',  name:'篠田',  role:'DR', pin:'1004'},
+  {id:'tsuruta',  name:'鶴田',  role:'DH', pin:'2001'},
+  {id:'yoshida',  name:'吉田',  role:'DH', pin:'2002'},
+  {id:'takagi',   name:'高木',  role:'DH', pin:'2003'},
+  {id:'matsumoto',name:'松本',  role:'DH', pin:'2004'},
+  {id:'nozaki',   name:'野崎',  role:'DH', pin:'2005'},
+  {id:'yamada',   name:'山田',  role:'DH', pin:'2006'},
+  {id:'hanowa',   name:'ハノワ',role:'DH', pin:'2007'},
+  {id:'tamiya',   name:'田宮',  role:'DA', pin:'3001'},
+  {id:'tanaka',   name:'田中',  role:'DA', pin:'3002'},
+  {id:'momo',     name:'百々',  role:'DA', pin:'3003'},
+];
+const ADMINS = ['sugihira','momo'];
+
+// ─── State ────────────────────────────────────────────────
+let state = {
+  view: 'staffSelect',
+  user: null,
+  pinInput: '',
+  selectedStaff: null,
+  events: {},
+  currentEventId: null,
+  pendingRes: {},
+  tab: 'list',
+  newName: '',
+  newDates: new Set(),   // 選択済み日付のSet（'YYYY-MM-DD'）
+  newDeadline: '',       // 回答期限（'YYYY-MM-DD'）
+  calYear:  null,        // カレンダー表示年
+  calMonth: null,        // カレンダー表示月
+  saving: false,
+};
+
+// ─── Firebase helpers ─────────────────────────────────────
+const DB_PATH = 'scheduling/events';
+
+async function loadEvents() {
+  const snap = await get(ref(db, DB_PATH));
+  state.events = snap.val() || {};
+}
+
+async function saveEvent(id, ev) {
+  await set(ref(db, `${DB_PATH}/${id}`), ev);
+}
+
+async function saveResponse(eventId, staffId, resMap) {
+  await update(ref(db, `${DB_PATH}/${eventId}/responses/${staffId}`), resMap);
+}
+
+async function deleteEvent(id) {
+  await remove(ref(db, `${DB_PATH}/${id}`));
+}
+
+// ─── Toast ────────────────────────────────────────────────
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 2000);
+}
+
+// ─── Helpers ──────────────────────────────────────────────
+function getAvatarStyle(role) {
+  if (role === 'DR') return 'background:var(--purple-light);color:var(--purple-dark)';
+  if (role === 'DH') return 'background:var(--green-light);color:var(--green-dark)';
+  return 'background:var(--amber-light);color:var(--amber)';
+}
+
+function fmtDate(d) {
+  if (!d) return '';
+  const dt = new Date(d + 'T00:00:00');
+  const w = ['日','月','火','水','木','金','土'][dt.getDay()];
+  return `${dt.getMonth()+1}/${dt.getDate()}(${w})`;
+}
+
+function fmtDateFull(d) {
+  if (!d) return '';
+  const dt = new Date(d + 'T00:00:00');
+  const w = ['日','月','火','水','木','金','土'][dt.getDay()];
+  return `${dt.getFullYear()}年${dt.getMonth()+1}月${dt.getDate()}日(${w})`;
+}
+
+function getStaff(id) { return STAFF.find(s => s.id === id); }
+function initials(name) { return name.slice(0, 2); }
+
+// 期限の状態を返す: { label, style }
+function deadlineStatus(deadline) {
+  if (!deadline) return null;
+  const today = new Date(); today.setHours(0,0,0,0);
+  const dl    = new Date(deadline + 'T00:00:00');
+  const diff  = Math.round((dl - today) / 86400000);
+  if (diff < 0)  return { label: '期限切れ',      style: `background:var(--red-light);color:var(--red);` };
+  if (diff === 0) return { label: '本日締切',     style: `background:#fff3cd;color:#856404;` };
+  if (diff <= 3)  return { label: `残り${diff}日`, style: `background:#fff3cd;color:#856404;` };
+  return { label: `${dl.getMonth()+1}/${dl.getDate()}まで`, style: `background:var(--green-light);color:var(--green-dark);` };
+}
+
+// ─── Render ───────────────────────────────────────────────
+function render() {
+  document.getElementById('header-info').innerHTML = state.user
+    ? `<div class="row gap-sm">
+        <div class="avatar" style="width:30px;height:30px;font-size:11px;${getAvatarStyle(state.user.role)}">${initials(state.user.name)}</div>
+        <span style="font-size:13px;font-weight:500">${state.user.name}</span>
+        <span class="badge badge-${state.user.role}">${state.user.role}</span>
+        <button class="btn-sm" onclick="doLogout()">← ポータル</button>
+      </div>`
+    : '';
+
+  const main = document.getElementById('main');
+  switch (state.view) {
+    case 'staffSelect': main.innerHTML = renderStaffSelect(); break;
+    case 'pinEntry':    main.innerHTML = renderPinEntry();    break;
+    case 'main':        main.innerHTML = renderMainView();    break;
+    case 'eventDetail': main.innerHTML = renderEventDetail(); break;
+    case 'newEvent':    main.innerHTML = renderNewEvent();    break;
+  }
+}
+
+// ── Staff select ──────────────────────────────────────────
+function renderStaffSelect() {
+  return `
+    <div class="card" style="margin-top:8px">
+      <div class="card-header"><span style="font-weight:600;font-size:15px">スタッフを選択</span></div>
+      <div>
+        ${STAFF.map(s => `
+          <div class="staff-item" onclick="selectStaff('${s.id}')">
+            <div class="avatar" style="width:38px;height:38px;font-size:13px;${getAvatarStyle(s.role)}">${initials(s.name)}</div>
+            <div style="flex:1">
+              <p style="font-weight:600">${s.name}</p>
+            </div>
+            <span class="badge badge-${s.role}">${s.role}</span>
+          </div>
+        `).join('')}
+      </div>
+    </div>`;
+}
+
+// ── PIN entry ─────────────────────────────────────────────
+function renderPinEntry() {
+  const s = state.selectedStaff;
+  const f = state.pinInput.length;
+  return `
+    <div class="pin-wrap">
+      <div class="avatar" style="width:60px;height:60px;font-size:20px;${getAvatarStyle(s.role)};margin:0 auto 10px">${initials(s.name)}</div>
+      <p style="font-weight:700;font-size:17px">${s.name}</p>
+      <p style="font-size:12px;color:var(--text-sub);margin-top:4px">${s.role}</p>
+      <div class="pin-dots" id="pin-dots">
+        ${[0,1,2,3].map(i=>`<div class="pin-dot ${i<f?'filled':''}"></div>`).join('')}
+      </div>
+      <p style="font-size:12px;color:var(--red);height:16px;margin-bottom:8px" id="pin-err"></p>
+      <div class="numpad">
+        ${[1,2,3,4,5,6,7,8,9,'','0','⌫'].map(k => k==='' ? '<div></div>' :
+          `<button onclick="pinKey('${k}')" ${k==='⌫'?'style="font-size:14px"':''}>${k}</button>`
+        ).join('')}
+      </div>
+      <button class="back-btn" style="margin:20px auto 0;display:flex" onclick="backToSelect()">← スタッフ選択に戻る</button>
+    </div>`;
+}
+
+// ── Main view ─────────────────────────────────────────────
+function renderMainView() {
+  const evList = Object.entries(state.events).sort((a,b) => b[1].createdAt - a[1].createdAt);
+  const myId = state.user.id;
+
+  const listHtml = evList.length === 0
+    ? `<div class="empty">まだイベントがありません<br>「作成」から追加してください</div>`
+    : evList.map(([id, ev]) => {
+        const dates = ev.dates || [];
+        const myRes = ev.responses?.[myId] || {};
+        const answered = dates.length > 0 && dates.every(d => myRes[d]);
+        const creator = getStaff(ev.createdBy);
+        const dl = deadlineStatus(ev.deadline);
+        return `
+          <div class="event-item" onclick="openEvent('${id}')">
+            <div style="flex:1;min-width:0">
+              <p style="font-weight:600;font-size:14px;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${ev.name}</p>
+              <p style="font-size:11px;color:var(--text-hint)">${dates.length}件の候補日　作成: ${creator?.name || ev.createdBy}</p>
+            </div>
+            <div style="text-align:right;flex-shrink:0;margin-left:10px">
+              <span class="pill ${answered?'pill-done':'pill-pending'}">${answered?'回答済':'未回答'}</span>
+              ${dl ? `<div style="margin-top:4px;font-size:10px;font-weight:600;padding:2px 7px;border-radius:10px;${dl.style}">${dl.label}</div>` : `<p style="font-size:10px;color:var(--text-hint);margin-top:4px">${new Date(ev.createdAt).toLocaleDateString('ja-JP',{month:'numeric',day:'numeric'})}</p>`}
+            </div>
+          </div>`;
+      }).join('');
+
+  return `
+    <div class="tabs">
+      <button class="tab-btn ${state.tab==='list'?'active':''}" onclick="setTab('list')">イベント一覧</button>
+      <button class="tab-btn ${state.tab==='new'?'active':''}" onclick="setTab('new')">＋ 作成</button>
+    </div>
+    ${state.tab === 'list'
+      ? `<div class="card">${listHtml}</div>`
+      : renderNewEventForm()
+    }`;
+}
+
+// ── New event form（カレンダー選択UI） ────────────────────
+function renderNewEventForm() {
+  const today = new Date();
+  const y = state.calYear  || today.getFullYear();
+  const m = state.calMonth || (today.getMonth() + 1);
+
+  // カレンダー生成
+  const firstDay = new Date(y, m - 1, 1).getDay(); // 0=日
+  const lastDate = new Date(y, m, 0).getDate();
+  const selected = new Set(state.newDates);
+
+  let cells = '';
+  // 空白セル
+  for (let i = 0; i < firstDay; i++) cells += `<div></div>`;
+  // 日付セル
+  for (let d = 1; d <= lastDate; d++) {
+    const key = `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const dt  = new Date(y, m - 1, d);
+    const dow = dt.getDay();
+    const isSel = selected.has(key);
+    const isSun = dow === 0, isSat = dow === 6;
+    const colorStyle = isSel
+      ? 'background:var(--green);color:#fff;'
+      : isSun ? 'color:var(--red);'
+      : isSat ? 'color:var(--sky);'
+      : '';
+    cells += `<div onclick="toggleDate('${key}')" style="
+      aspect-ratio:1;display:flex;align-items:center;justify-content:center;
+      border-radius:50%;font-size:14px;font-weight:${isSel?'700':'400'};
+      cursor:pointer;${colorStyle};-webkit-tap-highlight-color:transparent;
+    ">${d}</div>`;
+  }
+
+  const selList = [...selected].sort();
+
+  return `
+    <div class="card">
+      <div class="card-header"><span style="font-weight:600">新しいイベントを作成</span></div>
+      <div class="card-body">
+        <div class="mb12">
+          <label>イベント名</label>
+          <input type="text" id="ev-name" placeholder="例: 忘年会、春の部活動" value="${state.newName}" oninput="state.newName=this.value">
+        </div>
+
+        <label>候補日（タップして選択）</label>
+
+        <!-- 月ナビ -->
+        <div class="row flex-between" style="margin:8px 0 6px">
+          <button onclick="calPrev()" style="padding:4px 12px">＜</button>
+          <span style="font-weight:600">${y}年${m}月</span>
+          <button onclick="calNext()" style="padding:4px 12px">＞</button>
+        </div>
+
+        <!-- 曜日ヘッダー -->
+        <div style="display:grid;grid-template-columns:repeat(7,1fr);text-align:center;margin-bottom:4px">
+          ${['日','月','火','水','木','金','土'].map((w,i) =>
+            `<div style="font-size:11px;font-weight:600;color:${i===0?'var(--red)':i===6?'var(--sky)':'var(--text-sub)'}">${w}</div>`
+          ).join('')}
+        </div>
+
+        <!-- 日付グリッド -->
+        <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:12px">
+          ${cells}
+        </div>
+
+        <!-- 選択済み一覧 -->
+        ${selList.length > 0 ? `
+          <div style="background:var(--gray);border-radius:8px;padding:10px 12px;margin-bottom:12px">
+            <p style="font-size:11px;color:var(--text-sub);margin-bottom:6px">選択中 ${selList.length}件</p>
+            <div style="display:flex;flex-wrap:wrap;gap:6px">
+              ${selList.map(d => `
+                <div style="display:flex;align-items:center;gap:4px;background:#fff;border:1px solid var(--border);border-radius:20px;padding:3px 10px;font-size:12px">
+                  ${fmtDate(d)}
+                  <span onclick="toggleDate('${d}')" style="color:var(--text-hint);cursor:pointer;font-size:14px;line-height:1">×</span>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        ` : `<p style="font-size:12px;color:var(--text-hint);margin-bottom:12px">カレンダーから候補日を選んでください</p>`}
+
+        <div class="mb12">
+          <label>回答期限（任意）</label>
+          <input type="date" id="ev-deadline" value="${state.newDeadline}" oninput="state.newDeadline=this.value" style="max-width:180px">
+        </div>
+
+        <div class="row flex-between mt8">
+          <button onclick="setTab('list')">キャンセル</button>
+          <button class="btn-primary" onclick="createEvent()" ${state.saving?'disabled':''}>
+            ${state.saving ? '作成中...' : '作成する'}
+          </button>
+        </div>
+      </div>
+    </div>`;
+}
+
+function renderDateRow(val, i) { return ''; }
+function renderNewEvent() { return ''; }
+
+// ── Event detail ──────────────────────────────────────────
+function renderEventDetail() {
+  const ev = state.events[state.currentEventId];
+  if (!ev) return '';
+  const myId = state.user.id;
+  const dates = ev.dates || [];
+  const responses = ev.responses || {};
+  const myRes = Object.assign({}, responses[myId] || {}, state.pendingRes);
+  const creator = getStaff(ev.createdBy);
+
+  // Summary calc
+  const summary = dates.map(d => {
+    const o = STAFF.filter(s => responses[s.id]?.[d] === 'o').length;
+    const t = STAFF.filter(s => responses[s.id]?.[d] === 't').length;
+    const x = STAFF.filter(s => responses[s.id]?.[d] === 'x').length;
+    return { d, o, t, x, score: o * 2 + t };
+  });
+  const maxScore = Math.max(...summary.map(s => s.score), 0);
+
+  const isOwner = (myId === ev.createdBy) || ADMINS.includes(myId);
+  const decided = ev.decided || null;
+
+  return `
+    <button class="back-btn" onclick="backToMain()">← 一覧に戻る</button>
+
+    <div class="row flex-between mb12">
+      <div>
+        <h2 style="font-size:17px;font-weight:700">${ev.name}</h2>
+        <p style="font-size:11px;color:var(--text-hint);margin-top:3px">作成: ${creator?.name||ev.createdBy} ／ ${new Date(ev.createdAt).toLocaleDateString('ja-JP')}</p>
+        ${(() => { const dl = deadlineStatus(ev.deadline); return dl ? `<div style="display:inline-block;margin-top:5px;font-size:11px;font-weight:600;padding:3px 10px;border-radius:10px;${dl.style}">⏰ 回答期限 ${dl.label}</div>` : ''; })()}
+      </div>
+      ${ADMINS.includes(myId) ? `<button class="btn-danger btn-sm" onclick="doDeleteEvent()">削除</button>` : ''}
+    </div>
+
+    ${decided ? `
+    <div style="background:var(--green);color:#fff;border-radius:12px;padding:14px 16px;margin-bottom:14px;display:flex;align-items:center;gap:10px">
+      <span style="font-size:22px">✅</span>
+      <div>
+        <p style="font-weight:700;font-size:15px">${fmtDateFull(decided)}に決定！</p>
+        <p style="font-size:11px;opacity:.85;margin-top:2px">みなさん予定に入れてください 🎉</p>
+      </div>
+      ${isOwner ? `<button onclick="doUndecide()" style="margin-left:auto;background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.4);color:#fff;border-radius:8px;padding:5px 10px;font-size:11px;cursor:pointer">取消</button>` : ''}
+    </div>
+    ` : ''}
+
+    <!-- 自分の回答 -->
+    <div class="card mb12">
+      <div class="card-header">
+        <span style="font-weight:600;font-size:13px">あなたの回答</span>
+        <span style="font-size:11px;color:var(--text-hint)">○参加 △未定 ×不参加</span>
+      </div>
+      <div class="card-body" style="padding-top:8px;padding-bottom:8px">
+        ${dates.map(d => `
+          <div class="row flex-between" style="padding:9px 0;border-bottom:1px solid var(--border)">
+            <span style="font-size:13px;font-weight:500">${fmtDateFull(d)}</span>
+            <div class="row" style="gap:6px">
+              <button class="res-btn ${myRes[d]==='o'?'sel-o':''}" onclick="setRes('${d}','o')">○</button>
+              <button class="res-btn ${myRes[d]==='t'?'sel-t':''}" onclick="setRes('${d}','t')">△</button>
+              <button class="res-btn ${myRes[d]==='x'?'sel-x':''}" onclick="setRes('${d}','x')">×</button>
+            </div>
+          </div>
+        `).join('')}
+        <div class="row flex-between" style="margin-top:12px">
+          <button onclick="setAllX()" style="font-size:12px;color:var(--red);border-color:var(--red);padding:6px 14px">
+            全日程×（参加不可）
+          </button>
+          <button class="btn-primary" onclick="doSaveResponse()" ${state.saving?'disabled':''}>
+            ${state.saving ? '保存中...' : '回答を保存'}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 集計 -->
+    <div class="card mb12">
+      <div class="card-header"><span style="font-weight:600;font-size:13px">集計</span></div>
+      <div class="card-body" style="overflow-x:auto;padding:12px">
+        <table class="tbl">
+          <thead>
+            <tr>
+              <th class="name-col">日程</th>
+              <th class="c-o">○</th>
+              <th class="c-t">△</th>
+              <th class="c-x">×</th>
+              <th style="color:var(--text-hint)">未</th>
+              ${isOwner && !decided ? `<th></th>` : ''}
+            </tr>
+          </thead>
+          <tbody>
+            ${summary.map(s => {
+              const noAns = STAFF.length - s.o - s.t - s.x;
+              const isBest = maxScore > 0 && s.score === maxScore;
+              const isDecided = decided === s.d;
+              return `<tr class="${isDecided ? 'best-row' : isBest ? 'best-row' : ''}">
+                <td class="name-col">${fmtDate(s.d)}${isDecided ? ` <span class="star">✅</span>` : isBest ? ` <span class="star">★</span>` : ''}</td>
+                <td class="c-o">${s.o}</td>
+                <td class="c-t">${s.t}</td>
+                <td class="c-x">${s.x}</td>
+                <td class="c-none">${noAns}</td>
+                ${isOwner && !decided ? `<td><button onclick="doDecide('${s.d}')" style="font-size:11px;padding:3px 8px;background:var(--green);color:#fff;border:none;border-radius:6px;cursor:pointer;white-space:nowrap">決定</button></td>` : ''}
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- スタッフ別 -->
+    <div class="card">
+      <div class="card-header"><span style="font-weight:600;font-size:13px">スタッフ別回答</span></div>
+      <div class="card-body" style="overflow-x:auto;padding:12px">
+        <table class="tbl">
+          <thead>
+            <tr>
+              <th class="name-col">名前</th>
+              ${dates.map(d => `<th>${fmtDate(d)}</th>`).join('')}
+            </tr>
+          </thead>
+          <tbody>
+            ${STAFF.map(s => {
+              const r = responses[s.id] || {};
+              return `<tr>
+                <td class="name-col">
+                  <span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${s.role==='DR'?'var(--purple-dark)':s.role==='DH'?'var(--green)':'var(--amber)'};margin-right:5px;vertical-align:middle"></span>${s.name}
+                </td>
+                ${dates.map(d => {
+                  const v = r[d];
+                  return `<td class="${v==='o'?'c-o':v==='t'?'c-t':v==='x'?'c-x':'c-none'}">${v==='o'?'○':v==='t'?'△':v==='x'?'×':'-'}</td>`;
+                }).join('')}
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+// ─── Actions ──────────────────────────────────────────────
+window.selectStaff = (id) => {
+  state.selectedStaff = STAFF.find(s => s.id === id);
+  state.pinInput = '';
+  state.view = 'pinEntry';
+  render();
+};
+
+window.backToSelect = () => {
+  state.selectedStaff = null;
+  state.pinInput = '';
+  state.view = 'staffSelect';
+  render();
+};
+
+window.pinKey = (k) => {
+  if (k === '⌫') {
+    state.pinInput = state.pinInput.slice(0, -1);
+    render();
+    return;
+  }
+  if (state.pinInput.length >= 4) return;
+  state.pinInput += k;
+  render();
+  if (state.pinInput.length === 4) {
+    setTimeout(async () => {
+      // ポータルと同じ: localStorageの変更分を優先
+    const storedPasswords = JSON.parse(localStorage.getItem('carmia_passwords') || '{}');
+    const correctPin = storedPasswords[state.selectedStaff.id] || state.selectedStaff.pin;
+    if (state.pinInput === correctPin) {
+        state.user = state.selectedStaff;
+        state.view = 'main';
+        state.tab = 'list';
+        state.pinInput = '';
+        await loadEvents();
+        render();
+      } else {
+        state.pinInput = '';
+        document.getElementById('pin-err').textContent = 'PINコードが違います';
+        document.getElementById('pin-dots')?.classList.add('shake');
+        setTimeout(() => {
+          render();
+        }, 600);
+      }
+    }, 80);
+  }
+};
+
+window.doLogout = () => {
+  window.location.href = 'https://kalmia-dc.github.io/portal/';
+};
+
+window.setTab = (t) => {
+  state.tab = t;
+  if (t === 'new') {
+    state.newName = '';
+    state.newDates = new Set();
+    const now = new Date();
+    state.calYear  = now.getFullYear();
+    state.calMonth = now.getMonth() + 1;
+  }
+  render();
+};
+
+window.toggleDate = (key) => {
+  if (state.newDates.has(key)) {
+    state.newDates.delete(key);
+  } else {
+    state.newDates.add(key);
+  }
+  render();
+};
+
+window.calPrev = () => {
+  state.calMonth--;
+  if (state.calMonth < 1) { state.calMonth = 12; state.calYear--; }
+  render();
+};
+
+window.calNext = () => {
+  state.calMonth++;
+  if (state.calMonth > 12) { state.calMonth = 1; state.calYear++; }
+  render();
+};
+
+window.createEvent = async () => {
+  const nameEl = document.getElementById('ev-name');
+  const dlEl   = document.getElementById('ev-deadline');
+  const name     = nameEl ? nameEl.value.trim() : state.newName.trim();
+  const deadline = dlEl   ? dlEl.value           : state.newDeadline;
+  const dates = [...state.newDates].sort();
+  if (!name) { toast('イベント名を入力してください'); return; }
+  if (dates.length === 0) { toast('候補日を1件以上選んでください'); return; }
+  state.saving = true;
+  render();
+  const id = 'ev_' + Date.now();
+  const ev = { name, dates, createdBy: state.user.id, createdAt: Date.now(), responses: {} };
+  if (deadline) ev.deadline = deadline;
+  await saveEvent(id, ev);
+  state.events[id] = ev;
+  state.saving = false;
+  state.tab = 'list';
+  state.newName     = '';
+  state.newDates    = new Set();
+  state.newDeadline = '';
+  render();
+  toast('イベントを作成しました');
+};
+
+window.openEvent = async (id) => {
+  state.currentEventId = id;
+  state.pendingRes = {};
+  state.view = 'eventDetail';
+  render();
+};
+
+window.backToMain = () => {
+  state.view = 'main';
+  state.currentEventId = null;
+  state.pendingRes = {};
+  render();
+};
+
+window.setAllX = () => {
+  const ev = state.events[state.currentEventId];
+  if (!ev) return;
+  const dates = ev.dates || [];
+  dates.forEach(d => { state.pendingRes[d] = 'x'; });
+  // 既存回答にもマージ
+  if (!ev.responses) ev.responses = {};
+  if (!ev.responses[state.user.id]) ev.responses[state.user.id] = {};
+  Object.assign(ev.responses[state.user.id], state.pendingRes);
+  render();
+  toast('全日程に×をセットしました。「回答を保存」で確定してください');
+};
+
+window.setRes = (date, val) => {
+  state.pendingRes[date] = val;
+  // 即時UI更新
+  document.querySelectorAll(`[onclick="setRes('${date}','o')"]`).forEach(b => b.className = `res-btn ${val==='o'?'sel-o':''}`);
+  document.querySelectorAll(`[onclick="setRes('${date}','t')"]`).forEach(b => b.className = `res-btn ${val==='t'?'sel-t':''}`);
+  document.querySelectorAll(`[onclick="setRes('${date}','x')"]`).forEach(b => b.className = `res-btn ${val==='x'?'sel-x':''}`);
+};
+
+window.doSaveResponse = async () => {
+  if (Object.keys(state.pendingRes).length === 0) { toast('回答を選択してください'); return; }
+  state.saving = true;
+  render();
+  try {
+    await saveResponse(state.currentEventId, state.user.id, state.pendingRes);
+    if (!state.events[state.currentEventId].responses) state.events[state.currentEventId].responses = {};
+    if (!state.events[state.currentEventId].responses[state.user.id]) state.events[state.currentEventId].responses[state.user.id] = {};
+    Object.assign(state.events[state.currentEventId].responses[state.user.id], state.pendingRes);
+    state.pendingRes = {};
+    toast('回答を保存しました');
+  } catch(e) {
+    toast('保存に失敗しました');
+  }
+  state.saving = false;
+  render();
+};
+
+window.doDecide = async (date) => {
+  if (!confirm(`${fmtDateFull(date)}に決定しますか？`)) return;
+  await update(ref(db, `${DB_PATH}/${state.currentEventId}`), { decided: date });
+  state.events[state.currentEventId].decided = date;
+  render();
+  toast('日程を決定しました！');
+};
+
+window.doUndecide = async () => {
+  if (!confirm('決定を取り消しますか？')) return;
+  await update(ref(db, `${DB_PATH}/${state.currentEventId}`), { decided: null });
+  state.events[state.currentEventId].decided = null;
+  render();
+  toast('決定を取り消しました');
+};
+
+window.doDeleteEvent = async () => {
+  if (!confirm(`「${state.events[state.currentEventId]?.name}」を削除しますか？`)) return;
+  await deleteEvent(state.currentEventId);
+  delete state.events[state.currentEventId];
+  state.view = 'main';
+  state.currentEventId = null;
+  render();
+  toast('削除しました');
+};
+
+// ─── Boot ─────────────────────────────────────────────────
+// URLパラメータからログイン（ポータルからの遷移専用）
+// パラメータなし・不正な場合はポータルに戻す
+(async function() {
+  const params = new URLSearchParams(location.search);
+  const sid = params.get('sid');
+  const p   = params.get('p');
+
+  if (sid && p) {
+    const staff = STAFF.find(s => s.id === sid);
+    if (staff) {
+      const stored  = JSON.parse(localStorage.getItem('carmia_passwords') || '{}');
+      const correct = stored[sid] || staff.pin;
+      if (p === correct) {
+        state.user = staff;
+        state.view = 'main';
+        state.tab  = 'list';
+        render();
+        await loadEvents();
+        // 特定イベントへの直接遷移
+        const evid = params.get('evid');
+        if (evid && state.events[evid]) {
+          state.currentEventId = evid;
+          state.view = 'eventDetail';
+        }
+        render();
+        return;
+      }
+    }
+  }
+
+  // パラメータなし・認証失敗 → ポータルへリダイレクト
+  window.location.href = 'https://kalmia-dc.github.io/portal/';
+})();
+</script>
+
+<!-- HTML structure -->
+<header class="header">
+  <div>
+    <div class="header-title">日程調整</div>
+    <div class="header-sub">カルミアデンタルクリニック</div>
+  </div>
+  <div class="header-user" id="header-info"></div>
+</header>
+
+<div class="main" id="main"></div>
+
+<div class="toast" id="toast"></div>
+
+</body>
+</html>

@@ -368,6 +368,15 @@
     <div id="heroNoticeList"></div>
   </div>
 
+  <!-- 日程調整（未回答） -->
+  <div class="hero-task-card" id="heroScheduleCard" style="display:none;">
+    <div class="hero-notice-label">
+      <span>🎉 日程調整（回答待ち）</span>
+      <button class="hero-notice-post-btn visible" onclick="goToScheduleApp()" style="display:inline-block;">すべて見る →</button>
+    </div>
+    <div id="heroScheduleList"></div>
+  </div>
+
   <!-- 自分のタスク（hero内） -->
   <div class="hero-task-card" id="heroTaskCard" style="display:none;">
     <div class="hero-notice-label">
@@ -415,6 +424,10 @@
       <span class="tool-icon">📋</span>
       <span class="tool-name">タスク管理</span>
     </a>
+    <a class="tool-item fu d2" href="#" onclick="goToScheduleApp();return false;" style="background:linear-gradient(135deg,#fff0f8,#ffe0f0);border:2px solid #ffb8d8;">
+      <span class="tool-icon">🎉</span>
+      <span class="tool-name">日程調整</span>
+    </a>
     <a class="tool-item fu d2" href="https://kalmia-dc.doctor-hr.com/" target="_blank" rel="noopener">
       <span class="tool-icon">👨‍⚕️</span>
       <span class="tool-name">Doctor HR</span>
@@ -427,6 +440,12 @@
       <span class="tool-icon">🗓️</span>
       <span class="tool-name">予約カレンダー</span>
     </a>
+  </div>
+
+  <!-- 日程決定済みイベント -->
+  <div id="decidedScheduleSection" style="display:none;">
+    <div class="section-title fu d2">✅ 開催決定</div>
+    <div class="notice-board fu d2" id="decidedScheduleBoard" style="padding:0;overflow:hidden;"></div>
   </div>
 
   <!-- 今週のシフト（localStorage連携） -->
@@ -653,6 +672,13 @@ function goToTaskApp() {
   window.open(`https://kalmia-dc.github.io/portal/task-manager.html?${params}`, '_blank');
 }
 
+function goToScheduleApp(eventId) {
+  if (!currentUser) return;
+  const params = new URLSearchParams({ sid: currentUser.staffId, name: currentUser.name, p: currentUser.pass });
+  if (eventId) params.set('evid', eventId);
+  window.location.href = `https://kalmia-dc.github.io/portal/schedule.html?${params}`;
+}
+
 function goToShiftApp(asAdmin = false) {
   if (!currentUser) return;
   if (asAdmin) {
@@ -793,6 +819,9 @@ async function initApp() {
 
   // 自分のタスク（Firebase）
   loadMyTasks(u.name);
+
+  // 日程調整（未回答）
+  loadScheduleEvents(u.staffId);
 }
 
 async function buildWeek(now, staffName) {
@@ -1092,11 +1121,118 @@ async function loadMyTasks(staffName) {
 }
 
 // ─────────────────────────────────────────
-// onclick属性から呼べるようwindowに公開
+// 日程調整（未回答 & 決定済み）→ hero & main に表示
 // ─────────────────────────────────────────
+async function loadScheduleEvents(staffId) {
+  const card    = document.getElementById('heroScheduleCard');
+  const list    = document.getElementById('heroScheduleList');
+  const section = document.getElementById('decidedScheduleSection');
+  const board   = document.getElementById('decidedScheduleBoard');
+  try {
+    const snap = await get(ref(_db, 'scheduling/events'));
+    const all  = snap.val() || {};
+    const today = new Date().toISOString().split('T')[0];
+    const DAY_JP = ['日','月','火','水','木','金','土'];
+
+    const fmt = d => {
+      const dt = new Date(d + 'T00:00:00');
+      return `${dt.getMonth()+1}月${dt.getDate()}日(${DAY_JP[dt.getDay()]})`;
+    };
+
+    // ── 未回答イベント（hero） ──
+    const pending = Object.entries(all)
+      .filter(([, ev]) => {
+        if (ev.decided) return false; // 決定済みは除外
+        const dates = ev.dates || [];
+        const myRes = ev.responses?.[staffId] || {};
+        return dates.length > 0 && !dates.every(d => myRes[d]);
+      })
+      .sort((a, b) => {
+        const da = a[1].deadline || '9999-99-99';
+        const db = b[1].deadline || '9999-99-99';
+        return da < db ? -1 : da > db ? 1 : 0;
+      })
+      .slice(0, 3);
+
+    if (pending.length) {
+      card.style.display = 'block';
+      list.innerHTML = pending.map(([id, ev]) => {
+        const dates    = ev.dates || [];
+        const myRes    = ev.responses?.[staffId] || {};
+        const answered = dates.filter(d => myRes[d]).length;
+        const total    = dates.length;
+        const dateStr  = dates.slice(0, 2).map(d => {
+          const dt = new Date(d + 'T00:00:00');
+          return `${dt.getMonth()+1}/${dt.getDate()}(${DAY_JP[dt.getDay()]})`;
+        }).join('・') + (dates.length > 2 ? ` 他${dates.length - 2}件` : '');
+
+        let dlBadge = '';
+        if (ev.deadline) {
+          const diff = Math.round((new Date(ev.deadline + 'T00:00:00') - new Date(today + 'T00:00:00')) / 86400000);
+          if (diff < 0)        dlBadge = `<span style="background:rgba(255,107,107,.3);border-radius:8px;padding:1px 6px;font-size:10px;margin-left:4px">期限切れ</span>`;
+          else if (diff === 0) dlBadge = `<span style="background:rgba(255,107,107,.3);border-radius:8px;padding:1px 6px;font-size:10px;margin-left:4px">本日締切</span>`;
+          else if (diff <= 3)  dlBadge = `<span style="background:rgba(255,217,61,.4);border-radius:8px;padding:1px 6px;font-size:10px;margin-left:4px">残り${diff}日</span>`;
+        }
+
+        return `
+          <div class="hero-task-item" onclick="goToScheduleApp('${id}')" style="cursor:pointer;">
+            <div style="flex:1;min-width:0;">
+              <div class="hero-task-title">${escHtml(ev.name)}${dlBadge}</div>
+              <div style="font-size:10px;opacity:.75;margin-top:2px">${dateStr}</div>
+            </div>
+            <div style="font-size:10px;opacity:.8;white-space:nowrap;flex-shrink:0;margin-left:8px">
+              ${answered}/${total}回答
+            </div>
+          </div>`;
+      }).join('');
+    }
+
+    // ── 決定済みイベント（main） ──
+    const decided = Object.entries(all)
+      .filter(([, ev]) => ev.decided)
+      .sort((a, b) => a[1].decided < b[1].decided ? -1 : 1); // 日付昇順
+
+    if (decided.length) {
+      section.style.display = 'block';
+      board.innerHTML = decided.map(([id, ev]) => {
+        const decidedDate = ev.decided;
+        const dt   = new Date(decidedDate + 'T00:00:00');
+        const isPast = decidedDate < today;
+        return `
+          <div onclick="goToScheduleApp('${id}')" style="
+            display:flex;align-items:center;gap:12px;
+            padding:13px 16px;border-bottom:1px solid var(--light-gray);
+            cursor:pointer;
+            ${isPast ? 'opacity:.5;' : ''}
+          ">
+            <div style="
+              width:48px;height:48px;border-radius:12px;flex-shrink:0;
+              background:${isPast ? '#f0f0f0' : 'linear-gradient(135deg,#4ecdc4,#74b9ff)'};
+              color:${isPast ? '#aaa' : '#fff'};
+              display:flex;flex-direction:column;align-items:center;justify-content:center;
+              font-family:'Nunito',sans-serif;line-height:1.1;
+            ">
+              <span style="font-size:10px;font-weight:700">${dt.getMonth()+1}月</span>
+              <span style="font-size:18px;font-weight:900">${dt.getDate()}</span>
+            </div>
+            <div style="flex:1;min-width:0;">
+              <p style="font-weight:700;font-size:14px;margin:0 0 2px">${escHtml(ev.name)}</p>
+              <p style="font-size:11px;color:var(--gray);margin:0">${fmt(decidedDate)}${isPast ? '（終了）' : ''}</p>
+            </div>
+            <span style="font-size:18px;color:var(--light-gray)">›</span>
+          </div>`;
+      }).join('');
+    }
+
+  } catch(e) {
+    console.warn('日程調整読み込みエラー:', e);
+  }
+}
+
+
 Object.assign(window, {
   doLogin, doLogout,
-  goToShiftApp, goToSkillApp, goToTaskApp,
+  goToShiftApp, goToSkillApp, goToTaskApp, goToScheduleApp,
   openPwModal, closePwModal, closePwModalIfBg, submitPwChange,
   openNoticeModal, closeNoticeModal, closeNoticeModalIfBg, submitNotice, deleteNotice
 });
