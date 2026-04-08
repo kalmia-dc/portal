@@ -716,30 +716,33 @@ async function getMonthShifts(year, month) {
   const key = `${year}-${String(month).padStart(2,'0')}`;
   if (_shiftCache[key] !== undefined) return _shiftCache[key];
   try {
-    // まず shifts/YYYY-MM/staffId 形式を試す
+    // まず shifts/YYYY-MM 形式を試す（新形式）
     const snap = await get(ref(_db, `shifts/${key}`));
     if (snap.exists()) {
       _shiftCache[key] = snap.val();
       return _shiftCache[key];
     }
-    // フォールバック: shifts/staffId/YYYY-MM-DD 形式（旧形式）
-    const staffIds = Object.keys(STAFF_ID_MAP);
+    // フォールバック: shifts/staffId 形式（旧形式）
+    // shifts全体を取得して月でフィルタ
+    const allSnap = await get(ref(_db, `shifts`));
+    if (!allSnap.exists()) { _shiftCache[key] = null; return null; }
+    const allData = allSnap.val();
     const result = {};
-    await Promise.all(staffIds.map(async sid => {
-      const s = await get(ref(_db, `shifts/${sid}`));
-      if (s.exists()) {
-        const allDates = s.val();
-        // 対象月のデータだけ抽出
+    Object.entries(allData).forEach(([sid, dates]) => {
+      // staffIdのキーを持つデータかチェック（日付形式でなければstaffId）
+      if (typeof dates === 'object' && dates !== null) {
         const monthData = {};
-        Object.entries(allDates).forEach(([date, val]) => {
-          if (date.startsWith(key)) monthData[date] = val;
+        Object.entries(dates).forEach(([date, val]) => {
+          if (typeof date === 'string' && date.startsWith(key)) {
+            monthData[date] = val;
+          }
         });
         if (Object.keys(monthData).length > 0) result[sid] = monthData;
       }
-    }));
+    });
     _shiftCache[key] = Object.keys(result).length > 0 ? result : null;
     return _shiftCache[key];
-  } catch(e) { return null; }
+  } catch(e) { console.error('getMonthShifts error:', e); return null; }
 }
 
 async function getShift(staffName, date) {
