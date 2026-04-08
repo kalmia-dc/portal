@@ -724,14 +724,11 @@ async function getMonthShifts(year, month) {
   } catch(e) { return null; }
 }
 
-async function getShift(staffName, date) {
+async function getShift(staffId, date) {
   const data = await getMonthShifts(date.getFullYear(), date.getMonth()+1);
   if (!data) return null;
-  const sid = NAME_TO_ID[staffName];
-  if (!sid) return null;
-  // Firebaseのキーは YYYY-MM-DD 形式
   const dateKey = `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
-  const raw = data[sid]?.[dateKey];
+  const raw = data[staffId]?.[dateKey];
   return raw ? (SHIFT_KEY_MAP[raw] || raw) : null;
 }
 
@@ -767,7 +764,7 @@ async function initApp() {
   document.getElementById('heroTitle').innerHTML = titleHtml;
 
   // 今日のシフト
-  const s = await getShift(u.name, now);
+  const s = await getShift(u.staffId, now);
   const typeEl = document.getElementById('heroShiftType');
   const timeEl = document.getElementById('heroShiftTime');
   if (s) {
@@ -806,7 +803,7 @@ async function initApp() {
   skillBtn.style.display = 'block';
 
   // 今週カレンダー
-  await buildWeek(now, u.name);
+  await buildWeek(now, u.staffId);
 
   // 本日出勤スタッフ
   await buildTodayStaff(now);
@@ -824,7 +821,7 @@ async function initApp() {
   loadScheduleEvents(u.staffId);
 }
 
-async function buildWeek(now, staffName) {
+async function buildWeek(now, staffId) {
   const el = document.getElementById('weekDays');
   el.innerHTML = '';
   const jsDay = now.getDay();
@@ -839,7 +836,7 @@ async function buildWeek(now, staffName) {
     const dt = new Date(mon); dt.setDate(mon.getDate()+i);
     const isToday = dt.toDateString()===now.toDateString();
     const isSat=i===5, isSun=i===6;
-    const s = await getShift(staffName, dt);
+    const s = await getShift(staffId, dt);
     let pill = '';
     if (s) {
       const info = SHIFT_INFO[s]||{label:s,cls:'on'};
