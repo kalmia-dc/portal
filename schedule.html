@@ -357,23 +357,6 @@ function renderNewEventForm() {
   const y = state.calYear  || today.getFullYear();
   const m = state.calMonth || (today.getMonth() + 1);
 
-  const firstDay = new Date(y, m - 1, 1).getDay();
-  const lastDate = new Date(y, m, 0).getDate();
-
-  let cells = '';
-  for (let i = 0; i < firstDay; i++) cells += `<div></div>`;
-  for (let d = 1; d <= lastDate; d++) {
-    const key = `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-    const dt  = new Date(y, m - 1, d);
-    const dow = dt.getDay();
-    const isSel = state.newDates.has(key);
-    const bg    = isSel ? 'background:var(--green);color:#fff;font-weight:700;' : '';
-    const col   = !isSel && dow === 0 ? 'color:var(--red);' : !isSel && dow === 6 ? 'color:var(--sky);' : '';
-    cells += `<div data-key="${key}" class="cal-day" style="aspect-ratio:1;display:flex;align-items:center;justify-content:center;border-radius:50%;font-size:14px;cursor:pointer;${bg}${col};-webkit-tap-highlight-color:transparent;">${d}</div>`;
-  }
-
-  const selList = [...state.newDates].sort();
-
   return `
     <div class="card">
       <div class="card-header"><span style="font-weight:600">新しいイベントを作成</span></div>
@@ -387,7 +370,7 @@ function renderNewEventForm() {
 
         <div class="row flex-between" style="margin:8px 0 6px">
           <button id="btn-cal-prev" style="padding:4px 12px">＜</button>
-          <span style="font-weight:600">${y}年${m}月</span>
+          <span id="cal-month-label" style="font-weight:600">${y}年${m}月</span>
           <button id="btn-cal-next" style="padding:4px 12px">＞</button>
         </div>
 
@@ -397,18 +380,9 @@ function renderNewEventForm() {
           ).join('')}
         </div>
 
-        <div id="cal-grid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:12px">
-          ${cells}
-        </div>
+        <div id="cal-grid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:12px"></div>
 
-        ${selList.length > 0 ? `
-          <div style="background:var(--gray);border-radius:8px;padding:10px 12px;margin-bottom:12px">
-            <p style="font-size:11px;color:var(--text-sub);margin-bottom:6px">選択中 ${selList.length}件</p>
-            <div style="display:flex;flex-wrap:wrap;gap:6px">
-              ${selList.map(d => `<div data-rm="${d}" style="display:flex;align-items:center;gap:4px;background:#fff;border:1px solid var(--border);border-radius:20px;padding:3px 10px;font-size:12px">${fmtDate(d)}<span style="color:var(--text-hint);cursor:pointer;font-size:14px;line-height:1">×</span></div>`).join('')}
-            </div>
-          </div>
-        ` : `<p style="font-size:12px;color:var(--text-hint);margin-bottom:12px">カレンダーから候補日を選んでください</p>`}
+        <div id="sel-dates-box" style="margin-bottom:12px"></div>
 
         <div class="mb12">
           <label>回答期限 <span style="color:var(--red);font-size:11px">必須</span></label>
@@ -421,6 +395,7 @@ function renderNewEventForm() {
         </div>
       </div>
     </div>`;
+}
 }
 
 function renderDateRow(val, i) { return ''; }
@@ -636,47 +611,88 @@ function saveFormState() {
   if (dlEl)   state.newDeadline = dlEl.value;
 }
 
-// フォーム描画後にリスナーを付ける
-function attachNewEventHandlers() {
-  if (state.tab !== 'new') return;
+// カレンダーグリッドだけ再描画（フォーム全体はrenderしない）
+function refreshCalendar() {
+  const y = state.calYear;
+  const m = state.calMonth;
+  const firstDay = new Date(y, m - 1, 1).getDay();
+  const lastDate = new Date(y, m, 0).getDate();
 
-  // カレンダー日付
+  let cells = '';
+  for (let i = 0; i < firstDay; i++) cells += `<div></div>`;
+  for (let d = 1; d <= lastDate; d++) {
+    const key = `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const dt  = new Date(y, m - 1, d);
+    const dow = dt.getDay();
+    const isSel = state.newDates.has(key);
+    const bg  = isSel ? 'background:var(--green);color:#fff;font-weight:700;' : '';
+    const col = !isSel && dow === 0 ? 'color:var(--red);' : !isSel && dow === 6 ? 'color:var(--sky);' : '';
+    cells += `<div data-key="${key}" class="cal-day" style="aspect-ratio:1;display:flex;align-items:center;justify-content:center;border-radius:50%;font-size:14px;cursor:pointer;${bg}${col};-webkit-tap-highlight-color:transparent;">${d}</div>`;
+  }
+
+  const grid = document.getElementById('cal-grid');
+  if (grid) grid.innerHTML = cells;
+
+  // 月表示更新
+  const label = document.getElementById('cal-month-label');
+  if (label) label.textContent = `${y}年${m}月`;
+
+  // 選択済み一覧更新
+  const selBox = document.getElementById('sel-dates-box');
+  if (selBox) {
+    const selList = [...state.newDates].sort();
+    selBox.innerHTML = selList.length > 0
+      ? `<div style="background:var(--gray);border-radius:8px;padding:10px 12px;">
+           <p style="font-size:11px;color:var(--text-sub);margin-bottom:6px">選択中 ${selList.length}件</p>
+           <div style="display:flex;flex-wrap:wrap;gap:6px">
+             ${selList.map(d => `<div data-rm="${d}" style="display:flex;align-items:center;gap:4px;background:#fff;border:1px solid var(--border);border-radius:20px;padding:3px 10px;font-size:12px">${fmtDate(d)}<span style="color:var(--text-hint);cursor:pointer;font-size:14px;line-height:1;margin-left:2px">×</span></div>`).join('')}
+           </div>
+         </div>`
+      : `<p style="font-size:12px;color:var(--text-hint);">カレンダーから候補日を選んでください</p>`;
+    // × ボタン
+    selBox.querySelectorAll('[data-rm]').forEach(el => {
+      el.addEventListener('click', () => {
+        state.newDates.delete(el.dataset.rm);
+        refreshCalendar();
+      });
+    });
+  }
+
+  // 日付セルにハンドラ再設定
   document.querySelectorAll('.cal-day').forEach(el => {
     el.addEventListener('click', () => {
-      saveFormState();
       const key = el.dataset.key;
       if (state.newDates.has(key)) state.newDates.delete(key);
       else state.newDates.add(key);
-      render();
-      attachNewEventHandlers();
+      refreshCalendar();
     });
   });
+}
 
-  // 選択済みタグの × 削除
-  document.querySelectorAll('[data-rm]').forEach(el => {
-    el.addEventListener('click', () => {
-      saveFormState();
-      state.newDates.delete(el.dataset.rm);
-      render();
-      attachNewEventHandlers();
-    });
-  });
+// フォーム描画後に一度だけリスナーを付ける
+function attachNewEventHandlers() {
+  if (state.tab !== 'new') return;
 
-  // 月ナビ
+  // 月ナビ（一度だけ）
   const prev = document.getElementById('btn-cal-prev');
   const next = document.getElementById('btn-cal-next');
-  if (prev) prev.addEventListener('click', () => {
-    saveFormState();
+  if (prev) { prev.replaceWith(prev.cloneNode(true)); }
+  if (next) { next.replaceWith(next.cloneNode(true)); }
+  const prev2 = document.getElementById('btn-cal-prev');
+  const next2 = document.getElementById('btn-cal-next');
+  if (prev2) prev2.addEventListener('click', () => {
     state.calMonth--;
     if (state.calMonth < 1) { state.calMonth = 12; state.calYear--; }
-    render(); attachNewEventHandlers();
+    refreshCalendar();
   });
-  if (next) next.addEventListener('click', () => {
-    saveFormState();
+  if (next2) next2.addEventListener('click', () => {
     state.calMonth++;
     if (state.calMonth > 12) { state.calMonth = 1; state.calYear++; }
-    render(); attachNewEventHandlers();
+    refreshCalendar();
   });
+
+  // 初回カレンダー描画
+  refreshCalendar();
 
   // キャンセル
   const cancel = document.getElementById('btn-cancel-ev');
@@ -692,9 +708,9 @@ function attachNewEventHandlers() {
     const name     = state.newName.trim();
     const deadline = state.newDeadline;
     const dates    = [...state.newDates].sort();
-    if (!name)          { toast('イベント名を入力してください'); return; }
+    if (!name)              { toast('イベント名を入力してください'); return; }
     if (dates.length === 0) { toast('候補日を1件以上選んでください'); return; }
-    if (!deadline)      { toast('回答期限を設定してください'); return; }
+    if (!deadline)          { toast('回答期限を設定してください'); return; }
 
     create.disabled = true;
     create.textContent = '作成中...';
