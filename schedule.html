@@ -632,8 +632,9 @@ window.doLogout = () => {
 window.setTab = (t) => {
   state.tab = t;
   if (t === 'new') {
-    state.newName = '';
-    state.newDates = new Set();
+    state.newName     = '';
+    state.newDates    = new Set();
+    state.newDeadline = '';
     const now = new Date();
     state.calYear  = now.getFullYear();
     state.calMonth = now.getMonth() + 1;
@@ -641,7 +642,16 @@ window.setTab = (t) => {
   render();
 };
 
+function saveFormState() {
+  if (state.tab !== 'new') return;
+  const nameEl = document.getElementById('ev-name');
+  const dlEl   = document.getElementById('ev-deadline');
+  if (nameEl) state.newName     = nameEl.value;
+  if (dlEl)   state.newDeadline = dlEl.value;
+}
+
 window.toggleDate = (key) => {
+  saveFormState();
   if (state.newDates.has(key)) {
     state.newDates.delete(key);
   } else {
@@ -651,18 +661,21 @@ window.toggleDate = (key) => {
 };
 
 window.calPrev = () => {
+  saveFormState();
   state.calMonth--;
   if (state.calMonth < 1) { state.calMonth = 12; state.calYear--; }
   render();
 };
 
 window.calNext = () => {
+  saveFormState();
   state.calMonth++;
   if (state.calMonth > 12) { state.calMonth = 1; state.calYear++; }
   render();
 };
 
 window.createEvent = async () => {
+  saveFormState();
   const nameEl = document.getElementById('ev-name');
   const dlEl   = document.getElementById('ev-deadline');
   const name     = nameEl ? nameEl.value.trim() : state.newName.trim();
