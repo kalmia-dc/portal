@@ -945,7 +945,10 @@
   <div class="staff-header">
     <div class="greeting">おつかれさまです 👋</div>
     <div class="name" id="staffGreetName">---</div>
-    <button class="logout-btn" onclick="doLogout()">ログアウト</button>
+    <div style="display:flex;gap:6px;align-items:center;">
+      <button class="logout-btn" id="backToPortalBtn" onclick="goBackToPortal()" style="display:none;background:rgba(255,255,255,.15);">← ポータル</button>
+      <button class="logout-btn" onclick="doLogout()">ログアウト</button>
+    </div>
   </div>
 
   <!-- ① シフト確認タブ -->
@@ -1138,6 +1141,7 @@
     <span id="monthLabel"></span>
     <button id="btnNextMonth" onclick="changeMonth(1)">›</button>
   </div>
+  <button class="admin-logout" id="adminBackToPortalBtn" onclick="goBackToPortal()" style="display:none;">← ポータル</button>
   <button class="admin-logout" onclick="doLogout()">ログアウト</button>
 </header>
 
@@ -4084,19 +4088,31 @@ function showAdminApp(){
   render();
 }
 
+function goBackToPortal(){
+  window.location.href = 'https://kalmia-dc.github.io/portal/';
+}
+
 // URLパラメータ ?admin で管理画面に直接入る
 // URLパラメータ ?sid=staffId でスタッフ自動ログイン
 window.addEventListener('load', ()=>{
   const params = new URLSearchParams(location.search);
+  const fromPortal = params.get('sid') || location.search.includes('admin');
+
   if(location.search.includes('admin') || location.hash === '#admin'){
     currentUser = { role:'admin', name:'管理者' };
     showAdminApp();
+    if(fromPortal){
+      const btn = document.getElementById('adminBackToPortalBtn');
+      if(btn) btn.style.display = '';
+    }
   } else if(params.get('sid')){
     const sid = params.get('sid');
     const s = STAFF.find(x=>x.id===sid);
     if(s){
       currentUser = { role:'staff', staffId:sid, name:s.name };
       showStaffApp();
+      const btn = document.getElementById('backToPortalBtn');
+      if(btn) btn.style.display = '';
     }
   }
 });
