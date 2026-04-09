@@ -1376,7 +1376,7 @@ function monthKey(y, m){ return `${y}-${String(m+1).padStart(2,'0')}`; }
 function saveCurrentShift(){
   const key=monthKey(currentYear, currentMonth);
   allShiftData[key] = JSON.parse(JSON.stringify(shiftData));
-  // Firebaseに保存
+  // Firebaseに保存（shifts/YYYY-MM/staffId/date 形式）
   if(window._fb){
     const { db, ref, set } = window._fb;
     set(ref(db, 'shifts/'+key), allShiftData[key]);
@@ -4085,10 +4085,19 @@ function showAdminApp(){
 }
 
 // URLパラメータ ?admin で管理画面に直接入る
+// URLパラメータ ?sid=staffId でスタッフ自動ログイン
 window.addEventListener('load', ()=>{
+  const params = new URLSearchParams(location.search);
   if(location.search.includes('admin') || location.hash === '#admin'){
     currentUser = { role:'admin', name:'管理者' };
     showAdminApp();
+  } else if(params.get('sid')){
+    const sid = params.get('sid');
+    const s = STAFF.find(x=>x.id===sid);
+    if(s){
+      currentUser = { role:'staff', staffId:sid, name:s.name };
+      showStaffApp();
+    }
   }
 });
 

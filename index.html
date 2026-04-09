@@ -684,7 +684,7 @@ function goToShiftApp(asAdmin = false) {
   if (asAdmin) {
     window.open(`https://kalmia-dc.github.io/portal/shift.html?admin`, '_blank');
   } else {
-    window.open(`https://kalmia-dc.github.io/portal/shift.html`, '_blank');
+    window.open(`https://kalmia-dc.github.io/portal/shift.html?sid=${currentUser.staffId}`, '_blank');
   }
 }
 
