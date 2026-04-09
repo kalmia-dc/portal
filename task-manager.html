@@ -683,9 +683,7 @@
   <button class="filter-chip" onclick="setFilter('mine',this)">担当のみ</button>
   <button class="filter-chip" onclick="setFilter('everyone',this)">👥 全員分</button>
   <button class="filter-chip" onclick="setFilter('未着手',this)">未着手</button>
-  <button class="filter-chip" onclick="setFilter('進行中',this)">進行中</button>
   <button class="filter-chip" onclick="setFilter('完了',this)">完了</button>
-  <button class="filter-chip" onclick="setFilter('保留',this)">保留</button>
   <button class="filter-chip" onclick="setFilter('overdue',this)">⚠ 期限切れ</button>
   <button class="filter-chip" onclick="setFilter('high',this)">🔴 高優先</button>
   <button class="filter-chip" onclick="setFilter('診療',this)">診療</button>
@@ -757,12 +755,8 @@
       <div class="status-group">
         <input type="radio" class="status-option" name="status" id="st-todo" value="未着手" checked>
         <label for="st-todo" class="status-label">未着手</label>
-        <input type="radio" class="status-option" name="status" id="st-doing" value="進行中">
-        <label for="st-doing" class="status-label">進行中</label>
         <input type="radio" class="status-option" name="status" id="st-done" value="完了">
         <label for="st-done" class="status-label">完了</label>
-        <input type="radio" class="status-option" name="status" id="st-hold" value="保留">
-        <label for="st-hold" class="status-label">保留</label>
       </div>
     </div>
 
@@ -1172,14 +1166,14 @@ function renderStats() {
   const related = isEveryone ? all : (currentUser ? all.filter(t =>
     (t.assignees||[]).includes(currentUser.name) || t.createdBy === currentUser.name
   ) : []);
-  const mine    = currentUser ? related.filter(t => (t.assignees||[]).includes(currentUser.name)) : [];
-  const doing   = related.filter(t => t.status === '進行中').length;
-  const overdue = related.filter(t => isOverdue(t.date) && t.status !== '完了').length;
+  const mine      = currentUser ? related.filter(t => (t.assignees||[]).includes(currentUser.name)) : [];
+  const incomplete = related.filter(t => t.status !== '完了').length;
+  const overdue    = related.filter(t => isOverdue(t.date) && t.status !== '完了').length;
 
   document.getElementById('statsBar').innerHTML = `
     <div class="stat-card"><div class="stat-num">${related.length}</div><div class="stat-label">${isEveryone ? '全タスク' : '自分のタスク'}</div></div>
     <div class="stat-card"><div class="stat-num" style="color:var(--low)">${mine.length}</div><div class="stat-label">担当中</div></div>
-    <div class="stat-card"><div class="stat-num" style="color:var(--med)">${doing}</div><div class="stat-label">進行中</div></div>
+    <div class="stat-card"><div class="stat-num" style="color:var(--med)">${incomplete}</div><div class="stat-label">未完了</div></div>
     <div class="stat-card"><div class="stat-num" style="color:var(--high)">${overdue}</div><div class="stat-label">期限切れ</div></div>`;
 }
 
@@ -1225,9 +1219,9 @@ function taskCardHtml(t) {
 
 function renderBoard() {
   const filtered = getFiltered();
-  const cols = ['未着手','進行中','完了','保留'];
-  const clsMap = {'未着手':'col-todo','進行中':'col-doing','完了':'col-done','保留':'col-hold'};
-  let html = '<div class="board">';
+  const cols = ['未着手','完了'];
+  const clsMap = {'未着手':'col-todo','完了':'col-done'};
+  let html = '<div class="board" style="grid-template-columns:1fr 1fr;">';
   for (const status of cols) {
     const items = filtered.filter(t => t.status===status);
     html += `<div class="column">
