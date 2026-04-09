@@ -476,9 +476,9 @@
 <!-- ボトムナビ（重複なし・4ツール＋マイページ） -->
 <nav class="bottom-nav">
   <button class="nav-item active" onclick="goToShiftApp()"><span class="nav-icon">📅</span><span class="nav-label">シフト</span></button>
-  <a class="nav-item" href="https://kalmia-dc.doctor-hr.com/" target="_blank"><span class="nav-icon">👨‍⚕️</span><span class="nav-label">DR-HR</span></a>
-  <a class="nav-item" href="https://ssl.jobcan.jp/employee" target="_blank"><span class="nav-icon">🕐</span><span class="nav-label">勤怠</span></a>
-  <a class="nav-item" href="https://apo-toolboxes.stransa.co.jp/calendar/" target="_blank"><span class="nav-icon">🗓️</span><span class="nav-label">予約</span></a>
+  <button class="nav-item" id="navSkillBtn" onclick="goToSkillApp()" style="display:none"><span class="nav-icon">📋</span><span class="nav-label">スキル</span></button>
+  <button class="nav-item" onclick="goToTaskApp()"><span class="nav-icon">✅</span><span class="nav-label">タスク</span></button>
+  <button class="nav-item" onclick="goToScheduleApp()"><span class="nav-icon">🎉</span><span class="nav-label">日程</span></button>
   <button class="nav-item" onclick="openPwModal()"><span class="nav-icon">👤</span><span class="nav-label">マイページ</span></button>
 </nav>
 
@@ -669,7 +669,7 @@ function goToSkillApp() {
 function goToTaskApp() {
   if (!currentUser) return;
   const params = new URLSearchParams({ sid: currentUser.staffId, name: currentUser.name });
-  window.location.href = `https://kalmia-dc.github.io/portal/task-manager.html?${params}`;
+  window.open(`https://kalmia-dc.github.io/portal/task-manager.html?${params}`, '_blank');
 }
 
 function goToScheduleApp(eventId) {
@@ -682,9 +682,11 @@ function goToScheduleApp(eventId) {
 function goToShiftApp(asAdmin = false) {
   if (!currentUser) return;
   if (asAdmin) {
-    window.location.href = `https://kalmia-dc.github.io/portal/shift.html?admin`;
+    // 管理者パスワードをパラメータで渡す
+    window.open(`https://kalmia-dc.github.io/portal/shift.html?admin=1`, '_blank');
   } else {
-    window.location.href = `https://kalmia-dc.github.io/portal/shift.html?sid=${currentUser.staffId}`;
+    const params = new URLSearchParams({ sid: currentUser.staffId, p: currentUser.pass });
+    window.open(`https://kalmia-dc.github.io/portal/shift.html?${params}`, '_blank');
   }
 }
 
@@ -703,8 +705,6 @@ const STAFF_ID_MAP = {
 };
 // staffName → staffId マップ（逆引き）
 const NAME_TO_ID = Object.fromEntries(Object.entries(STAFF_ID_MAP).map(([id,n])=>[n,id]));
-// 院長表示名も対応
-NAME_TO_ID['院長'] = 'sugihira';
 
 // シフトキー変換（シフトアプリ内部キー→表示名）
 const SHIFT_KEY_MAP = {
@@ -718,33 +718,10 @@ async function getMonthShifts(year, month) {
   const key = `${year}-${String(month).padStart(2,'0')}`;
   if (_shiftCache[key] !== undefined) return _shiftCache[key];
   try {
-    // まず shifts/YYYY-MM 形式を試す（新形式）
     const snap = await get(ref(_db, `shifts/${key}`));
-    if (snap.exists()) {
-      _shiftCache[key] = snap.val();
-      return _shiftCache[key];
-    }
-    // フォールバック: shifts/staffId 形式（旧形式）
-    // shifts全体を取得して月でフィルタ
-    const allSnap = await get(ref(_db, `shifts`));
-    if (!allSnap.exists()) { _shiftCache[key] = null; return null; }
-    const allData = allSnap.val();
-    const result = {};
-    Object.entries(allData).forEach(([sid, dates]) => {
-      // staffIdのキーを持つデータかチェック（日付形式でなければstaffId）
-      if (typeof dates === 'object' && dates !== null) {
-        const monthData = {};
-        Object.entries(dates).forEach(([date, val]) => {
-          if (typeof date === 'string' && date.startsWith(key)) {
-            monthData[date] = val;
-          }
-        });
-        if (Object.keys(monthData).length > 0) result[sid] = monthData;
-      }
-    });
-    _shiftCache[key] = Object.keys(result).length > 0 ? result : null;
+    _shiftCache[key] = snap.exists() ? snap.val() : null;
     return _shiftCache[key];
-  } catch(e) { console.error('getMonthShifts error:', e); return null; }
+  } catch(e) { return null; }
 }
 
 async function getShift(staffName, date) {
@@ -803,33 +780,35 @@ async function initApp() {
     typeEl.className = 'hero-shift-type dim';
   }
 
-  // 締切バナー（毎月20日までに翌々月分を提出）
+  // 締切バナー（毎月25日までに翌々月分を提出）
   // 例：4/25までに8月分、5/25までに9月分
-  const deadline = new Date(now.getFullYear(), now.getMonth(), 20);
+  const deadline = new Date(now.getFullYear(), now.getMonth(), 25);
   const targetMonth = now.getMonth() + 4; // 翌々々月（0始まり+4=翌々月の月名）
   const targetYear  = now.getFullYear() + Math.floor((now.getMonth() + 4) / 12);
   const targetMonthName = ((now.getMonth() + 4) % 12) + 1;
   const deadlineEl = document.getElementById('deadlineNotice');
   if (now <= deadline) {
     const daysLeft = Math.ceil((deadline - now) / 86400000);
-    deadlineEl.innerHTML = `シフト提出締切：<strong>${targetMonthName}月分</strong> ／ ${now.getMonth()+1}月20日まで（残り${daysLeft}日）`;
+    deadlineEl.innerHTML = `シフト提出締切：<strong>${targetMonthName}月分</strong> ／ ${now.getMonth()+1}月25日まで（残り${daysLeft}日）`;
   } else {
-    // 20日を過ぎたら翌月分を案内
+    // 25日を過ぎたら翌月分を案内
     const nextDeadlineMonth = now.getMonth() + 2;
     const nextTargetMonth   = ((now.getMonth() + 5) % 12) + 1;
-    deadlineEl.innerHTML = `次回締切：<strong>${nextTargetMonth}月分</strong> ／ ${nextDeadlineMonth > 12 ? nextDeadlineMonth-12 : nextDeadlineMonth}月20日まで`;
+    deadlineEl.innerHTML = `次回締切：<strong>${nextTargetMonth}月分</strong> ／ ${nextDeadlineMonth > 12 ? nextDeadlineMonth-12 : nextDeadlineMonth}月25日まで`;
   }
 
   // 管理者リンクを表示（杉平・百々のみ）
   const adminBtn = document.getElementById('adminToolBtn');
   const skillBtn = document.getElementById('skillToolBtn');
+  const navSkillBtn = document.getElementById('navSkillBtn');
   // 管理者画面は管理者のみ
   adminBtn.style.display = ADMIN_STAFF.includes(u.staffId) ? 'block' : 'none';
   // スキルチェックは全スタッフ表示
   skillBtn.style.display = 'block';
+  if (navSkillBtn) navSkillBtn.style.display = 'flex';
 
   // 今週カレンダー
-  await buildWeek(now, u.name);
+  await buildWeek(now, u.staffId);
 
   // 本日出勤スタッフ
   await buildTodayStaff(now);
@@ -1192,12 +1171,9 @@ async function loadScheduleEvents(staffId) {
         let dlBadge = '';
         if (ev.deadline) {
           const diff = Math.round((new Date(ev.deadline + 'T00:00:00') - new Date(today + 'T00:00:00')) / 86400000);
-          const dt   = new Date(ev.deadline + 'T00:00:00');
-          const dlStr = `${dt.getMonth()+1}/${dt.getDate()}(${DAY_JP[dt.getDay()]})まで`;
           if (diff < 0)        dlBadge = `<span style="background:rgba(255,107,107,.3);border-radius:8px;padding:1px 6px;font-size:10px;margin-left:4px">期限切れ</span>`;
           else if (diff === 0) dlBadge = `<span style="background:rgba(255,107,107,.3);border-radius:8px;padding:1px 6px;font-size:10px;margin-left:4px">本日締切</span>`;
-          else if (diff <= 3)  dlBadge = `<span style="background:rgba(255,217,61,.4);border-radius:8px;padding:1px 6px;font-size:10px;margin-left:4px">残り${diff}日（${dlStr}）</span>`;
-          else                 dlBadge = `<span style="background:rgba(255,255,255,.2);border-radius:8px;padding:1px 6px;font-size:10px;margin-left:4px">${dlStr}</span>`;
+          else if (diff <= 3)  dlBadge = `<span style="background:rgba(255,217,61,.4);border-radius:8px;padding:1px 6px;font-size:10px;margin-left:4px">残り${diff}日</span>`;
         }
 
         return `
