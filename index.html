@@ -669,7 +669,7 @@ function goToSkillApp() {
 function goToTaskApp() {
   if (!currentUser) return;
   const params = new URLSearchParams({ sid: currentUser.staffId, name: currentUser.name });
-  window.open(`https://kalmia-dc.github.io/portal/task-manager.html?${params}`, '_blank');
+  window.location.href = `https://kalmia-dc.github.io/portal/task-manager.html?${params}`;
 }
 
 function goToScheduleApp(eventId) {
@@ -682,9 +682,9 @@ function goToScheduleApp(eventId) {
 function goToShiftApp(asAdmin = false) {
   if (!currentUser) return;
   if (asAdmin) {
-    window.open(`https://kalmia-dc.github.io/portal/shift.html?admin`, '_blank');
+    window.location.href = `https://kalmia-dc.github.io/portal/shift.html?admin`;
   } else {
-    window.open(`https://kalmia-dc.github.io/portal/shift.html?sid=${currentUser.staffId}`, '_blank');
+    window.location.href = `https://kalmia-dc.github.io/portal/shift.html?sid=${currentUser.staffId}`;
   }
 }
 
