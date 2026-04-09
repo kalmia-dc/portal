@@ -476,9 +476,9 @@
 <!-- ボトムナビ（重複なし・4ツール＋マイページ） -->
 <nav class="bottom-nav">
   <button class="nav-item active" onclick="goToShiftApp()"><span class="nav-icon">📅</span><span class="nav-label">シフト</span></button>
-  <button class="nav-item" id="navSkillBtn" onclick="goToSkillApp()" style="display:none"><span class="nav-icon">📋</span><span class="nav-label">スキル</span></button>
-  <button class="nav-item" onclick="goToTaskApp()"><span class="nav-icon">✅</span><span class="nav-label">タスク</span></button>
-  <button class="nav-item" onclick="goToScheduleApp()"><span class="nav-icon">🎉</span><span class="nav-label">日程</span></button>
+  <a class="nav-item" href="https://kalmia-dc.doctor-hr.com/" target="_blank"><span class="nav-icon">👨‍⚕️</span><span class="nav-label">DR-HR</span></a>
+  <a class="nav-item" href="https://ssl.jobcan.jp/employee" target="_blank"><span class="nav-icon">🕐</span><span class="nav-label">勤怠</span></a>
+  <a class="nav-item" href="https://apo-toolboxes.stransa.co.jp/calendar/" target="_blank"><span class="nav-icon">🗓️</span><span class="nav-label">予約</span></a>
   <button class="nav-item" onclick="openPwModal()"><span class="nav-icon">👤</span><span class="nav-label">マイページ</span></button>
 </nav>
 
@@ -549,21 +549,31 @@ const ON_SHIFTS = ['通常','遅出'];
 // ─────────────────────────────────────────
 let currentUser = null;
 
-function doLogin() {
+async function doLogin() {
   const sel  = document.getElementById('loginStaff').value;
   const pass = document.getElementById('loginPass').value;
   const err  = document.getElementById('loginError');
   if (!sel) { err.style.display='block'; err.textContent='スタッフを選択してください'; return; }
   // value形式: "名前|役職|初期PW|staffId"
   const [name, role, defaultPass, staffId] = sel.split('|');
-  // パスワード照合：localStorage変更分を優先、なければ初期値
-  const storedPasswords = JSON.parse(localStorage.getItem('carmia_passwords') || '{}');
-  const correct = storedPasswords[staffId] || defaultPass;
-  if (pass !== correct) { err.style.display='block'; err.textContent='パスワードが違います'; return; }
-  currentUser = { name, role, pass, staffId };
-  sessionStorage.setItem('portalUser', JSON.stringify(currentUser));
-  err.style.display = 'none';
-  showApp();
+
+  // Firebaseからパスワードを取得して照合
+  try {
+    const snap = await get(ref(_db, `passwords/${staffId}`));
+    const correct = snap.exists() ? snap.val() : defaultPass;
+    if (pass !== correct) { err.style.display='block'; err.textContent='パスワードが違います'; return; }
+    currentUser = { name, role, pass, staffId };
+    sessionStorage.setItem('portalUser', JSON.stringify(currentUser));
+    err.style.display = 'none';
+    showApp();
+  } catch(e) {
+    // Firebase失敗時は初期パスワードで照合
+    if (pass !== defaultPass) { err.style.display='block'; err.textContent='パスワードが違います'; return; }
+    currentUser = { name, role, pass, staffId };
+    sessionStorage.setItem('portalUser', JSON.stringify(currentUser));
+    err.style.display = 'none';
+    showApp();
+  }
 }
 
 function doLogout() {
@@ -595,13 +605,13 @@ function closePwModalIfBg(e) {
   if (e.target === document.getElementById('pwModal')) closePwModal();
 }
 
-function submitPwChange() {
+async function submitPwChange() {
   const oldVal = document.getElementById('pwOld').value;
   const newVal = document.getElementById('pwNew').value;
   const newVal2= document.getElementById('pwNew2').value;
   const msg    = document.getElementById('pwMsg');
 
-  // 現在パスワード取得（localStorageの変更分 or 初期値）
+  // 現在パスワード取得（Firebase or 初期値）
   const stored   = JSON.parse(localStorage.getItem('carmia_passwords') || '{}');
   const sid      = currentUser.staffId;
   const DEFAULTS = {
@@ -610,7 +620,15 @@ function submitPwChange() {
     nozaki:'2005',   yamada:'2006',    hanowa:'2007',
     tamiya:'3001',   tanaka:'3002',    momo:'3003'
   };
-  const current = stored[sid] || DEFAULTS[sid] || '';
+
+  // Firebaseから現在のパスワードを取得
+  let current = DEFAULTS[sid] || '';
+  try {
+    const snap = await get(ref(_db, `passwords/${sid}`));
+    if (snap.exists()) current = snap.val();
+  } catch(e) {
+    current = stored[sid] || DEFAULTS[sid] || '';
+  }
 
   if (oldVal !== current) {
     msg.textContent = '現在のパスワードが違います';
@@ -629,7 +647,10 @@ function submitPwChange() {
     msg.className = 'pw-msg err'; return;
   }
 
-  // 保存（シフトアプリと共有のlocalStorageキー）
+  // FirebaseとlocalStorage両方に保存
+  try {
+    await set(ref(_db, `passwords/${sid}`), newVal);
+  } catch(e) { console.warn('Firebase保存失敗:', e); }
   stored[sid] = newVal;
   localStorage.setItem('carmia_passwords', JSON.stringify(stored));
 
@@ -800,15 +821,13 @@ async function initApp() {
   // 管理者リンクを表示（杉平・百々のみ）
   const adminBtn = document.getElementById('adminToolBtn');
   const skillBtn = document.getElementById('skillToolBtn');
-  const navSkillBtn = document.getElementById('navSkillBtn');
   // 管理者画面は管理者のみ
   adminBtn.style.display = ADMIN_STAFF.includes(u.staffId) ? 'block' : 'none';
   // スキルチェックは全スタッフ表示
   skillBtn.style.display = 'block';
-  if (navSkillBtn) navSkillBtn.style.display = 'flex';
 
   // 今週カレンダー
-  await buildWeek(now, u.staffId);
+  await buildWeek(now, u.name);
 
   // 本日出勤スタッフ
   await buildTodayStaff(now);
@@ -889,7 +908,7 @@ async function buildTodayStaff(now) {
 // Firebase（シフトアプリと同じプロジェクト）
 // ─────────────────────────────────────────
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getDatabase, ref, push, remove, onValue, get } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
+import { getDatabase, ref, push, remove, onValue, get, set } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 
 const firebaseConfig = {
   apiKey:            'AIzaSyDdMe7feUF6CKPHH0YIx7Suk-WnXtOYUu8',
