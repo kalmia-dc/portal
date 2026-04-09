@@ -1140,10 +1140,15 @@ function getFiltered() {
     if (currentFilter === 'everyone') return true;
 
     // それ以外は自分が作成 or 担当のタスクのみ
-    const isRelated = currentUser && (
-      (t.assignees||[]).includes(currentUser.name) ||
-      t.createdBy === currentUser.name
-    );
+    const isRelated = currentUser && (() => {
+      const name = currentUser.name;
+      // ① 自分が担当
+      if ((t.assignees||[]).includes(name)) return true;
+      // ② 自分が作成（通常 or Google取込）
+      if (t.createdBy === name) return true;
+      if (t.createdBy === `${name}（Google）`) return true;
+      return false;
+    })();
     if (!isRelated) return false;
 
     if (currentFilter === 'all')     return true;
@@ -1163,9 +1168,12 @@ function renderStats() {
   const all = Object.values(tasks);
   const isEveryone = currentFilter === 'everyone';
 
-  const related = isEveryone ? all : (currentUser ? all.filter(t =>
-    (t.assignees||[]).includes(currentUser.name) || t.createdBy === currentUser.name
-  ) : []);
+  const related = isEveryone ? all : (currentUser ? all.filter(t => {
+    const name = currentUser.name;
+    return (t.assignees||[]).includes(name) ||
+           t.createdBy === name ||
+           t.createdBy === `${name}（Google）`;
+  }) : []);
   const mine      = currentUser ? related.filter(t => (t.assignees||[]).includes(currentUser.name)) : [];
   const incomplete = related.filter(t => t.status !== '完了').length;
   const overdue    = related.filter(t => isOverdue(t.date) && t.status !== '完了').length;
@@ -1202,18 +1210,43 @@ function taskCardHtml(t) {
   const tags  = (t.tags||[]).map(g=>`<span class="tag">${esc(g)}</span>`).join('');
   const chips = assigneeChips(t.assignees);
   const isDone = t.status === '完了';
-  const gIcon = t.googleTaskId ? `<span title="Googleタスク" style="font-size:10px;margin-left:auto;">G</span>` : '';
+  const gIcon  = t.googleTaskId ? `<span style="font-size:10px;color:#4285f4;margin-left:2px;">G</span>` : '';
+
+  // タスク種別ラベル
+  const myName = currentUser?.name || '';
+  const isMeCreated  = t.createdBy === myName || t.createdBy === `${myName}（Google）`;
+  const isMeAssigned = (t.assignees||[]).includes(myName);
+  const assigneesWithoutMe = (t.assignees||[]).filter(n => n !== myName);
+  let typeLabel = '';
+  if (isMeCreated && isMeAssigned && assigneesWithoutMe.length === 0) {
+    // 自分で作って自分がやる
+    typeLabel = `<span style="font-size:10px;background:#e8fdf8;color:#00b894;padding:2px 7px;border-radius:100px;font-weight:700;">自分</span>`;
+  } else if (isMeCreated && !isMeAssigned) {
+    // 自分が作って誰かにお願い
+    typeLabel = `<span style="font-size:10px;background:#fff4e0;color:#e67e22;padding:2px 7px;border-radius:100px;font-weight:700;">→ 依頼</span>`;
+  } else if (!isMeCreated && isMeAssigned) {
+    // 誰かが作って自分にお願い
+    const from = t.createdBy || '不明';
+    typeLabel = `<span style="font-size:10px;background:#f0f0ff;color:#6c5ce7;padding:2px 7px;border-radius:100px;font-weight:700;">${from} より</span>`;
+  } else if (isMeCreated && isMeAssigned && assigneesWithoutMe.length > 0) {
+    // 自分も担当で他にも依頼
+    typeLabel = `<span style="font-size:10px;background:#e8fdf8;color:#00b894;padding:2px 7px;border-radius:100px;font-weight:700;">自分＋依頼</span>`;
+  }
+
   return `
     <div class="task-card pri-${t.priority} ${od?'overdue':''} ${isDone?'done-card':''}" onclick="window._openTask('${t.id}')">
+      <div style="display:flex;align-items:center;gap:5px;margin-bottom:6px;">
+        ${typeLabel}${gIcon}
+      </div>
       <div class="task-title" style="${isDone?'text-decoration:line-through;color:var(--text-muted);':''}">${esc(t.title)}</div>
       <div class="task-meta">
         <span class="badge badge-cat">${t.category||'その他'}</span>
         <span class="badge ${priCls[t.priority]}">${priLbl[t.priority]}</span>
-        ${dateLabel}${gIcon}
+        ${dateLabel}
       </div>
       ${chips?`<div class="task-assignees">${chips}</div>`:''}
       ${tags ?`<div class="task-tags">${tags}</div>`:''}
-      <button class="btn-done" onclick="window._toggleDone(event,'${t.id}')" title="${isDone?'未着手に戻す':'完了にする'}">${isDone?'✓':'✓'}</button>
+      <button class="btn-done" onclick="window._toggleDone(event,'${t.id}')" title="${isDone?'未着手に戻す':'完了にする'}">✓</button>
     </div>`;
 }
 
