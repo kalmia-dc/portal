@@ -947,7 +947,7 @@
     <div class="name" id="staffGreetName">---</div>
     <div style="display:flex;gap:6px;align-items:center;">
       <button class="logout-btn" id="backToPortalBtn" onclick="goBackToPortal()" style="display:none;background:rgba(255,255,255,.15);">← ポータル</button>
-      <button class="logout-btn" onclick="doLogout()">ログアウト</button>
+      <button class="logout-btn" id="staffLogoutBtn" onclick="doLogout()">ログアウト</button>
     </div>
   </div>
 
@@ -4104,6 +4104,8 @@ window.addEventListener('load', ()=>{
     if(fromPortal){
       const btn = document.getElementById('adminBackToPortalBtn');
       if(btn) btn.style.display = '';
+      const logout = document.querySelector('.admin-logout:not(#adminBackToPortalBtn)');
+      if(logout) logout.style.display = 'none';
     }
   } else if(params.get('sid')){
     const sid = params.get('sid');
@@ -4113,6 +4115,8 @@ window.addEventListener('load', ()=>{
       showStaffApp();
       const btn = document.getElementById('backToPortalBtn');
       if(btn) btn.style.display = '';
+      const logout = document.getElementById('staffLogoutBtn');
+      if(logout) logout.style.display = 'none';
     }
   }
 });
