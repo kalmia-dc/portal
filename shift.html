@@ -334,6 +334,78 @@
   .req-status.approved { background: #E8F5E9; color: #2E7D32; }
   .req-status.rejected { background: #FFEBEE; color: var(--red); }
 
+  /* ── 申請カレンダー ── */
+  .req-cal-nav {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 8px;
+  }
+  .req-cal-arrow {
+    background: var(--bg); border: none; border-radius: 8px;
+    width: 34px; height: 34px; font-size: 1.2rem; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--teal-dk); font-weight: 700;
+    -webkit-tap-highlight-color: transparent;
+    transition: background .15s;
+  }
+  .req-cal-arrow:active { background: var(--teal-lt); }
+  .req-cal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 3px;
+    background: var(--bg);
+    border-radius: 12px;
+    padding: 8px;
+  }
+  .req-cal-dow {
+    text-align: center; font-size: .6rem; font-weight: 700;
+    padding: 3px 0 5px; letter-spacing: .02em;
+  }
+  .req-cal-day {
+    aspect-ratio: 1;
+    border-radius: 9px;
+    border: none;
+    background: #fff;
+    font-family: inherit;
+    font-size: .78rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: background .12s, transform .1s;
+    -webkit-tap-highlight-color: transparent;
+    position: relative;
+    color: var(--text);
+  }
+  .req-cal-day:active { transform: scale(.88); }
+  .req-cal-day.empty  { background: transparent; cursor: default; }
+  .req-cal-day.past   { color: #ccc; cursor: not-allowed; }
+  .req-cal-day.off-day { background: #FFEBEE; color: #C62828; }
+  .req-cal-day.sat    { color: var(--blue); }
+  .req-cal-day.sun    { color: var(--red); }
+  .req-cal-day.today-mark {
+    outline: 2px solid var(--teal);
+    outline-offset: -1px;
+  }
+  .req-cal-day.selected {
+    background: var(--teal) !important;
+    color: #fff !important;
+    box-shadow: 0 2px 6px rgba(0,137,123,.35);
+  }
+  .req-cal-day.sat-blocked {
+    background: #F5F5F5; color: #ccc; cursor: not-allowed;
+  }
+  .req-cal-day.already-applied {
+    background: #FFF8E1; color: #E65100;
+  }
+  .req-date-tag {
+    display: inline-flex; align-items: center; gap: 3px;
+    background: var(--teal-lt); color: var(--teal-dk);
+    border-radius: 20px; padding: 4px 10px;
+    font-size: .78rem; font-weight: 600;
+  }
+  .req-date-tag .tag-x {
+    cursor: pointer; font-size: .9rem; color: #999; margin-left: 2px; line-height: 1;
+  }
+
   /* ── ボトムナビ（スマホ最適化） ── */
   .staff-bottom-nav {
     position: fixed; bottom: 0; left: 0; right: 0;
@@ -1025,12 +1097,17 @@
           </div>
         </div>
         <div class="login-field">
-          <label>申請日（複数選択可）</label>
-          <div id="reqDateList" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;min-height:32px;"></div>
-          <div style="display:flex;gap:8px;align-items:center;">
-            <input type="date" id="reqDate" style="font-size:1rem;flex:1;">
-            <button class="btn" style="padding:8px 16px;font-size:.9rem;white-space:nowrap;" onclick="addReqDate()">＋追加</button>
+          <label>申請日（複数タップで選択）</label>
+          <!-- カレンダーナビ -->
+          <div class="req-cal-nav">
+            <button class="req-cal-arrow" onclick="reqCalPrev()">‹</button>
+            <span id="reqCalTitle" style="font-size:.92rem;font-weight:700;"></span>
+            <button class="req-cal-arrow" onclick="reqCalNext()">›</button>
           </div>
+          <!-- カレンダーグリッド -->
+          <div id="reqCalGrid" class="req-cal-grid"></div>
+          <!-- 選択済み日付タグ -->
+          <div id="reqDateList" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;min-height:28px;"></div>
         </div>
         <div class="login-field">
           <label id="reqCommentLabel">コメント（任意）</label>
@@ -3992,7 +4069,10 @@ window.addEventListener('firebaseReady', ()=>{
     requestData = data ? Object.values(data) : [];
     if(currentUser){
       if(currentUser.role==='admin') renderApprovalList();
-      else renderRequestHistory(currentUser.staffId);
+      else {
+        renderRequestHistory(currentUser.staffId);
+        renderReqCal(); // 申請済みマーク更新
+      }
     }
   });
 
@@ -4141,6 +4221,10 @@ function showStaffApp(){
   }
 
   renderStaffScreen();
+  // 申請カレンダー初期化
+  reqDateList = [];
+  reqCalInit();
+  renderReqDateTags();
 }
 
 // ══════════════════════════════════════════════
@@ -4275,49 +4359,120 @@ function selectReqType(type, el){
     label.textContent = 'コメント（任意）';
     input.placeholder = '例：私用のため';
   }
+  // 申請タイプ変更時に選択日をクリア＆カレンダー再描画
+  reqDateList = [];
+  renderReqCal();
+  renderReqDateTags();
 }
 
-// 選択した申請日リスト
+// ── 申請カレンダー ──
 let reqDateList = [];
+let reqCalYear  = today.getFullYear();
+let reqCalMonth = today.getMonth();
 
-function addReqDate(){
-  const input = document.getElementById('reqDate');
-  const date = input.value;
-  if(!date) return;
-  if(reqDateList.includes(date)){
-    document.getElementById('reqResult').textContent = 'すでに追加されています';
-    document.getElementById('reqResult').style.color = 'var(--amber)';
-    return;
+function reqCalInit(){
+  reqCalYear  = today.getFullYear();
+  reqCalMonth = today.getMonth();
+  renderReqCal();
+}
+
+function reqCalPrev(){
+  reqCalMonth--;
+  if(reqCalMonth < 0){ reqCalMonth = 11; reqCalYear--; }
+  renderReqCal();
+}
+function reqCalNext(){
+  reqCalMonth++;
+  if(reqCalMonth > 11){ reqCalMonth = 0; reqCalYear++; }
+  renderReqCal();
+}
+
+function renderReqCal(){
+  const y = reqCalYear, m = reqCalMonth;
+  const title = document.getElementById('reqCalTitle');
+  if(title) title.textContent = `${y}年${m+1}月`;
+
+  const grid = document.getElementById('reqCalGrid');
+  if(!grid) return;
+
+  const days     = daysInMonth(y, m);
+  const firstDow = new Date(y, m, 1).getDay();
+  const todayY   = today.getFullYear();
+  const todayM   = today.getMonth();
+  const todayD   = today.getDate();
+
+  // 申請済み日付セット（今のスタッフ）
+  const appliedSet = new Set(
+    requestData
+      .filter(r => r.staffId === currentUser?.staffId && !r.cancelled)
+      .map(r => r.date)
+  );
+
+  const dows = ['日','月','火','水','木','金','土'];
+  let html = dows.map((d,i)=>
+    `<div class="req-cal-dow" style="color:${i===0?'var(--red)':i===6?'var(--blue)':'var(--muted)'}">${d}</div>`
+  ).join('');
+
+  for(let i=0; i<firstDow; i++) html += `<div class="req-cal-day empty"></div>`;
+
+  for(let d=1; d<=days; d++){
+    const ds   = dateStr(y, m, d);
+    const dow  = new Date(y, m, d).getDay();
+    const isPast = (y < todayY) || (y === todayY && m === todayM && d < todayD);
+    const isToday = (y === todayY && m === todayM && d === todayD);
+    const isOff   = isOffDay(y, m, d);
+    const isSat   = dow === 6;
+    const isSun   = dow === 0;
+    const isSatBlocked = isSat && selectedReqType === 'wish';
+    const isApplied = appliedSet.has(ds);
+    const isSelected = reqDateList.includes(ds);
+
+    let cls = 'req-cal-day';
+    if(isPast)         cls += ' past';
+    else if(isOff && !isSelected) cls += ' off-day';
+    else if(isSatBlocked && !isSelected) cls += ' sat-blocked';
+    else if(isApplied && !isSelected) cls += ' already-applied';
+    else if(isSun && !isSelected) cls += ' sun';
+    else if(isSat && !isSelected) cls += ' sat';
+    if(isToday) cls += ' today-mark';
+    if(isSelected) cls += ' selected';
+
+    const clickable = !isPast && !isSatBlocked && !isOff;
+    const onclick   = clickable ? `onclick="reqCalToggle('${ds}')"` : '';
+    html += `<div class="${cls}" ${onclick}>${d}</div>`;
   }
-  // 希望休の場合、土曜日は受け付けない
-  if(selectedReqType==='wish'){
-    const d=new Date(date);
-    if(d.getDay()===6){
-      document.getElementById('reqResult').textContent = '土曜日は希望休を申請できません';
-      document.getElementById('reqResult').style.color = 'var(--red)';
-      setTimeout(()=>{ document.getElementById('reqResult').textContent=''; }, 3000);
-      return;
-    }
+
+  grid.innerHTML = html;
+}
+
+function reqCalToggle(ds){
+  if(reqDateList.includes(ds)){
+    reqDateList = reqDateList.filter(d => d !== ds);
+  } else {
+    reqDateList.push(ds);
+    reqDateList.sort();
   }
-  reqDateList.push(date);
-  reqDateList.sort();
-  renderReqDateList();
-  input.value = '';
-  document.getElementById('reqResult').textContent = '';
+  renderReqCal();
+  renderReqDateTags();
 }
 
 function removeReqDate(date){
-  reqDateList = reqDateList.filter(d=>d!==date);
-  renderReqDateList();
+  reqDateList = reqDateList.filter(d => d !== date);
+  renderReqCal();
+  renderReqDateTags();
 }
 
-function renderReqDateList(){
+function renderReqDateTags(){
   const el = document.getElementById('reqDateList');
-  if(reqDateList.length===0){ el.innerHTML='<span style="font-size:.8rem;color:var(--muted);">日付を追加してください</span>'; return; }
+  if(!el) return;
+  if(reqDateList.length === 0){
+    el.innerHTML = '<span style="font-size:.78rem;color:var(--muted);">タップして日付を選択</span>';
+    return;
+  }
   el.innerHTML = reqDateList.map(d=>`
-    <span style="display:inline-flex;align-items:center;gap:4px;background:#E8F5E9;color:#2E7D32;border-radius:20px;padding:4px 10px;font-size:.82rem;font-weight:600;">
+    <span class="req-date-tag">
       ${d.slice(5).replace('-','/')}
-      <span onclick="removeReqDate('${d}')" style="cursor:pointer;font-size:1rem;line-height:1;color:#999;margin-left:2px;">✕</span>
+      <span class="tag-x" onclick="removeReqDate('${d}')">✕</span>
     </span>`).join('');
 }
 
@@ -4327,10 +4482,8 @@ function submitRequest(){
   const comment = document.getElementById('reqComment').value;
 
   // 日付リストの確認
-  const singleDate = document.getElementById('reqDate').value;
-  if(reqDateList.length===0 && singleDate) reqDateList = [singleDate];
   if(reqDateList.length===0){
-    result.textContent='日付を追加してください'; result.style.color='var(--red)'; return;
+    result.textContent='日付を選択してください'; result.style.color='var(--red)'; return;
   }
 
   // 有給の場合、コメント必須チェック
@@ -4397,8 +4550,8 @@ function submitRequest(){
   result.style.color='var(--teal)';
 
   reqDateList=[];
-  renderReqDateList();
-  document.getElementById('reqDate').value='';
+  renderReqDateTags();
+  renderReqCal();
   document.getElementById('reqComment').value='';
 
   renderRequestHistory(currentUser.staffId);
