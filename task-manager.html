@@ -637,6 +637,29 @@
 
   .toast.show { transform: translateX(-50%) translateY(0); }
 
+  /* ===== FAB ===== */
+  .fab {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--mint), var(--sky));
+    color: white;
+    border: none;
+    font-size: 28px;
+    cursor: pointer;
+    box-shadow: 0 6px 24px rgba(78,205,196,0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 150;
+    transition: all 0.2s;
+  }
+  .fab:hover { transform: scale(1.1) rotate(90deg); box-shadow: 0 10px 32px rgba(78,205,196,0.6); }
+  .fab:active { transform: scale(0.95); }
+
   @media print {
     header, .filter-bar, .stats-bar, .btn-add, .btn-icon, .overlay { display: none !important; }
     .board { grid-template-columns: repeat(4,1fr); }
@@ -675,7 +698,6 @@
     <button class="btn-icon" id="btn-list" title="リスト" onclick="setView('list')">☰</button>
     <button class="btn-icon active" id="btn-board" title="ボード" onclick="setView('board')">⊞</button>
     <button class="btn-icon" title="印刷" onclick="window.print()">🖨</button>
-    <button class="btn-add" onclick="openModal()">＋ 追加</button>
   </div>
 </header>
 
@@ -782,6 +804,8 @@
     </div>
   </div>
 </div>
+
+<button class="fab" onclick="openModal()" title="新規タスクを追加">＋</button>
 
 <div class="toast" id="toast"></div>
 
