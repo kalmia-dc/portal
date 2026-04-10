@@ -3992,7 +3992,7 @@ window.addEventListener('firebaseReady', ()=>{
     requestData = data ? Object.values(data) : [];
     if(currentUser){
       if(currentUser.role==='admin') renderApprovalList();
-      else renderStaffRequestList();
+      else renderRequestHistory(currentUser.staffId);
     }
   });
 
