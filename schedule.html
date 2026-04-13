@@ -1109,8 +1109,19 @@ window.doDeleteEvent = async () => {
   if (sid && p) {
     const staff = STAFF.find(s => s.id === sid);
     if (staff) {
-      const stored  = JSON.parse(localStorage.getItem('carmia_passwords') || '{}');
-      const correct = stored[sid] || staff.pin;
+      // FirebaseからパスワードをfetchしてからLSにもフォールバック
+      let correct = staff.pin;
+      try {
+        const snap = await get(ref(db, `passwords/${sid}`));
+        if (snap.exists()) correct = snap.val();
+        else {
+          const stored = JSON.parse(localStorage.getItem('carmia_passwords') || '{}');
+          correct = stored[sid] || staff.pin;
+        }
+      } catch(e) {
+        const stored = JSON.parse(localStorage.getItem('carmia_passwords') || '{}');
+        correct = stored[sid] || staff.pin;
+      }
       if (p === correct) {
         state.user = staff;
         state.view = 'main';
