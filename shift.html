@@ -1575,6 +1575,19 @@ function generateShift(){
   setTimeout(()=>{
     STAFF.forEach(s=>{ if(!shiftData[s.id]) shiftData[s.id]={}; });
 
+    // ── 申請データをshiftDataに反映（有給・希望休）──
+    const monthStr = monthKey(y, m); // 'YYYY-MM'
+    requestData
+      .filter(r=>!r.cancelled && r.date && r.date.startsWith(monthStr))
+      .forEach(r=>{
+        if(!shiftData[r.staffId]) shiftData[r.staffId]={};
+        if(r.type==='paid'){
+          shiftData[r.staffId][r.date]='paid';
+        } else if(r.type==='wish'){
+          shiftData[r.staffId][r.date]='wish';
+        }
+      });
+
     const allDays=Array.from({length:days},(_,i)=>i+1);
     const workDays=allDays.filter(d=>!isOffDay(y,m,d));
     const wds=workDays.map(d=>dateStr(y,m,d)); // 診療日の日付文字列リスト
