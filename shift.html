@@ -894,7 +894,10 @@
       <button class="login-role-tab active" onclick="setLoginRole('staff',this)">👤 スタッフ</button>
     </div>
     <div id="adminLoginForm" style="display:none">
-      <p style="font-size:.85rem;color:#888;text-align:center;margin:8px 0 0;">管理者としてログインします</p>
+      <div class="login-field">
+        <label>パスワード</label>
+        <input type="password" id="adminPass" placeholder="管理者パスワードを入力" onkeydown="if(event.key==='Enter')doLogin()">
+      </div>
     </div>
     <div id="staffLoginForm">
       <div class="login-field">
@@ -945,10 +948,7 @@
   <div class="staff-header">
     <div class="greeting">おつかれさまです 👋</div>
     <div class="name" id="staffGreetName">---</div>
-    <div style="display:flex;gap:6px;align-items:center;">
-      <button class="logout-btn" id="backToPortalBtn" onclick="goBackToPortal()" style="display:none;background:rgba(255,255,255,.15);">← ポータル</button>
-      <button class="logout-btn" id="staffLogoutBtn" onclick="doLogout()">ログアウト</button>
-    </div>
+    <button class="logout-btn" onclick="doLogout()">ログアウト</button>
   </div>
 
   <!-- ① シフト確認タブ -->
@@ -1141,7 +1141,6 @@
     <span id="monthLabel"></span>
     <button id="btnNextMonth" onclick="changeMonth(1)">›</button>
   </div>
-  <button class="admin-logout" id="adminBackToPortalBtn" onclick="goBackToPortal()" style="display:none;">← ポータル</button>
   <button class="admin-logout" onclick="doLogout()">ログアウト</button>
 </header>
 
@@ -1184,9 +1183,9 @@
       </button>
       <button class="btn btn-secondary btn-full" onclick="openApprovalModal()">📋 申請確認</button>
       <button class="btn btn-amber btn-full" onclick="exportCSV()">📥 CSVエクスポート</button>
+      <button class="btn btn-full" style="background:#e8f5e9;color:#2e7d32;font-weight:700;" onclick="confirmAndNotify()">📣 シフト確定・通知</button>
       <button class="btn btn-full" style="background:#E3F2FD;color:#1565C0;" onclick="printShift()">🖨️ 印刷</button>
       <button class="btn btn-full" style="background:#E8F5E9;color:#2E7D32;" onclick="openStaffMgr()">👥 スタッフ管理</button>
-      <button class="btn btn-full" style="background:#FCE4EC;color:#880E4F;" onclick="openHolidayMgr()">🏥 休業日管理</button>
       <button class="btn btn-danger btn-full" onclick="clearShift()">🗑 クリア</button>
     </div>
 
@@ -1311,36 +1310,6 @@
     </div>
   </div>
 </div>
-<!-- 休業日管理モーダル -->
-<div class="modal-overlay" id="holidayMgrModal">
-  <div class="modal" style="max-height:85vh;overflow-y:auto;">
-    <h2 style="margin-bottom:12px;">🏥 休業日管理</h2>
-
-    <!-- 登録済み一覧 -->
-    <div id="holidayList" style="margin-bottom:16px;"></div>
-
-    <!-- 追加フォーム -->
-    <div style="border-top:1px solid #eee;padding-top:14px;">
-      <h3 style="font-size:.95rem;margin-bottom:10px;">➕ 休業日を追加</h3>
-      <div style="display:flex;flex-direction:column;gap:8px;">
-        <div class="login-field" style="margin:0;">
-          <label>日付</label>
-          <input type="date" id="newHolidayDate" style="font-size:.95rem;padding:10px;border-radius:8px;border:1.5px solid #ddd;width:100%;">
-        </div>
-        <div class="login-field" style="margin:0;">
-          <label>理由（任意）</label>
-          <input type="text" id="newHolidayLabel" placeholder="例：お盆休み、年末年始" style="font-size:.95rem;">
-        </div>
-      </div>
-      <button class="btn" style="width:100%;margin-top:10px;background:#FCE4EC;color:#880E4F;font-weight:700;padding:12px;" onclick="addHoliday()">追加する</button>
-      <div id="holidayResult" style="font-size:.85rem;text-align:center;margin-top:8px;min-height:20px;font-weight:600;"></div>
-    </div>
-
-    <div class="modal-actions" style="margin-top:12px;">
-      <button class="btn btn-secondary" onclick="document.getElementById('holidayMgrModal').classList.remove('open')">閉じる</button>
-    </div>
-  </div>
-</div>
 
 </div><!-- /#mainApp -->
 
@@ -1404,6 +1373,38 @@ const today = new Date();
 let currentYear  = today.getFullYear();
 let currentMonth = today.getMonth(); // 0-indexed
 let shiftData = {};      // shiftData[staffId][dateStr] = shiftKey
+
+// ─── シフト確定・LINEワークス通知 ───────────────────
+async function confirmAndNotify() {
+  const monthNames = ['1','2','3','4','5','6','7','8','9','10','11','12'];
+  const m = monthNames[currentMonth];
+  const y = currentYear;
+
+  if (!confirm(`${y}年${m}月のシフトを確定してLINEワークスに通知しますか？`)) return;
+
+  // シフトを保存
+  saveCurrentShift();
+
+  // LINEワークス通知
+  const text = `📅 ${y}年${m}月のシフトが確定しました。\nポータルサイトで確認してください。\nhttps://kalmia-dc.github.io/portal/`;
+
+  try {
+    const res = await fetch('https://kalmia-notify.chibakenmin-sugihey.workers.dev', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text })
+    });
+    const data = await res.json();
+    if (data.ok && data.status === 200) {
+      alert(`✅ ${y}年${m}月のシフトを確定し、LINEワークスに通知しました！`);
+    } else {
+      alert('シフトは保存しましたが、通知に失敗しました。');
+    }
+  } catch(e) {
+    alert('シフトは保存しましたが、通知に失敗しました: ' + e.message);
+  }
+}
+
 // 複数月のシフトデータを保存
 let allShiftData = {};   // allShiftData['2026-03'][staffId][dateStr] = shiftKey
 
@@ -1411,7 +1412,7 @@ function monthKey(y, m){ return `${y}-${String(m+1).padStart(2,'0')}`; }
 function saveCurrentShift(){
   const key=monthKey(currentYear, currentMonth);
   allShiftData[key] = JSON.parse(JSON.stringify(shiftData));
-  // Firebaseに保存（shifts/YYYY-MM/staffId/date 形式）
+  // Firebaseに保存
   if(window._fb){
     const { db, ref, set } = window._fb;
     set(ref(db, 'shifts/'+key), allShiftData[key]);
@@ -1434,13 +1435,10 @@ let modalSelected = null;
 //  HELPERS
 // ──────────────────────────────────────────────
 function dateStr(y,m,d){ return `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`; }
-// カスタム休業日（Firebaseから読み込み）
-let customHolidays = {}; // { 'YYYY-MM-DD': '理由' }
-
 function isOffDay(y,m,d){
   const ds = dateStr(y,m,d);
   const dow = new Date(y,m,d).getDay();
-  return dow===0 || HOLIDAYS[ds] || !!customHolidays[ds];
+  return dow===0 || HOLIDAYS[ds];
 }
 function isSaturday(y,m,d){ return new Date(y,m,d).getDay()===6; }
 
@@ -1495,16 +1493,16 @@ function changeMonth(delta){
 }
 
 function updateMonthNavButtons(){
-  // 3ヶ月前〜12ヶ月後まで移動可能
+  // 今月〜3ヶ月後まで移動可能
   const now = new Date();
-  const minDate = new Date(now.getFullYear(), now.getMonth()-3, 1);
-  const maxDate = new Date(now.getFullYear(), now.getMonth()+12, 1);
-  const current = new Date(currentYear, currentMonth, 1);
+  const minY = now.getFullYear(), minM = now.getMonth();
+  const maxDate = new Date(now.getFullYear(), now.getMonth()+3, 1);
+  const maxY = maxDate.getFullYear(), maxM = maxDate.getMonth();
 
   const prevBtn = document.getElementById('btnPrevMonth');
   const nextBtn = document.getElementById('btnNextMonth');
-  if(prevBtn) prevBtn.disabled = current <= minDate;
-  if(nextBtn) nextBtn.disabled = current >= maxDate;
+  if(prevBtn) prevBtn.disabled = (currentYear < minY || (currentYear===minY && currentMonth<=minM));
+  if(nextBtn) nextBtn.disabled = (currentYear > maxY || (currentYear===maxY && currentMonth>=maxM));
 }
 
 // ──────────────────────────────────────────────
@@ -1574,19 +1572,6 @@ function generateShift(){
 
   setTimeout(()=>{
     STAFF.forEach(s=>{ if(!shiftData[s.id]) shiftData[s.id]={}; });
-
-    // ── 申請データをshiftDataに反映（有給・希望休）──
-    const monthStr = monthKey(y, m); // 'YYYY-MM'
-    requestData
-      .filter(r=>!r.cancelled && r.date && r.date.startsWith(monthStr))
-      .forEach(r=>{
-        if(!shiftData[r.staffId]) shiftData[r.staffId]={};
-        if(r.type==='paid'){
-          shiftData[r.staffId][r.date]='paid';
-        } else if(r.type==='wish'){
-          shiftData[r.staffId][r.date]='wish';
-        }
-      });
 
     const allDays=Array.from({length:days},(_,i)=>i+1);
     const workDays=allDays.filter(d=>!isOffDay(y,m,d));
@@ -3729,63 +3714,6 @@ function clearShift(){
 // ══════════════════════════════════════════════
 //  スタッフ管理（Firebase連携）
 // ══════════════════════════════════════════════
-// ══════════════════════════════════════════════
-//  休業日管理
-// ══════════════════════════════════════════════
-function openHolidayMgr(){
-  renderHolidayList();
-  // 今日の日付をデフォルトに
-  document.getElementById('newHolidayDate').value = dateStr(currentYear, currentMonth, 1);
-  document.getElementById('holidayMgrModal').classList.add('open');
-}
-
-function renderHolidayList(){
-  const el = document.getElementById('holidayList');
-  const all = Object.entries(customHolidays).sort(([a],[b])=>a.localeCompare(b));
-  if(all.length===0){
-    el.innerHTML = '<div style="font-size:.85rem;color:#aaa;text-align:center;padding:8px;">登録された休業日はありません</div>';
-    return;
-  }
-  el.innerHTML = `<div style="font-size:.8rem;color:#888;margin-bottom:6px;">登録済み ${all.length}件</div>` +
-    all.map(([ds, label])=>`
-    <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:10px;background:#FFF3F7;margin-bottom:5px;">
-      <span style="font-weight:700;flex:1;">${ds}</span>
-      <span style="font-size:.8rem;color:#888;">${label||'休業'}</span>
-      <button onclick="removeHoliday('${ds}')" style="font-size:.72rem;padding:3px 8px;border-radius:6px;border:1px solid #ffcdd2;background:#ffebee;color:#c62828;cursor:pointer;">削除</button>
-    </div>`).join('');
-}
-
-function addHoliday(){
-  const result = document.getElementById('holidayResult');
-  const ds = document.getElementById('newHolidayDate').value;
-  const label = document.getElementById('newHolidayLabel').value.trim() || '休業';
-  if(!ds){ result.textContent='日付を選択してください'; result.style.color='var(--red)'; return; }
-
-  customHolidays[ds] = label;
-  if(window._fb){
-    const { db, ref, set } = window._fb;
-    set(ref(db, 'custom_holidays/'+ds.replace(/-/g,'_')), label);
-  }
-  result.textContent = `✅ ${ds}（${label}）を追加しました`;
-  result.style.color = 'var(--teal)';
-  document.getElementById('newHolidayDate').value = '';
-  document.getElementById('newHolidayLabel').value = '';
-  setTimeout(()=>{ result.textContent=''; }, 3000);
-  renderHolidayList();
-  render();
-}
-
-function removeHoliday(ds){
-  if(!confirm(`${ds} を削除しますか？`)) return;
-  delete customHolidays[ds];
-  if(window._fb){
-    const { db, ref, remove } = window._fb;
-    remove(ref(db, 'custom_holidays/'+ds.replace(/-/g,'_')));
-  }
-  renderHolidayList();
-  render();
-}
-
 function openStaffMgr(){
   resetStaffForm();
   renderStaffMgrList();
@@ -4079,17 +4007,6 @@ let requestData = [];
 window.addEventListener('firebaseReady', ()=>{
   const { db, ref, onValue } = window._fb;
 
-  // カスタム休業日のリアルタイム同期
-  onValue(ref(db, 'custom_holidays'), (snapshot)=>{
-    const data = snapshot.val() || {};
-    // キーの _ を - に戻す（YYYY_MM_DD → YYYY-MM-DD）
-    customHolidays = {};
-    Object.entries(data).forEach(([k,v])=>{
-      customHolidays[k.replace(/_/g,'-')] = v;
-    });
-    if(currentUser?.role==='admin') render();
-  });
-
   // パスワードのリアルタイム同期
   onValue(ref(db, 'passwords'), (snapshot)=>{
     const data = snapshot.val();
@@ -4151,8 +4068,14 @@ function doLogin(){
   err.textContent = '';
 
   if(loginRole === 'admin'){
-    currentUser = { role:'admin', name:'管理者' };
-    showAdminApp();
+    const pass = document.getElementById('adminPass').value;
+    if(pass === 'admin'){
+      currentUser = { role:'admin', name:'管理者' };
+      showAdminApp();
+    } else {
+      err.textContent = 'パスワードが違います';
+      document.getElementById('adminPass').value = '';
+    }
   } else {
     const sid  = document.getElementById('staffSelect').value;
     const pass = document.getElementById('staffPass').value;
@@ -4191,6 +4114,7 @@ function doLogout(){
   document.getElementById('loginScreen').style.display = 'flex';
   document.getElementById('mainApp').style.display    = 'none';
   document.getElementById('staffScreen').style.display = 'none';
+  document.getElementById('adminPass').value  = '';
   document.getElementById('staffPass').value  = '';
   document.getElementById('staffSelect').value = '';
   document.getElementById('loginError').textContent = '';
@@ -4202,39 +4126,6 @@ function showAdminApp(){
   document.getElementById('mainApp').style.display      = 'block';
   render();
 }
-
-function goBackToPortal(){
-  window.location.href = 'https://kalmia-dc.github.io/portal/';
-}
-
-// URLパラメータ ?admin で管理画面に直接入る
-// URLパラメータ ?sid=staffId でスタッフ自動ログイン
-window.addEventListener('load', ()=>{
-  const params = new URLSearchParams(location.search);
-  const fromPortal = params.get('sid') || location.search.includes('admin');
-
-  if(location.search.includes('admin') || location.hash === '#admin'){
-    currentUser = { role:'admin', name:'管理者' };
-    showAdminApp();
-    if(fromPortal){
-      const btn = document.getElementById('adminBackToPortalBtn');
-      if(btn) btn.style.display = '';
-      const logout = document.querySelector('.admin-logout:not(#adminBackToPortalBtn)');
-      if(logout) logout.style.display = 'none';
-    }
-  } else if(params.get('sid')){
-    const sid = params.get('sid');
-    const s = STAFF.find(x=>x.id===sid);
-    if(s){
-      currentUser = { role:'staff', staffId:sid, name:s.name };
-      showStaffApp();
-      const btn = document.getElementById('backToPortalBtn');
-      if(btn) btn.style.display = '';
-      const logout = document.getElementById('staffLogoutBtn');
-      if(logout) logout.style.display = 'none';
-    }
-  }
-});
 
 function showStaffApp(){
   document.getElementById('loginScreen').style.display  = 'none';
