@@ -1472,6 +1472,11 @@ async function saveTask() {
       if (newStatus === '完了' && existing.googleTaskId) {
         await completeGoogleTask(existing.googleTaskId, existing.googleListId);
       }
+      // 完了になった場合にLINEワークス通知
+      if (newStatus === '完了' && existing.status !== '完了') {
+        const assigneeStr = data.assignees?.length ? data.assignees.join('・') : 'なし';
+        await sendNotify(`✅ タスクが完了しました\nタイトル：${data.title}\n担当者：${assigneeStr}\n完了者：${currentUser?.name||'不明'}\nhttps://kalmia-dc.github.io/portal/`);
+      }
       showToast('更新しました');
     } else {
       data.createdAt = Date.now();
