@@ -192,6 +192,36 @@ async function loadEvents() {
   state.events = snap.val() || {};
 }
 
+
+// ─── LINEワークス通知 ───────────────────────────────────
+const NOTIFY_URL = 'https://kalmia-notify.chibakenmin-sugihey.workers.dev';
+
+async function sendNotify(text) {
+  try {
+    await fetch(NOTIFY_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text })
+    });
+  } catch(e) { console.warn('通知失敗:', e); }
+}
+
+
+// ─── 回答期限前日通知 ───────────────────────────────────
+async function checkScheduleDeadlines() {
+  const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
+  const today    = new Date().toISOString().split('T')[0];
+  for (const ev of Object.values(state.events)) {
+    if (!ev.deadline) continue;
+    if (ev.decided) continue; // 決定済みはスキップ
+    if (ev.deadline === tomorrow) {
+      await sendNotify(`⏰ 【明日期限】日程調整「${ev.name}」の回答期限は明日です。\nポータルから回答してください。\nhttps://kalmia-dc.github.io/portal/`);
+    } else if (ev.deadline === today) {
+      await sendNotify(`⚠️ 【本日期限】日程調整「${ev.name}」の回答期限は今日です！\nポータルから回答してください。\nhttps://kalmia-dc.github.io/portal/`);
+    }
+  }
+}
+
 async function saveEvent(id, ev) {
   await set(ref(db, `${DB_PATH}/${id}`), ev);
 }
@@ -875,6 +905,9 @@ function attachNewEventHandlers() {
     state.newMembers  = new Set();
     render();
     toast('イベントを作成しました');
+    // LINEワークス通知
+    const dateList = dates.slice(0,3).map(d => d.replace(/-/g,'/')).join('・') + (dates.length > 3 ? `他${dates.length-3}件` : '');
+    await sendNotify(`🎉 日程調整が作成されました\nイベント：${name}\n候補日：${dateList}\n回答期限：${deadline.replace(/-/g,'/')}\nポータルから回答してください。\nhttps://kalmia-dc.github.io/portal/`);
   });
 }
 
@@ -946,6 +979,11 @@ window.toggleDecide = async (date) => {
   state.events[state.currentEventId].decided = val;
   render();
   toast(next.includes(date) ? `${fmtDate(date)}を決定に追加しました` : `${fmtDate(date)}の決定を取り消しました`);
+  // 決定日が追加された場合のみ通知
+  if (next.includes(date)) {
+    const evName = state.events[state.currentEventId]?.name || '';
+    await sendNotify(`✅ 日程が決定しました\nイベント：${evName}\n開催日：${fmtDate(date)}\nhttps://kalmia-dc.github.io/portal/`);
+  }
 };
 
 window.doUndecide = async () => {
@@ -1109,19 +1147,8 @@ window.doDeleteEvent = async () => {
   if (sid && p) {
     const staff = STAFF.find(s => s.id === sid);
     if (staff) {
-      // FirebaseからパスワードをfetchしてからLSにもフォールバック
-      let correct = staff.pin;
-      try {
-        const snap = await get(ref(db, `passwords/${sid}`));
-        if (snap.exists()) correct = snap.val();
-        else {
-          const stored = JSON.parse(localStorage.getItem('carmia_passwords') || '{}');
-          correct = stored[sid] || staff.pin;
-        }
-      } catch(e) {
-        const stored = JSON.parse(localStorage.getItem('carmia_passwords') || '{}');
-        correct = stored[sid] || staff.pin;
-      }
+      const stored  = JSON.parse(localStorage.getItem('carmia_passwords') || '{}');
+      const correct = stored[sid] || staff.pin;
       if (p === correct) {
         state.user = staff;
         state.view = 'main';
@@ -1131,6 +1158,9 @@ window.doDeleteEvent = async () => {
 
         // 期限切れ未回答を自動で×に
         await autoFillExpired(staff.id);
+
+        // 回答期限前日通知チェック
+        checkScheduleDeadlines();
 
         // 特定イベントへの直接遷移
         const evid = params.get('evid');
