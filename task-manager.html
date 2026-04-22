@@ -1139,9 +1139,15 @@ function init() {
     showNameBanner();
   }
   buildAssigneeGrid();
+  let deadlineChecked = false;
   onValue(ref(db, 'tasks'), snap => {
     tasks = snap.val() || {};
     render();
+    // 初回ロード時のみ期限チェック
+    if (!deadlineChecked && currentUser) {
+      deadlineChecked = true;
+      setTimeout(() => checkTaskDeadlines(), 1500);
+    }
   });
 }
 
@@ -1403,6 +1409,41 @@ function openModal(id = null) {
 function closeModal() { document.getElementById('overlay').classList.remove('open'); editingId = null; }
 function handleOverlayClick(e) { if (e.target===document.getElementById('overlay')) closeModal(); }
 
+
+// ─── LINEワークス通知 ───────────────────────────────
+const NOTIFY_URL = 'https://kalmia-notify.chibakenmin-sugihey.workers.dev';
+
+async function sendNotify(text) {
+  try {
+    await fetch(NOTIFY_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text })
+    });
+  } catch(e) { console.warn('通知失敗:', e); }
+}
+
+// タスク期限通知（ログイン時に呼ぶ）
+async function checkTaskDeadlines() {
+  const today = new Date().toISOString().split('T')[0];
+  const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
+  const snap = await get(ref(db, 'tasks'));
+  if (!snap.exists()) return;
+  const all = snap.val();
+  const userName = currentUser?.name;
+  if (!userName) return;
+
+  for (const t of Object.values(all)) {
+    if (t.status === '完了') continue;
+    if (!t.assignees?.includes(userName)) continue;
+    if (t.date === today) {
+      await sendNotify(`⚠️ 【本日期限】タスク「${t.title}」の期限は今日です！\nポータルで確認してください。\nhttps://kalmia-dc.github.io/portal/`);
+    } else if (t.date === tomorrow) {
+      await sendNotify(`📅 【明日期限】タスク「${t.title}」の期限は明日です。\nポータルで確認してください。\nhttps://kalmia-dc.github.io/portal/`);
+    }
+  }
+}
+
 async function saveTask() {
   if (saving) return;
   const title = document.getElementById('fTitle').value.trim();
@@ -1437,6 +1478,10 @@ async function saveTask() {
       data.createdBy = currentUser?.name||'不明';
       await push(ref(db, 'tasks'), data);
       showToast('追加しました');
+      // LINEワークス通知
+      const assigneeStr = data.assignees?.length ? data.assignees.join('・') : 'なし';
+      const dateStr = data.date ? `期限：${data.date}` : '期限なし';
+      await sendNotify(`📋 新しいタスクが作成されました\nタイトル：${data.title}\n担当者：${assigneeStr}\n${dateStr}\n作成者：${data.createdBy}\nhttps://kalmia-dc.github.io/portal/`);
     }
     closeModal();
   } catch(e) { showToast('保存に失敗しました'); }
