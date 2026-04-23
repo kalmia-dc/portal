@@ -549,31 +549,21 @@ const ON_SHIFTS = ['通常','遅出'];
 // ─────────────────────────────────────────
 let currentUser = null;
 
-async function doLogin() {
+function doLogin() {
   const sel  = document.getElementById('loginStaff').value;
   const pass = document.getElementById('loginPass').value;
   const err  = document.getElementById('loginError');
   if (!sel) { err.style.display='block'; err.textContent='スタッフを選択してください'; return; }
   // value形式: "名前|役職|初期PW|staffId"
   const [name, role, defaultPass, staffId] = sel.split('|');
-
-  // Firebaseからパスワードを取得して照合
-  try {
-    const snap = await get(ref(_db, `passwords/${staffId}`));
-    const correct = snap.exists() ? snap.val() : defaultPass;
-    if (pass !== correct) { err.style.display='block'; err.textContent='パスワードが違います'; return; }
-    currentUser = { name, role, pass, staffId };
-    sessionStorage.setItem('portalUser', JSON.stringify(currentUser));
-    err.style.display = 'none';
-    showApp();
-  } catch(e) {
-    // Firebase失敗時は初期パスワードで照合
-    if (pass !== defaultPass) { err.style.display='block'; err.textContent='パスワードが違います'; return; }
-    currentUser = { name, role, pass, staffId };
-    sessionStorage.setItem('portalUser', JSON.stringify(currentUser));
-    err.style.display = 'none';
-    showApp();
-  }
+  // パスワード照合：localStorage変更分を優先、なければ初期値
+  const storedPasswords = JSON.parse(localStorage.getItem('carmia_passwords') || '{}');
+  const correct = storedPasswords[staffId] || defaultPass;
+  if (pass !== correct) { err.style.display='block'; err.textContent='パスワードが違います'; return; }
+  currentUser = { name, role, pass, staffId };
+  sessionStorage.setItem('portalUser', JSON.stringify(currentUser));
+  err.style.display = 'none';
+  showApp();
 }
 
 function doLogout() {
@@ -605,13 +595,13 @@ function closePwModalIfBg(e) {
   if (e.target === document.getElementById('pwModal')) closePwModal();
 }
 
-async function submitPwChange() {
+function submitPwChange() {
   const oldVal = document.getElementById('pwOld').value;
   const newVal = document.getElementById('pwNew').value;
   const newVal2= document.getElementById('pwNew2').value;
   const msg    = document.getElementById('pwMsg');
 
-  // 現在パスワード取得（Firebase or 初期値）
+  // 現在パスワード取得（localStorageの変更分 or 初期値）
   const stored   = JSON.parse(localStorage.getItem('carmia_passwords') || '{}');
   const sid      = currentUser.staffId;
   const DEFAULTS = {
@@ -620,15 +610,7 @@ async function submitPwChange() {
     nozaki:'2005',   yamada:'2006',    hanowa:'2007',
     tamiya:'3001',   tanaka:'3002',    momo:'3003'
   };
-
-  // Firebaseから現在のパスワードを取得
-  let current = DEFAULTS[sid] || '';
-  try {
-    const snap = await get(ref(_db, `passwords/${sid}`));
-    if (snap.exists()) current = snap.val();
-  } catch(e) {
-    current = stored[sid] || DEFAULTS[sid] || '';
-  }
+  const current = stored[sid] || DEFAULTS[sid] || '';
 
   if (oldVal !== current) {
     msg.textContent = '現在のパスワードが違います';
@@ -647,10 +629,7 @@ async function submitPwChange() {
     msg.className = 'pw-msg err'; return;
   }
 
-  // FirebaseとlocalStorage両方に保存
-  try {
-    await set(ref(_db, `passwords/${sid}`), newVal);
-  } catch(e) { console.warn('Firebase保存失敗:', e); }
+  // 保存（シフトアプリと共有のlocalStorageキー）
   stored[sid] = newVal;
   localStorage.setItem('carmia_passwords', JSON.stringify(stored));
 
@@ -702,13 +681,9 @@ function goToScheduleApp(eventId) {
 
 function goToShiftApp(asAdmin = false) {
   if (!currentUser) return;
-  if (asAdmin) {
-    // 管理者パスワードをパラメータで渡す
-    window.open(`https://kalmia-dc.github.io/portal/shift.html?admin=1`, '_blank');
-  } else {
-    const params = new URLSearchParams({ sid: currentUser.staffId, p: currentUser.pass });
-    window.open(`https://kalmia-dc.github.io/portal/shift.html?${params}`, '_blank');
-  }
+  const params = new URLSearchParams({ sid: currentUser.staffId, p: currentUser.pass });
+  if (asAdmin) params.set('admin', '1');
+  window.location.href = `https://kalmia-dc.github.io/portal/shift.html?${params}`;
 }
 
 // ─────────────────────────────────────────
@@ -908,7 +883,7 @@ async function buildTodayStaff(now) {
 // Firebase（シフトアプリと同じプロジェクト）
 // ─────────────────────────────────────────
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getDatabase, ref, push, remove, onValue, get, set } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
+import { getDatabase, ref, push, remove, onValue, get } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 
 const firebaseConfig = {
   apiKey:            'AIzaSyDdMe7feUF6CKPHH0YIx7Suk-WnXtOYUu8',
