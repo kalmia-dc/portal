@@ -1437,9 +1437,9 @@ async function checkTaskDeadlines() {
     if (t.status === '完了') continue;
     if (!t.assignees?.includes(userName)) continue;
     if (t.date === today) {
-      await sendNotify(`⚠️ 【本日期限】タスク「${t.title}」の期限は今日です！\nポータルで確認してください。\nhttps://kalmia-dc.github.io/portal/`);
+      await sendNotify(`⚠️ 【本日期限】タスクの期限は今日です！\nポータルで確認してください。\nhttps://kalmia-dc.github.io/portal/`);
     } else if (t.date === tomorrow) {
-      await sendNotify(`📅 【明日期限】タスク「${t.title}」の期限は明日です。\nポータルで確認してください。\nhttps://kalmia-dc.github.io/portal/`);
+      await sendNotify(`📅 【明日期限】タスクの期限は明日です。\nポータルで確認してください。\nhttps://kalmia-dc.github.io/portal/`);
     }
   }
 }
@@ -1475,7 +1475,7 @@ async function saveTask() {
       // 完了になった場合にLINEワークス通知
       if (newStatus === '完了' && existing.status !== '完了') {
         const assigneeStr = data.assignees?.length ? data.assignees.join('・') : 'なし';
-        await sendNotify(`✅ タスクが完了しました\nタイトル：${data.title}\n担当者：${assigneeStr}\n完了者：${currentUser?.name||'不明'}\nhttps://kalmia-dc.github.io/portal/`);
+        await sendNotify(`✅ タスクが完了しました\n担当者：${assigneeStr}\n完了者：${currentUser?.name||'不明'}\nhttps://kalmia-dc.github.io/portal/`);
       }
       showToast('更新しました');
     } else {
@@ -1486,7 +1486,7 @@ async function saveTask() {
       // LINEワークス通知
       const assigneeStr = data.assignees?.length ? data.assignees.join('・') : 'なし';
       const dateStr = data.date ? `期限：${data.date}` : '期限なし';
-      await sendNotify(`📋 新しいタスクが作成されました\nタイトル：${data.title}\n担当者：${assigneeStr}\n${dateStr}\n作成者：${data.createdBy}\nhttps://kalmia-dc.github.io/portal/`);
+      await sendNotify(`📋 新しいタスクが作成されました\n担当者：${assigneeStr}\n${dateStr}\n作成者：${data.createdBy}\nhttps://kalmia-dc.github.io/portal/`);
     }
     closeModal();
   } catch(e) { showToast('保存に失敗しました'); }
