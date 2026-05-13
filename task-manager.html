@@ -811,7 +811,7 @@
 
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getDatabase, ref, push, set, remove, onValue }
+import { getDatabase, ref, push, set, remove, onValue, get }
   from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 
 // ===== FIREBASE =====
@@ -1403,6 +1403,47 @@ function openModal(id = null) {
 function closeModal() { document.getElementById('overlay').classList.remove('open'); editingId = null; }
 function handleOverlayClick(e) { if (e.target===document.getElementById('overlay')) closeModal(); }
 
+
+// ─── LINEワークス通知 ───────────────────────────────
+const NOTIFY_URL = 'https://kalmia-notify.chibakenmin-sugihey.workers.dev';
+
+async function sendNotify(text) {
+  try {
+    await fetch(NOTIFY_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text })
+    });
+  } catch(e) { console.warn('通知失敗:', e); }
+}
+
+// タスク期限通知（1日1回のみ）
+async function checkTaskDeadlines() {
+  const today    = new Date().toISOString().split('T')[0];
+  const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
+  const userName = currentUser?.name;
+  if (!userName) return;
+
+  // 今日すでに通知済みのタスクIDを記録
+  const storageKey = `task_notified_${today}`;
+  const notified = new Set(JSON.parse(localStorage.getItem(storageKey) || '[]'));
+
+  for (const [tid, t] of Object.entries(tasks)) {
+    if (t.status === '完了') continue;
+    if (!(t.assignees||[]).includes(userName)) continue;
+    if (notified.has(tid)) continue; // 今日すでに通知済み
+
+    if (t.date === today) {
+      await sendNotify(`⚠️ 【本日期限】タスクの期限は今日です！\nポータルで確認してください。\nhttps://kalmia-dc.github.io/portal/`);
+      notified.add(tid);
+    } else if (t.date === tomorrow) {
+      await sendNotify(`📅 【明日期限】タスクの期限は明日です。\nポータルで確認してください。\nhttps://kalmia-dc.github.io/portal/`);
+      notified.add(tid);
+    }
+  }
+  localStorage.setItem(storageKey, JSON.stringify([...notified]));
+}
+
 async function saveTask() {
   if (saving) return;
   const title = document.getElementById('fTitle').value.trim();
@@ -1433,12 +1474,21 @@ async function saveTask() {
       if (newStatus === '完了' && existing.googleTaskId) {
         await completeGoogleTask(existing.googleTaskId, existing.googleListId);
       }
+      // 完了になった場合にLINEワークス通知
+      if (newStatus === '完了' && existing.status !== '完了') {
+        const assigneeStr = data.assignees?.length ? data.assignees.join('・') : 'なし';
+        await sendNotify(`✅ タスクが完了しました\n担当者：${assigneeStr}\n完了者：${currentUser?.name||'不明'}\nhttps://kalmia-dc.github.io/portal/`);
+      }
       showToast('更新しました');
     } else {
       data.createdAt = Date.now();
       data.createdBy = currentUser?.name||'不明';
       await push(ref(db, 'tasks'), data);
       showToast('追加しました');
+      // LINEワークス通知
+      const assigneeStr = data.assignees?.length ? data.assignees.join('・') : 'なし';
+      const dateStr = data.date ? `期限：${data.date}` : '期限なし';
+      await sendNotify(`📋 新しいタスクが作成されました\n担当者：${assigneeStr}\n${dateStr}\n作成者：${data.createdBy}\nhttps://kalmia-dc.github.io/portal/`);
     }
     closeModal();
   } catch(e) { showToast('保存に失敗しました'); }
