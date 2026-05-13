@@ -1187,6 +1187,7 @@
       </button>
       <button class="btn btn-secondary btn-full" onclick="openApprovalModal()">📋 申請確認</button>
       <button class="btn btn-amber btn-full" onclick="exportCSV()">📥 CSVエクスポート</button>
+      <button class="btn btn-full" style="background:#e8f5e9;color:#2e7d32;font-weight:700;" onclick="confirmAndNotify()">📣 シフト確定・通知</button>
       <button class="btn btn-full" style="background:#E3F2FD;color:#1565C0;" onclick="printShift()">🖨️ 印刷</button>
       <button class="btn btn-full" style="background:#E8F5E9;color:#2E7D32;" onclick="openStaffMgr()">👥 スタッフ管理</button>
       <button class="btn btn-full" style="background:#FCE4EC;color:#880E4F;" onclick="openHolidayMgr()">🏥 休業日管理</button>
@@ -1407,6 +1408,38 @@ const today = new Date();
 let currentYear  = today.getFullYear();
 let currentMonth = today.getMonth(); // 0-indexed
 let shiftData = {};      // shiftData[staffId][dateStr] = shiftKey
+
+// ─── LINEワークス通知 ───────────────────────────────────
+async function confirmAndNotify() {
+  const monthNames = ['1','2','3','4','5','6','7','8','9','10','11','12'];
+  const m = monthNames[currentMonth];
+  const y = currentYear;
+
+  if (!confirm(`${y}年${m}月のシフトを確定してLINEワークスに通知しますか？`)) return;
+
+  // シフトを保存
+  saveCurrentShift();
+
+  // LINEワークス通知
+  const text = `📅 ${y}年${m}月のシフトが確定しました。\nポータルサイトで確認してください。\nhttps://kalmia-dc.github.io/portal/`;
+
+  try {
+    const res = await fetch('https://kalmia-notify.chibakenmin-sugihey.workers.dev', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text })
+    });
+    const data = await res.json();
+    if (data.ok && data.status === 200) {
+      alert(`✅ ${y}年${m}月のシフトを確定し、LINEワークスに通知しました！`);
+    } else {
+      alert('シフトは保存しましたが、通知に失敗しました。');
+    }
+  } catch(e) {
+    alert('シフトは保存しましたが、通知に失敗しました: ' + e.message);
+  }
+}
+
 // 複数月のシフトデータを保存
 let allShiftData = {};   // allShiftData['2026-03'][staffId][dateStr] = shiftKey
 
