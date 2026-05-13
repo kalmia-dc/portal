@@ -211,15 +211,27 @@ async function sendNotify(text) {
 async function checkScheduleDeadlines() {
   const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
   const today    = new Date().toISOString().split('T')[0];
-  for (const ev of Object.values(state.events)) {
+
+  // 今日すでに通知済みのイベントIDを記録（localStorageで管理）
+  const storageKey = `schedule_notified_${today}`;
+  const notified = new Set(JSON.parse(localStorage.getItem(storageKey) || '[]'));
+
+  for (const [evId, ev] of Object.entries(state.events)) {
     if (!ev.deadline) continue;
     if (ev.decided) continue; // 決定済みはスキップ
+    if (notified.has(evId)) continue; // 今日すでに通知済み
+
     if (ev.deadline === tomorrow) {
       await sendNotify(`⏰ 【明日期限】日程調整「${ev.name}」の回答期限は明日です。\nポータルから回答してください。\nhttps://kalmia-dc.github.io/portal/`);
+      notified.add(evId);
     } else if (ev.deadline === today) {
       await sendNotify(`⚠️ 【本日期限】日程調整「${ev.name}」の回答期限は今日です！\nポータルから回答してください。\nhttps://kalmia-dc.github.io/portal/`);
+      notified.add(evId);
     }
   }
+
+  // 通知済みリストを保存（翌日以降は自動的に別キーになるので蓄積しない）
+  localStorage.setItem(storageKey, JSON.stringify([...notified]));
 }
 
 async function saveEvent(id, ev) {
