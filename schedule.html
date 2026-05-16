@@ -222,10 +222,10 @@ async function checkScheduleDeadlines() {
     if (notified.has(evId)) continue; // 今日すでに通知済み
 
     if (ev.deadline === tomorrow) {
-      await sendNotify(`⏰ 【明日期限】日程調整「${ev.name}」の回答期限は明日です。\nポータルから回答してください。\nhttps://kalmia-dc.github.io/portal/`);
+      await sendNotify(`⏰ 【明日期限】日程調整「${ev.name}」の回答期限は明日です。\nポータルから回答してください。`);
       notified.add(evId);
     } else if (ev.deadline === today) {
-      await sendNotify(`⚠️ 【本日期限】日程調整「${ev.name}」の回答期限は今日です！\nポータルから回答してください。\nhttps://kalmia-dc.github.io/portal/`);
+      await sendNotify(`⚠️ 【本日期限】日程調整「${ev.name}」の回答期限は今日です！\nポータルから回答してください。`);
       notified.add(evId);
     }
   }
@@ -919,7 +919,7 @@ function attachNewEventHandlers() {
     toast('イベントを作成しました');
     // LINEワークス通知
     const dateList = dates.slice(0,3).map(d => d.replace(/-/g,'/')).join('・') + (dates.length > 3 ? `他${dates.length-3}件` : '');
-    await sendNotify(`🎉 日程調整が作成されました\nイベント：${name}\n候補日：${dateList}\n回答期限：${deadline.replace(/-/g,'/')}\nポータルから回答してください。\nhttps://kalmia-dc.github.io/portal/`);
+    await sendNotify(`🎉 日程調整が作成されました\nイベント：${name}\n候補日：${dateList}\n回答期限：${deadline.replace(/-/g,'/')}\nポータルから回答してください。`);
   });
 }
 
@@ -994,7 +994,7 @@ window.toggleDecide = async (date) => {
   // 決定日が追加された場合のみ通知
   if (next.includes(date)) {
     const evName = state.events[state.currentEventId]?.name || '';
-    await sendNotify(`✅ 日程が決定しました\nイベント：${evName}\n開催日：${fmtDate(date)}\nhttps://kalmia-dc.github.io/portal/`);
+    await sendNotify(`✅ 日程が決定しました\nイベント：${evName}\n開催日：${fmtDate(date)}`);
   }
 };
 

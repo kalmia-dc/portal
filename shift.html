@@ -1421,7 +1421,7 @@ async function confirmAndNotify() {
   saveCurrentShift();
 
   // LINEワークス通知
-  const text = `📅 ${y}年${m}月のシフトが確定しました。\nポータルサイトで確認してください。\nhttps://kalmia-dc.github.io/portal/`;
+  const text = `📅 ${y}年${m}月のシフトが確定しました。\nポータルサイトで確認してください。`;
 
   try {
     const res = await fetch('https://kalmia-notify.chibakenmin-sugihey.workers.dev', {
