@@ -476,9 +476,9 @@
 <!-- ボトムナビ（重複なし・4ツール＋マイページ） -->
 <nav class="bottom-nav">
   <button class="nav-item active" onclick="goToShiftApp()"><span class="nav-icon">📅</span><span class="nav-label">シフト</span></button>
-  <a class="nav-item" href="https://kalmia-dc.doctor-hr.com/" target="_blank"><span class="nav-icon">👨‍⚕️</span><span class="nav-label">DR-HR</span></a>
-  <a class="nav-item" href="https://ssl.jobcan.jp/employee" target="_blank"><span class="nav-icon">🕐</span><span class="nav-label">勤怠</span></a>
-  <a class="nav-item" href="https://apo-toolboxes.stransa.co.jp/calendar/" target="_blank"><span class="nav-icon">🗓️</span><span class="nav-label">予約</span></a>
+  <button class="nav-item" id="navSkillBtn" onclick="goToSkillApp()" style="display:none"><span class="nav-icon">📋</span><span class="nav-label">スキル</span></button>
+  <button class="nav-item" onclick="goToTaskApp()"><span class="nav-icon">✅</span><span class="nav-label">タスク</span></button>
+  <button class="nav-item" onclick="goToScheduleApp()"><span class="nav-icon">🎉</span><span class="nav-label">日程</span></button>
   <button class="nav-item" onclick="openPwModal()"><span class="nav-icon">👤</span><span class="nav-label">マイページ</span></button>
 </nav>
 
@@ -669,7 +669,7 @@ function goToSkillApp() {
 function goToTaskApp() {
   if (!currentUser) return;
   const params = new URLSearchParams({ sid: currentUser.staffId, name: currentUser.name });
-  window.location.href = `https://kalmia-dc.github.io/portal/task-manager.html?${params}`;
+  window.open(`https://kalmia-dc.github.io/portal/task-manager.html?${params}`, '_blank');
 }
 
 function goToScheduleApp(eventId) {
@@ -800,6 +800,8 @@ async function initApp() {
   adminBtn.style.display = ADMIN_STAFF.includes(u.staffId) ? 'block' : 'none';
   // スキルチェックは全スタッフ表示
   skillBtn.style.display = 'block';
+  const navSkillBtn = document.getElementById('navSkillBtn');
+  if (navSkillBtn) navSkillBtn.style.display = 'flex';
 
   // 今週カレンダー
   await buildWeek(now, u.name);
