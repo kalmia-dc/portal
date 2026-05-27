@@ -940,11 +940,11 @@ function renderNotices(data) {
     const dateStr = d ? `${d.getMonth()+1}/${d.getDate()}` : '';
     return `
     <div class="hero-notice-item">
-      <div class="hero-notice-text">${escHtml(n.text)}</div>
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-top:4px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
         ${dateStr ? `<span style="font-size:10px;color:var(--gray);">${dateStr}</span>` : '<span></span>'}
         <button class="hero-notice-del ${isAdmin?'visible':''}" onclick="deleteNotice('${key}')" title="削除">✕</button>
       </div>
+      <div class="hero-notice-text">${escHtml(n.text)}</div>
     </div>`;
   }).join('');
 }
