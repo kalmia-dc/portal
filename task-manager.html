@@ -1477,7 +1477,8 @@ async function saveTask() {
       // 完了になった場合にLINEワークス通知
       if (newStatus === '完了' && existing.status !== '完了') {
         const assigneeStr = data.assignees?.length ? data.assignees.join('・') : 'なし';
-        await sendNotify(`✅ タスクが完了しました\n担当者：${assigneeStr}\n完了者：${currentUser?.name||'不明'}`);
+        const createdBy = existing.createdBy || '不明';
+        await sendNotify(`✅ タスクが完了しました\n担当者：${assigneeStr}\n作成者：${createdBy}`);
       }
       showToast('更新しました');
     } else {
@@ -1544,7 +1545,8 @@ window.quickComplete = async function() {
     if (newStatus === '完了') {
       const t = tasks[editingId];
       const assigneeStr = (t.assignees||[]).join('・') || 'なし';
-      await sendNotify(`✅ タスクが完了しました\n担当者：${assigneeStr}\n完了者：${currentUser?.name||'不明'}`);
+      const createdBy = t.createdBy || '不明';
+      await sendNotify(`✅ タスクが完了しました\n担当者：${assigneeStr}\n作成者：${createdBy}`);
     }
     showToast(newStatus === '完了' ? '✅ 完了にしました' : '↩ 未着手に戻しました');
     closeModal();
@@ -1570,7 +1572,8 @@ window._toggleDone = async function(e, id) {
     if (newStatus === '完了') {
       const t = tasks[id];
       const assigneeStr = (t.assignees||[]).join('・') || 'なし';
-      await sendNotify(`✅ タスクが完了しました\n担当者：${assigneeStr}\n完了者：${currentUser?.name||'不明'}`);
+      const createdBy = t.createdBy || '不明';
+      await sendNotify(`✅ タスクが完了しました\n担当者：${assigneeStr}\n作成者：${createdBy}`);
     }
     showToast(newStatus === '完了' ? '✅ 完了にしました' : '↩ 未着手に戻しました');
   } catch(err) {
