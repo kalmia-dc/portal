@@ -1541,6 +1541,11 @@ window.quickComplete = async function() {
     if (newStatus === '完了' && tasks[editingId].googleTaskId) {
       await completeGoogleTask(tasks[editingId].googleTaskId, tasks[editingId].googleListId);
     }
+    if (newStatus === '完了') {
+      const t = tasks[editingId];
+      const assigneeStr = (t.assignees||[]).join('・') || 'なし';
+      await sendNotify(`✅ タスクが完了しました\n担当者：${assigneeStr}\n完了者：${currentUser?.name||'不明'}`);
+    }
     showToast(newStatus === '完了' ? '✅ 完了にしました' : '↩ 未着手に戻しました');
     closeModal();
   } catch(e) {
@@ -1561,6 +1566,11 @@ window._toggleDone = async function(e, id) {
     // Googleタスクと連携していれば完了を反映
     if (newStatus === '完了' && tasks[id].googleTaskId) {
       await completeGoogleTask(tasks[id].googleTaskId, tasks[id].googleListId);
+    }
+    if (newStatus === '完了') {
+      const t = tasks[id];
+      const assigneeStr = (t.assignees||[]).join('・') || 'なし';
+      await sendNotify(`✅ タスクが完了しました\n担当者：${assigneeStr}\n完了者：${currentUser?.name||'不明'}`);
     }
     showToast(newStatus === '完了' ? '✅ 完了にしました' : '↩ 未着手に戻しました');
   } catch(err) {
