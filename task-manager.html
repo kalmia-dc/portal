@@ -1431,7 +1431,8 @@ async function sendNotify(text) {
 async function cleanupCompletedExpired() {
   const today = new Date().toISOString().split('T')[0];
   for (const [tid, t] of Object.entries(tasks)) {
-    if (t.status === '完了' && t.date && t.date < today) {
+    // 完了済み かつ（期限なし OR 期限切れ）
+    if (t.status === '完了' && (!t.date || t.date < today)) {
       try {
         await remove(ref(db, `tasks/${tid}`));
       } catch(e) { console.warn('削除失敗:', e); }
