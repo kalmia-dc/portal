@@ -1192,7 +1192,14 @@ function getFiltered() {
     if (['未着手','進行中','完了','保留'].includes(currentFilter)) return t.status === currentFilter;
     if (['診療','経営','スタッフ','設備','その他'].includes(currentFilter)) return t.category === currentFilter;
     return true;
-  }).map(([id, t]) => ({ id, ...t }));
+  }).map(([id, t]) => ({ id, ...t }))
+    .sort((a, b) => {
+      // 期限なしは最後
+      if (!a.date && !b.date) return 0;
+      if (!a.date) return 1;
+      if (!b.date) return -1;
+      return a.date < b.date ? -1 : a.date > b.date ? 1 : 0;
+    });
 }
 
 // ===== RENDER =====
