@@ -1139,9 +1139,17 @@ function init() {
     showNameBanner();
   }
   buildAssigneeGrid();
+  let deadlineChecked = false;
   onValue(ref(db, 'tasks'), snap => {
     tasks = snap.val() || {};
     render();
+    if (!deadlineChecked && currentUser) {
+      deadlineChecked = true;
+      setTimeout(async () => {
+        await checkTaskDeadlines();
+        await cleanupCompletedExpired();
+      }, 1500);
+    }
   });
 }
 
@@ -1418,6 +1426,19 @@ async function sendNotify(text) {
 }
 
 // タスク期限通知（1日1回のみ）
+
+// ─── 完了済み・期限切れタスクの自動削除 ─────────────────
+async function cleanupCompletedExpired() {
+  const today = new Date().toISOString().split('T')[0];
+  for (const [tid, t] of Object.entries(tasks)) {
+    if (t.status === '完了' && t.date && t.date < today) {
+      try {
+        await remove(ref(db, `tasks/${tid}`));
+      } catch(e) { console.warn('削除失敗:', e); }
+    }
+  }
+}
+
 async function checkTaskDeadlines() {
   const today    = new Date().toISOString().split('T')[0];
   const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
@@ -1438,6 +1459,9 @@ async function checkTaskDeadlines() {
       notified.add(tid);
     } else if (t.date === tomorrow) {
       await sendNotify(`📅 【明日期限】タスクの期限は明日です。\nポータルで確認してください。`);
+      notified.add(tid);
+    } else if (t.date < today) {
+      await sendNotify(`🔴 【期限切れ】タスクの期限が過ぎています。\nポータルで確認してください。`);
       notified.add(tid);
     }
   }
