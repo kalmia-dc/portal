@@ -1454,14 +1454,16 @@ async function checkTaskDeadlines() {
     if (!(t.assignees||[]).includes(userName)) continue;
     if (notified.has(tid)) continue; // 今日すでに通知済み
 
+    const assigneeStr = (t.assignees||[]).join('・') || '未設定';
+    const createdBy = t.createdBy || '不明';
     if (t.date === today) {
-      await sendNotify(`⚠️ 【本日期限】タスクの期限は今日です！\nポータルで確認してください。`);
+      await sendNotify(`⚠️ 【本日期限】タスクの期限は今日です！\n担当者：${assigneeStr}\n作成者：${createdBy}`);
       notified.add(tid);
     } else if (t.date === tomorrow) {
-      await sendNotify(`📅 【明日期限】タスクの期限は明日です。\nポータルで確認してください。`);
+      await sendNotify(`📅 【明日期限】タスクの期限は明日です。\n担当者：${assigneeStr}\n作成者：${createdBy}`);
       notified.add(tid);
     } else if (t.date < today) {
-      await sendNotify(`🔴 【期限切れ】タスクの期限が過ぎています。\nポータルで確認してください。`);
+      await sendNotify(`🔴 【期限切れ】タスクの期限が過ぎています。\n担当者：${assigneeStr}\n作成者：${createdBy}`);
       notified.add(tid);
     }
   }
