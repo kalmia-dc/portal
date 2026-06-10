@@ -329,7 +329,7 @@
 
   table {
     width: 100%;
-    min-width: 1040px;
+    min-width: 1120px;
     border-collapse: collapse;
   }
 
@@ -573,7 +573,7 @@
 
   .history-grid {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(6, minmax(0, 1fr));
     gap: 8px;
   }
 
@@ -617,6 +617,7 @@
     .month-controls .field { grid-column: 1 / -1; }
     .toolbar { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .history-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   }
 
   @media (max-width: 560px) {
@@ -650,7 +651,7 @@
     <a class="back-link" href="./index.html" title="ポータルに戻る">←</a>
     <div class="title-wrap">
       <h1>目標管理</h1>
-      <div class="subtitle">月間目標値・3ヶ月平均・達成状況</div>
+      <div class="subtitle">月別入力・6ヶ月平均・半期達成状況</div>
     </div>
   </div>
   <div class="header-actions">
@@ -667,13 +668,13 @@
 
   <section class="month-board" aria-label="月次入力">
     <div>
-      <div class="section-kicker">月次入力</div>
-      <div class="month-title" id="monthActionTitle">対象月の目標</div>
+      <div class="section-kicker">半期集計・月次入力</div>
+      <div class="month-title" id="monthActionTitle">集計期間の目標</div>
       <div class="month-meta" id="monthActionSub">読み込み中</div>
     </div>
     <div class="month-controls">
       <div class="field">
-        <label for="monthFilter">対象月</label>
+        <label for="monthFilter">入力月</label>
         <input type="month" id="monthFilter" onchange="render()">
       </div>
       <button class="btn primary editor-only" id="seedBtn" onclick="seedTemplates()">この月の標準項目を作成</button>
@@ -714,7 +715,7 @@
   <section class="panel">
     <div class="panel-head">
       <div>
-        <div class="panel-title" id="listTitle">月間目標一覧</div>
+        <div class="panel-title" id="listTitle">半期目標一覧</div>
         <div class="panel-sub" id="listSub">読み込み中</div>
       </div>
     </div>
@@ -765,18 +766,24 @@
         </select>
       </div>
       <div class="field">
-        <label for="fCurrent">3ヶ月平均</label>
+        <label for="fCurrent">6ヶ月平均</label>
         <input type="text" id="fCurrent" inputmode="decimal" placeholder="例：31">
       </div>
       <div class="field full">
-        <label>3ヶ月平均の内訳</label>
+        <label>6ヶ月平均の内訳</label>
         <div class="history-grid">
           <input type="text" id="fHistoryLabel1" placeholder="月">
           <input type="text" id="fHistoryLabel2" placeholder="月">
           <input type="text" id="fHistoryLabel3" placeholder="月">
+          <input type="text" id="fHistoryLabel4" placeholder="月">
+          <input type="text" id="fHistoryLabel5" placeholder="月">
+          <input type="text" id="fHistoryLabel6" placeholder="月">
           <input type="text" id="fHistoryValue1" inputmode="decimal" placeholder="数値">
           <input type="text" id="fHistoryValue2" inputmode="decimal" placeholder="数値">
           <input type="text" id="fHistoryValue3" inputmode="decimal" placeholder="数値">
+          <input type="text" id="fHistoryValue4" inputmode="decimal" placeholder="数値">
+          <input type="text" id="fHistoryValue5" inputmode="decimal" placeholder="数値">
+          <input type="text" id="fHistoryValue6" inputmode="decimal" placeholder="数値">
         </div>
       </div>
       <div class="field">
@@ -827,6 +834,7 @@ const db = getDatabase(fbApp);
 const DB_PATH = 'monthlyGoals';
 const NOTIFY_URL = 'https://kalmia-notify.chibakenmin-sugihey.workers.dev';
 const EDITOR_IDS = ['sugihira', 'momo'];
+const HISTORY_MONTH_COUNT = 6;
 const STAFF_NAMES = {
   sugihira: '杉平院長',
   shimanaka: '嶋中',
@@ -946,12 +954,52 @@ function monthLabel(month) {
   return `${y}年${Number(m)}月`;
 }
 
+function monthShortLabel(month) {
+  if (!month || !month.includes('-')) return '-';
+  const [, m] = month.split('-');
+  return `${Number(m)}月`;
+}
+
+function addMonths(month, offset) {
+  const [year, monthNumber] = month.split('-').map(Number);
+  const date = new Date(year, monthNumber - 1 + offset, 1);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function halfYearStart(month) {
+  const [year, monthNumber] = month.split('-').map(Number);
+  if (monthNumber >= 6 && monthNumber <= 11) return `${year}-06`;
+  if (monthNumber === 12) return `${year}-12`;
+  return `${year - 1}-12`;
+}
+
+function periodMonths(month) {
+  const start = halfYearStart(month);
+  return Array.from({ length: 6 }, (_, index) => addMonths(start, index));
+}
+
+function periodLabel(month) {
+  const months = periodMonths(month);
+  return `${monthLabel(months[0])}〜${monthLabel(months[months.length - 1])}`;
+}
+
+function periodFileLabel(month) {
+  const months = periodMonths(month);
+  return `${months[0]}_${months[months.length - 1]}`;
+}
+
 function blankHistory() {
-  return [
-    { label: '', value: '' },
-    { label: '', value: '' },
-    { label: '', value: '' }
-  ];
+  return Array.from({ length: HISTORY_MONTH_COUNT }, () => ({ label: '', value: '' }));
+}
+
+function normalizeHistory(history = []) {
+  return blankHistory().map((blank, index) => {
+    const item = history[index] || {};
+    return {
+      label: item.label || blank.label,
+      value: item.value ?? blank.value
+    };
+  });
 }
 
 function parseNumber(value) {
@@ -1001,13 +1049,14 @@ function statusLabel(status) {
 
 function filteredGoals() {
   const month = document.getElementById('monthFilter').value || currentMonth();
+  const periodSet = new Set(periodMonths(month));
   const dept = document.getElementById('deptFilter').value;
   const status = document.getElementById('statusFilter').value;
   const query = document.getElementById('searchInput').value.trim().toLowerCase();
 
   return Object.entries(allGoals)
     .map(([id, goal]) => ({ id, ...goal }))
-    .filter(goal => (goal.month || '') === month)
+    .filter(goal => periodSet.has(goal.month || ''))
     .filter(goal => dept === 'all' || goal.department === dept)
     .filter(goal => status === 'all' || goalStatus(goal) === status)
     .filter(goal => {
@@ -1019,6 +1068,8 @@ function filteredGoals() {
         .includes(query);
     })
     .sort((a, b) => {
+      const monthDiff = (a.month || '').localeCompare(b.month || '');
+      if (monthDiff) return monthDiff;
       const depOrder = ['全体', '院長', '受付', 'DH', 'DA'];
       const depDiff = depOrder.indexOf(a.department) - depOrder.indexOf(b.department);
       if (depDiff) return depDiff;
@@ -1032,27 +1083,35 @@ function monthGoals(month) {
     .filter(goal => goal.month === month);
 }
 
+function periodGoals(month) {
+  const periodSet = new Set(periodMonths(month));
+  return Object.entries(allGoals)
+    .map(([id, goal]) => ({ id, ...goal }))
+    .filter(goal => periodSet.has(goal.month || ''));
+}
+
 function render() {
   const month = document.getElementById('monthFilter').value || currentMonth();
   const goals = filteredGoals();
-  const totalForMonth = monthGoals(month);
-  document.getElementById('listTitle').textContent = `${monthLabel(month)} 月間目標一覧`;
-  document.getElementById('listSub').textContent = `${goals.length}件表示 / 月内${totalForMonth.length}件`;
-  renderMonthBoard(month, totalForMonth);
-  renderStats(totalForMonth);
-  renderTable(goals, totalForMonth.length);
+  const goalsForPeriod = periodGoals(month);
+  const goalsForMonth = monthGoals(month);
+  document.getElementById('listTitle').textContent = `${periodLabel(month)} 半期目標一覧`;
+  document.getElementById('listSub').textContent = `${goals.length}件表示 / 期間内${goalsForPeriod.length}件`;
+  renderMonthBoard(month, goalsForPeriod, goalsForMonth);
+  renderStats(goalsForPeriod);
+  renderTable(goals, goalsForPeriod.length);
 }
 
-function renderMonthBoard(month, goals) {
-  const blank = goals.filter(g => goalStatus(g) === 'blank').length;
-  const done = goals.filter(g => goalStatus(g) === 'done').length;
+function renderMonthBoard(month, periodGoals, monthGoals) {
+  const blank = periodGoals.filter(g => goalStatus(g) === 'blank').length;
+  const done = periodGoals.filter(g => goalStatus(g) === 'done').length;
   const seedBtn = document.getElementById('seedBtn');
-  document.getElementById('monthActionTitle').textContent = `${monthLabel(month)}の目標`;
-  document.getElementById('monthActionSub').textContent = goals.length
-    ? `月内${goals.length}件 / 実績未入力${blank}件 / 達成${done}件`
-    : '月内の目標は未作成';
+  document.getElementById('monthActionTitle').textContent = periodLabel(month);
+  document.getElementById('monthActionSub').textContent = periodGoals.length
+    ? `入力月: ${monthLabel(month)} / この月${monthGoals.length}件 / 期間内${periodGoals.length}件 / 未入力${blank}件 / 達成${done}件`
+    : `入力月: ${monthLabel(month)} / この半期の目標は未作成`;
   if (seedBtn) {
-    seedBtn.textContent = goals.length ? '標準項目を追加' : 'この月の標準項目を作成';
+    seedBtn.textContent = monthGoals.length ? '標準項目を追加' : 'この月の標準項目を作成';
   }
 }
 
@@ -1065,7 +1124,7 @@ function renderStats(goals) {
   const avgRates = goals.map(calcRate).filter(v => v !== null);
   const avg = avgRates.length ? avgRates.reduce((a, b) => a + b, 0) / avgRates.length : null;
   document.getElementById('stats').innerHTML = `
-    <div class="stat"><div class="stat-label">月内項目</div><div class="stat-value">${total}</div><div class="stat-note">対象月の登録数</div></div>
+    <div class="stat"><div class="stat-label">半期項目</div><div class="stat-value">${total}</div><div class="stat-note">集計期間の登録数</div></div>
     <div class="stat"><div class="stat-label">実績未入力</div><div class="stat-value" style="color:var(--amber)">${blank}</div><div class="stat-note">入力待ちの項目</div></div>
     <div class="stat"><div class="stat-label">達成</div><div class="stat-value" style="color:var(--green)">${done}</div><div class="stat-note">達成率100%以上</div></div>
     <div class="stat"><div class="stat-label">要確認</div><div class="stat-value" style="color:var(--coral)">${behind}</div><div class="stat-note">あと少し ${close} / 平均 ${avg === null ? '-' : `${Math.round(avg)}%`}</div></div>`;
@@ -1076,8 +1135,8 @@ function renderTable(goals, monthTotal) {
   if (!monthTotal) {
     wrap.innerHTML = `
       <div class="empty">
-        <strong>この月の目標は未登録です</strong>
-        <div>管理者または院長は、この月の標準項目を作成できます。</div>
+        <strong>この半期の目標は未登録です</strong>
+        <div>管理者または院長は、入力月を選んで標準項目を作成できます。</div>
       </div>`;
     return;
   }
@@ -1096,8 +1155,9 @@ function renderTable(goals, monthTotal) {
       <thead>
         <tr>
           <th>項目</th>
+          <th>月</th>
           <th>担当</th>
-          <th>現状</th>
+          <th>6ヶ月平均</th>
           <th>目標</th>
           <th>実績</th>
           <th>達成率</th>
@@ -1128,6 +1188,7 @@ function goalRowHtml(goal) {
           ${goal.note ? `<div class="goal-detail">メモ: ${escapeHtml(goal.note)}</div>` : ''}
         </div>
       </td>
+      <td><span class="num">${escapeHtml(monthShortLabel(goal.month || ''))}</span></td>
       <td><span class="dept-pill ${deptClass}">${escapeHtml(goal.department || '-')}</span></td>
       <td><span class="num">${fmtNumber(goal.currentValue, goal.unit)}</span><div class="goal-detail">${escapeHtml(history)}</div></td>
       <td><span class="num">${fmtNumber(goal.targetValue, goal.unit)}</span><div class="goal-detail">${goal.direction === 'down' ? '少ないほど達成' : '多いほど達成'}</div></td>
@@ -1153,7 +1214,7 @@ function actionLabel(status) {
 }
 
 function historyText(goal) {
-  const items = [1, 2, 3].map(i => {
+  const items = Array.from({ length: HISTORY_MONTH_COUNT }, (_, index) => index + 1).map(i => {
     const label = goal.history?.[i - 1]?.label || '';
     const value = goal.history?.[i - 1]?.value ?? '';
     if (!label && value === '') return '';
@@ -1188,9 +1249,10 @@ window.openGoalModal = function(id = null) {
   setFormValue('fOwner', goal?.owner || currentUser.name);
   setFormValue('fNote', goal?.note || '');
 
-  for (let i = 1; i <= 3; i++) {
-    setFormValue(`fHistoryLabel${i}`, goal?.history?.[i - 1]?.label || '');
-    setFormValue(`fHistoryValue${i}`, goal?.history?.[i - 1]?.value ?? '');
+  const history = normalizeHistory(goal?.history || []);
+  for (let i = 1; i <= HISTORY_MONTH_COUNT; i++) {
+    setFormValue(`fHistoryLabel${i}`, history[i - 1]?.label || '');
+    setFormValue(`fHistoryValue${i}`, history[i - 1]?.value ?? '');
   }
 
   document.querySelectorAll('#goalModal input, #goalModal select, #goalModal textarea').forEach(el => {
@@ -1231,7 +1293,7 @@ window.saveGoal = async function() {
     actualValue: document.getElementById('fActual').value.trim(),
     owner: document.getElementById('fOwner').value.trim(),
     note: document.getElementById('fNote').value.trim(),
-    history: [1, 2, 3].map(i => ({
+    history: Array.from({ length: HISTORY_MONTH_COUNT }, (_, index) => index + 1).map(i => ({
       label: document.getElementById(`fHistoryLabel${i}`).value.trim(),
       value: document.getElementById(`fHistoryValue${i}`).value.trim()
     })),
@@ -1296,7 +1358,7 @@ window.seedTemplates = async function() {
         actualValue: '',
         owner: currentUser.name,
         note: '',
-        history: template.history?.map(item => ({ ...item })) || blankHistory(),
+        history: normalizeHistory(template.history),
         createdAt: Date.now(),
         createdBy: currentUser.name,
         updatedAt: Date.now(),
@@ -1310,23 +1372,24 @@ window.seedTemplates = async function() {
 };
 
 window.exportCSV = function() {
+  const month = document.getElementById('monthFilter').value || currentMonth();
   const goals = filteredGoals();
   if (!goals.length) { showToast('出力する目標がありません'); return; }
   const headers = [
-    '対象月','担当区分','項目','詳細','現状数値','3ヶ月内訳1','3ヶ月内訳2','3ヶ月内訳3',
+    '集計期間','対象月','担当区分','項目','詳細','6ヶ月平均',
+    '6ヶ月内訳1','6ヶ月内訳2','6ヶ月内訳3','6ヶ月内訳4','6ヶ月内訳5','6ヶ月内訳6',
     '目標数値','実績数値','達成率','状況','単位','判定方向','入力担当','メモ','更新者','更新日'
   ];
   const rows = goals.map(goal => {
     const rate = calcRate(goal);
     return [
+      periodLabel(month),
       goal.month,
       goal.department,
       goal.item,
       goal.detail,
       goal.currentValue,
-      historyCsvValue(goal, 0),
-      historyCsvValue(goal, 1),
-      historyCsvValue(goal, 2),
+      ...Array.from({ length: HISTORY_MONTH_COUNT }, (_, index) => historyCsvValue(goal, index)),
       goal.targetValue,
       goal.actualValue,
       rate === null ? '' : `${Math.round(rate)}%`,
@@ -1346,7 +1409,7 @@ window.exportCSV = function() {
   const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = `月間目標_${document.getElementById('monthFilter').value || currentMonth()}.csv`;
+  a.download = `半期目標_${periodFileLabel(month)}.csv`;
   a.click();
   URL.revokeObjectURL(a.href);
 };
@@ -1360,7 +1423,7 @@ function historyCsvValue(goal, index) {
 window.sendLineWorksSummary = async function() {
   if (!isEditor()) return;
   const month = document.getElementById('monthFilter').value || currentMonth();
-  const goals = monthGoals(month);
+  const goals = periodGoals(month);
   if (!goals.length) { showToast('通知する目標がありません'); return; }
   const done = goals.filter(g => goalStatus(g) === 'done');
   const behind = goals.filter(g => goalStatus(g) === 'behind');
@@ -1369,10 +1432,11 @@ window.sendLineWorksSummary = async function() {
   const avg = avgRates.length ? Math.round(avgRates.reduce((a, b) => a + b, 0) / avgRates.length) : '-';
   const lowLines = behind.slice(0, 5).map(g => {
     const rate = calcRate(g);
-    return `・${g.item}: ${rate === null ? '-' : Math.round(rate) + '%'}（実績 ${fmtNumber(g.actualValue, g.unit)} / 目標 ${fmtNumber(g.targetValue, g.unit)}）`;
+    return `・${monthShortLabel(g.month)} ${g.item}: ${rate === null ? '-' : Math.round(rate) + '%'}（実績 ${fmtNumber(g.actualValue, g.unit)} / 目標 ${fmtNumber(g.targetValue, g.unit)}）`;
   });
   const text = [
-    `【月間目標】${monthLabel(month)} 達成状況`,
+    `【半期目標】${periodLabel(month)} 達成状況`,
+    `入力月: ${monthLabel(month)}`,
     `登録: ${goals.length}件`,
     `達成: ${done.length}件`,
     `未達: ${behind.length}件`,
