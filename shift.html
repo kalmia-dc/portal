@@ -1173,7 +1173,7 @@
         <h4>勤務パターン</h4>
         <div class="rule-item"><span class="rule-dot"></span>通常: 8:30〜18:30 (実働9h)</div>
         <div class="rule-item"><span class="rule-dot"></span>遅出: 9:00〜18:30 (実働8.5h) ×月4回（有給1日につき2回減）</div>
-        <div class="rule-item"><span class="rule-dot"></span>常勤: 週40hを目標（160h優先・差異は警告）</div>
+        <div class="rule-item"><span class="rule-dot"></span>常勤: 週40hをなるべく超えないよう調整（160h優先・超過時警告）</div>
         <h4>自動補完</h4>
         <div class="rule-item"><span class="rule-dot"></span>人数不足日 → ハノワ(午後)自動生成</div>
         <div class="rule-item"><span class="rule-dot"></span>DA不足 → 百々を現場アサイン</div>
@@ -1714,13 +1714,138 @@ function weeklyHourSummary(id, y, m, days){
 function addWeeklyHourAlerts(staffList, y, m, days){
   staffList.forEach(s=>{
     const diffs=weeklyHourSummary(s.id,y,m,days).filter(w=>{
-      if(w.hours>TARGET_WEEKLY_HOURS+0.1) return true;
-      return w.isFullWeek && w.hours<TARGET_WEEKLY_HOURS-0.1;
+      return w.hours>TARGET_WEEKLY_HOURS+0.1;
     }).map(w=>w.label+' '+w.hours+'h');
     if(diffs.length){
-      addAlert('warn', s.name+': 週40h目標差異（'+diffs.join('、')+'）');
+      addAlert('warn', s.name+': 週40h超過（'+diffs.join('、')+'）');
     }
   });
+}
+function weekKeyForDateStr(ds){
+  const y=parseInt(ds.slice(0,4),10);
+  const m=parseInt(ds.slice(5,7),10)-1;
+  const d=parseInt(ds.slice(8,10),10);
+  const start=getMondayStart(new Date(y,m,d));
+  return dateStr(start.getFullYear(), start.getMonth(), start.getDate());
+}
+function weeklyOverageScore(id, y, m, days){
+  return weeklyHourSummary(id,y,m,days)
+    .reduce((sum,w)=>sum+Math.max(0,w.hours-TARGET_WEEKLY_HOURS),0);
+}
+function exceedsConsecutiveLimit(id, wds, maxDays){
+  let streak=0;
+  for(const ds of wds){
+    const k=shiftData[id]?.[ds]||'';
+    const working=id==='momo'
+      ? k==='early'||k==='late'||k==='admin'
+      : k==='early'||k==='late';
+    streak = working ? streak+1 : 0;
+    if(streak>maxDays) return true;
+  }
+  return false;
+}
+function receptionistCovered(ds){
+  return isWorking('tamiya',ds)||isWorking('tanaka',ds)||shiftData['momo']?.[ds]==='early';
+}
+function dailyCoverageOkAfterWeeklyBalance(ds, y, m){
+  const reasons=getHanowaCoverageReasons(ds,y,m);
+  const staffLineOk = (countCoreDrDh(ds)>=5 && countCoreDh(ds)+countFieldDa(ds)>=6) || reasons.length>0;
+  return staffLineOk && receptionistCovered(ds);
+}
+function isWeeklyMovableWork(s, ds, y, m){
+  const k=shiftData[s.id]?.[ds]||'';
+  if(s.id==='momo'){
+    if(k!=='admin'&&k!=='early'&&k!=='late') return false;
+    if(isSaturday(y,m,parseInt(ds.slice(8,10),10))) return false;
+    return true;
+  }
+  if(k!=='early'&&k!=='late') return false;
+  if(isSatMandatoryDay(s.id, ds)) return false;
+  return true;
+}
+function canReceiveWeeklyMove(s, ds, moveKey, y, m, wds, fullStaff){
+  if(shiftData[s.id]?.[ds]!=='off') return false;
+  const d=parseInt(ds.slice(8,10),10);
+  if(s.id==='momo'&&isSaturday(y,m,d)) return false;
+  if(moveKey==='late'){
+    if(isSaturday(y,m,d)) return false;
+    const lateToday=fullStaff.filter(x=>x.id!==s.id&&shiftData[x.id]?.[ds]==='late').length;
+    if(lateToday>=2) return false;
+  }
+  const old=shiftData[s.id][ds];
+  shiftData[s.id][ds]=moveKey;
+  const ok=!exceedsConsecutiveLimit(s.id, wds, s.id==='momo'?5:3);
+  shiftData[s.id][ds]=old;
+  return ok;
+}
+function balanceWeeklyHours(staffList, y, m, days, wds, fullStaff){
+  let moves=0;
+  staffList.forEach(s=>{
+    for(let pass=0; pass<20; pass++){
+      const beforeScore=weeklyOverageScore(s.id,y,m,days);
+      if(beforeScore<=0.1) break;
+      const maxBefore=Math.max(...weeklyHourSummary(s.id,y,m,days).map(w=>w.hours));
+
+      const weeks=weeklyHourSummary(s.id,y,m,days)
+        .filter(w=>w.hours>TARGET_WEEKLY_HOURS+0.1)
+        .sort((a,b)=>b.hours-a.hours);
+      let best=null;
+
+      for(const overWeek of weeks){
+        const sourceDays=wds.filter(ds=>{
+          return weekKeyForDateStr(ds)===overWeek.key && isWeeklyMovableWork(s,ds,y,m);
+        }).sort((a,b)=>{
+          return calcShiftHours(shiftData[s.id]?.[b]||'')-calcShiftHours(shiftData[s.id]?.[a]||'');
+        });
+
+        for(const sourceDs of sourceDays){
+          const moveKey=shiftData[s.id][sourceDs];
+          const moveHours=calcShiftHours(moveKey);
+          const targetDays=wds.filter(ds=>{
+            if(ds===sourceDs) return false;
+            if(weekKeyForDateStr(ds)===overWeek.key) return false;
+            if(!canReceiveWeeklyMove(s,ds,moveKey,y,m,wds,fullStaff)) return false;
+            const targetWeek=weeklyHourSummary(s.id,y,m,days).find(w=>w.key===weekKeyForDateStr(ds));
+            return targetWeek && targetWeek.hours < overWeek.hours-0.1;
+          });
+
+          for(const targetDs of targetDays){
+            const oldSource=shiftData[s.id][sourceDs];
+            const oldTarget=shiftData[s.id][targetDs];
+            shiftData[s.id][sourceDs]='off';
+            shiftData[s.id][targetDs]=moveKey;
+
+            const valid=dailyCoverageOkAfterWeeklyBalance(sourceDs,y,m) &&
+              dailyCoverageOkAfterWeeklyBalance(targetDs,y,m) &&
+              !exceedsConsecutiveLimit(s.id,wds,s.id==='momo'?5:3);
+            const afterScore=valid ? weeklyOverageScore(s.id,y,m,days) : beforeScore;
+            const maxAfter=valid
+              ? Math.max(...weeklyHourSummary(s.id,y,m,days).map(w=>w.hours))
+              : 999;
+
+            shiftData[s.id][sourceDs]=oldSource;
+            shiftData[s.id][targetDs]=oldTarget;
+
+            if(valid && (afterScore < beforeScore-0.1 ||
+              (Math.abs(afterScore-beforeScore)<=0.1 && maxAfter < maxBefore-0.1))){
+              const candidate={ sourceDs, targetDs, moveKey, afterScore, maxAfter };
+              if(!best || candidate.afterScore<best.afterScore-0.1 ||
+                (Math.abs(candidate.afterScore-best.afterScore)<=0.1 && candidate.maxAfter<best.maxAfter)){
+                best=candidate;
+              }
+            }
+          }
+        }
+      }
+
+      if(!best) break;
+      shiftData[s.id][best.sourceDs]='off';
+      shiftData[s.id][best.targetDs]=best.moveKey;
+      moves++;
+      addAlert('info', s.name+': 週40h超過調整（'+best.sourceDs.slice(5)+' → '+best.targetDs.slice(5)+'）');
+    }
+  });
+  return moves;
 }
 function countWorkdays(id, wds){
   return wds.filter(ds=>{
@@ -1744,18 +1869,28 @@ function normalizeLateCount(id, wds, y, m, fullStaff){
   let lateCount = wds.filter(ds=>shiftData[id]?.[ds]==='late').length;
 
   if(lateCount < target){
-    shuffle(wds.filter(ds=>{
+    const weekHours={};
+    weeklyHourSummary(id,y,m,daysInMonth(y,m)).forEach(w=>{ weekHours[w.key]=w.hours; });
+    wds.filter(ds=>{
       if(shiftData[id]?.[ds]!==sourceKey) return false;
       const d=parseInt(ds.slice(8,10));
       if(isSaturday(y,m,d)) return false;
       return fullStaff.filter(x=>x.id!==id&&shiftData[x.id]?.[ds]==='late').length<2;
-    })).slice(0,target-lateCount).forEach(ds=>{ shiftData[id][ds]='late'; });
+    }).sort((a,b)=>{
+      const wh=(weekHours[weekKeyForDateStr(b)]||0)-(weekHours[weekKeyForDateStr(a)]||0);
+      return Math.abs(wh)>0.1 ? wh : a.localeCompare(b);
+    }).slice(0,target-lateCount).forEach(ds=>{ shiftData[id][ds]='late'; });
   }
 
   lateCount = wds.filter(ds=>shiftData[id]?.[ds]==='late').length;
   if(lateCount > target){
+    const weekHours={};
+    weeklyHourSummary(id,y,m,daysInMonth(y,m)).forEach(w=>{ weekHours[w.key]=w.hours; });
     wds.filter(ds=>shiftData[id]?.[ds]==='late')
-      .sort((a,b)=>b.localeCompare(a))
+      .sort((a,b)=>{
+        const wh=(weekHours[weekKeyForDateStr(a)]||0)-(weekHours[weekKeyForDateStr(b)]||0);
+        return Math.abs(wh)>0.1 ? wh : b.localeCompare(a);
+      })
       .slice(0,lateCount-target)
       .forEach(ds=>{ shiftData[id][ds]=fallbackKey; });
   }
@@ -3289,6 +3424,7 @@ function generateShift(){
 
       if(!anyFixed) break;
     }
+    balanceWeeklyHours(STAFF.filter(s=>s.type==='full'), y, m, days, wds, fullStaff);
     syncHanowaCoverage(y, m, workDays, true);
 
     const checked=new Set();
