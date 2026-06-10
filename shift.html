@@ -843,6 +843,10 @@
       background:#FFE5CC !important; color:#7B3100 !important;
       -webkit-print-color-adjust:exact; print-color-adjust:exact;
     }
+    .print-hanowa {
+      background:#FCE4EC !important; color:#880E4F !important;
+      -webkit-print-color-adjust:exact; print-color-adjust:exact;
+    }
     .print-off {
       background:#F8F9FA !important; color:#AAAAAA !important;
       -webkit-print-color-adjust:exact; print-color-adjust:exact;
@@ -912,7 +916,6 @@
             <option value="yoshida">吉田</option>
             <option value="takagi">高木</option>
             <option value="matsumoto">松本</option>
-            <option value="nozaki">野崎</option>
             <option value="yamada">山田</option>
           </optgroup>
           <optgroup label="DA（歯科助手/事務）">
@@ -933,7 +936,7 @@
       🔑 <strong>初期パスワード</strong><br>
       <strong>DR</strong>　杉平:1001　嶋中:1002　保刈:1003　篠田:1004<br>
       <strong>DH</strong>　鶴田:2001　吉田:2002　高木:2003<br>
-      　　松本:2004　野崎:2005　山田:2006<br>
+      　　松本:2004　山田:2006<br>
       <strong>DA</strong>　田宮:3001　田中:3002　百々:3003<br><br>
       <span style="color:#888;font-size:.8rem;">パスワードはログイン後に変更してください</span>
     </div>
@@ -1169,9 +1172,9 @@
         <div class="rule-item"><span class="rule-dot"></span>受付は診療時間中必ず1名以上</div>
         <h4>勤務パターン</h4>
         <div class="rule-item"><span class="rule-dot"></span>通常: 8:30〜18:30 (実働9h)</div>
-        <div class="rule-item"><span class="rule-dot"></span>遅出: 9:00〜18:30 (実働8.5h) ×月4回</div>
+        <div class="rule-item"><span class="rule-dot"></span>遅出: 9:00〜18:30 (実働8.5h) ×月4回（有給1日につき2回減）</div>
         <h4>自動補完</h4>
-        <div class="rule-item"><span class="rule-dot"></span>DH不足 → ハノワ(午後)自動生成</div>
+        <div class="rule-item"><span class="rule-dot"></span>人数不足日 → ハノワ(午後)自動生成</div>
         <div class="rule-item"><span class="rule-dot"></span>DA不足 → 百々を現場アサイン</div>
         <div class="rule-item"><span class="rule-dot"></span>土曜受付空 → 百々の固定休を解除</div>
         <div class="rule-item"><span class="rule-dot"></span>有給は絶対優先・却下不可</div>
@@ -1375,7 +1378,6 @@ const DEFAULT_STAFF = [
   { id:'yoshida',  name:'吉田', role:'DH', type:'full' },
   { id:'takagi',   name:'高木', role:'DH', type:'full' },
   { id:'matsumoto',name:'松本', role:'DH', type:'full' },
-  { id:'nozaki',   name:'野崎', role:'DH', type:'full' },
   { id:'yamada',   name:'山田', role:'DH', type:'part', fixedDays:[1,2,4,5] },
   { id:'hanowa',   name:'ハノワ',role:'DH', type:'spot' },
   { id:'tamiya',   name:'田宮', role:'DA', type:'full', uketsuke:true, satFixed:true },
@@ -1420,6 +1422,16 @@ async function confirmAndNotify() {
   // シフトを保存
   saveCurrentShift();
 
+  // 確定通知と同時にロックを設定する
+  const key = monthKey(y, currentMonth);
+  const safeKey = firebaseSafeKey(key);
+  shiftLocks[key] = true;
+  if(window._fb){
+    const { db, ref, set } = window._fb;
+    set(ref(db, 'shift_locks/'+safeKey), true);
+  }
+  updateLockUI();
+
   // LINEワークス通知
   const text = `📅 ${y}年${m}月のシフトが確定しました。\nポータルサイトで確認してください。`;
 
@@ -1444,6 +1456,8 @@ async function confirmAndNotify() {
 let allShiftData = {};   // allShiftData['2026-03'][staffId][dateStr] = shiftKey
 
 function monthKey(y, m){ return `${y}-${String(m+1).padStart(2,'0')}`; }
+function firebaseSafeKey(key){ return key.replace(/-/g,'_'); }
+function restoreFirebaseKey(key){ return key.replace(/_/g,'-'); }
 function saveCurrentShift(){
   const key=monthKey(currentYear, currentMonth);
   allShiftData[key] = JSON.parse(JSON.stringify(shiftData));
@@ -1481,7 +1495,7 @@ function isOffDay(y,m,d){
 function isSaturday(y,m,d){ return new Date(y,m,d).getDay()===6; }
 
 // 土曜日固定出勤スタッフ（有給以外は必ず出勤）
-const SAT_MANDATORY=['shimanaka','tamiya','tanaka','yoshida','tsuruta','takagi','matsumoto','nozaki'];
+const SAT_MANDATORY=['shimanaka','tamiya','tanaka','yoshida','tsuruta','takagi','matsumoto'];
 function isSatMandatoryDay(sid, ds){
   // 土曜固定スタッフの土曜日かどうか
   if(!SAT_MANDATORY.includes(sid)) return false;
@@ -1573,6 +1587,79 @@ function isOff(id, ds){
   const k=shiftData[id]?.[ds]||'';
   return !k||k==='off'||k==='wish'||k==='paid'||k==='none';
 }
+function isRuleWorkingKey(k){
+  return k==='early'||k==='late'||k==='fixed'||k==='admin';
+}
+function isRuleWorking(id, ds){
+  const k=shiftData[id]?.[ds]||'';
+  return isRuleWorkingKey(k);
+}
+function countCoreDrDh(ds){
+  return STAFF.filter(s=>s.role==='DR'||(s.role==='DH'&&s.id!=='hanowa'))
+    .filter(s=>isRuleWorking(s.id,ds)).length;
+}
+function countCoreDh(ds){
+  return STAFF.filter(s=>s.role==='DH'&&s.id!=='hanowa')
+    .filter(s=>isRuleWorking(s.id,ds)).length;
+}
+function isFieldDa(id, ds){
+  const k=shiftData[id]?.[ds]||'';
+  if(id==='momo') return k==='early';
+  return isRuleWorkingKey(k);
+}
+function countFieldDa(ds){
+  return ['tamiya','tanaka','momo'].filter(id=>isFieldDa(id,ds)).length;
+}
+function isHanowaAssigned(ds){
+  return shiftData['hanowa']?.[ds]==='hanowa';
+}
+function countCoveredDrDh(ds){
+  const core=countCoreDrDh(ds);
+  if(isHanowaAssigned(ds)) return Math.max(core + 1, 5);
+  return core;
+}
+function countCoveredDhDa(ds){
+  const core=countCoreDh(ds) + countFieldDa(ds);
+  if(isHanowaAssigned(ds)) return Math.max(core + 1, 6);
+  return core;
+}
+function getHanowaCoverageReasons(ds, y, m){
+  const d=parseInt(ds.slice(8,10),10);
+  const dd=dow(y,m,d);
+  const reasons=[];
+
+  if(dd===4) reasons.push('木曜固定');
+  if(countCoreDrDh(ds)<5) reasons.push('DR+DH不足');
+  if(countCoreDh(ds)+countFieldDa(ds)<6) reasons.push('DH+DA不足');
+
+  const yamadaOn=shiftData['yamada']?.[ds]==='fixed'&&[1,2,4,5].includes(dd);
+  const dhAfter17=countCoreDh(ds)-(yamadaOn?1:0);
+  const drOn=STAFF.filter(s=>s.role==='DR').filter(s=>isRuleWorking(s.id,ds)).length;
+  if(drOn+dhAfter17<5) reasons.push('17時以降DH不足');
+
+  return reasons;
+}
+function syncHanowaCoverage(y, m, workDays, addAlerts){
+  if(!shiftData['hanowa']) shiftData['hanowa']={};
+  for(const d of workDays){
+    const ds=dateStr(y,m,d);
+    const reasons=getHanowaCoverageReasons(ds,y,m);
+    const wasAssigned=isHanowaAssigned(ds);
+
+    if(reasons.length){
+      shiftData['hanowa'][ds]='hanowa';
+      if(addAlerts&& !wasAssigned){
+        const dd=dow(y,m,d);
+        const label=dd===4&&reasons.length===1
+          ? ds+'(木): ハノワ固定出勤'
+          : ds+': 人数不足補填 → ハノワを配置（'+reasons.join('・')+'）';
+        addAlert('info', label);
+      }
+    } else {
+      shiftData['hanowa'][ds]='none';
+    }
+  }
+}
 function shuffle(arr){
   const a=[...arr];
   for(let i=a.length-1;i>0;i--){
@@ -1595,6 +1682,40 @@ function countWorkdays(id, wds){
     const k=shiftData[id]?.[ds]||'';
     return k==='early'||k==='late'||k==='paid'||k==='fixed';
   }).length;
+}
+function countPaidWorkdays(id, wds){
+  return wds.filter(ds=>shiftData[id]?.[ds]==='paid').length;
+}
+function targetLateCountForPaid(paidCount){
+  return Math.max(0, TARGET_LATE - paidCount * 2);
+}
+function targetLateCount(id, wds){
+  return targetLateCountForPaid(countPaidWorkdays(id, wds));
+}
+function normalizeLateCount(id, wds, y, m, fullStaff){
+  const target = targetLateCount(id, wds);
+  const sourceKey = id==='momo' ? 'admin' : 'early';
+  const fallbackKey = id==='momo' ? 'admin' : 'early';
+  let lateCount = wds.filter(ds=>shiftData[id]?.[ds]==='late').length;
+
+  if(lateCount < target){
+    shuffle(wds.filter(ds=>{
+      if(shiftData[id]?.[ds]!==sourceKey) return false;
+      const d=parseInt(ds.slice(8,10));
+      if(isSaturday(y,m,d)) return false;
+      return fullStaff.filter(x=>x.id!==id&&shiftData[x.id]?.[ds]==='late').length<2;
+    })).slice(0,target-lateCount).forEach(ds=>{ shiftData[id][ds]='late'; });
+  }
+
+  lateCount = wds.filter(ds=>shiftData[id]?.[ds]==='late').length;
+  if(lateCount > target){
+    wds.filter(ds=>shiftData[id]?.[ds]==='late')
+      .sort((a,b)=>b.localeCompare(a))
+      .slice(0,lateCount-target)
+      .forEach(ds=>{ shiftData[id][ds]=fallbackKey; });
+  }
+
+  return target;
 }
 
 // ──────────────────────────────────────────────
@@ -1619,19 +1740,26 @@ function generateShift(){
     // ── 申請データをshiftDataに反映（有給・希望休）──
     const monthStr = monthKey(y, m); // 'YYYY-MM'
     requestData
-      .filter(r=>!r.cancelled && r.date && r.date.startsWith(monthStr))
+      .filter(r=>!r.cancelled && r.status==='approved' && r.date && r.date.startsWith(monthStr))
       .forEach(r=>{
         if(!shiftData[r.staffId]) shiftData[r.staffId]={};
         if(r.type==='paid'){
           shiftData[r.staffId][r.date]='paid';
         } else if(r.type==='wish'){
           shiftData[r.staffId][r.date]='wish';
+        } else if(r.type==='work'){
+          shiftData[r.staffId][r.date]='early';
         }
       });
 
     const allDays=Array.from({length:days},(_,i)=>i+1);
     const workDays=allDays.filter(d=>!isOffDay(y,m,d));
     const wds=workDays.map(d=>dateStr(y,m,d)); // 診療日の日付文字列リスト
+
+    STAFF.filter(s=>s.type==='full').forEach(s=>{
+      const paidC=countPaidWorkdays(s.id,wds);
+      if(paidC>2) addAlert('warn', s.name+': 有給'+paidC+'日は18日勤務・有給8h・遅出調整だけでは160h調整不可');
+    });
 
     // ══ STEP 1: 有給・希望休・固定スタッフを先に確定 ══
     for(const d of allDays){
@@ -1704,8 +1832,7 @@ function generateShift(){
         }
         if(s.type==='full'){
           // 土曜固定出勤スタッフ: 土曜はearlyで設定（isSatMandatoryDayで削除保護）
-          const satMandatory=['shimanaka','tamiya','tanaka','yoshida','tsuruta','takagi','matsumoto','nozaki'];
-          if(sat && satMandatory.includes(s.id)){
+          if(sat && SAT_MANDATORY.includes(s.id)){
             if(cur==='paid'){ return; }
             shiftData[s.id][ds]='early'; return;
           }
@@ -1735,12 +1862,11 @@ function generateShift(){
       const offQ=needOff(s);
       if(offQ<=0) continue;
 
-      const satMandatory=['shimanaka','tamiya','tanaka','yoshida','tsuruta','takagi','matsumoto','nozaki'];
       const freeDays=wds.filter(ds=>{
         const k=shiftData[sid][ds];
         if(!k||k===''){
           // 土曜固定出勤スタッフは土曜日を公休候補から除外
-          if(satMandatory.includes(sid)&&isSaturday(y,m,parseInt(ds.slice(8,10)))) return false;
+          if(SAT_MANDATORY.includes(sid)&&isSaturday(y,m,parseInt(ds.slice(8,10)))) return false;
           return true;
         }
         return false;
@@ -1787,10 +1913,10 @@ function generateShift(){
             const tanakaOn=tanakaK!=='off'&&tanakaK!=='wish'&&tanakaK!=='none'&&tanakaK!=='paid';
             // 田宮：wishOnly、土曜のみ出勤確定。平日は申請がなければoff
             const tamiyaK=shiftData['tamiya']?.[ds]||'';
-            const tamiyaOn=tamiyaK==='early'||tamiyaK==='paid';
-            // 百々：空白（STEP2.5前）→出勤見込み、offなら不出勤
+            const tamiyaOn=isRuleWorkingKey(tamiyaK);
+            // 百々：空白（STEP2.5前）→出勤見込み、offなら不出勤。有給は現場人数に含めない
             const momoK=shiftData['momo']?.[ds]||'';
-            const momoOn=momoK!=='off'&&momoK!=='wish'&&momoK!=='none';
+            const momoOn=momoK===''||momoK==='early';
             const daExpected=(tanakaOn?1:0)+(tamiyaOn?1:0)+(momoOn?1:0);
 
             if(dhAfterOff+daExpected<6) continue;
@@ -1819,10 +1945,10 @@ function generateShift(){
       });
     }
 
-    // ══ STEP 2.1: 遅出シフト分配（月4回・1日最大2名） ══
+    // ══ STEP 2.1: 遅出シフト分配（有給日数に応じて回数調整・1日最大2名） ══
     fullStaff.forEach(s=>{
-      const paidC=wds.filter(ds=>shiftData[s.id][ds]==='paid').length;
-      const lateQ=Math.min(TARGET_LATE, TARGET_WORKDAYS-paidC);
+      const paidC=countPaidWorkdays(s.id,wds);
+      const lateQ=targetLateCountForPaid(paidC);
       const cands=shuffle(wds.filter(ds=>{
         const k=shiftData[s.id][ds];
         const d=parseInt(ds.slice(8,10));
@@ -1897,8 +2023,8 @@ function generateShift(){
         shiftData['momo'][ds] = chosenOff.has(ds) ? 'off' : 'admin';
       });
 
-      // 遅出4回を割り当て（adminの中からランダムに）
-      const momoLateQ = Math.min(TARGET_LATE, TARGET_WORKDAYS - momoPaidC);
+      // 遅出を割り当て（有給日数に応じて回数調整・adminの中からランダムに）
+      const momoLateQ = targetLateCountForPaid(momoPaidC);
       let lateN=0;
       shuffle(wds.filter(ds=>{
         if(shiftData['momo'][ds]!=='admin') return false;
@@ -1953,11 +2079,10 @@ function generateShift(){
 
       const s=STAFF.find(x=>x.id===sid);
 
-      const satMandatory2=['shimanaka','tamiya','tanaka','yoshida','tsuruta','takagi','matsumoto','nozaki'];
       const canTrim=(ds,k)=>{
         if(k!=='early'&&k!=='late') return false;
         // 土曜固定出勤スタッフは土曜日を削れない（有給以外）
-        if(satMandatory2.includes(sid) && isSaturday(y,m,parseInt(ds.slice(8,10)))){
+        if(SAT_MANDATORY.includes(sid) && isSaturday(y,m,parseInt(ds.slice(8,10)))){
           return false;
         }
         if(sid==='tamiya'||sid==='tanaka'){
@@ -1970,10 +2095,7 @@ function generateShift(){
         const dhNow=STAFF.filter(x=>x.role==='DH'&&x.id!=='hanowa'&&x.id!==sid)
           .filter(x=>isWorking(x.id,ds)).length;
         if(drNow+dhNow<5) return false;
-        const daNow=['tamiya','tanaka','momo'].filter(id=>{
-          const k2=shiftData[id]?.[ds]||'';
-          return k2==='early'||k2==='late'||k2==='admin'||k2==='paid';
-        }).length;
+        const daNow=countFieldDa(ds);
         return dhNow+daNow>=6;
       };
 
@@ -2066,10 +2188,7 @@ function generateShift(){
             .filter(x=>isWorking(x.id,ds)).length;
           if(drN+dhN<5) return false;
           // DH+DA≥6チェック（自分を除いたDH+DA）
-          const daN=['tamiya','tanaka','momo'].filter(id=>{
-            const k2=shiftData[id]?.[ds]||'';
-            return k2==='early'||k2==='late'||k2==='admin'||k2==='paid';
-          }).length;
+          const daN=countFieldDa(ds);
           if(dhN+daN<6) return false;
         }
         return true;
@@ -2291,11 +2410,8 @@ function generateShift(){
     // ══ STEP 6.5: DH+DA≥6 保証 ══
     for(const d of workDays){
       const ds=dateStr(y,m,d);
-      const dhOn=STAFF.filter(s=>s.role==='DH'&&s.id!=='hanowa').filter(s=>isWorking(s.id,ds)).length;
-      const daOn=(['tamiya','tanaka','momo']).filter(id=>{
-        const k=shiftData[id]?.[ds]||'';
-        return k==='early'||k==='late'||k==='admin'||k==='paid';
-      }).length;
+      const dhOn=countCoreDh(ds);
+      const daOn=countFieldDa(ds);
       if(dhOn+daOn>=6) continue;
 
       const need=6-(dhOn+daOn);
@@ -2364,8 +2480,7 @@ function generateShift(){
 
     for(const ds of wds){
       // DR+DH競合チェック（5名未満なら申請が遅い順に取り消す）
-      const drDhOn=STAFF.filter(s=>s.role==='DR'||s.role==='DH')
-        .filter(s=>isWorking(s.id,ds)).length;
+      const drDhOn=countCoreDrDh(ds);
       if(drDhOn<5){
         // 申請が遅い順（id降順）にソート → 遅い申請から取り消す
         const wishers=STAFF.filter(s=>
@@ -2399,31 +2514,8 @@ function generateShift(){
       }
     }
 
-    // ══ STEP 8: ハノワ配置（木曜必ず出勤・他は不足時のみ） ══
-    for(const d of workDays){
-      const ds=dateStr(y,m,d);
-      const dd=dow(y,m,d);
-      const isThu=dd===4; // 木曜日
-
-      if(isThu){
-        // 木曜は無条件で出勤
-        shiftData['hanowa'][ds]='hanowa';
-        addAlert('info', ds+'(木): ハノワ固定出勤');
-      } else {
-        // 木曜以外: 17時以降DH不足の場合のみ出勤
-        const dhAll=STAFF.filter(s=>s.role==='DH'&&s.id!=='hanowa')
-          .filter(s=>isWorking(s.id,ds)).length;
-        const yamadaOn=shiftData['yamada']?.[ds]==='fixed'&&[1,2,4,5].includes(dd);
-        const dhAfter17=dhAll-(yamadaOn?1:0);
-        const drOn=STAFF.filter(s=>s.role==='DR').filter(s=>isWorking(s.id,ds)).length;
-        if(dhAfter17+drOn<5){
-          shiftData['hanowa'][ds]='hanowa';
-          addAlert('info', ds+': 17時以降DH不足 → ハノワを配置');
-        } else {
-          shiftData['hanowa'][ds]='none';
-        }
-      }
-    }
+    // ══ STEP 8: ハノワ配置（木曜固定・不足日は全て補填） ══
+    syncHanowaCoverage(y, m, workDays, true);
 
     // ══ STEP 9: 最終強制クリーンアップ（18日・160h保証） ══
     fullStaff.forEach(s=>{
@@ -2467,7 +2559,7 @@ function generateShift(){
           if(total<=TARGET_WORKDAYS) break;
           shiftData[s.id][ds]='off'; total--;
         }
-        // earlyで足りない場合はlateも（ただし遅出4回を維持するため後で補正）
+        // earlyで足りない場合はlateも（遅出回数は後で有給日数に応じて補正）
         if(total>TARGET_WORKDAYS){
           const lateArr=wds.filter(ds=>canDel(ds,'late')&&canFill(ds)&&shiftData[s.id][ds]==='late')
             .sort((a,b)=>b.localeCompare(a));
@@ -2499,30 +2591,14 @@ function generateShift(){
         }
       }
 
-      // 遅出4回に補正（先に18日を確保してから）
-      const lateCount=wds.filter(ds=>shiftData[s.id][ds]==='late').length;
-      if(lateCount<TARGET_LATE){
-        const need=TARGET_LATE-lateCount;
-        const earlyDays=wds.filter(ds=>{
-          if(shiftData[s.id][ds]!=='early') return false;
-          const d=parseInt(ds.slice(8,10));
-          if(isSaturday(y,m,d)) return false;
-          return fullStaff.filter(x=>x.id!==s.id&&shiftData[x.id]?.[ds]==='late').length<2;
-        });
-        shuffle(earlyDays).slice(0,need).forEach(ds=>{ shiftData[s.id][ds]='late'; });
-      }
-      const lateFinal=wds.filter(ds=>shiftData[s.id][ds]==='late').length;
-      if(lateFinal>TARGET_LATE){
-        wds.filter(ds=>shiftData[s.id][ds]==='late')
-          .sort((a,b)=>b.localeCompare(a))
-          .slice(0,lateFinal-TARGET_LATE)
-          .forEach(ds=>{ shiftData[s.id][ds]='early'; });
-      }
+      // 遅出回数を有給日数に応じて補正（先に18日を確保してから）
+      normalizeLateCount(s.id, wds, y, m, fullStaff);
 
       // 最終時間確認・補正（必ず160hになるよう）
       {
         const h=calcHours(s.id,y,m,days);
-        if(h<TARGET_HOURS-0.1){
+        const paidC=countPaidWorkdays(s.id,wds);
+        if(h<TARGET_HOURS-0.1 && paidC<=2){
           // 公休を出勤に変えて補填
           const offArr2=wds.filter(ds=>shiftData[s.id][ds]==='off')
             .sort((a,b)=>a.localeCompare(b));
@@ -2534,7 +2610,7 @@ function generateShift(){
       }
     });
 
-    // 百々の最終クリーンアップ（late4回+admin14回=160h保証）
+    // 百々の最終クリーンアップ（有給日数に応じた遅出回数+adminで160h保証）
     {
       let momoTotal=wds.filter(ds=>{
         const k=shiftData['momo'][ds];
@@ -2561,13 +2637,7 @@ function generateShift(){
       }
 
       // late回数チェック・補正
-      const momoLate=wds.filter(ds=>shiftData['momo'][ds]==='late').length;
-      if(momoLate>TARGET_LATE){
-        wds.filter(ds=>shiftData['momo'][ds]==='late')
-          .sort((a,b)=>b.localeCompare(a))
-          .slice(0, momoLate-TARGET_LATE)
-          .forEach(ds=>{ shiftData['momo'][ds]='admin'; });
-      }
+      normalizeLateCount('momo', wds, y, m, fullStaff);
     }
 
     // ══ STEP 9.5: STEP9後の再DR+DHチェック（クリーンアップで崩れた場合を修正） ══
@@ -2597,9 +2667,9 @@ function generateShift(){
         if(swapCands.length>0){
           shiftData[target.id][swapCands[0]]='off';
           shiftData[target.id][ds]='early';
-          // late数を維持
+          // late数を有給日数に応じた目標まで維持
           const lateCnt=wds.filter(x=>shiftData[target.id][x]==='late').length;
-          if(lateCnt<TARGET_LATE && shiftData[target.id][ds]==='early'){
+          if(lateCnt<targetLateCount(target.id,wds) && shiftData[target.id][ds]==='early'){
             const lateToday=fullStaff.filter(x=>x.id!==target.id&&shiftData[x.id]?.[ds]==='late').length;
             if(lateToday<2) shiftData[target.id][ds]='late';
           }
@@ -2653,10 +2723,7 @@ function generateShift(){
                   const dhN=STAFF.filter(x=>x.role==='DH'&&x.id!=='hanowa'&&x.id!==s.id)
                     .filter(x=>isWorking(x.id,breakDs)).length;
                   if(drN+dhN<5) continue;
-                  const daN2=['tamiya','tanaka','momo'].filter(id=>{
-                    const k2=shiftData[id]?.[breakDs]||'';
-                    return k2==='early'||k2==='late'||k2==='admin'||k2==='paid';
-                  }).length;
+                  const daN2=countFieldDa(breakDs);
                   if(dhN+daN2<6) continue;
                 }
                 // 代替出勤日を探す
@@ -2749,10 +2816,7 @@ function generateShift(){
                   const dhN=STAFF.filter(x=>x.role==='DH'&&x.id!=='hanowa'&&x.id!==s.id)
                     .filter(x=>isWorking(x.id,breakDs)).length;
                   if(drN+dhN<5) continue;
-                  const daN2=['tamiya','tanaka','momo'].filter(id=>{
-                    const k2=shiftData[id]?.[breakDs]||'';
-                    return k2==='early'||k2==='late'||k2==='admin'||k2==='paid';
-                  }).length;
+                  const daN2=countFieldDa(breakDs);
                   if(dhN+daN2<6) continue;
                 }
                 if(s.id==='tamiya'||s.id==='tanaka'){
@@ -2790,29 +2854,13 @@ function generateShift(){
         if(!changed) break;
       }
 
-      // 遅出4回に最終補正
-      const lateCount=wds.filter(ds=>shiftData[s.id][ds]==='late').length;
-      if(lateCount<TARGET_LATE){
-        const need=TARGET_LATE-lateCount;
-        const earlyDays=wds.filter(ds=>{
-          if(shiftData[s.id][ds]!=='early') return false;
-          const d=parseInt(ds.slice(8,10));
-          if(isSaturday(y,m,d)) return false;
-          return fullStaff.filter(x=>x.id!==s.id&&shiftData[x.id]?.[ds]==='late').length<2;
-        });
-        shuffle(earlyDays).slice(0,need).forEach(ds=>{ shiftData[s.id][ds]='late'; });
-      }
-      if(lateCount>TARGET_LATE){
-        wds.filter(ds=>shiftData[s.id][ds]==='late')
-          .sort((a,b)=>b.localeCompare(a))
-          .slice(0,lateCount-TARGET_LATE)
-          .forEach(ds=>{ shiftData[s.id][ds]='early'; });
-      }
+      // 遅出回数を有給日数に応じて最終補正
+      normalizeLateCount(s.id, wds, y, m, fullStaff);
     });
 
     // ══ 最終強制補正: 絶対に18日・160hにする ══
     fullStaff.forEach(s=>{
-      // 何があっても最終的に18日・遅出4回を保証
+      // 何があっても最終的に18日・有給日数に応じた遅出回数を保証
       let total=countWorkdays(s.id,wds);
 
       // 不足 → 制約を一切無視して公休を出勤に変える
@@ -2845,24 +2893,8 @@ function generateShift(){
         }
       }
 
-      // 遅出4回に確定
-      const lateCount=wds.filter(ds=>shiftData[s.id][ds]==='late').length;
-      if(lateCount<TARGET_LATE){
-        const need=TARGET_LATE-lateCount;
-        const earlyDays=shuffle(wds.filter(ds=>{
-          if(shiftData[s.id][ds]!=='early') return false;
-          const d=parseInt(ds.slice(8,10));
-          if(isSaturday(y,m,d)) return false;
-          return fullStaff.filter(x=>x.id!==s.id&&shiftData[x.id]?.[ds]==='late').length<2;
-        }));
-        earlyDays.slice(0,need).forEach(ds=>{ shiftData[s.id][ds]='late'; });
-      }
-      if(lateCount>TARGET_LATE){
-        wds.filter(ds=>shiftData[s.id][ds]==='late')
-          .sort((a,b)=>b.localeCompare(a))
-          .slice(0,lateCount-TARGET_LATE)
-          .forEach(ds=>{ shiftData[s.id][ds]='early'; });
-      }
+      // 遅出回数を有給日数に応じて確定
+      normalizeLateCount(s.id, wds, y, m, fullStaff);
     });
 
     // ══ 百々の最終強制補正（160h保証） ══
@@ -2901,23 +2933,8 @@ function generateShift(){
         }
       }
 
-      // 遅出4回に確定
-      const momoLate=wds.filter(ds=>shiftData['momo'][ds]==='late').length;
-      if(momoLate<TARGET_LATE){
-        const need=TARGET_LATE-momoLate;
-        shuffle(wds.filter(ds=>{
-          if(shiftData['momo'][ds]!=='admin') return false;
-          const d=parseInt(ds.slice(8,10));
-          if(isSaturday(y,m,d)) return false;
-          return [...fullStaff].filter(x=>shiftData[x.id]?.[ds]==='late').length<2;
-        })).slice(0,need).forEach(ds=>{ shiftData['momo'][ds]='late'; });
-      }
-      if(momoLate>TARGET_LATE){
-        wds.filter(ds=>shiftData['momo'][ds]==='late')
-          .sort((a,b)=>b.localeCompare(a))
-          .slice(0,momoLate-TARGET_LATE)
-          .forEach(ds=>{ shiftData['momo'][ds]='admin'; });
-      }
+      // 遅出回数を有給日数に応じて確定
+      normalizeLateCount('momo', wds, y, m, fullStaff);
     }
 
     // ══ 最終連勤チェック（最終強制補正後） ══
@@ -2963,10 +2980,7 @@ function generateShift(){
                   const dhN=STAFF.filter(x=>x.role==='DH'&&x.id!=='hanowa'&&x.id!==s.id)
                     .filter(x=>isWorking(x.id,breakDs)).length;
                   if(drN+dhN<5) continue;
-                  const daN2=['tamiya','tanaka','momo'].filter(id=>{
-                    const k2=shiftData[id]?.[breakDs]||'';
-                    return k2==='early'||k2==='late'||k2==='admin'||k2==='paid';
-                  }).length;
+                  const daN2=countFieldDa(breakDs);
                   if(dhN+daN2<6) continue;
                 }
                 const altWork=wds.find(x=>{
@@ -3029,22 +3043,8 @@ function generateShift(){
             .forEach(ds=>{ if(total<TARGET_WORKDAYS){ shiftData[s.id][ds]='early'; total++; } });
         }
       }
-      // 遅出4回に確定
-      const lc=wds.filter(ds=>shiftData[s.id][ds]==='late').length;
-      if(lc<TARGET_LATE){
-        shuffle(wds.filter(ds=>{
-          if(shiftData[s.id][ds]!=='early') return false;
-          const d=parseInt(ds.slice(8,10));
-          if(isSaturday(y,m,d)) return false;
-          return fullStaff.filter(x=>x.id!==s.id&&shiftData[x.id]?.[ds]==='late').length<2;
-        })).slice(0,TARGET_LATE-lc).forEach(ds=>{ shiftData[s.id][ds]='late'; });
-      }
-      if(lc>TARGET_LATE){
-        wds.filter(ds=>shiftData[s.id][ds]==='late')
-          .sort((a,b)=>b.localeCompare(a))
-          .slice(0,lc-TARGET_LATE)
-          .forEach(ds=>{ shiftData[s.id][ds]='early'; });
-      }
+      // 遅出回数を有給日数に応じて確定
+      normalizeLateCount(s.id, wds, y, m, fullStaff);
     });
 
     // ══ 百々の最終統合補正（連勤5日以内 + 160h = 18日を同時保証） ══
@@ -3130,23 +3130,9 @@ function generateShift(){
       if(!changed) break;
     }
 
-    // 百々の遅出4回最終確定
+    // 百々の遅出回数を有給日数に応じて最終確定
     {
-      const ml=wds.filter(ds=>shiftData['momo'][ds]==='late').length;
-      if(ml<TARGET_LATE){
-        shuffle(wds.filter(ds=>{
-          if(shiftData['momo'][ds]!=='admin') return false;
-          const d=parseInt(ds.slice(8,10));
-          if(isSaturday(y,m,d)) return false;
-          return [...fullStaff].filter(x=>shiftData[x.id]?.[ds]==='late').length<2;
-        })).slice(0,TARGET_LATE-ml).forEach(ds=>{ shiftData['momo'][ds]='late'; });
-      }
-      if(ml>TARGET_LATE){
-        wds.filter(ds=>shiftData['momo'][ds]==='late')
-          .sort((a,b)=>b.localeCompare(a))
-          .slice(0,ml-TARGET_LATE)
-          .forEach(ds=>{ shiftData['momo'][ds]='admin'; });
-      }
+      normalizeLateCount('momo', wds, y, m, fullStaff);
     }
 
     // ══ 最終DH+DAチェック（全補正後にDH+DA≥6を再保証・時間超過補正と交互に実行） ══
@@ -3157,11 +3143,8 @@ function generateShift(){
         let fixed=false;
         for(const d of workDays){
           const ds=dateStr(y,m,d);
-          const dhOn=STAFF.filter(s=>s.role==='DH'&&s.id!=='hanowa').filter(s=>isWorking(s.id,ds)).length;
-          const daOn=(['tamiya','tanaka','momo']).filter(id=>{
-            const k=shiftData[id]?.[ds]||'';
-            return k==='early'||k==='late'||k==='admin'||k==='paid';
-          }).length;
+          const dhOn=countCoreDh(ds);
+          const daOn=countFieldDa(ds);
           if(dhOn+daOn>=6) continue;
 
           const need=6-(dhOn+daOn);
@@ -3255,43 +3238,31 @@ function generateShift(){
             shiftData[s.id][ds]='off'; total--;
           }
         }
-        // 遅出4回に最終確定
-        const lc=wds.filter(ds=>shiftData[s.id][ds]==='late').length;
-        if(lc<TARGET_LATE){
-          shuffle(wds.filter(ds=>{
-            if(shiftData[s.id][ds]!=='early') return false;
-            const d=parseInt(ds.slice(8,10));
-            if(isSaturday(y,m,d)) return false;
-            return fullStaff.filter(x=>x.id!==s.id&&shiftData[x.id]?.[ds]==='late').length<2;
-          })).slice(0,TARGET_LATE-lc).forEach(ds=>{ shiftData[s.id][ds]='late'; });
-        }
-        if(lc>TARGET_LATE){
-          wds.filter(ds=>shiftData[s.id][ds]==='late')
-            .sort((a,b)=>b.localeCompare(a))
-            .slice(0,lc-TARGET_LATE)
-            .forEach(ds=>{ shiftData[s.id][ds]='early'; });
-        }
+        // 遅出回数を有給日数に応じて最終確定
+        normalizeLateCount(s.id, wds, y, m, fullStaff);
       });
 
       if(!anyFixed) break;
     }
+    syncHanowaCoverage(y, m, workDays, true);
+
     const checked=new Set();
     for(const d of workDays){
       const ds=dateStr(y,m,d);
-      const drDhOn=STAFF.filter(s=>s.role==='DR'||s.role==='DH')
-        .filter(s=>isWorking(s.id,ds)).length;
+      const drDhOn=countCoveredDrDh(ds);
       if(drDhOn<5) addAlert('error', ds+': DR+DH='+drDhOn+'名(5名未満)');
 
       const uketsukeOk=isWorking('tamiya',ds)||isWorking('tanaka',ds)||
         shiftData['momo']?.[ds]==='early';
       if(!uketsukeOk) addAlert('error', ds+': 受付DA不在');
 
-      const dhF=STAFF.filter(s=>s.role==='DH').filter(s=>isWorking(s.id,ds)).length;
-      const daF=(isWorking('tamiya',ds)?1:0)+(isWorking('tanaka',ds)?1:0)
-        +(shiftData['momo']?.[ds]==='early'?1:0);
-      if(dhF+daF!==6){
-        if(dhF>=5&&daF===1) addAlert('info', ds+': DH兼任モード(DH'+dhF+'+DA'+daF+')');
-        else if(dhF+daF<6)  addAlert('warn', ds+': 現場='+(dhF+daF)+'名(目標6名)');
+      const dhF=countCoreDh(ds);
+      const daF=countFieldDa(ds);
+      const dhDaF=countCoveredDhDa(ds);
+      if(dhDaF<6){
+        addAlert('warn', ds+': 現場='+(dhDaF)+'名(目標6名)');
+      } else if(dhF>=5&&daF===1&&!isHanowaAssigned(ds)){
+        addAlert('info', ds+': DH兼任モード(DH'+dhF+'+DA'+daF+')');
       }
     }
     // 160h達成確認（1スタッフ1回のみ）
@@ -3317,7 +3288,7 @@ function printShift(){
 
   // 印刷対象スタッフ（役職グループ別）
   const drStaff=STAFF.filter(s=>s.role==='DR'&&(s.type==='full'||s.type==='director'||s.type==='part'));
-  const dhStaff=STAFF.filter(s=>s.role==='DH'&&s.type!=='spot');
+  const dhStaff=STAFF.filter(s=>s.role==='DH');
   const daStaff=STAFF.filter(s=>s.role==='DA'&&(s.type==='full'||s.type==='part'));
 
   // ヘッダー行生成
@@ -3349,7 +3320,7 @@ function printShift(){
       const cls2={
         'early':'print-early','late':'print-late','off':'print-off',
         'paid':'print-paid','wish':'print-wish','fixed':'print-early',
-        'admin':'print-early','none':'print-off-day'
+        'admin':'print-early','hanowa':'print-hanowa','none':'print-off-day'
       }[k]||'print-off';
       r+=`<td class="${cls2}">${label}</td>`;
     }
@@ -3367,6 +3338,7 @@ function printShift(){
       <div class="print-legend-item"><div class="print-legend-dot" style="background:#FFF3CD;border:1px solid #7B4F00"></div>遅出</div>
       <div class="print-legend-item"><div class="print-legend-dot" style="background:#E2D9F3;border:1px solid #4A148C"></div>有給</div>
       <div class="print-legend-item"><div class="print-legend-dot" style="background:#FFE5CC;border:1px solid #7B3100"></div>希望休</div>
+      <div class="print-legend-item"><div class="print-legend-dot" style="background:#FCE4EC;border:1px solid #880E4F"></div>HW</div>
       <div class="print-legend-item"><div class="print-legend-dot" style="background:#F8F9FA;border:1px solid #ccc"></div>公休</div>
     </div>`;
 
@@ -3378,8 +3350,9 @@ function printShift(){
       const off=isOffDay(y,m,d);
       if(off){ r+=`<td class="print-off-day" style="font-size:8pt;">─</td>`; continue; }
       const count=roleIds.filter(id=>{
-        const k=shiftData[id]?.[ds]||'';
-        return k==='early'||k==='late'||k==='fixed'||k==='admin'||k==='paid';
+        if(label==='DA人数') return isFieldDa(id, ds);
+        if(id==='hanowa') return isHanowaAssigned(ds);
+        return isRuleWorking(id, ds);
       }).length;
       const color=count>=5?'#155724':count>=3?'#004085':'#7B3100';
       r+=`<td style="font-size:9pt;font-weight:800;color:${color};background:#EEF2F7!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;">${count}</td>`;
@@ -3538,10 +3511,7 @@ function renderCalendar(){
     const el = document.createElement('div');
     el.className = 'cal-day-summary' + (off?' off-day':'');
     if(!off){
-      const drDh = STAFF.filter(s=>(s.role==='DR'||s.role==='DH')).filter(s=>{
-        const k = shiftData[s.id]?.[ds]||'';
-        return k==='early'||k==='late'||k==='fixed'||k==='hanowa';
-      }).length;
+      const drDh = countCoveredDrDh(ds);
       el.className += drDh >= 5 ? ' ok' : ' ng';
       el.textContent = drDh;
     } else {
@@ -3563,12 +3533,7 @@ function renderCalendar(){
     const el = document.createElement('div');
     el.className = 'cal-day-summary' + (off?' off-day':'');
     if(!off){
-      const dhN = STAFF.filter(s=>s.role==='DH'&&s.id!=='hanowa').filter(s=>isWorking(s.id,ds)).length;
-      const daN = ['tamiya','tanaka','momo'].filter(id=>{
-        const k=shiftData[id]?.[ds]||'';
-        return k==='early'||k==='late'||k==='admin'||k==='paid';
-      }).length;
-      const total = dhN + daN;
+      const total = countCoveredDhDa(ds);
       el.className += total >= 6 ? ' ok' : ' ng';
       el.textContent = total;
     } else {
@@ -3588,11 +3553,10 @@ function renderSummary(){
     if(isOffDay(y,m,d)) continue;
     workdays++;
 
-    const drDh = STAFF.filter(s=>(s.role==='DR'||s.role==='DH')).filter(s=>{
-      const k = shiftData[s.id]?.[ds]||'';
-      return k==='early'||k==='late'||k==='fixed'||k==='hanowa';
-    }).length;
+    const drDh = countCoveredDrDh(ds);
     if(drDh < 5) ngdays++;
+
+    if(countCoveredDhDa(ds) < 6) dhshort++;
 
     if(shiftData['hanowa']?.[ds]==='hanowa') hanowa++;
   }
@@ -3610,6 +3574,7 @@ function renderSummary(){
   document.getElementById('s-paid').textContent = `${paid}件`;
   document.getElementById('s-hanowa').textContent = `${hanowa}日`;
   document.getElementById('s-ngdays').className = ngdays>0?'value alert':'value';
+  document.getElementById('s-dhshort').className = dhshort>0?'value alert':'value';
 
   // sidebar summary
   const sl = document.getElementById('summaryList');
@@ -3751,10 +3716,20 @@ function exportCSV(){
 //  CLEAR
 // ──────────────────────────────────────────────
 function clearShift(){
+  if(isCurrentMonthLocked()){
+    alert('確定済みのシフトはクリアできません。確定を解除してから操作してください。');
+    return;
+  }
   if(!confirm('シフトデータをすべてクリアしますか？')) return;
+  const key = monthKey(currentYear, currentMonth);
   shiftData = {};
   wishData = {};
   paidData = {};
+  delete allShiftData[key];
+  if(window._fb){
+    const { db, ref, remove } = window._fb;
+    remove(ref(db, 'shifts/'+key));
+  }
   clearAlerts();
   render();
 }
@@ -3807,20 +3782,21 @@ function updateLockUI(){
 
 function toggleShiftLock(){
   const key = monthKey(currentYear, currentMonth);
+  const safeKey = firebaseSafeKey(key);
   const locked = isCurrentMonthLocked();
   if(locked){
     if(!confirm('確定を解除してシフト生成を再度許可しますか？')) return;
     delete shiftLocks[key];
     if(window._fb){
       const { db, ref, remove } = window._fb;
-      remove(ref(db, 'shift_locks/'+key.replace('-','_')));
+      remove(ref(db, 'shift_locks/'+safeKey));
     }
   } else {
     if(!confirm(`${currentYear}年${currentMonth+1}月のシフトを確定しますか？\n確定後はシフト自動生成ができなくなります。`)) return;
     shiftLocks[key] = true;
     if(window._fb){
       const { db, ref, set } = window._fb;
-      set(ref(db, 'shift_locks/'+key.replace('-','_')), true);
+      set(ref(db, 'shift_locks/'+safeKey), true);
     }
   }
   updateLockUI();
@@ -4103,7 +4079,8 @@ function renderApprovalList(){
       ${r.comment?`<span style="color:var(--muted);font-size:.75rem;flex:1;">${r.comment}</span>`:'<span style="flex:1"></span>'}
       ${`<span class="req-status ${r.status}">${statusLabel[r.status]||r.status}</span>`}
       ${r.status==='pending'&&r.type!=='paid'
-        ? `<button onclick="rejectReq('${r.id}')" style="font-size:.72rem;padding:3px 8px;border-radius:6px;border:1px solid #ffcdd2;background:#ffebee;color:#c62828;cursor:pointer;">却下</button>`
+        ? `<button onclick="approveReq('${r.id}')" style="font-size:.72rem;padding:3px 8px;border-radius:6px;border:1px solid #a5d6a7;background:#e8f5e9;color:#2e7d32;cursor:pointer;">承認</button>
+           <button onclick="rejectReq('${r.id}')" style="font-size:.72rem;padding:3px 8px;border-radius:6px;border:1px solid #ffcdd2;background:#ffebee;color:#c62828;cursor:pointer;">却下</button>`
         : r.status==='approved'&&r.type!=='paid'
         ? `<button onclick="rejectReq('${r.id}')" style="font-size:.72rem;padding:3px 8px;border-radius:6px;border:1px solid #ffcdd2;background:#ffebee;color:#c62828;cursor:pointer;">却下</button>`
         : ''}
@@ -4112,33 +4089,45 @@ function renderApprovalList(){
 }
 
 function approveReq(id){
-  const r = requestData.find(x=>x.id===id);
+  const r = requestData.find(x=>String(x.id)===String(id));
   if(!r) return;
   r.status = 'approved';
   if(!shiftData[r.staffId]) shiftData[r.staffId]={};
-  shiftData[r.staffId][r.date] = r.type;
   if(r.type==='paid'){
+    shiftData[r.staffId][r.date] = 'paid';
     if(!paidData[r.staffId]) paidData[r.staffId]={};
     paidData[r.staffId][r.date]=true;
+  } else if(r.type==='work'){
+    shiftData[r.staffId][r.date] = 'early';
+    if(!wishData[r.staffId]) wishData[r.staffId]={};
+    wishData[r.staffId][r.date]=true;
   } else {
+    shiftData[r.staffId][r.date] = 'wish';
     if(!wishData[r.staffId]) wishData[r.staffId]={};
     wishData[r.staffId][r.date]=true;
   }
-  addAlert('info',`${r.date} ${STAFF.find(s=>s.id===r.staffId)?.name}の${r.type==='paid'?'有給':'希望休'}を承認`);
+  addAlert('info',`${r.date} ${STAFF.find(s=>s.id===r.staffId)?.name}の${r.type==='paid'?'有給':r.type==='work'?'出勤希望':'希望休'}を承認`);
+  if(window._fb){
+    const { db, ref, set } = window._fb;
+    set(ref(db, 'requests/'+r.id), r);
+  }
+  saveCurrentShift();
   renderApprovalList(); render();
 }
 
 function rejectReq(id){
-  const r = requestData.find(x=>x.id===id);
+  const r = requestData.find(x=>String(x.id)===String(id));
   if(!r) return;
   if(r.type==='paid'){ alert('有給は却下できません'); return; }
   if(!confirm(`${STAFF.find(s=>s.id===r.staffId)?.name} の ${r.date} の申請を却下しますか？`)) return;
   r.status = 'rejected';
   r.cancelled = true;
   // shiftDataから削除
-  if(shiftData[r.staffId]?.[r.date]==='wish'||shiftData[r.staffId]?.[r.date]==='paid'){
+  const shiftKey = r.type==='work' ? 'early' : r.type;
+  if(shiftData[r.staffId]?.[r.date]===shiftKey){
     delete shiftData[r.staffId][r.date];
   }
+  if(r.type==='paid') delete paidData[r.staffId]?.[r.date];
   if(wishData[r.staffId]) delete wishData[r.staffId][r.date];
   // Firebaseに反映
   if(window._fb){
@@ -4159,7 +4148,7 @@ function rejectReq(id){
 const DEFAULT_PASSWORDS = {
   sugihira:'1001', shimanaka:'1002', hokari:'1003', shinoda:'1004',
   tsuruta:'2001',  yoshida:'2002',   takagi:'2003', matsumoto:'2004',
-  nozaki:'2005',   yamada:'2006',
+  yamada:'2006',
   tamiya:'3001',   tanaka:'3002',    momo:'3003',
 };
 // デフォルト＋localStorageの変更をマージ（Firebase同期前の暫定値）
@@ -4198,7 +4187,11 @@ window.addEventListener('firebaseReady', ()=>{
 
   // シフト確定ロック状態の同期
   onValue(ref(db, 'shift_locks'), (snapshot)=>{
-    shiftLocks = snapshot.val() || {};
+    const data = snapshot.val() || {};
+    shiftLocks = {};
+    Object.entries(data).forEach(([k, v])=>{
+      shiftLocks[restoreFirebaseKey(k)] = v;
+    });
     updateLockUI();
   });
 
@@ -4592,8 +4585,9 @@ function submitRequest(){
   }
 
   let count=0;
+  let shiftChanged = false;
   for(const date of targetDates){
-    const status = 'approved'; // 有給・希望休ともに即承認
+    const status = selectedReqType==='work' ? 'pending' : 'approved';
     const req = {
       id: Date.now()+count,
       staffId: currentUser.staffId,
@@ -4609,28 +4603,28 @@ function submitRequest(){
       set(ref(db, 'requests/'+req.id), req);
     }
 
-    if(!shiftData[currentUser.staffId]) shiftData[currentUser.staffId]={};
-    if(selectedReqType==='paid'){
-      shiftData[currentUser.staffId][date]='paid';
-      if(!paidData[currentUser.staffId]) paidData[currentUser.staffId]={};
-      paidData[currentUser.staffId][date]=true;
-    } else if(selectedReqType==='work'){
-      // 田宮の出勤申請: shiftDataに'early'を設定、wishDataに登録
-      shiftData[currentUser.staffId][date]='early';
-      if(!wishData[currentUser.staffId]) wishData[currentUser.staffId]={};
-      wishData[currentUser.staffId][date]=true;
-    } else {
-      shiftData[currentUser.staffId][date]='wish';
-      if(!wishData[currentUser.staffId]) wishData[currentUser.staffId]={};
-      wishData[currentUser.staffId][date]=true;
+    if(status === 'approved'){
+      if(!shiftData[currentUser.staffId]) shiftData[currentUser.staffId]={};
+      if(selectedReqType==='paid'){
+        shiftData[currentUser.staffId][date]='paid';
+        if(!paidData[currentUser.staffId]) paidData[currentUser.staffId]={};
+        paidData[currentUser.staffId][date]=true;
+        shiftChanged = true;
+      } else {
+        shiftData[currentUser.staffId][date]='wish';
+        if(!wishData[currentUser.staffId]) wishData[currentUser.staffId]={};
+        wishData[currentUser.staffId][date]=true;
+        shiftChanged = true;
+      }
     }
     count++;
   }
+  if(shiftChanged) saveCurrentShift();
 
   result.textContent = selectedReqType==='paid'
     ? `✅ ${targetDates.length}日分の有給申請を受け付けました（自動承認）`
     : selectedReqType==='work'
-    ? `✅ ${targetDates.length}日分の出勤希望を受け付けました（自動承認）`
+    ? `✅ ${targetDates.length}日分の出勤希望を受け付けました（承認待ち）`
     : `✅ ${targetDates.length}日分の希望休を受け付けました（自動承認）`;
   result.style.color='var(--teal)';
 
@@ -4645,7 +4639,7 @@ function submitRequest(){
 }
 
 function cancelRequest(id){
-  const r = requestData.find(x=>x.id===id);
+  const r = requestData.find(x=>String(x.id)===String(id));
   if(!r||r.cancelled) return;
   r.cancelled=true;
   r.status='cancelled';
@@ -4655,9 +4649,11 @@ function cancelRequest(id){
     set(ref(db, 'requests/'+r.id), r);
   }
   // シフトデータから削除
-  if(shiftData[r.staffId]?.[r.date]===r.type) delete shiftData[r.staffId][r.date];
+  const shiftKey = r.type==='work' ? 'early' : r.type;
+  if(shiftData[r.staffId]?.[r.date]===shiftKey) delete shiftData[r.staffId][r.date];
   if(r.type==='paid') delete paidData[r.staffId]?.[r.date];
   else delete wishData[r.staffId]?.[r.date];
+  saveCurrentShift();
   renderRequestHistory(currentUser.staffId);
   renderStaffMonthGrid(currentUser.staffId);
 }

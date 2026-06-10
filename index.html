@@ -312,9 +312,8 @@
         <option value="吉田|DH|2002|yoshida">吉田</option>
         <option value="高木|DH|2003|takagi">高木</option>
         <option value="松本|DH|2004|matsumoto">松本</option>
-        <option value="野崎|DH|2005|nozaki">野崎</option>
         <option value="山田|DH|2006|yamada">山田</option>
-
+      </optgroup>
       <optgroup label="DA（受付・歯科助手）">
         <option value="田宮|DA|3001|tamiya">田宮</option>
         <option value="田中|DA|3002|tanaka">田中</option>
@@ -328,8 +327,7 @@
     <div style="margin-top:16px;padding:12px;background:#f8f9fa;border-radius:12px;font-size:11px;color:#636e72;line-height:1.8;">
       🔑 <strong>初期パスワード</strong><br>
       <strong>DR</strong>　院長:1001　嶋中:1002　保刈:1003　篠田:1004<br>
-      <strong>DH</strong>　鶴田:2001　吉田:2002　高木:2003　松本:2004<br>
-      　　　野崎:2005　山田:2006<br>
+      <strong>DH</strong>　鶴田:2001　吉田:2002　高木:2003　松本:2004　山田:2006<br>
       <strong>DA</strong>　田宮:3001　田中:3002　百々:3003<br>
       <span style="color:#aaa;">※ シフトアプリで変更した場合は新パスワードを使用</span>
     </div>
@@ -527,7 +525,7 @@
 // ─────────────────────────────────────────
 const STAFF_ROLES = {
   DR: ['杉平','嶋中','保刈','篠田'],
-  DH: ['鶴田','吉田','高木','松本','野崎','山田','ハノワ'],
+  DH: ['鶴田','吉田','高木','松本','山田','ハノワ'],
   DA: ['田宮','田中','百々']
 };
 
@@ -607,7 +605,7 @@ function submitPwChange() {
   const DEFAULTS = {
     sugihira:'1001', shimanaka:'1002', hokari:'1003', shinoda:'1004',
     tsuruta:'2001',  yoshida:'2002',   takagi:'2003', matsumoto:'2004',
-    nozaki:'2005',   yamada:'2006',    hanowa:'2007',
+    yamada:'2006',    hanowa:'2007',
     tamiya:'3001',   tanaka:'3002',    momo:'3003'
   };
   const current = stored[sid] || DEFAULTS[sid] || '';
@@ -656,7 +654,7 @@ function goToSkillApp() {
   if (!currentUser) return;
   const roleMap = {
     sugihira:'DR', shimanaka:'DR', hokari:'DR', shinoda:'DR',
-    tsuruta:'DH', yoshida:'DH', takagi:'DH', matsumoto:'DH', nozaki:'DH', yamada:'DH',
+    tsuruta:'DH', yoshida:'DH', takagi:'DH', matsumoto:'DH', yamada:'DH',
     tamiya:'DA受付', tanaka:'DA受付', momo:'DA助手'
   };
   const role = roleMap[currentUser.staffId] || 'DH';
@@ -696,7 +694,7 @@ function goToShiftApp(asAdmin = false) {
 const STAFF_ID_MAP = {
   sugihira:'杉平', shimanaka:'嶋中', hokari:'保刈', shinoda:'篠田',
   tsuruta:'鶴田',  yoshida:'吉田',  takagi:'高木', matsumoto:'松本',
-  nozaki:'野崎',   yamada:'山田',   hanowa:'ハノワ',
+  yamada:'山田',   hanowa:'ハノワ',
   tamiya:'田宮',   tanaka:'田中',   momo:'百々'
 };
 // staffName → staffId マップ（逆引き）
