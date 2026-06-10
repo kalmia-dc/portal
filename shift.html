@@ -2073,6 +2073,192 @@ function normalizeLateCount(id, wds, y, m, fullStaff){
 // ──────────────────────────────────────────────
 //  AUTO GENERATE SHIFT
 // ──────────────────────────────────────────────
+function hoursToUnits(hours){ return Math.round(hours*2); }
+function staffHourUnits(id, y, m, days){ return hoursToUnits(calcHours(id,y,m,days)); }
+function canConvertToLateForExact(id, ds, y, m, fullStaff){
+  const k=shiftData[id]?.[ds]||'';
+  if(k!=='early'&&k!=='admin') return false;
+  const d=parseInt(ds.slice(8,10),10);
+  if(isSaturday(y,m,d)) return false;
+  return fullStaff.filter(s=>s.id!==id&&shiftData[s.id]?.[ds]==='late').length<2;
+}
+function canSetForExactHours(s, ds, key, y, m, wds, fullStaff){
+  if(shiftData[s.id]?.[ds]!=='off') return false;
+  const d=parseInt(ds.slice(8,10),10);
+  if(s.id==='momo'&&isSaturday(y,m,d)) return false;
+  if(key==='late'){
+    if(isSaturday(y,m,d)) return false;
+    if(fullStaff.filter(x=>x.id!==s.id&&shiftData[x.id]?.[ds]==='late').length>=2) return false;
+  }
+  return canSetWithoutHardConsecutive(s.id,wds,ds,key);
+}
+function canRemoveForExactHours(s, ds, y, m){
+  const k=shiftData[s.id]?.[ds]||'';
+  if(k!=='early'&&k!=='late'&&k!=='admin') return false;
+  if(s.id!=='momo'&&isSatMandatoryDay(s.id, ds)) return false;
+  const old=shiftData[s.id][ds];
+  shiftData[s.id][ds]='off';
+  const ok=dailyCoverageOkAfterWeeklyBalance(ds,y,m);
+  shiftData[s.id][ds]=old;
+  return ok;
+}
+function trimStaffToExactHours(s, y, m, days, wds){
+  const targetUnits=hoursToUnits(TARGET_HOURS);
+  for(let pass=0; pass<20; pass++){
+    const current=staffHourUnits(s.id,y,m,days);
+    const excess=current-targetUnits;
+    if(excess<=0) return current===targetUnits;
+
+    const removable=wds.map(ds=>{
+      const k=shiftData[s.id]?.[ds]||'';
+      return { ds, k, units:hoursToUnits(calcShiftHours(k)) };
+    }).filter(x=>x.units>0&&x.units<=excess&&canRemoveForExactHours(s,x.ds,y,m))
+      .sort((a,b)=>{
+        const exact=(b.units===excess?1:0)-(a.units===excess?1:0);
+        if(exact) return exact;
+        const unit=b.units-a.units;
+        return unit||b.ds.localeCompare(a.ds);
+      });
+
+    if(removable.length){
+      shiftData[s.id][removable[0].ds]='off';
+      continue;
+    }
+
+    if(excess>=1){
+      const convert=wds.filter(ds=>canConvertToLateForExact(s.id,ds,y,m,STAFF.filter(x=>x.type==='full')))
+        .sort((a,b)=>b.localeCompare(a))[0];
+      if(convert){
+        shiftData[s.id][convert]='late';
+        continue;
+      }
+    }
+    return false;
+  }
+  return staffHourUnits(s.id,y,m,days)===targetUnits;
+}
+function fillStaffToExactHours(s, y, m, days, wds, fullStaff){
+  const targetUnits=hoursToUnits(TARGET_HOURS);
+  for(let pass=0; pass<20; pass++){
+    const current=staffHourUnits(s.id,y,m,days);
+    const deficit=targetUnits-current;
+    if(deficit<=0) return current===targetUnits;
+
+    if(deficit===1){
+      const convert=wds.filter(ds=>{
+        const k=shiftData[s.id]?.[ds]||'';
+        if(k!=='late') return false;
+        return s.id==='momo'||!isSatMandatoryDay(s.id,ds);
+      }).sort((a,b)=>a.localeCompare(b))[0];
+      if(convert){
+        shiftData[s.id][convert]=s.id==='momo'?'admin':'early';
+        continue;
+      }
+    }
+
+    const addKey = deficit===17 ? 'late' : (s.id==='momo'?'admin':'early');
+    const addUnits=hoursToUnits(calcShiftHours(addKey));
+    if(addUnits>deficit) return false;
+    const addDay=wds.filter(ds=>canSetForExactHours(s,ds,addKey,y,m,wds,fullStaff))
+      .sort((a,b)=>a.localeCompare(b))[0];
+    if(addDay){
+      shiftData[s.id][addDay]=addKey;
+      continue;
+    }
+    return false;
+  }
+  return staffHourUnits(s.id,y,m,days)===targetUnits;
+}
+function enforceExactHours(staffList, y, m, days, wds, workDays){
+  const fullStaffForLate=STAFF.filter(s=>s.type==='full');
+  staffList.forEach(s=>normalizeLateCount(s.id,wds,y,m,fullStaffForLate));
+
+  for(let pass=0; pass<8; pass++){
+    let changed=false;
+    for(const s of staffList){
+      const before=staffHourUnits(s.id,y,m,days);
+      if(before>hoursToUnits(TARGET_HOURS)){
+        trimStaffToExactHours(s,y,m,days,wds);
+      } else if(before<hoursToUnits(TARGET_HOURS)){
+        fillStaffToExactHours(s,y,m,days,wds,fullStaffForLate);
+      }
+      normalizeLateCount(s.id,wds,y,m,fullStaffForLate);
+      const after=staffHourUnits(s.id,y,m,days);
+      if(after!==before) changed=true;
+    }
+    syncHanowaCoverage(y,m,workDays,false);
+    if(!changed) break;
+  }
+}
+function addExactHourAlerts(staffList, y, m, days){
+  staffList.forEach(s=>{
+    const h=calcHours(s.id,y,m,days);
+    if(Math.abs(h-TARGET_HOURS)>0.1){
+      addAlert('error', s.name+': '+h+'h 160h厳守NG');
+    }
+  });
+}
+function equivalentExactKeys(s, oldKey){
+  const units=hoursToUnits(calcShiftHours(oldKey));
+  if(units===18) return s.id==='momo' ? ['admin','early'] : ['early'];
+  if(units===17) return ['late'];
+  return [];
+}
+function repairHardConsecutiveExact(staffList, y, m, days, wds, workDays){
+  const fullStaffForLate=STAFF.filter(s=>s.type==='full');
+  for(let pass=0; pass<20; pass++){
+    let changed=false;
+    for(const s of staffList){
+      if(consecutiveStats(s.id,wds).max<=maxConsecutiveLimit(s.id)) continue;
+
+      const removeDays=wds.filter(ds=>{
+        const k=shiftData[s.id]?.[ds]||'';
+        return isConsecutiveWorkKey(s.id,k)&&canRemoveForExactHours(s,ds,y,m);
+      }).sort((a,b)=>{
+        const sa=s.id==='momo'&&isSaturday(y,m,parseInt(a.slice(8,10),10)) ? 0 : 1;
+        const sb=s.id==='momo'&&isSaturday(y,m,parseInt(b.slice(8,10),10)) ? 0 : 1;
+        return sa-sb||b.localeCompare(a);
+      });
+
+      for(const removeDs of removeDays){
+        const oldKey=shiftData[s.id][removeDs];
+        const keys=equivalentExactKeys(s,oldKey);
+        if(!keys.length) continue;
+
+        for(const addKey of keys){
+          const addDays=wds.filter(ds=>{
+            if(ds===removeDs) return false;
+            shiftData[s.id][removeDs]='off';
+            const ok=canSetForExactHours(s,ds,addKey,y,m,wds,fullStaffForLate);
+            shiftData[s.id][removeDs]=oldKey;
+            return ok;
+          }).sort((a,b)=>a.localeCompare(b));
+
+          for(const addDs of addDays){
+            const oldAdd=shiftData[s.id][addDs];
+            shiftData[s.id][removeDs]='off';
+            shiftData[s.id][addDs]=addKey;
+            const ok=staffHourUnits(s.id,y,m,days)===hoursToUnits(TARGET_HOURS) &&
+              consecutiveStats(s.id,wds).max<=maxConsecutiveLimit(s.id) &&
+              dailyCoverageOkAfterWeeklyBalance(removeDs,y,m);
+            shiftData[s.id][addDs]=oldAdd;
+            shiftData[s.id][removeDs]=oldKey;
+            if(!ok) continue;
+
+            shiftData[s.id][removeDs]='off';
+            shiftData[s.id][addDs]=addKey;
+            syncHanowaCoverage(y,m,workDays,false);
+            changed=true;
+            break;
+          }
+          if(changed) break;
+        }
+        if(changed) break;
+      }
+    }
+    if(!changed) break;
+  }
+}
 function generateShift(){
   if(isCurrentMonthLocked()){
     alert(`${currentYear}年${currentMonth+1}月のシフトは確定済みです。\n生成するには確定を解除してください。`);
@@ -2193,7 +2379,8 @@ function generateShift(){
       });
     }
 
-    const fullStaff=STAFF.filter(s=>s.type==='full'&&s.id!=='momo');
+    const allFullStaff=STAFF.filter(s=>s.type==='full');
+    const fullStaff=allFullStaff.filter(s=>s.id!=='momo');
 
     // ══ STEP 2: 公休日を等間隔に分散（最大3連勤保証・連休防止） ══
     const paidOnWds = s => wds.filter(ds=>shiftData[s.id][ds]==='paid').length;
@@ -3603,6 +3790,9 @@ function generateShift(){
     }
     balanceWeeklyHours(STAFF.filter(s=>s.type==='full'), y, m, days, wds, fullStaff);
     balanceDhThreeStreaks(STAFF.filter(s=>s.role==='DH'&&s.type==='full'), y, m, wds);
+    enforceExactHours(allFullStaff, y, m, days, wds, workDays);
+    repairHardConsecutiveExact(allFullStaff, y, m, days, wds, workDays);
+    enforceExactHours(allFullStaff, y, m, days, wds, workDays);
     syncHanowaCoverage(y, m, workDays, true);
 
     const checked=new Set();
@@ -3624,12 +3814,8 @@ function generateShift(){
         addAlert('info', ds+': DH兼任モード(DH'+dhF+'+DA'+daF+')');
       }
     }
-    // 160h達成確認（1スタッフ1回のみ）
-    fullStaff.forEach(s=>{
-      const h=calcHours(s.id,y,m,days);
-      if(h>TARGET_HOURS+0.1)      addAlert('error', s.name+': '+h+'h 160h超過 残業警告');
-      else if(h<TARGET_HOURS-0.1) addAlert('warn',  s.name+': '+h+'h(目標160h差異あり)');
-    });
+    // 160h達成確認（百々を含む全常勤）
+    addExactHourAlerts(allFullStaff, y, m, days);
     addWeeklyHourAlerts(STAFF.filter(s=>s.type==='full'), y, m, days);
     addConsecutiveAlerts(STAFF.filter(s=>s.type==='full'), wds);
 
