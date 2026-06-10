@@ -1173,6 +1173,7 @@
         <h4>勤務パターン</h4>
         <div class="rule-item"><span class="rule-dot"></span>通常: 8:30〜18:30 (実働9h)</div>
         <div class="rule-item"><span class="rule-dot"></span>遅出: 9:00〜18:30 (実働8.5h) ×月4回（有給1日につき2回減）</div>
+        <div class="rule-item"><span class="rule-dot"></span>常勤: 週40hを目標（160h優先・差異は警告）</div>
         <h4>自動補完</h4>
         <div class="rule-item"><span class="rule-dot"></span>人数不足日 → ハノワ(午後)自動生成</div>
         <div class="rule-item"><span class="rule-dot"></span>DA不足 → 百々を現場アサイン</div>
@@ -1578,6 +1579,7 @@ const TARGET_WORKDAYS = 18;
 const TARGET_LATE     = 4;
 const TARGET_EARLY    = 14;
 const TARGET_HOURS    = 160.0;
+const TARGET_WEEKLY_HOURS = 40.0;
 
 function isWorking(id, ds){
   const k=shiftData[id]?.[ds]||'';
@@ -1668,14 +1670,57 @@ function shuffle(arr){
   }
   return a;
 }
+function calcShiftHours(k){
+  return k==='early'?H_EARLY:k==='late'?H_LATE:k==='paid'?H_PAID:
+    k==='fixed'?H_EARLY:k==='admin'?H_EARLY:k==='hanowa'?4:0;
+}
 function calcHours(id, y, m, days){
   let h=0;
   for(let d=1;d<=days;d++){
     const k=shiftData[id]?.[dateStr(y,m,d)]||'';
-    h+=k==='early'?H_EARLY:k==='late'?H_LATE:k==='paid'?H_PAID:
-       k==='fixed'?H_EARLY:k==='admin'?H_EARLY:k==='hanowa'?4:0;
+    h+=calcShiftHours(k);
   }
   return Math.round(h*10)/10;
+}
+function getMondayStart(dt){
+  const d=new Date(dt.getFullYear(), dt.getMonth(), dt.getDate());
+  const day=d.getDay();
+  d.setDate(d.getDate()-(day===0?6:day-1));
+  return d;
+}
+function formatWeekLabel(dt){
+  return (dt.getMonth()+1)+'/'+dt.getDate()+'週';
+}
+function weeklyHourSummary(id, y, m, days){
+  const monthStart=new Date(y,m,1);
+  const monthEnd=new Date(y,m,days);
+  const map={};
+  for(let d=1; d<=days; d++){
+    const current=new Date(y,m,d);
+    const start=getMondayStart(current);
+    const key=dateStr(start.getFullYear(), start.getMonth(), start.getDate());
+    if(!map[key]){
+      const end=new Date(start);
+      end.setDate(start.getDate()+6);
+      map[key]={ key, start, end, hours:0, isFullWeek:start>=monthStart&&end<=monthEnd };
+    }
+    const ds=dateStr(y,m,d);
+    map[key].hours += calcShiftHours(shiftData[id]?.[ds]||'');
+  }
+  return Object.values(map)
+    .sort((a,b)=>a.key.localeCompare(b.key))
+    .map(w=>({ ...w, hours:Math.round(w.hours*10)/10, label:formatWeekLabel(w.start) }));
+}
+function addWeeklyHourAlerts(staffList, y, m, days){
+  staffList.forEach(s=>{
+    const diffs=weeklyHourSummary(s.id,y,m,days).filter(w=>{
+      if(w.hours>TARGET_WEEKLY_HOURS+0.1) return true;
+      return w.isFullWeek && w.hours<TARGET_WEEKLY_HOURS-0.1;
+    }).map(w=>w.label+' '+w.hours+'h');
+    if(diffs.length){
+      addAlert('warn', s.name+': 週40h目標差異（'+diffs.join('、')+'）');
+    }
+  });
 }
 function countWorkdays(id, wds){
   return wds.filter(ds=>{
@@ -3271,6 +3316,7 @@ function generateShift(){
       if(h>TARGET_HOURS+0.1)      addAlert('error', s.name+': '+h+'h 160h超過 残業警告');
       else if(h<TARGET_HOURS-0.1) addAlert('warn',  s.name+': '+h+'h(目標160h差異あり)');
     });
+    addWeeklyHourAlerts(STAFF.filter(s=>s.type==='full'), y, m, days);
 
     renderAlerts();
     btn.disabled=false;
