@@ -170,9 +170,49 @@
     margin: 18px auto 40px;
   }
 
+  .month-board {
+    display: grid;
+    grid-template-columns: minmax(260px, 1fr) auto;
+    gap: 16px;
+    align-items: end;
+    padding: 16px;
+    margin-bottom: 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+  }
+
+  .section-kicker {
+    color: var(--mint-dark);
+    font-size: 11px;
+    font-weight: 900;
+  }
+
+  .month-title {
+    margin-top: 3px;
+    font-size: 22px;
+    line-height: 1.1;
+    font-weight: 900;
+  }
+
+  .month-meta {
+    margin-top: 5px;
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 700;
+  }
+
+  .month-controls {
+    display: grid;
+    grid-template-columns: 160px repeat(2, auto);
+    gap: 10px;
+    align-items: end;
+  }
+
   .toolbar {
     display: grid;
-    grid-template-columns: 150px 160px 150px minmax(200px, 1fr);
+    grid-template-columns: 160px 150px minmax(220px, 1fr);
     gap: 10px;
     padding: 14px;
     background: var(--surface);
@@ -318,6 +358,14 @@
     background: #fbfefe;
   }
 
+  .goal-row.blank td {
+    background: #fffdf5;
+  }
+
+  .goal-row.blank:hover td {
+    background: #fff9e8;
+  }
+
   .goal-main {
     display: flex;
     flex-direction: column;
@@ -361,6 +409,19 @@
   .status-pill.close { color: #8b5b0f; background: #fff5db; border-color: #efd39c; }
   .status-pill.behind { color: #a23a3a; background: #fff0f0; border-color: #edc5c5; }
   .status-pill.blank { color: var(--muted); }
+
+  .value-missing {
+    display: inline-flex;
+    align-items: center;
+    min-height: 24px;
+    padding: 3px 8px;
+    border-radius: 999px;
+    color: #8a5d11;
+    background: #fff3d7;
+    border: 1px solid #f0d49a;
+    font-size: 11px;
+    font-weight: 900;
+  }
 
   .num {
     font-family: 'Nunito', sans-serif;
@@ -411,6 +472,12 @@
     background: var(--surface);
     color: var(--text);
     font-weight: 900;
+  }
+
+  .action-btn {
+    width: auto;
+    min-width: 52px;
+    padding: 0 10px;
   }
 
   .empty {
@@ -472,11 +539,27 @@
     font-weight: 900;
   }
 
+  .form-section {
+    grid-column: 1 / -1;
+    padding: 10px 12px;
+    border-radius: var(--radius);
+    background: var(--surface-alt);
+    color: var(--mint-dark);
+    font-size: 12px;
+    font-weight: 900;
+  }
+
   .form-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 12px;
     padding: 16px;
+  }
+
+  .field.entry-field input {
+    border-color: #b9e7df;
+    background: #f8fffd;
+    font-weight: 900;
   }
 
   .field.full {
@@ -529,12 +612,17 @@
   @media (max-width: 920px) {
     header { align-items: flex-start; flex-direction: column; }
     .header-actions { justify-content: flex-start; width: 100%; }
+    .month-board { grid-template-columns: 1fr; align-items: stretch; }
+    .month-controls { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .month-controls .field { grid-column: 1 / -1; }
     .toolbar { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   }
 
   @media (max-width: 560px) {
     main { width: min(100% - 18px, 1280px); }
+    .month-controls { grid-template-columns: 1fr; }
+    .month-controls .field { grid-column: auto; }
     .toolbar { grid-template-columns: 1fr; }
     .stats { grid-template-columns: 1fr; }
     .form-grid { grid-template-columns: 1fr; }
@@ -544,7 +632,7 @@
   }
 
   @media print {
-    header, .toolbar, .panel-head .btn, .actions-cell, .readonly-note, .modal-backdrop, .toast {
+    header, .toolbar, .month-controls, .panel-head .btn, .actions-cell, .readonly-note, .modal-backdrop, .toast {
       display: none !important;
     }
     body { background: #fff; }
@@ -571,18 +659,29 @@
     <button class="btn secondary" onclick="exportCSV()">CSV</button>
     <button class="btn secondary" onclick="window.print()">印刷</button>
     <button class="btn secondary editor-only" onclick="sendLineWorksSummary()">LINE WORKS通知</button>
-    <button class="btn primary editor-only" onclick="openGoalModal()">登録</button>
   </div>
 </header>
 
 <main>
   <div class="readonly-note" id="readonlyNote" style="display:none;">閲覧モードです。登録・編集は百々さん（管理者）と杉平院長のみ可能です。</div>
 
-  <section class="toolbar" aria-label="検索条件">
-    <div class="field">
-      <label for="monthFilter">対象月</label>
-      <input type="month" id="monthFilter" onchange="render()">
+  <section class="month-board" aria-label="月次入力">
+    <div>
+      <div class="section-kicker">月次入力</div>
+      <div class="month-title" id="monthActionTitle">対象月の目標</div>
+      <div class="month-meta" id="monthActionSub">読み込み中</div>
     </div>
+    <div class="month-controls">
+      <div class="field">
+        <label for="monthFilter">対象月</label>
+        <input type="month" id="monthFilter" onchange="render()">
+      </div>
+      <button class="btn primary editor-only" id="seedBtn" onclick="seedTemplates()">この月の標準項目を作成</button>
+      <button class="btn secondary editor-only" onclick="openGoalModal()">個別目標を追加</button>
+    </div>
+  </section>
+
+  <section class="toolbar" aria-label="絞り込み">
     <div class="field">
       <label for="deptFilter">担当区分</label>
       <select id="deptFilter" onchange="render()">
@@ -618,7 +717,6 @@
         <div class="panel-title" id="listTitle">月間目標一覧</div>
         <div class="panel-sub" id="listSub">読み込み中</div>
       </div>
-      <button class="btn secondary editor-only" onclick="seedTemplates()">月別テンプレートを作成</button>
     </div>
     <div class="table-wrap" id="tableWrap"></div>
   </section>
@@ -631,6 +729,7 @@
       <button class="icon-btn" onclick="closeGoalModal()" title="閉じる">×</button>
     </div>
     <div class="form-grid">
+      <div class="form-section">基本情報</div>
       <div class="field">
         <label for="fMonth">対象月</label>
         <input type="month" id="fMonth">
@@ -657,6 +756,7 @@
         <label for="fDetail">詳細</label>
         <textarea id="fDetail" placeholder="計算方法・対象範囲など"></textarea>
       </div>
+      <div class="form-section">毎月入力する数値</div>
       <div class="field">
         <label for="fDirection">判定方向</label>
         <select id="fDirection">
@@ -665,11 +765,11 @@
         </select>
       </div>
       <div class="field">
-        <label for="fCurrent">現状数値・3ヶ月平均</label>
+        <label for="fCurrent">3ヶ月平均</label>
         <input type="text" id="fCurrent" inputmode="decimal" placeholder="例：31">
       </div>
       <div class="field full">
-        <label>直近3ヶ月の内訳</label>
+        <label>3ヶ月平均の内訳</label>
         <div class="history-grid">
           <input type="text" id="fHistoryLabel1" placeholder="月">
           <input type="text" id="fHistoryLabel2" placeholder="月">
@@ -680,13 +780,14 @@
         </div>
       </div>
       <div class="field">
-        <label for="fTarget">目標数値</label>
+        <label for="fTarget">今月の目標値</label>
         <input type="text" id="fTarget" inputmode="decimal" placeholder="例：35">
       </div>
-      <div class="field">
-        <label for="fActual">実績数値</label>
+      <div class="field entry-field">
+        <label for="fActual">今月の実績値</label>
         <input type="text" id="fActual" inputmode="decimal" placeholder="例：32">
       </div>
+      <div class="form-section">補足</div>
       <div class="field">
         <label for="fOwner">入力担当</label>
         <input type="text" id="fOwner" placeholder="例：百々">
@@ -937,8 +1038,22 @@ function render() {
   const totalForMonth = monthGoals(month);
   document.getElementById('listTitle').textContent = `${monthLabel(month)} 月間目標一覧`;
   document.getElementById('listSub').textContent = `${goals.length}件表示 / 月内${totalForMonth.length}件`;
+  renderMonthBoard(month, totalForMonth);
   renderStats(totalForMonth);
   renderTable(goals, totalForMonth.length);
+}
+
+function renderMonthBoard(month, goals) {
+  const blank = goals.filter(g => goalStatus(g) === 'blank').length;
+  const done = goals.filter(g => goalStatus(g) === 'done').length;
+  const seedBtn = document.getElementById('seedBtn');
+  document.getElementById('monthActionTitle').textContent = `${monthLabel(month)}の目標`;
+  document.getElementById('monthActionSub').textContent = goals.length
+    ? `月内${goals.length}件 / 実績未入力${blank}件 / 達成${done}件`
+    : '月内の目標は未作成';
+  if (seedBtn) {
+    seedBtn.textContent = goals.length ? '標準項目を追加' : 'この月の標準項目を作成';
+  }
 }
 
 function renderStats(goals) {
@@ -950,10 +1065,10 @@ function renderStats(goals) {
   const avgRates = goals.map(calcRate).filter(v => v !== null);
   const avg = avgRates.length ? avgRates.reduce((a, b) => a + b, 0) / avgRates.length : null;
   document.getElementById('stats').innerHTML = `
-    <div class="stat"><div class="stat-label">項目数</div><div class="stat-value">${total}</div><div class="stat-note">対象月の登録数</div></div>
+    <div class="stat"><div class="stat-label">月内項目</div><div class="stat-value">${total}</div><div class="stat-note">対象月の登録数</div></div>
+    <div class="stat"><div class="stat-label">実績未入力</div><div class="stat-value" style="color:var(--amber)">${blank}</div><div class="stat-note">入力待ちの項目</div></div>
     <div class="stat"><div class="stat-label">達成</div><div class="stat-value" style="color:var(--green)">${done}</div><div class="stat-note">達成率100%以上</div></div>
-    <div class="stat"><div class="stat-label">要確認</div><div class="stat-value" style="color:var(--coral)">${behind}</div><div class="stat-note">あと少し ${close} / 未入力 ${blank}</div></div>
-    <div class="stat"><div class="stat-label">平均達成率</div><div class="stat-value" style="color:var(--sky)">${avg === null ? '-' : `${Math.round(avg)}%`}</div><div class="stat-note">実績入力済みのみ</div></div>`;
+    <div class="stat"><div class="stat-label">要確認</div><div class="stat-value" style="color:var(--coral)">${behind}</div><div class="stat-note">あと少し ${close} / 平均 ${avg === null ? '-' : `${Math.round(avg)}%`}</div></div>`;
 }
 
 function renderTable(goals, monthTotal) {
@@ -962,7 +1077,7 @@ function renderTable(goals, monthTotal) {
     wrap.innerHTML = `
       <div class="empty">
         <strong>この月の目標は未登録です</strong>
-        <div>管理者または院長は、月別テンプレートを作成できます。</div>
+        <div>管理者または院長は、この月の標準項目を作成できます。</div>
       </div>`;
     return;
   }
@@ -1005,7 +1120,7 @@ function goalRowHtml(goal) {
   const updated = goal.updatedAt ? new Date(goal.updatedAt).toLocaleDateString('ja-JP') : '-';
   const history = historyText(goal);
   return `
-    <tr>
+    <tr class="goal-row ${status}">
       <td>
         <div class="goal-main">
           <div class="goal-name">${escapeHtml(goal.item || '')}</div>
@@ -1016,7 +1131,7 @@ function goalRowHtml(goal) {
       <td><span class="dept-pill ${deptClass}">${escapeHtml(goal.department || '-')}</span></td>
       <td><span class="num">${fmtNumber(goal.currentValue, goal.unit)}</span><div class="goal-detail">${escapeHtml(history)}</div></td>
       <td><span class="num">${fmtNumber(goal.targetValue, goal.unit)}</span><div class="goal-detail">${goal.direction === 'down' ? '少ないほど達成' : '多いほど達成'}</div></td>
-      <td><span class="num">${fmtNumber(goal.actualValue, goal.unit)}</span></td>
+      <td>${status === 'blank' ? '<span class="value-missing">未入力</span>' : `<span class="num">${fmtNumber(goal.actualValue, goal.unit)}</span>`}</td>
       <td>
         <div class="progress">
           <span class="num">${rate === null ? '-' : `${Math.round(rate)}%`}</span>
@@ -1027,10 +1142,14 @@ function goalRowHtml(goal) {
       <td><div>${escapeHtml(updated)}</div><div class="goal-detail">${escapeHtml(goal.updatedBy || goal.createdBy || '')}</div></td>
       <td>
         <div class="actions-cell">
-          <button class="icon-btn" onclick="openGoalModal('${goal.id}')" title="${isEditor() ? '編集' : '詳細'}">${isEditor() ? '編集' : '詳細'}</button>
+          <button class="icon-btn action-btn" onclick="openGoalModal('${goal.id}')" title="${isEditor() ? actionLabel(status) : '詳細'}">${isEditor() ? actionLabel(status) : '詳細'}</button>
         </div>
       </td>
     </tr>`;
+}
+
+function actionLabel(status) {
+  return status === 'blank' ? '入力' : '編集';
 }
 
 function historyText(goal) {
@@ -1162,8 +1281,8 @@ window.seedTemplates = async function() {
   const month = document.getElementById('monthFilter').value || currentMonth();
   const existing = monthGoals(month);
   if (existing.length) {
-    if (!confirm(`${monthLabel(month)}には既に${existing.length}件あります。テンプレートを追加しますか？`)) return;
-  } else if (!confirm(`${monthLabel(month)}の月別テンプレートを作成しますか？`)) {
+    if (!confirm(`${monthLabel(month)}には既に${existing.length}件あります。標準項目を追加しますか？`)) return;
+  } else if (!confirm(`${monthLabel(month)}の標準項目を作成しますか？`)) {
     return;
   }
 
@@ -1184,9 +1303,9 @@ window.seedTemplates = async function() {
         updatedBy: currentUser.name
       });
     }
-    showToast('テンプレートを作成しました');
+    showToast('標準項目を作成しました');
   } catch(e) {
-    showToast('テンプレート作成に失敗しました: ' + e.message);
+    showToast('標準項目の作成に失敗しました: ' + e.message);
   }
 };
 
