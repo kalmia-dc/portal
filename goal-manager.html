@@ -1,0 +1,1308 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>目標管理 | カルミアデンタル ポータル</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Zen+Maru+Gothic:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --mint: #37b8a9;
+    --mint-dark: #20796f;
+    --sky: #3f8edb;
+    --coral: #e65b5b;
+    --amber: #d89226;
+    --green: #2f9b65;
+    --violet: #7257c9;
+    --bg: #f4f8fb;
+    --surface: #ffffff;
+    --surface-alt: #eef6f8;
+    --border: #d9e7ec;
+    --text: #263238;
+    --muted: #60727c;
+    --shadow: 0 3px 14px rgba(31, 64, 74, .08);
+    --radius: 8px;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Zen Maru Gothic', system-ui, sans-serif;
+    letter-spacing: 0;
+  }
+
+  button, input, select, textarea {
+    font: inherit;
+  }
+
+  button {
+    cursor: pointer;
+  }
+
+  header {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: 60px;
+    padding: 10px 18px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    box-shadow: 0 2px 10px rgba(31, 64, 74, .06);
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+  }
+
+  .back-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface-alt);
+    color: var(--text);
+    text-decoration: none;
+    font-weight: 900;
+  }
+
+  .title-wrap { min-width: 0; }
+  h1 {
+    margin: 0;
+    font-family: 'Nunito', sans-serif;
+    font-size: 20px;
+    line-height: 1.05;
+    font-weight: 900;
+  }
+  .subtitle {
+    margin-top: 2px;
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 700;
+  }
+
+  .header-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .user-badge, .mode-badge {
+    display: inline-flex;
+    align-items: center;
+    min-height: 32px;
+    padding: 6px 10px;
+    border-radius: 999px;
+    background: var(--surface-alt);
+    color: var(--muted);
+    border: 1px solid var(--border);
+    font-size: 12px;
+    font-weight: 800;
+    white-space: nowrap;
+  }
+
+  .mode-badge.editor {
+    color: var(--mint-dark);
+    background: #e6f7f4;
+    border-color: #b9e7df;
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: 36px;
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+    color: var(--text);
+    font-size: 13px;
+    font-weight: 800;
+    transition: border-color .15s, transform .15s, background .15s;
+    white-space: nowrap;
+  }
+
+  .btn:hover {
+    border-color: var(--mint);
+    transform: translateY(-1px);
+  }
+
+  .btn.primary {
+    border-color: var(--mint);
+    background: var(--mint);
+    color: #fff;
+  }
+
+  .btn.secondary {
+    background: var(--surface-alt);
+  }
+
+  .btn.danger {
+    border-color: #f1c2c2;
+    color: #b43c3c;
+    background: #fff5f5;
+  }
+
+  .btn:disabled {
+    opacity: .55;
+    cursor: not-allowed;
+    transform: none;
+  }
+
+  main {
+    width: min(1280px, calc(100% - 28px));
+    margin: 18px auto 40px;
+  }
+
+  .toolbar {
+    display: grid;
+    grid-template-columns: 150px 160px 150px minmax(200px, 1fr);
+    gap: 10px;
+    padding: 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    margin-bottom: 14px;
+  }
+
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    min-width: 0;
+  }
+
+  .field label {
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 800;
+  }
+
+  .field input,
+  .field select,
+  .field textarea {
+    width: 100%;
+    min-height: 38px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: #fff;
+    color: var(--text);
+    padding: 8px 10px;
+    outline: none;
+  }
+
+  .field input:focus,
+  .field select:focus,
+  .field textarea:focus {
+    border-color: var(--mint);
+    box-shadow: 0 0 0 3px rgba(55, 184, 169, .12);
+  }
+
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+
+  .stat {
+    min-height: 88px;
+    padding: 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+  }
+
+  .stat-label {
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 800;
+  }
+
+  .stat-value {
+    margin-top: 6px;
+    font-family: 'Nunito', sans-serif;
+    font-size: 28px;
+    line-height: 1;
+    font-weight: 900;
+  }
+
+  .stat-note {
+    margin-top: 5px;
+    color: var(--muted);
+    font-size: 11px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+
+  .panel-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--border);
+    background: #fbfdfe;
+  }
+
+  .panel-title {
+    font-weight: 900;
+    font-size: 14px;
+  }
+
+  .panel-sub {
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  .table-wrap {
+    overflow: auto;
+  }
+
+  table {
+    width: 100%;
+    min-width: 1040px;
+    border-collapse: collapse;
+  }
+
+  th, td {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+    text-align: left;
+    vertical-align: middle;
+  }
+
+  th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: #f7fbfc;
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 900;
+  }
+
+  td {
+    font-size: 13px;
+  }
+
+  tr:hover td {
+    background: #fbfefe;
+  }
+
+  .goal-main {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .goal-name {
+    font-weight: 900;
+    color: var(--text);
+  }
+
+  .goal-detail {
+    max-width: 320px;
+    color: var(--muted);
+    font-size: 11px;
+    line-height: 1.45;
+  }
+
+  .dept-pill, .status-pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 58px;
+    min-height: 24px;
+    padding: 4px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 900;
+    border: 1px solid var(--border);
+    background: var(--surface-alt);
+    white-space: nowrap;
+  }
+
+  .dept-pill.all { color: #2d6574; background: #e9f5f8; border-color: #cde5ed; }
+  .dept-pill.director { color: #7a4a14; background: #fff3df; border-color: #f2d6aa; }
+  .dept-pill.reception { color: #8b3f67; background: #fdebf5; border-color: #f2bfd9; }
+  .dept-pill.dh { color: #315f9d; background: #eaf2ff; border-color: #cbdcf6; }
+  .dept-pill.da { color: #5f4aa2; background: #f1edff; border-color: #d9cef8; }
+
+  .status-pill.done { color: #176d46; background: #e9f8ef; border-color: #c5ead4; }
+  .status-pill.close { color: #8b5b0f; background: #fff5db; border-color: #efd39c; }
+  .status-pill.behind { color: #a23a3a; background: #fff0f0; border-color: #edc5c5; }
+  .status-pill.blank { color: var(--muted); }
+
+  .num {
+    font-family: 'Nunito', sans-serif;
+    font-weight: 900;
+    white-space: nowrap;
+  }
+
+  .progress {
+    display: grid;
+    grid-template-columns: 58px 1fr;
+    align-items: center;
+    gap: 8px;
+    min-width: 160px;
+  }
+
+  .bar {
+    height: 8px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: #e5eef2;
+  }
+
+  .bar-fill {
+    height: 100%;
+    width: 0;
+    border-radius: inherit;
+    background: var(--sky);
+  }
+
+  .bar-fill.done { background: var(--green); }
+  .bar-fill.close { background: var(--amber); }
+  .bar-fill.behind { background: var(--coral); }
+
+  .actions-cell {
+    display: flex;
+    gap: 6px;
+    justify-content: flex-end;
+  }
+
+  .icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+    color: var(--text);
+    font-weight: 900;
+  }
+
+  .empty {
+    padding: 34px 18px;
+    text-align: center;
+    color: var(--muted);
+  }
+
+  .empty strong {
+    display: block;
+    color: var(--text);
+    font-size: 16px;
+    margin-bottom: 8px;
+  }
+
+  .modal-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 18px;
+    background: rgba(20, 34, 40, .45);
+  }
+
+  .modal-backdrop.open {
+    display: flex;
+  }
+
+  .modal {
+    width: min(760px, 100%);
+    max-height: min(90vh, 820px);
+    overflow: auto;
+    background: var(--surface);
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    box-shadow: 0 18px 50px rgba(10, 30, 40, .22);
+  }
+
+  .modal-head,
+  .modal-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .modal-foot {
+    border-top: 1px solid var(--border);
+    border-bottom: 0;
+    justify-content: flex-end;
+    background: #fbfdfe;
+  }
+
+  .modal-title {
+    font-weight: 900;
+  }
+
+  .form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    padding: 16px;
+  }
+
+  .field.full {
+    grid-column: 1 / -1;
+  }
+
+  textarea {
+    min-height: 86px;
+    resize: vertical;
+  }
+
+  .history-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .toast {
+    position: fixed;
+    left: 50%;
+    bottom: 22px;
+    z-index: 80;
+    display: none;
+    transform: translateX(-50%);
+    max-width: min(520px, calc(100% - 28px));
+    padding: 10px 14px;
+    border-radius: var(--radius);
+    background: #20323a;
+    color: #fff;
+    box-shadow: 0 10px 30px rgba(0,0,0,.18);
+    font-size: 13px;
+    font-weight: 800;
+  }
+
+  .toast.show {
+    display: block;
+  }
+
+  .readonly-note {
+    margin-bottom: 14px;
+    padding: 10px 12px;
+    border: 1px solid #efd39c;
+    border-radius: var(--radius);
+    background: #fff8e8;
+    color: #7c5516;
+    font-size: 13px;
+    font-weight: 800;
+  }
+
+  @media (max-width: 920px) {
+    header { align-items: flex-start; flex-direction: column; }
+    .header-actions { justify-content: flex-start; width: 100%; }
+    .toolbar { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+
+  @media (max-width: 560px) {
+    main { width: min(100% - 18px, 1280px); }
+    .toolbar { grid-template-columns: 1fr; }
+    .stats { grid-template-columns: 1fr; }
+    .form-grid { grid-template-columns: 1fr; }
+    .history-grid { grid-template-columns: 1fr; }
+    .btn { flex: 1 1 auto; }
+    .user-badge, .mode-badge { max-width: 100%; }
+  }
+
+  @media print {
+    header, .toolbar, .panel-head .btn, .actions-cell, .readonly-note, .modal-backdrop, .toast {
+      display: none !important;
+    }
+    body { background: #fff; }
+    main { width: 100%; margin: 0; }
+    .stats { grid-template-columns: repeat(5, 1fr); }
+    .panel, .stat { box-shadow: none; }
+    table { min-width: 0; font-size: 10px; }
+    th, td { padding: 6px; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <a class="back-link" href="./index.html" title="ポータルに戻る">←</a>
+    <div class="title-wrap">
+      <h1>目標管理</h1>
+      <div class="subtitle">月間目標値・3ヶ月平均・達成状況</div>
+    </div>
+  </div>
+  <div class="header-actions">
+    <span class="user-badge" id="userBadge">読み込み中</span>
+    <span class="mode-badge" id="modeBadge">確認中</span>
+    <button class="btn secondary" onclick="exportCSV()">CSV</button>
+    <button class="btn secondary" onclick="window.print()">印刷</button>
+    <button class="btn secondary editor-only" onclick="sendLineWorksSummary()">LINE WORKS通知</button>
+    <button class="btn primary editor-only" onclick="openGoalModal()">登録</button>
+  </div>
+</header>
+
+<main>
+  <div class="readonly-note" id="readonlyNote" style="display:none;">閲覧モードです。登録・編集は百々さん（管理者）と杉平院長のみ可能です。</div>
+
+  <section class="toolbar" aria-label="検索条件">
+    <div class="field">
+      <label for="monthFilter">対象月</label>
+      <input type="month" id="monthFilter" onchange="render()">
+    </div>
+    <div class="field">
+      <label for="deptFilter">担当区分</label>
+      <select id="deptFilter" onchange="render()">
+        <option value="all">すべて</option>
+        <option value="全体">全体</option>
+        <option value="院長">院長</option>
+        <option value="受付">受付</option>
+        <option value="DH">DH</option>
+        <option value="DA">DA</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="statusFilter">達成状況</label>
+      <select id="statusFilter" onchange="render()">
+        <option value="all">すべて</option>
+        <option value="done">達成</option>
+        <option value="close">あと少し</option>
+        <option value="behind">未達</option>
+        <option value="blank">実績未入力</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="searchInput">検索</label>
+      <input type="search" id="searchInput" placeholder="項目・詳細・メモで検索" oninput="render()">
+    </div>
+  </section>
+
+  <section class="stats" id="stats"></section>
+
+  <section class="panel">
+    <div class="panel-head">
+      <div>
+        <div class="panel-title" id="listTitle">月間目標一覧</div>
+        <div class="panel-sub" id="listSub">読み込み中</div>
+      </div>
+      <button class="btn secondary editor-only" onclick="seedTemplates()">PDFテンプレートから作成</button>
+    </div>
+    <div class="table-wrap" id="tableWrap"></div>
+  </section>
+</main>
+
+<div class="modal-backdrop" id="goalModal" onclick="closeModalOnBackdrop(event)">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="modal-title" id="modalTitle">目標を登録</div>
+      <button class="icon-btn" onclick="closeGoalModal()" title="閉じる">×</button>
+    </div>
+    <div class="form-grid">
+      <div class="field">
+        <label for="fMonth">対象月</label>
+        <input type="month" id="fMonth">
+      </div>
+      <div class="field">
+        <label for="fDepartment">担当区分</label>
+        <select id="fDepartment">
+          <option value="全体">全体</option>
+          <option value="院長">院長</option>
+          <option value="受付">受付</option>
+          <option value="DH">DH</option>
+          <option value="DA">DA</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="fItem">項目</label>
+        <input type="text" id="fItem" placeholder="例：初診">
+      </div>
+      <div class="field">
+        <label for="fUnit">単位</label>
+        <input type="text" id="fUnit" placeholder="例：人、件、円、%">
+      </div>
+      <div class="field full">
+        <label for="fDetail">詳細</label>
+        <textarea id="fDetail" placeholder="計算方法・対象範囲など"></textarea>
+      </div>
+      <div class="field">
+        <label for="fDirection">判定方向</label>
+        <select id="fDirection">
+          <option value="up">多いほど達成</option>
+          <option value="down">少ないほど達成</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="fCurrent">現状数値・3ヶ月平均</label>
+        <input type="text" id="fCurrent" inputmode="decimal" placeholder="例：31">
+      </div>
+      <div class="field full">
+        <label>直近3ヶ月の内訳</label>
+        <div class="history-grid">
+          <input type="text" id="fHistoryLabel1" placeholder="月">
+          <input type="text" id="fHistoryLabel2" placeholder="月">
+          <input type="text" id="fHistoryLabel3" placeholder="月">
+          <input type="text" id="fHistoryValue1" inputmode="decimal" placeholder="数値">
+          <input type="text" id="fHistoryValue2" inputmode="decimal" placeholder="数値">
+          <input type="text" id="fHistoryValue3" inputmode="decimal" placeholder="数値">
+        </div>
+      </div>
+      <div class="field">
+        <label for="fTarget">目標数値</label>
+        <input type="text" id="fTarget" inputmode="decimal" placeholder="例：35">
+      </div>
+      <div class="field">
+        <label for="fActual">実績数値</label>
+        <input type="text" id="fActual" inputmode="decimal" placeholder="例：32">
+      </div>
+      <div class="field">
+        <label for="fIncentive">インセンティブ（一人当たり）</label>
+        <input type="text" id="fIncentive" inputmode="decimal" placeholder="例：1000">
+      </div>
+      <div class="field">
+        <label for="fOwner">入力担当</label>
+        <input type="text" id="fOwner" placeholder="例：百々">
+      </div>
+      <div class="field full">
+        <label for="fNote">メモ</label>
+        <textarea id="fNote" placeholder="補足・確認事項"></textarea>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn danger" id="deleteBtn" onclick="deleteGoal()" style="display:none;">削除</button>
+      <button class="btn secondary" onclick="closeGoalModal()">キャンセル</button>
+      <button class="btn primary" id="saveBtn" onclick="saveGoal()">保存</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import { getDatabase, ref, push, set, remove, onValue, get }
+  from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
+
+const firebaseConfig = {
+  apiKey:            'AIzaSyDdMe7feUF6CKPHH0YIx7Suk-WnXtOYUu8',
+  authDomain:        'kalmia-shift.firebaseapp.com',
+  databaseURL:       'https://kalmia-shift-default-rtdb.asia-southeast1.firebasedatabase.app',
+  projectId:         'kalmia-shift',
+  storageBucket:     'kalmia-shift.firebasestorage.app',
+  messagingSenderId: '714175473480',
+  appId:             '1:714175473480:web:7d6626a46e4a9dcb1fb57d'
+};
+
+const fbApp = initializeApp(firebaseConfig);
+const db = getDatabase(fbApp);
+const DB_PATH = 'monthlyGoals';
+const NOTIFY_URL = 'https://kalmia-notify.chibakenmin-sugihey.workers.dev';
+const EDITOR_IDS = ['sugihira', 'momo'];
+const STAFF_NAMES = {
+  sugihira: '杉平院長',
+  shimanaka: '嶋中',
+  hokari: '保刈',
+  shinoda: '篠田',
+  tsuruta: '鶴田',
+  yoshida: '吉田',
+  takagi: '高木',
+  matsumoto: '松本',
+  yamada: '山田',
+  hanowa: 'ハノワ',
+  tamiya: '田宮',
+  tanaka: '田中',
+  momo: '百々'
+};
+
+const DEPARTMENT_CLASSES = {
+  '全体': 'all',
+  '院長': 'director',
+  '受付': 'reception',
+  'DH': 'dh',
+  'DA': 'da'
+};
+
+const TEMPLATE_ITEMS = [
+  { department: '全体', item: '初診', unit: '人', direction: 'up', detail: '月計表の新患数から初診数を引き、再初診数を足して確認' },
+  { department: '全体', item: '再初診', unit: '人', direction: 'up', detail: '月計表の再初診数を確認' },
+  { department: '院長', item: 'インプラント', unit: '本', direction: 'up', detail: 'インプラント実施本数' },
+  { department: '受付', item: '物販売上', unit: '円', direction: 'up', detail: '物販の月間売上' },
+  { department: '全体', item: '1日平均来院数', unit: '人', direction: 'up', detail: '月間来院数を診療日数で割った平均' },
+  { department: '院長', item: 'ジルコニア', unit: '本', direction: 'up', detail: 'ジルコニア補綴の本数' },
+  { department: '院長', item: '自費売上', unit: '円', direction: 'up', detail: '会計ベースの自費売上' },
+  { department: 'DH', item: 'ホワイトニング', unit: '件', direction: 'up', detail: 'ホワイトニング実施件数' },
+  { department: '受付', item: 'Google口コミ', unit: '枚', direction: 'up', detail: '口コミ投稿依頼・配布数' },
+  { department: '全体', item: 'キャンセル率', unit: '%', direction: 'down', detail: '月間キャンセル率' },
+  { department: '全体', item: '中断数', unit: '件', direction: 'down', detail: 'アポツールの計算による中断数' },
+  { department: 'DH', item: 'GBTメンテナンス', unit: '件', direction: 'up', detail: 'GBTメンテナンス件数' },
+  { department: '院長', item: '根管治療', unit: '人', direction: 'up', detail: '根管治療の対象人数' }
+];
+
+let currentUser = resolveUser();
+let allGoals = {};
+let editingId = null;
+let saving = false;
+
+function resolveUser() {
+  try {
+    const saved = sessionStorage.getItem('portalUser');
+    if (saved) {
+      const user = JSON.parse(saved);
+      if (user?.staffId) return normalizeUser(user);
+    }
+  } catch(e) {}
+
+  const params = new URLSearchParams(location.search);
+  const sid = params.get('sid') || '';
+  if (sid) {
+    return normalizeUser({
+      staffId: sid,
+      name: params.get('name') || STAFF_NAMES[sid] || sid,
+      pass: params.get('p') || '',
+      role: roleFromStaffId(sid)
+    });
+  }
+
+  return { staffId: '', name: 'ゲスト', role: '', pass: '' };
+}
+
+function normalizeUser(user) {
+  const sid = user.staffId || '';
+  return {
+    ...user,
+    staffId: sid,
+    name: sid === 'sugihira' ? '杉平院長' : (user.name || STAFF_NAMES[sid] || 'ゲスト'),
+    role: user.role || roleFromStaffId(sid)
+  };
+}
+
+function roleFromStaffId(sid) {
+  if (['sugihira', 'shimanaka', 'hokari', 'shinoda'].includes(sid)) return 'DR';
+  if (['tsuruta', 'yoshida', 'takagi', 'matsumoto', 'yamada', 'hanowa'].includes(sid)) return 'DH';
+  if (['tamiya', 'tanaka', 'momo'].includes(sid)) return 'DA';
+  return '';
+}
+
+function isEditor() {
+  return EDITOR_IDS.includes(currentUser.staffId);
+}
+
+function init() {
+  document.getElementById('monthFilter').value = currentMonth();
+  document.getElementById('userBadge').textContent = currentUser.name;
+  const modeBadge = document.getElementById('modeBadge');
+  if (isEditor()) {
+    modeBadge.textContent = currentUser.staffId === 'momo' ? '管理者' : '院長';
+    modeBadge.classList.add('editor');
+  } else {
+    modeBadge.textContent = '閲覧のみ';
+    document.getElementById('readonlyNote').style.display = 'block';
+    document.querySelectorAll('.editor-only').forEach(el => el.style.display = 'none');
+  }
+
+  onValue(ref(db, DB_PATH), snap => {
+    allGoals = snap.val() || {};
+    render();
+  }, err => {
+    showToast('データ読み込みに失敗しました: ' + err.message);
+  });
+}
+
+function currentMonth(date = new Date()) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function monthLabel(month) {
+  const [y, m] = month.split('-');
+  return `${y}年${Number(m)}月`;
+}
+
+function parseNumber(value) {
+  if (value === null || value === undefined) return null;
+  const text = String(value).replace(/,/g, '').trim();
+  if (text === '') return null;
+  const n = Number(text);
+  return Number.isFinite(n) ? n : null;
+}
+
+function fmtNumber(value, unit = '') {
+  const n = parseNumber(value);
+  if (n === null) return '-';
+  const formatted = Math.abs(n) >= 1000
+    ? n.toLocaleString('ja-JP', { maximumFractionDigits: 2 })
+    : String(Number(n.toFixed(2)));
+  return unit ? `${formatted}${unit}` : formatted;
+}
+
+function fmtCurrency(value) {
+  const n = parseNumber(value);
+  if (n === null) return '-';
+  return `${Math.round(n).toLocaleString('ja-JP')}円`;
+}
+
+function calcRate(goal) {
+  const target = parseNumber(goal.targetValue);
+  const actual = parseNumber(goal.actualValue);
+  if (target === null || target === 0 || actual === null) return null;
+  if (goal.direction === 'down') {
+    if (actual <= 0) return 100;
+    return Math.min(200, (target / actual) * 100);
+  }
+  return Math.min(200, (actual / target) * 100);
+}
+
+function goalStatus(goal) {
+  const rate = calcRate(goal);
+  if (rate === null) return 'blank';
+  if (rate >= 100) return 'done';
+  if (rate >= 80) return 'close';
+  return 'behind';
+}
+
+function statusLabel(status) {
+  return {
+    done: '達成',
+    close: 'あと少し',
+    behind: '未達',
+    blank: '実績未入力'
+  }[status] || '-';
+}
+
+function filteredGoals() {
+  const month = document.getElementById('monthFilter').value || currentMonth();
+  const dept = document.getElementById('deptFilter').value;
+  const status = document.getElementById('statusFilter').value;
+  const query = document.getElementById('searchInput').value.trim().toLowerCase();
+
+  return Object.entries(allGoals)
+    .map(([id, goal]) => ({ id, ...goal }))
+    .filter(goal => (goal.month || '') === month)
+    .filter(goal => dept === 'all' || goal.department === dept)
+    .filter(goal => status === 'all' || goalStatus(goal) === status)
+    .filter(goal => {
+      if (!query) return true;
+      return [goal.item, goal.detail, goal.note, goal.department, goal.owner]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+        .includes(query);
+    })
+    .sort((a, b) => {
+      const depOrder = ['全体', '院長', '受付', 'DH', 'DA'];
+      const depDiff = depOrder.indexOf(a.department) - depOrder.indexOf(b.department);
+      if (depDiff) return depDiff;
+      return (a.item || '').localeCompare(b.item || '', 'ja');
+    });
+}
+
+function monthGoals(month) {
+  return Object.entries(allGoals)
+    .map(([id, goal]) => ({ id, ...goal }))
+    .filter(goal => goal.month === month);
+}
+
+function render() {
+  const month = document.getElementById('monthFilter').value || currentMonth();
+  const goals = filteredGoals();
+  const totalForMonth = monthGoals(month);
+  document.getElementById('listTitle').textContent = `${monthLabel(month)} 月間目標一覧`;
+  document.getElementById('listSub').textContent = `${goals.length}件表示 / 月内${totalForMonth.length}件`;
+  renderStats(totalForMonth);
+  renderTable(goals, totalForMonth.length);
+}
+
+function renderStats(goals) {
+  const total = goals.length;
+  const done = goals.filter(g => goalStatus(g) === 'done').length;
+  const close = goals.filter(g => goalStatus(g) === 'close').length;
+  const behind = goals.filter(g => goalStatus(g) === 'behind').length;
+  const blank = goals.filter(g => goalStatus(g) === 'blank').length;
+  const avgRates = goals.map(calcRate).filter(v => v !== null);
+  const avg = avgRates.length ? avgRates.reduce((a, b) => a + b, 0) / avgRates.length : null;
+  const incentive = goals.filter(g => goalStatus(g) === 'done')
+    .reduce((sum, g) => sum + (parseNumber(g.incentive) || 0), 0);
+
+  document.getElementById('stats').innerHTML = `
+    <div class="stat"><div class="stat-label">項目数</div><div class="stat-value">${total}</div><div class="stat-note">対象月の登録数</div></div>
+    <div class="stat"><div class="stat-label">達成</div><div class="stat-value" style="color:var(--green)">${done}</div><div class="stat-note">達成率100%以上</div></div>
+    <div class="stat"><div class="stat-label">要確認</div><div class="stat-value" style="color:var(--coral)">${behind}</div><div class="stat-note">あと少し ${close} / 未入力 ${blank}</div></div>
+    <div class="stat"><div class="stat-label">平均達成率</div><div class="stat-value" style="color:var(--sky)">${avg === null ? '-' : `${Math.round(avg)}%`}</div><div class="stat-note">実績入力済みのみ</div></div>
+    <div class="stat"><div class="stat-label">達成インセンティブ</div><div class="stat-value" style="color:var(--violet)">${fmtCurrency(incentive)}</div><div class="stat-note">一人当たり合計</div></div>`;
+}
+
+function renderTable(goals, monthTotal) {
+  const wrap = document.getElementById('tableWrap');
+  if (!monthTotal) {
+    wrap.innerHTML = `
+      <div class="empty">
+        <strong>この月の目標は未登録です</strong>
+        <div>管理者または院長は、PDFテンプレートから初期項目を作成できます。</div>
+      </div>`;
+    return;
+  }
+
+  if (!goals.length) {
+    wrap.innerHTML = `
+      <div class="empty">
+        <strong>条件に合う目標がありません</strong>
+        <div>検索条件を変更してください。</div>
+      </div>`;
+    return;
+  }
+
+  wrap.innerHTML = `
+    <table>
+      <thead>
+        <tr>
+          <th>項目</th>
+          <th>担当</th>
+          <th>現状</th>
+          <th>目標</th>
+          <th>実績</th>
+          <th>達成率</th>
+          <th>状況</th>
+          <th>インセンティブ</th>
+          <th>更新</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        ${goals.map(goalRowHtml).join('')}
+      </tbody>
+    </table>`;
+}
+
+function goalRowHtml(goal) {
+  const status = goalStatus(goal);
+  const rate = calcRate(goal);
+  const fill = rate === null ? 0 : Math.max(0, Math.min(100, rate));
+  const deptClass = DEPARTMENT_CLASSES[goal.department] || 'all';
+  const updated = goal.updatedAt ? new Date(goal.updatedAt).toLocaleDateString('ja-JP') : '-';
+  const history = historyText(goal);
+  return `
+    <tr>
+      <td>
+        <div class="goal-main">
+          <div class="goal-name">${escapeHtml(goal.item || '')}</div>
+          <div class="goal-detail">${escapeHtml(goal.detail || '')}</div>
+          ${goal.note ? `<div class="goal-detail">メモ: ${escapeHtml(goal.note)}</div>` : ''}
+        </div>
+      </td>
+      <td><span class="dept-pill ${deptClass}">${escapeHtml(goal.department || '-')}</span></td>
+      <td><span class="num">${fmtNumber(goal.currentValue, goal.unit)}</span><div class="goal-detail">${escapeHtml(history)}</div></td>
+      <td><span class="num">${fmtNumber(goal.targetValue, goal.unit)}</span><div class="goal-detail">${goal.direction === 'down' ? '少ないほど達成' : '多いほど達成'}</div></td>
+      <td><span class="num">${fmtNumber(goal.actualValue, goal.unit)}</span></td>
+      <td>
+        <div class="progress">
+          <span class="num">${rate === null ? '-' : `${Math.round(rate)}%`}</span>
+          <div class="bar"><div class="bar-fill ${status}" style="width:${fill}%"></div></div>
+        </div>
+      </td>
+      <td><span class="status-pill ${status}">${statusLabel(status)}</span></td>
+      <td><span class="num">${fmtCurrency(goal.incentive)}</span></td>
+      <td><div>${escapeHtml(updated)}</div><div class="goal-detail">${escapeHtml(goal.updatedBy || goal.createdBy || '')}</div></td>
+      <td>
+        <div class="actions-cell">
+          <button class="icon-btn" onclick="openGoalModal('${goal.id}')" title="${isEditor() ? '編集' : '詳細'}">${isEditor() ? '編集' : '詳細'}</button>
+        </div>
+      </td>
+    </tr>`;
+}
+
+function historyText(goal) {
+  const items = [1, 2, 3].map(i => {
+    const label = goal.history?.[i - 1]?.label || '';
+    const value = goal.history?.[i - 1]?.value ?? '';
+    if (!label && value === '') return '';
+    return `${label || `${i}ヶ月前`}: ${fmtNumber(value, goal.unit)}`;
+  }).filter(Boolean);
+  return items.join(' / ');
+}
+
+function escapeHtml(text) {
+  return String(text ?? '').replace(/[&<>"']/g, ch => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[ch]));
+}
+
+window.openGoalModal = function(id = null) {
+  editingId = id;
+  const goal = id ? allGoals[id] : null;
+  document.getElementById('modalTitle').textContent = goal ? (isEditor() ? '目標を編集' : '目標の詳細') : '目標を登録';
+  document.getElementById('deleteBtn').style.display = goal && isEditor() ? 'inline-flex' : 'none';
+  document.getElementById('saveBtn').style.display = isEditor() ? 'inline-flex' : 'none';
+
+  const month = document.getElementById('monthFilter').value || currentMonth();
+  setFormValue('fMonth', goal?.month || month);
+  setFormValue('fDepartment', goal?.department || '全体');
+  setFormValue('fItem', goal?.item || '');
+  setFormValue('fUnit', goal?.unit || '');
+  setFormValue('fDetail', goal?.detail || '');
+  setFormValue('fDirection', goal?.direction || 'up');
+  setFormValue('fCurrent', goal?.currentValue ?? '');
+  setFormValue('fTarget', goal?.targetValue ?? '');
+  setFormValue('fActual', goal?.actualValue ?? '');
+  setFormValue('fIncentive', goal?.incentive ?? '');
+  setFormValue('fOwner', goal?.owner || currentUser.name);
+  setFormValue('fNote', goal?.note || '');
+
+  for (let i = 1; i <= 3; i++) {
+    setFormValue(`fHistoryLabel${i}`, goal?.history?.[i - 1]?.label || '');
+    setFormValue(`fHistoryValue${i}`, goal?.history?.[i - 1]?.value ?? '');
+  }
+
+  document.querySelectorAll('#goalModal input, #goalModal select, #goalModal textarea').forEach(el => {
+    el.disabled = !isEditor();
+  });
+  document.getElementById('goalModal').classList.add('open');
+};
+
+function setFormValue(id, value) {
+  document.getElementById(id).value = value;
+}
+
+window.closeGoalModal = function() {
+  document.getElementById('goalModal').classList.remove('open');
+  editingId = null;
+};
+
+window.closeModalOnBackdrop = function(event) {
+  if (event.target.id === 'goalModal') closeGoalModal();
+};
+
+window.saveGoal = async function() {
+  if (!isEditor() || saving) return;
+  const item = document.getElementById('fItem').value.trim();
+  if (!item) { showToast('項目を入力してください'); return; }
+  const month = document.getElementById('fMonth').value;
+  if (!month) { showToast('対象月を選択してください'); return; }
+
+  const data = {
+    month,
+    department: document.getElementById('fDepartment').value,
+    item,
+    unit: document.getElementById('fUnit').value.trim(),
+    detail: document.getElementById('fDetail').value.trim(),
+    direction: document.getElementById('fDirection').value,
+    currentValue: document.getElementById('fCurrent').value.trim(),
+    targetValue: document.getElementById('fTarget').value.trim(),
+    actualValue: document.getElementById('fActual').value.trim(),
+    incentive: document.getElementById('fIncentive').value.trim(),
+    owner: document.getElementById('fOwner').value.trim(),
+    note: document.getElementById('fNote').value.trim(),
+    history: [1, 2, 3].map(i => ({
+      label: document.getElementById(`fHistoryLabel${i}`).value.trim(),
+      value: document.getElementById(`fHistoryValue${i}`).value.trim()
+    })),
+    updatedAt: Date.now(),
+    updatedBy: currentUser.name
+  };
+
+  saving = true;
+  document.getElementById('saveBtn').disabled = true;
+  try {
+    if (editingId) {
+      const existing = allGoals[editingId] || {};
+      await set(ref(db, `${DB_PATH}/${editingId}`), { ...existing, ...data });
+      showToast('目標を更新しました');
+    } else {
+      await push(ref(db, DB_PATH), {
+        ...data,
+        createdAt: Date.now(),
+        createdBy: currentUser.name
+      });
+      showToast('目標を登録しました');
+    }
+    document.getElementById('monthFilter').value = month;
+    closeGoalModal();
+  } catch(e) {
+    showToast('保存に失敗しました: ' + e.message);
+  } finally {
+    saving = false;
+    document.getElementById('saveBtn').disabled = false;
+  }
+};
+
+window.deleteGoal = async function() {
+  if (!isEditor() || !editingId) return;
+  if (!confirm('この目標を削除しますか？')) return;
+  try {
+    await remove(ref(db, `${DB_PATH}/${editingId}`));
+    closeGoalModal();
+    showToast('削除しました');
+  } catch(e) {
+    showToast('削除に失敗しました: ' + e.message);
+  }
+};
+
+window.seedTemplates = async function() {
+  if (!isEditor()) return;
+  const month = document.getElementById('monthFilter').value || currentMonth();
+  const existing = monthGoals(month);
+  if (existing.length) {
+    if (!confirm(`${monthLabel(month)}には既に${existing.length}件あります。テンプレートを追加しますか？`)) return;
+  } else if (!confirm(`${monthLabel(month)}の初期目標をPDFテンプレートから作成しますか？`)) {
+    return;
+  }
+
+  try {
+    for (const template of TEMPLATE_ITEMS) {
+      await push(ref(db, DB_PATH), {
+        ...template,
+        month,
+        currentValue: '',
+        targetValue: '',
+        actualValue: '',
+        incentive: '',
+        owner: currentUser.name,
+        note: '',
+        history: [
+          { label: '', value: '' },
+          { label: '', value: '' },
+          { label: '', value: '' }
+        ],
+        createdAt: Date.now(),
+        createdBy: currentUser.name,
+        updatedAt: Date.now(),
+        updatedBy: currentUser.name
+      });
+    }
+    showToast('テンプレートを作成しました');
+  } catch(e) {
+    showToast('テンプレート作成に失敗しました: ' + e.message);
+  }
+};
+
+window.exportCSV = function() {
+  const goals = filteredGoals();
+  if (!goals.length) { showToast('出力する目標がありません'); return; }
+  const headers = [
+    '対象月','担当区分','項目','詳細','現状数値','3ヶ月内訳1','3ヶ月内訳2','3ヶ月内訳3',
+    '目標数値','実績数値','達成率','状況','単位','判定方向','インセンティブ','入力担当','メモ','更新者','更新日'
+  ];
+  const rows = goals.map(goal => {
+    const rate = calcRate(goal);
+    return [
+      goal.month,
+      goal.department,
+      goal.item,
+      goal.detail,
+      goal.currentValue,
+      historyCsvValue(goal, 0),
+      historyCsvValue(goal, 1),
+      historyCsvValue(goal, 2),
+      goal.targetValue,
+      goal.actualValue,
+      rate === null ? '' : `${Math.round(rate)}%`,
+      statusLabel(goalStatus(goal)),
+      goal.unit,
+      goal.direction === 'down' ? '少ないほど達成' : '多いほど達成',
+      goal.incentive,
+      goal.owner,
+      goal.note,
+      goal.updatedBy || goal.createdBy || '',
+      goal.updatedAt ? new Date(goal.updatedAt).toLocaleDateString('ja-JP') : ''
+    ];
+  });
+
+  const csv = [headers, ...rows]
+    .map(row => row.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(','))
+    .join('\n');
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `月間目標_${document.getElementById('monthFilter').value || currentMonth()}.csv`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+};
+
+function historyCsvValue(goal, index) {
+  const item = goal.history?.[index];
+  if (!item) return '';
+  return `${item.label || ''}:${item.value ?? ''}`;
+}
+
+window.sendLineWorksSummary = async function() {
+  if (!isEditor()) return;
+  const month = document.getElementById('monthFilter').value || currentMonth();
+  const goals = monthGoals(month);
+  if (!goals.length) { showToast('通知する目標がありません'); return; }
+  const done = goals.filter(g => goalStatus(g) === 'done');
+  const behind = goals.filter(g => goalStatus(g) === 'behind');
+  const blank = goals.filter(g => goalStatus(g) === 'blank');
+  const avgRates = goals.map(calcRate).filter(v => v !== null);
+  const avg = avgRates.length ? Math.round(avgRates.reduce((a, b) => a + b, 0) / avgRates.length) : '-';
+  const lowLines = behind.slice(0, 5).map(g => {
+    const rate = calcRate(g);
+    return `・${g.item}: ${rate === null ? '-' : Math.round(rate) + '%'}（実績 ${fmtNumber(g.actualValue, g.unit)} / 目標 ${fmtNumber(g.targetValue, g.unit)}）`;
+  });
+  const text = [
+    `【月間目標】${monthLabel(month)} 達成状況`,
+    `登録: ${goals.length}件`,
+    `達成: ${done.length}件`,
+    `未達: ${behind.length}件`,
+    `実績未入力: ${blank.length}件`,
+    `平均達成率: ${avg}%`,
+    lowLines.length ? '\n要確認:\n' + lowLines.join('\n') : '',
+    `\n送信者: ${currentUser.name}`
+  ].filter(Boolean).join('\n');
+
+  try {
+    const res = await fetch(NOTIFY_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text })
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    showToast('LINE WORKSに通知しました');
+  } catch(e) {
+    showToast('通知に失敗しました: ' + e.message);
+  }
+};
+
+function showToast(message) {
+  const toast = document.getElementById('toast');
+  toast.textContent = message;
+  toast.classList.add('show');
+  clearTimeout(showToast.timer);
+  showToast.timer = setTimeout(() => toast.classList.remove('show'), 2800);
+}
+
+window.render = render;
+
+init();
+</script>
+</body>
+</html>
