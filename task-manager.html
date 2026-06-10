@@ -837,7 +837,7 @@ let gsiReady     = false;
 // ===== STAFF =====
 const STAFF = {
   DR: ['院長','嶋中','保刈','篠田'],
-  DH: ['鶴田','吉田','高木','松本','野崎','山田','ハノワ'],
+  DH: ['鶴田','吉田','高木','松本','山田','ハノワ'],
   DA: ['田宮','田中','百々']
 };
 const ROLE_OF = {};
@@ -853,7 +853,7 @@ function resolveUser() {
   const name = p.get('name'), sid = p.get('sid');
   if (name && sid) {
     const rm = { sugihira:'DR',shimanaka:'DR',hokari:'DR',shinoda:'DR',
-                 tsuruta:'DH',yoshida:'DH',takagi:'DH',matsumoto:'DH',nozaki:'DH',yamada:'DH',hanowa:'DH',
+                 tsuruta:'DH',yoshida:'DH',takagi:'DH',matsumoto:'DH',yamada:'DH',hanowa:'DH',
                  tamiya:'DA',tanaka:'DA',momo:'DA' };
     return { name, staffId: sid, role: rm[sid]||'DH' };
   }
@@ -904,13 +904,14 @@ window._setName = function() {
   Object.entries(STAFF).forEach(([r,names]) => names.forEach(n => rm[n]=r));
   // staffIdマッピング
   const sidMap = { '院長':'sugihira','嶋中':'shimanaka','保刈':'hokari','篠田':'shinoda',
-    '鶴田':'tsuruta','吉田':'yoshida','高木':'takagi','松本':'matsumoto','野崎':'nozaki','山田':'yamada','ハノワ':'hanowa',
+    '鶴田':'tsuruta','吉田':'yoshida','高木':'takagi','松本':'matsumoto','山田':'yamada','ハノワ':'hanowa',
     '田宮':'tamiya','田中':'tanaka','百々':'momo' };
   currentUser = { name: sel, role: rm[sel]||'DH', staffId: sidMap[sel]||'' };
   sessionStorage.setItem('taskUserName', sel);
   document.getElementById('nameBanner').remove();
   document.getElementById('userBadge').textContent = sel;
   setupGoogleForIncho();
+  startTaskMaintenance();
 };
 
 // ===== GOOGLE AUTH SETUP =====
@@ -1019,7 +1020,10 @@ window.syncGoogleTasks = async function() {
         // 既存タスクの完了状態を同期
         const fbTask = Object.entries(tasks).find(([,t]) => t.googleTaskId === gt.id);
         if (fbTask && gt.status === 'completed' && fbTask[1].status !== '完了') {
+          const now = Date.now();
           await set(ref(db, `tasks/${fbTask[0]}/status`), '完了');
+          await set(ref(db, `tasks/${fbTask[0]}/completedAt`), now);
+          await set(ref(db, `tasks/${fbTask[0]}/updatedAt`), now);
         }
         continue;
       }
@@ -1041,6 +1045,7 @@ window.syncGoogleTasks = async function() {
         updatedAt:    Date.now(),
         updatedBy:    '院長（Google）',
       };
+      if (newTask.status === '完了') newTask.completedAt = Date.now();
       await push(ref(db, 'tasks'), newTask);
       imported++;
     }
@@ -1139,22 +1144,26 @@ function init() {
     showNameBanner();
   }
   buildAssigneeGrid();
-  let deadlineChecked = false;
   onValue(ref(db, 'tasks'), snap => {
     tasks = snap.val() || {};
     render();
-    if (!deadlineChecked && currentUser) {
-      deadlineChecked = true;
-      setTimeout(async () => {
-        await checkTaskDeadlines();
-        await cleanupCompletedExpired();
-      }, 1500);
-    }
+    startTaskMaintenance();
   });
 }
 
 // ===== DATE HELPERS =====
-function todayStr() { return new Date().toISOString().split('T')[0]; }
+function localDateStr(date = new Date()) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+function todayStr(date = new Date()) { return localDateStr(date); }
+function dateOffsetStr(offset, base = new Date()) {
+  const d = new Date(base);
+  d.setDate(d.getDate() + offset);
+  return localDateStr(d);
+}
 function isOverdue(d) { return d && d < todayStr(); }
 function isToday(d)   { return d === todayStr(); }
 function fmtDate(d) {
@@ -1421,39 +1430,140 @@ function handleOverlayClick(e) { if (e.target===document.getElementById('overlay
 
 // ─── LINEワークス通知 ───────────────────────────────
 const NOTIFY_URL = 'https://kalmia-notify.chibakenmin-sugihey.workers.dev';
+const NOTIFY_START_HOUR = 8;
+const NOTIFY_END_HOUR   = 19;
+const NOTIFY_QUEUE_KEY  = 'task_notify_queue';
 
-async function sendNotify(text) {
-  try {
-    await fetch(NOTIFY_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text })
-    });
-  } catch(e) { console.warn('通知失敗:', e); }
+let taskMaintenanceStarted = false;
+let deadlineCheckTimer = null;
+let lastDeadlineCheckDate = '';
+
+function isNotifyWindow(now = new Date()) {
+  const minutes = now.getHours() * 60 + now.getMinutes();
+  return minutes >= NOTIFY_START_HOUR * 60 && minutes <= NOTIFY_END_HOUR * 60;
 }
 
-// タスク期限通知（1日1回のみ）
+function msUntilNextNotifyWindow(now = new Date(), forceTomorrow = false) {
+  const target = new Date(now);
+  target.setHours(NOTIFY_START_HOUR, 0, 0, 0);
+  if (forceTomorrow || now > target) target.setDate(target.getDate() + 1);
+  return Math.max(0, target.getTime() - now.getTime());
+}
 
-// ─── 完了済み・期限切れタスクの自動削除 ─────────────────
+function getNotifyQueue() {
+  try { return JSON.parse(localStorage.getItem(NOTIFY_QUEUE_KEY) || '[]'); }
+  catch(e) { return []; }
+}
+
+function saveNotifyQueue(queue) {
+  localStorage.setItem(NOTIFY_QUEUE_KEY, JSON.stringify(queue));
+}
+
+function queueNotify(text) {
+  const queue = getNotifyQueue();
+  queue.push({ text, queuedAt: Date.now() });
+  saveNotifyQueue(queue);
+}
+
+async function postNotify(text) {
+  const res = await fetch(NOTIFY_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text })
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+}
+
+async function flushNotifyQueue() {
+  if (!isNotifyWindow()) return;
+  const queue = getNotifyQueue();
+  if (!queue.length) return;
+
+  const remaining = [];
+  for (const item of queue) {
+    try { await postNotify(item.text); }
+    catch(e) {
+      console.warn('保留通知の送信失敗:', e);
+      remaining.push(item);
+    }
+  }
+  saveNotifyQueue(remaining);
+}
+
+async function sendNotify(text) {
+  if (!isNotifyWindow()) {
+    queueNotify(text);
+    scheduleDeadlineCheck();
+    return false;
+  }
+
+  try {
+    await flushNotifyQueue();
+    await postNotify(text);
+    return true;
+  } catch(e) {
+    console.warn('通知失敗:', e);
+    return false;
+  }
+}
+
+function scheduleDeadlineCheck() {
+  if (deadlineCheckTimer) clearTimeout(deadlineCheckTimer);
+
+  const now = new Date();
+  const today = todayStr(now);
+  const delay = isNotifyWindow(now) && lastDeadlineCheckDate !== today
+    ? 1500
+    : msUntilNextNotifyWindow(now, isNotifyWindow(now));
+
+  deadlineCheckTimer = setTimeout(async () => {
+    await flushNotifyQueue();
+    await checkTaskDeadlines();
+    scheduleDeadlineCheck();
+  }, delay);
+}
+
+function startTaskMaintenance() {
+  if (taskMaintenanceStarted || !currentUser) return;
+  taskMaintenanceStarted = true;
+  setTimeout(async () => { await cleanupCompletedExpired(); }, 1500);
+  scheduleDeadlineCheck();
+}
+
+// タスク期限通知（8:00〜19:00内で1日1回。期限切れは完了まで毎日）
+
+// ─── 完了から1週間経過したタスクの自動削除 ─────────────────
+const COMPLETED_DELETE_AFTER_MS = 7 * 24 * 60 * 60 * 1000;
+
 async function cleanupCompletedExpired() {
-  const today = new Date().toISOString().split('T')[0];
+  const now = Date.now();
   for (const [tid, t] of Object.entries(tasks)) {
-    // 完了済み かつ（期限なし OR 期限切れ）
-    if (t.status === '完了' && (!t.date || t.date < today)) {
-      try {
-        await remove(ref(db, `tasks/${tid}`));
-      } catch(e) { console.warn('削除失敗:', e); }
+    if (t.status !== '完了') continue;
+
+    const completedAt = Number(t.completedAt || 0);
+    if (!completedAt) {
+      try { await set(ref(db, `tasks/${tid}/completedAt`), now); }
+      catch(e) { console.warn('完了日時の補完に失敗:', e); }
+      continue;
+    }
+
+    if (now - completedAt >= COMPLETED_DELETE_AFTER_MS) {
+      try { await remove(ref(db, `tasks/${tid}`)); }
+      catch(e) { console.warn('削除失敗:', e); }
     }
   }
 }
 
 async function checkTaskDeadlines() {
-  const today    = new Date().toISOString().split('T')[0];
-  const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
+  if (!isNotifyWindow()) return;
+
+  const today    = todayStr();
+  const tomorrow = dateOffsetStr(1);
   const userName = currentUser?.name;
   if (!userName) return;
+  lastDeadlineCheckDate = today;
 
-  // 今日すでに通知済みのタスクIDを記録
+  // 今日すでに通知済みのタスクIDを記録。期限切れも翌日は再通知する。
   const storageKey = `task_notified_${today}`;
   const notified = new Set(JSON.parse(localStorage.getItem(storageKey) || '[]'));
 
@@ -1466,14 +1576,11 @@ async function checkTaskDeadlines() {
     const createdBy = t.createdBy || '不明';
     const taskTitle = t.title || '';
     if (t.date === today) {
-      await sendNotify(`⚠️ 【本日期限】タスクの期限は今日です！\n${taskTitle}\n担当者：${assigneeStr}\n作成者：${createdBy}`);
-      notified.add(tid);
+      if (await sendNotify(`⚠️ 【本日期限】タスクの期限は今日です！\n${taskTitle}\n担当者：${assigneeStr}\n作成者：${createdBy}`)) notified.add(tid);
     } else if (t.date === tomorrow) {
-      await sendNotify(`📅 【明日期限】タスクの期限は明日です。\n${taskTitle}\n担当者：${assigneeStr}\n作成者：${createdBy}`);
-      notified.add(tid);
+      if (await sendNotify(`📅 【明日期限】タスクの期限は明日です。\n${taskTitle}\n担当者：${assigneeStr}\n作成者：${createdBy}`)) notified.add(tid);
     } else if (t.date < today) {
-      await sendNotify(`🔴 【期限切れ】タスクの期限が過ぎています。\n${taskTitle}\n担当者：${assigneeStr}\n作成者：${createdBy}`);
-      notified.add(tid);
+      if (await sendNotify(`🔴 【期限切れ】タスクの期限が過ぎています。\n${taskTitle}\n担当者：${assigneeStr}\n作成者：${createdBy}`)) notified.add(tid);
     }
   }
   localStorage.setItem(storageKey, JSON.stringify([...notified]));
@@ -1504,7 +1611,13 @@ async function saveTask() {
   try {
     if (editingId) {
       const existing = tasks[editingId] || {};
-      await set(ref(db, `tasks/${editingId}`), { ...existing, ...data });
+      const payload = { ...existing, ...data };
+      if (newStatus === '完了') {
+        payload.completedAt = existing.status === '完了' && existing.completedAt ? existing.completedAt : Date.now();
+      } else {
+        delete payload.completedAt;
+      }
+      await set(ref(db, `tasks/${editingId}`), payload);
       // Googleタスクが紐づいていて完了になった場合
       if (newStatus === '完了' && existing.googleTaskId) {
         await completeGoogleTask(existing.googleTaskId, existing.googleListId);
@@ -1519,6 +1632,7 @@ async function saveTask() {
     } else {
       data.createdAt = Date.now();
       data.createdBy = currentUser?.name||'不明';
+      if (newStatus === '完了') data.completedAt = Date.now();
       await push(ref(db, 'tasks'), data);
       showToast('追加しました');
       // LINEワークス通知
@@ -1571,9 +1685,12 @@ window.quickComplete = async function() {
   const current = tasks[editingId].status;
   const newStatus = current === '完了' ? '未着手' : '完了';
   try {
+    const now = Date.now();
     await set(ref(db, `tasks/${editingId}/status`), newStatus);
-    await set(ref(db, `tasks/${editingId}/updatedAt`), Date.now());
+    await set(ref(db, `tasks/${editingId}/updatedAt`), now);
     await set(ref(db, `tasks/${editingId}/updatedBy`), currentUser?.name || '不明');
+    if (newStatus === '完了') await set(ref(db, `tasks/${editingId}/completedAt`), now);
+    else await remove(ref(db, `tasks/${editingId}/completedAt`));
     if (newStatus === '完了' && tasks[editingId].googleTaskId) {
       await completeGoogleTask(tasks[editingId].googleTaskId, tasks[editingId].googleListId);
     }
@@ -1597,9 +1714,12 @@ window._toggleDone = async function(e, id) {
   const current = tasks[id].status;
   const newStatus = current === '完了' ? '未着手' : '完了';
   try {
+    const now = Date.now();
     await set(ref(db, `tasks/${id}/status`), newStatus);
-    await set(ref(db, `tasks/${id}/updatedAt`), Date.now());
+    await set(ref(db, `tasks/${id}/updatedAt`), now);
     await set(ref(db, `tasks/${id}/updatedBy`), currentUser?.name||'不明');
+    if (newStatus === '完了') await set(ref(db, `tasks/${id}/completedAt`), now);
+    else await remove(ref(db, `tasks/${id}/completedAt`));
     // Googleタスクと連携していれば完了を反映
     if (newStatus === '完了' && tasks[id].googleTaskId) {
       await completeGoogleTask(tasks[id].googleTaskId, tasks[id].googleListId);
