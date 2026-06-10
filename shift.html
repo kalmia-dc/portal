@@ -1174,6 +1174,8 @@
         <div class="rule-item"><span class="rule-dot"></span>通常: 8:30〜18:30 (実働9h)</div>
         <div class="rule-item"><span class="rule-dot"></span>遅出: 9:00〜18:30 (実働8.5h) ×月4回（有給1日につき2回減）</div>
         <div class="rule-item"><span class="rule-dot"></span>常勤: 週40hをなるべく超えないよう調整（160h優先・超過時警告）</div>
+        <div class="rule-item"><span class="rule-dot"></span>連勤: 基本3連勤まで、やむを得ない場合のみ4連勤まで（百々は土曜なしのため5連勤可）</div>
+        <div class="rule-item"><span class="rule-dot"></span>DH: 3連勤の回数をできるだけ均等化</div>
         <h4>自動補完</h4>
         <div class="rule-item"><span class="rule-dot"></span>人数不足日 → ハノワ(午後)自動生成</div>
         <div class="rule-item"><span class="rule-dot"></span>DA不足 → 百々を現場アサイン</div>
@@ -1510,6 +1512,7 @@ function dow(y,m,d){ return new Date(y,m,d).getDay(); }
 function dowName(d){ return ['日','月','火','水','木','金','土'][d]; }
 
 function addAlert(type, msg){
+  if(alertMessages.some(a=>a.type===type&&a.msg===msg)) return;
   alertMessages.push({ type, msg, time: new Date().toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'}) });
 }
 function clearAlerts(){ alertMessages = []; }
@@ -1580,6 +1583,9 @@ const TARGET_LATE     = 4;
 const TARGET_EARLY    = 14;
 const TARGET_HOURS    = 160.0;
 const TARGET_WEEKLY_HOURS = 40.0;
+const BASE_CONSECUTIVE_DAYS = 3;
+const MAX_CONSECUTIVE_DAYS = 4;
+const MOMO_MAX_CONSECUTIVE_DAYS = 5;
 
 function isWorking(id, ds){
   const k=shiftData[id]?.[ds]||'';
@@ -1595,6 +1601,56 @@ function isRuleWorkingKey(k){
 function isRuleWorking(id, ds){
   const k=shiftData[id]?.[ds]||'';
   return isRuleWorkingKey(k);
+}
+function isConsecutiveWorkKey(id, k){
+  if(id==='momo') return k==='early'||k==='late'||k==='admin';
+  return k==='early'||k==='late'||k==='fixed';
+}
+function preferredConsecutiveLimit(id){
+  return id==='momo' ? MOMO_MAX_CONSECUTIVE_DAYS : BASE_CONSECUTIVE_DAYS;
+}
+function maxConsecutiveLimit(id){
+  return id==='momo' ? MOMO_MAX_CONSECUTIVE_DAYS : MAX_CONSECUTIVE_DAYS;
+}
+function isNextCalendarDay(prevDs, ds){
+  if(!prevDs||!ds) return false;
+  const a=new Date(parseInt(prevDs.slice(0,4),10), parseInt(prevDs.slice(5,7),10)-1, parseInt(prevDs.slice(8,10),10));
+  const b=new Date(parseInt(ds.slice(0,4),10), parseInt(ds.slice(5,7),10)-1, parseInt(ds.slice(8,10),10));
+  return Math.round((b-a)/(24*60*60*1000))===1;
+}
+function consecutiveStats(id, wds, overrides={}){
+  let streak=0, max=0, tripleWindows=0;
+  let prevDs=null;
+  for(const ds of wds){
+    if(prevDs&&!isNextCalendarDay(prevDs,ds)) streak=0;
+    const k=Object.prototype.hasOwnProperty.call(overrides, ds)
+      ? overrides[ds]
+      : (shiftData[id]?.[ds]||'');
+    if(isConsecutiveWorkKey(id,k)){
+      streak++;
+      max=Math.max(max,streak);
+      if(streak>=BASE_CONSECUTIVE_DAYS) tripleWindows++;
+    } else {
+      streak=0;
+    }
+    prevDs=ds;
+  }
+  return { max, tripleWindows };
+}
+function canSetWithoutHardConsecutive(id, wds, ds, key){
+  return consecutiveStats(id,wds,{ [ds]:key }).max<=maxConsecutiveLimit(id);
+}
+function projectedDhWorkScore(s, ds, wds, key='early'){
+  const stats=consecutiveStats(s.id,wds,{ [ds]:key });
+  const hard=stats.max>maxConsecutiveLimit(s.id) ? 1 : 0;
+  const soft=stats.max>preferredConsecutiveLimit(s.id) ? 1 : 0;
+  return { hard, soft, triples:stats.tripleWindows, workdays:countWorkdays(s.id,wds) };
+}
+function compareDhWorkCandidate(a, b, ds, wds){
+  const sa=projectedDhWorkScore(a,ds,wds);
+  const sb=projectedDhWorkScore(b,ds,wds);
+  return (sa.hard-sb.hard) || (sa.soft-sb.soft) ||
+    (sa.triples-sb.triples) || (sa.workdays-sb.workdays);
 }
 function countCoreDrDh(ds){
   return STAFF.filter(s=>s.role==='DR'||(s.role==='DH'&&s.id!=='hanowa'))
@@ -1733,16 +1789,7 @@ function weeklyOverageScore(id, y, m, days){
     .reduce((sum,w)=>sum+Math.max(0,w.hours-TARGET_WEEKLY_HOURS),0);
 }
 function exceedsConsecutiveLimit(id, wds, maxDays){
-  let streak=0;
-  for(const ds of wds){
-    const k=shiftData[id]?.[ds]||'';
-    const working=id==='momo'
-      ? k==='early'||k==='late'||k==='admin'
-      : k==='early'||k==='late';
-    streak = working ? streak+1 : 0;
-    if(streak>maxDays) return true;
-  }
-  return false;
+  return consecutiveStats(id,wds).max>maxDays;
 }
 function receptionistCovered(ds){
   return isWorking('tamiya',ds)||isWorking('tanaka',ds)||shiftData['momo']?.[ds]==='early';
@@ -1774,7 +1821,7 @@ function canReceiveWeeklyMove(s, ds, moveKey, y, m, wds, fullStaff){
   }
   const old=shiftData[s.id][ds];
   shiftData[s.id][ds]=moveKey;
-  const ok=!exceedsConsecutiveLimit(s.id, wds, s.id==='momo'?5:3);
+  const ok=!exceedsConsecutiveLimit(s.id, wds, maxConsecutiveLimit(s.id));
   shiftData[s.id][ds]=old;
   return ok;
 }
@@ -1817,7 +1864,7 @@ function balanceWeeklyHours(staffList, y, m, days, wds, fullStaff){
 
             const valid=dailyCoverageOkAfterWeeklyBalance(sourceDs,y,m) &&
               dailyCoverageOkAfterWeeklyBalance(targetDs,y,m) &&
-              !exceedsConsecutiveLimit(s.id,wds,s.id==='momo'?5:3);
+              !exceedsConsecutiveLimit(s.id,wds,maxConsecutiveLimit(s.id));
             const afterScore=valid ? weeklyOverageScore(s.id,y,m,days) : beforeScore;
             const maxAfter=valid
               ? Math.max(...weeklyHourSummary(s.id,y,m,days).map(w=>w.hours))
@@ -1846,6 +1893,131 @@ function balanceWeeklyHours(staffList, y, m, days, wds, fullStaff){
     }
   });
   return moves;
+}
+function canRemoveWorkForBalance(s, ds, y, m){
+  const k=shiftData[s.id]?.[ds]||'';
+  if(k!=='early'&&k!=='late') return false;
+  if(isSatMandatoryDay(s.id, ds)) return false;
+  if(s.role==='DH'){
+    const old=shiftData[s.id][ds];
+    shiftData[s.id][ds]='off';
+    const ok=dailyCoverageOkAfterWeeklyBalance(ds,y,m);
+    shiftData[s.id][ds]=old;
+    if(!ok) return false;
+  }
+  return true;
+}
+function canSwapDhWorkDays(high, low, sourceDs, targetDs, wds, y, m){
+  if(shiftData[high.id]?.[sourceDs]!=='early') return false;
+  if(shiftData[low.id]?.[sourceDs]!=='off') return false;
+  if(shiftData[high.id]?.[targetDs]!=='off') return false;
+  if(shiftData[low.id]?.[targetDs]!=='early') return false;
+  if(!canRemoveWorkForBalance(high, sourceDs, y, m)) return false;
+  if(!canRemoveWorkForBalance(low, targetDs, y, m)) return false;
+
+  const highBefore=consecutiveStats(high.id,wds).tripleWindows;
+  const lowBefore=consecutiveStats(low.id,wds).tripleWindows;
+  const oldHighSource=shiftData[high.id][sourceDs];
+  const oldHighTarget=shiftData[high.id][targetDs];
+  const oldLowSource=shiftData[low.id][sourceDs];
+  const oldLowTarget=shiftData[low.id][targetDs];
+
+  shiftData[high.id][sourceDs]='off';
+  shiftData[high.id][targetDs]='early';
+  shiftData[low.id][sourceDs]='early';
+  shiftData[low.id][targetDs]='off';
+
+  const highAfter=consecutiveStats(high.id,wds);
+  const lowAfter=consecutiveStats(low.id,wds);
+  const valid=highAfter.max<=maxConsecutiveLimit(high.id) &&
+    lowAfter.max<=maxConsecutiveLimit(low.id) &&
+    highAfter.tripleWindows<=highBefore &&
+    lowAfter.tripleWindows>=lowBefore &&
+    dailyCoverageOkAfterWeeklyBalance(sourceDs,y,m) &&
+    dailyCoverageOkAfterWeeklyBalance(targetDs,y,m);
+
+  shiftData[high.id][sourceDs]=oldHighSource;
+  shiftData[high.id][targetDs]=oldHighTarget;
+  shiftData[low.id][sourceDs]=oldLowSource;
+  shiftData[low.id][targetDs]=oldLowTarget;
+  return valid;
+}
+function balanceDhThreeStreaks(dhStaff, y, m, wds){
+  let moves=0;
+  for(let pass=0; pass<30; pass++){
+    const stats=dhStaff.map(s=>({ s, ...consecutiveStats(s.id,wds) }))
+      .sort((a,b)=>b.tripleWindows-a.tripleWindows);
+    const high=stats[0];
+    const low=stats[stats.length-1];
+    if(!high||!low||high.tripleWindows-low.tripleWindows<=1) break;
+
+    let best=null;
+    const sourceDays=wds.filter(ds=>{
+      if(shiftData[high.s.id]?.[ds]!=='early') return false;
+      if(shiftData[low.s.id]?.[ds]!=='off') return false;
+      const after=consecutiveStats(high.s.id,wds,{ [ds]:'off' }).tripleWindows;
+      return after<high.tripleWindows;
+    });
+    const targetDays=wds.filter(ds=>{
+      return shiftData[high.s.id]?.[ds]==='off' && shiftData[low.s.id]?.[ds]==='early';
+    });
+
+    for(const sourceDs of sourceDays){
+      for(const targetDs of targetDays){
+        if(!canSwapDhWorkDays(high.s, low.s, sourceDs, targetDs, wds, y, m)) continue;
+        const oldHighSource=shiftData[high.s.id][sourceDs];
+        const oldHighTarget=shiftData[high.s.id][targetDs];
+        const oldLowSource=shiftData[low.s.id][sourceDs];
+        const oldLowTarget=shiftData[low.s.id][targetDs];
+        shiftData[high.s.id][sourceDs]='off';
+        shiftData[high.s.id][targetDs]='early';
+        shiftData[low.s.id][sourceDs]='early';
+        shiftData[low.s.id][targetDs]='off';
+        const next=dhStaff.map(s=>consecutiveStats(s.id,wds).tripleWindows);
+        const spread=Math.max(...next)-Math.min(...next);
+        const highNext=consecutiveStats(high.s.id,wds).tripleWindows;
+        shiftData[high.s.id][sourceDs]=oldHighSource;
+        shiftData[high.s.id][targetDs]=oldHighTarget;
+        shiftData[low.s.id][sourceDs]=oldLowSource;
+        shiftData[low.s.id][targetDs]=oldLowTarget;
+        const candidate={ sourceDs, targetDs, spread, highNext };
+        if(!best || candidate.spread<best.spread ||
+          (candidate.spread===best.spread && candidate.highNext<best.highNext)){
+          best=candidate;
+        }
+      }
+    }
+
+    if(!best) break;
+    shiftData[high.s.id][best.sourceDs]='off';
+    shiftData[high.s.id][best.targetDs]='early';
+    shiftData[low.s.id][best.sourceDs]='early';
+    shiftData[low.s.id][best.targetDs]='off';
+    moves++;
+    addAlert('info', 'DH3連勤均等化: '+high.s.name+' '+best.sourceDs.slice(5)+'⇔'+best.targetDs.slice(5)+' / '+low.s.name);
+  }
+  return moves;
+}
+function addConsecutiveAlerts(staffList, wds){
+  staffList.forEach(s=>{
+    const stats=consecutiveStats(s.id,wds);
+    const max=maxConsecutiveLimit(s.id);
+    if(stats.max>max){
+      addAlert('error', s.name+': 最大連勤'+stats.max+'日（上限'+max+'日）');
+    } else if(s.id!=='momo' && stats.max>BASE_CONSECUTIVE_DAYS){
+      addAlert('warn', s.name+': 4連勤あり（人数制約で許容）');
+    }
+  });
+  const dhStats=staffList.filter(s=>s.role==='DH').map(s=>({
+    name:s.name,
+    count:consecutiveStats(s.id,wds).tripleWindows
+  }));
+  if(dhStats.length){
+    const counts=dhStats.map(x=>x.count);
+    const spread=Math.max(...counts)-Math.min(...counts);
+    const label=dhStats.map(x=>x.name+':'+x.count).join(' / ');
+    addAlert(spread<=1?'info':'warn', 'DH3連勤回数 '+label);
+  }
 }
 function countWorkdays(id, wds){
   return wds.filter(ds=>{
@@ -2226,11 +2398,14 @@ function generateShift(){
       const pending=fullStaff.filter(s=>{
         const k=shiftData[s.id][ds];
         return !k||k==='';
-      }).sort((a,b)=>countWorkdays(a.id,wds)-countWorkdays(b.id,wds));
+      }).sort((a,b)=>{
+        if(a.role==='DH'&&b.role==='DH') return compareDhWorkCandidate(a,b,ds,wds);
+        return countWorkdays(a.id,wds)-countWorkdays(b.id,wds);
+      });
 
       for(const s of pending){
         const wkC=countWorkdays(s.id,wds);
-        if(wkC < TARGET_WORKDAYS){
+        if(wkC < TARGET_WORKDAYS && canSetWithoutHardConsecutive(s.id,wds,ds,'early')){
           shiftData[s.id][ds]='early';
         } else {
           // DHの場合: 公休にするとDH+DA<6になる日は出勤のまま
@@ -2438,7 +2613,7 @@ function generateShift(){
           for(let i=0; i<=wds.length; i++){
             const ds=i<wds.length?wds[i]:null;
             const k=ds?shiftData[s.id][ds]:'off';
-            const isWork=k==='early'||k==='late';
+            const isWork=isConsecutiveWorkKey(s.id,k);
             if(isWork){
               if(streakStart<0) streakStart=i;
               streakLen++;
@@ -2456,11 +2631,11 @@ function generateShift(){
                     let before=0, after=0;
                     for(let dd=xi-1;dd>=Math.max(0,xi-3);dd--){
                       const ak=shiftData[s.id][wds[dd]];
-                      if(ak==='early'||ak==='late') before++; else break;
+                      if(isConsecutiveWorkKey(s.id,ak)) before++; else break;
                     }
                     for(let dd=xi+1;dd<=Math.min(wds.length-1,xi+3);dd++){
                       const ak=shiftData[s.id][wds[dd]];
-                      if(ak==='early'||ak==='late') after++; else break;
+                      if(isConsecutiveWorkKey(s.id,ak)) after++; else break;
                     }
                     return before+1+after<=3;
                   });
@@ -2490,7 +2665,8 @@ function generateShift(){
         // 公休中のDHを出勤日数が少ない順に並べる
         const offDH=fullStaff
           .filter(s=>s.role==='DH'&&shiftData[s.id]?.[ds]==='off')
-          .sort((a,b)=>countWorkdays(a.id,wds)-countWorkdays(b.id,wds));
+          .filter(s=>canSetWithoutHardConsecutive(s.id,wds,ds,'early'))
+          .sort((a,b)=>compareDhWorkCandidate(a,b,ds,wds));
         if(offDH.length===0) continue;
 
         let resolved=false;
@@ -2600,7 +2776,8 @@ function generateShift(){
       // ① 18日未満のDHのみ直接出勤追加
       const underDH=fullStaff
         .filter(s=>s.role==='DH'&&shiftData[s.id][ds]==='off'&&countWorkdays(s.id,wds)<TARGET_WORKDAYS)
-        .sort((a,b)=>countWorkdays(a.id,wds)-countWorkdays(b.id,wds));
+        .filter(s=>canSetWithoutHardConsecutive(s.id,wds,ds,'early'))
+        .sort((a,b)=>compareDhWorkCandidate(a,b,ds,wds));
       for(const target of underDH){
         if(filled>=need) break;
         shiftData[target.id][ds]='early'; filled++;
@@ -2611,7 +2788,8 @@ function generateShift(){
       if(filled<need){
         const fullDH=fullStaff
           .filter(s=>s.role==='DH'&&shiftData[s.id][ds]==='off'&&countWorkdays(s.id,wds)>=TARGET_WORKDAYS)
-          .sort((a,b)=>countWorkdays(a.id,wds)-countWorkdays(b.id,wds));
+          .filter(s=>canSetWithoutHardConsecutive(s.id,wds,ds,'early'))
+          .sort((a,b)=>compareDhWorkCandidate(a,b,ds,wds));
         for(const target of fullDH){
           if(filled>=need) break;
           const swapDay=wds.find(x=>{
@@ -2622,7 +2800,15 @@ function generateShift(){
             const drX=STAFF.filter(s=>s.role==='DR').filter(s=>isWorking(s.id,x)).length;
             const dhX=STAFF.filter(s=>s.role==='DH'&&s.id!=='hanowa'&&s.id!==target.id).filter(s=>isWorking(s.id,x)).length;
             const daX=['tamiya','tanaka','momo'].filter(id=>{ const k2=shiftData[id]?.[x]||''; return k2==='early'||k2==='late'||k2==='admin'; }).length;
-            return drX+dhX>=5 && dhX+daX>=5;
+            if(!(drX+dhX>=5 && dhX+daX>=5)) return false;
+            const oldDs=shiftData[target.id][ds];
+            const oldX=shiftData[target.id][x];
+            shiftData[target.id][x]='off';
+            shiftData[target.id][ds]='early';
+            const ok=!exceedsConsecutiveLimit(target.id,wds,maxConsecutiveLimit(target.id));
+            shiftData[target.id][ds]=oldDs;
+            shiftData[target.id][x]=oldX;
+            return ok;
           });
           if(swapDay){
             shiftData[target.id][swapDay]='off';
@@ -2831,7 +3017,8 @@ function generateShift(){
         // 公休DHを探してスワップ
         const offDH=fullStaff
           .filter(s=>s.role==='DH'&&shiftData[s.id]?.[ds]==='off')
-          .sort((a,b)=>countWorkdays(a.id,wds)-countWorkdays(b.id,wds));
+          .filter(s=>canSetWithoutHardConsecutive(s.id,wds,ds,'early'))
+          .sort((a,b)=>compareDhWorkCandidate(a,b,ds,wds));
         if(offDH.length===0) continue;
 
         const target=offDH[0];
@@ -2874,7 +3061,7 @@ function generateShift(){
         for(let i=0; i<=wds.length; i++){
           const ds=i<wds.length?wds[i]:null;
           const k=ds?shiftData[s.id][ds]:'off';
-          const isWork=k==='early'||k==='late';
+          const isWork=isConsecutiveWorkKey(s.id,k);
           if(isWork){
             if(streakStart<0) streakStart=i;
             streakLen++;
@@ -2899,12 +3086,7 @@ function generateShift(){
                 }
                 // DH制約
                 if(s.role==='DH'){
-                  const drN=STAFF.filter(x=>x.role==='DR').filter(x=>isWorking(x.id,breakDs)).length;
-                  const dhN=STAFF.filter(x=>x.role==='DH'&&x.id!=='hanowa'&&x.id!==s.id)
-                    .filter(x=>isWorking(x.id,breakDs)).length;
-                  if(drN+dhN<5) continue;
-                  const daN2=countFieldDa(breakDs);
-                  if(dhN+daN2<6) continue;
+                  if(!canRemoveWorkForBalance(s, breakDs, y, m)) continue;
                 }
                 // 代替出勤日を探す
                 const altWork=wds.find(x=>{
@@ -2913,11 +3095,11 @@ function generateShift(){
                   let before=0,after=0;
                   for(let di=xi-1;di>=Math.max(0,xi-3);di--){
                     const ak=shiftData[s.id][wds[di]];
-                    if(ak==='early'||ak==='late') before++; else break;
+                    if(isConsecutiveWorkKey(s.id,ak)) before++; else break;
                   }
                   for(let di=xi+1;di<=Math.min(wds.length-1,xi+3);di++){
                     const ak=shiftData[s.id][wds[di]];
-                    if(ak==='early'||ak==='late') after++; else break;
+                    if(isConsecutiveWorkKey(s.id,ak)) after++; else break;
                   }
                   return before+1+after<=3;
                 });
@@ -2945,17 +3127,7 @@ function generateShift(){
         if(total<TARGET_WORKDAYS){
           const offArr=wds.filter(ds=>{
             if(shiftData[s.id][ds]!=='off') return false;
-            const xi=wds.indexOf(ds);
-            let before=0,after=0;
-            for(let di=xi-1;di>=Math.max(0,xi-3);di--){
-              const ak=shiftData[s.id][wds[di]];
-              if(ak==='early'||ak==='late') before++; else break;
-            }
-            for(let di=xi+1;di<=Math.min(wds.length-1,xi+3);di++){
-              const ak=shiftData[s.id][wds[di]];
-              if(ak==='early'||ak==='late') after++; else break;
-            }
-            return before+1+after<=3;
+            return consecutiveStats(s.id,wds,{ [ds]:'early' }).max<=preferredConsecutiveLimit(s.id);
           }).sort((a,b)=>a.localeCompare(b));
 
           for(const ds of offArr){
@@ -2965,7 +3137,7 @@ function generateShift(){
 
           // それでも足りなければ制約なしで追加
           if(total<TARGET_WORKDAYS){
-            const offArr2=wds.filter(ds=>shiftData[s.id][ds]==='off')
+            const offArr2=wds.filter(ds=>shiftData[s.id][ds]==='off'&&canSetWithoutHardConsecutive(s.id,wds,ds,'early'))
               .sort((a,b)=>a.localeCompare(b));
             for(const ds of offArr2){
               if(total>=TARGET_WORKDAYS) break;
@@ -2979,7 +3151,7 @@ function generateShift(){
         for(let i=0; i<=wds.length; i++){
           const ds=i<wds.length?wds[i]:null;
           const k=ds?shiftData[s.id][ds]:'off';
-          if(k==='early'||k==='late'){
+          if(isConsecutiveWorkKey(s.id,k)){
             if(streakStart<0) streakStart=i;
             streakLen++;
           } else {
@@ -2992,12 +3164,7 @@ function generateShift(){
                 // 土曜固定スタッフの土曜日は削れない
                 if(isSatMandatoryDay(s.id, breakDs)) continue;
                 if(s.role==='DH'){
-                  const drN=STAFF.filter(x=>x.role==='DR').filter(x=>isWorking(x.id,breakDs)).length;
-                  const dhN=STAFF.filter(x=>x.role==='DH'&&x.id!=='hanowa'&&x.id!==s.id)
-                    .filter(x=>isWorking(x.id,breakDs)).length;
-                  if(drN+dhN<5) continue;
-                  const daN2=countFieldDa(breakDs);
-                  if(dhN+daN2<6) continue;
+                  if(!canRemoveWorkForBalance(s, breakDs, y, m)) continue;
                 }
                 if(s.id==='tamiya'||s.id==='tanaka'){
                   const p=s.id==='tamiya'?'tanaka':'tamiya';
@@ -3014,11 +3181,11 @@ function generateShift(){
                   let before=0,after=0;
                   for(let di=xi-1;di>=Math.max(0,xi-3);di--){
                     const ak=shiftData[s.id][wds[di]];
-                    if(ak==='early'||ak==='late') before++; else break;
+                    if(isConsecutiveWorkKey(s.id,ak)) before++; else break;
                   }
                   for(let di=xi+1;di<=Math.min(wds.length-1,xi+3);di++){
                     const ak=shiftData[s.id][wds[di]];
-                    if(ak==='early'||ak==='late') after++; else break;
+                    if(isConsecutiveWorkKey(s.id,ak)) after++; else break;
                   }
                   return before+1+after<=3;
                 });
@@ -3045,7 +3212,16 @@ function generateShift(){
 
       // 不足 → 制約を一切無視して公休を出勤に変える
       if(total<TARGET_WORKDAYS){
-        const offArr=wds.filter(ds=>shiftData[s.id][ds]==='off')
+        const preferredOffArr=wds.filter(ds=>{
+          if(shiftData[s.id][ds]!=='off') return false;
+          return consecutiveStats(s.id,wds,{ [ds]:'early' }).max<=preferredConsecutiveLimit(s.id);
+        }).sort((a,b)=>a.localeCompare(b));
+        for(const ds of preferredOffArr){
+          if(total>=TARGET_WORKDAYS) break;
+          shiftData[s.id][ds]='early'; total++;
+        }
+
+        const offArr=wds.filter(ds=>shiftData[s.id][ds]==='off'&&canSetWithoutHardConsecutive(s.id,wds,ds,'early'))
           .sort((a,b)=>a.localeCompare(b));
         for(const ds of offArr){
           if(total>=TARGET_WORKDAYS) break;
@@ -3124,20 +3300,19 @@ function generateShift(){
       let anyFixed=false;
       for(const s of allCheckStaff){
         const isMomo=s.id==='momo';
+        const maxLimit=maxConsecutiveLimit(s.id);
         let streakStart=-1, streakLen=0;
         for(let i=0; i<=wds.length; i++){
           const ds=i<wds.length?wds[i]:null;
           const k=ds?shiftData[s.id][ds]:'off';
-          const isWork=isMomo
-            ?(k==='early'||k==='late'||k==='admin')
-            :(k==='early'||k==='late');
+          const isWork=isConsecutiveWorkKey(s.id,k);
           if(isWork){
             if(streakStart<0) streakStart=i;
             streakLen++;
           } else {
-            if(streakLen>3){
+            if(streakLen>maxLimit){
               // 4日目を公休に
-              for(let bi=streakStart+3; bi>=streakStart+1; bi--){
+              for(let bi=streakStart+maxLimit; bi>=streakStart+1; bi--){
                 const breakDs=wds[bi];
                 if(!breakDs) continue;
                 const bk=shiftData[s.id][breakDs];
@@ -3156,12 +3331,7 @@ function generateShift(){
                 }
                 // DH制約
                 if(s.role==='DH'){
-                  const drN=STAFF.filter(x=>x.role==='DR').filter(x=>isWorking(x.id,breakDs)).length;
-                  const dhN=STAFF.filter(x=>x.role==='DH'&&x.id!=='hanowa'&&x.id!==s.id)
-                    .filter(x=>isWorking(x.id,breakDs)).length;
-                  if(drN+dhN<5) continue;
-                  const daN2=countFieldDa(breakDs);
-                  if(dhN+daN2<6) continue;
+                  if(!canRemoveWorkForBalance(s, breakDs, y, m)) continue;
                 }
                 const altWork=wds.find(x=>{
                   const xk=shiftData[s.id][x];
@@ -3169,17 +3339,17 @@ function generateShift(){
                   if(isMomo&&isSaturday(y,m,parseInt(x.slice(8,10)))) return false;
                   const xi=wds.indexOf(x);
                   let before=0,after=0;
-                  for(let di=xi-1;di>=Math.max(0,xi-3);di--){
+                  for(let di=xi-1;di>=Math.max(0,xi-maxLimit);di--){
                     const ak=shiftData[s.id][wds[di]];
-                    const w=isMomo?(ak==='early'||ak==='late'||ak==='admin'):(ak==='early'||ak==='late');
+                    const w=isConsecutiveWorkKey(s.id,ak);
                     if(w) before++; else break;
                   }
-                  for(let di=xi+1;di<=Math.min(wds.length-1,xi+3);di++){
+                  for(let di=xi+1;di<=Math.min(wds.length-1,xi+maxLimit);di++){
                     const ak=shiftData[s.id][wds[di]];
-                    const w=isMomo?(ak==='early'||ak==='late'||ak==='admin'):(ak==='early'||ak==='late');
+                    const w=isConsecutiveWorkKey(s.id,ak);
                     if(w) after++; else break;
                   }
-                  return before+1+after<=3;
+                  return before+1+after<=maxLimit;
                 });
                 shiftData[s.id][breakDs]='off';
                 if(altWork) shiftData[s.id][altWork]=isMomo?bk:'early';
@@ -3200,17 +3370,7 @@ function generateShift(){
       if(total<TARGET_WORKDAYS){
         const offArr=wds.filter(ds=>{
           if(shiftData[s.id][ds]!=='off') return false;
-          const xi=wds.indexOf(ds);
-          let b=0,a=0;
-          for(let di=xi-1;di>=Math.max(0,xi-3);di--){
-            const ak=shiftData[s.id][wds[di]];
-            if(ak==='early'||ak==='late') b++; else break;
-          }
-          for(let di=xi+1;di<=Math.min(wds.length-1,xi+3);di++){
-            const ak=shiftData[s.id][wds[di]];
-            if(ak==='early'||ak==='late') a++; else break;
-          }
-          return b+1+a<=3;
+          return consecutiveStats(s.id,wds,{ [ds]:'early' }).max<=preferredConsecutiveLimit(s.id);
         }).sort((a,b)=>a.localeCompare(b));
         for(const ds of offArr){
           if(total>=TARGET_WORKDAYS) break;
@@ -3218,7 +3378,7 @@ function generateShift(){
         }
         // それでも足りなければ制約なしで補填
         if(total<TARGET_WORKDAYS){
-          wds.filter(ds=>shiftData[s.id][ds]==='off')
+          wds.filter(ds=>shiftData[s.id][ds]==='off'&&canSetWithoutHardConsecutive(s.id,wds,ds,'early'))
             .sort((a,b)=>a.localeCompare(b))
             .forEach(ds=>{ if(total<TARGET_WORKDAYS){ shiftData[s.id][ds]='early'; total++; } });
         }
@@ -3333,7 +3493,8 @@ function generateShift(){
           // スワップで対応（土曜固定保護）
           const offDH=fullStaff
             .filter(s=>s.role==='DH'&&shiftData[s.id][ds]==='off')
-            .sort((a,b)=>countWorkdays(a.id,wds)-countWorkdays(b.id,wds));
+            .filter(s=>canSetWithoutHardConsecutive(s.id,wds,ds,'early'))
+            .sort((a,b)=>compareDhWorkCandidate(a,b,ds,wds));
 
           for(const target of offDH){
             if(filled>=need) break;
@@ -3353,7 +3514,15 @@ function generateShift(){
                 const dhX=STAFF.filter(s=>s.role==='DH'&&s.id!=='hanowa'&&s.id!==target.id).filter(s=>isWorking(s.id,x)).length;
                 const daX=['tamiya','tanaka','momo'].filter(id=>{ const k2=shiftData[id]?.[x]||''; return k2==='early'||k2==='late'||k2==='admin'; }).length;
                 // DR+DH>=5 かつ DH+DA>=6（自分を除いても）
-                return drX+dhX>=5 && dhX+daX>=6;
+                if(!(drX+dhX>=5 && dhX+daX>=6)) return false;
+                const oldDs=shiftData[target.id][ds];
+                const oldX=shiftData[target.id][x];
+                shiftData[target.id][x]='off';
+                shiftData[target.id][ds]='early';
+                const ok=!exceedsConsecutiveLimit(target.id,wds,maxConsecutiveLimit(target.id));
+                shiftData[target.id][ds]=oldDs;
+                shiftData[target.id][x]=oldX;
+                return ok;
               }) || wds.find(x=>{
                 // 条件緩和: DR+DH>=5 のみ
                 if(x===ds) return false;
@@ -3362,7 +3531,15 @@ function generateShift(){
                 if(isSatMandatoryDay(target.id,x)) return false;
                 const drX=STAFF.filter(s=>s.role==='DR').filter(s=>isWorking(s.id,x)).length;
                 const dhX=STAFF.filter(s=>s.role==='DH'&&s.id!=='hanowa'&&s.id!==target.id).filter(s=>isWorking(s.id,x)).length;
-                return drX+dhX>=5;
+                if(!(drX+dhX>=5)) return false;
+                const oldDs=shiftData[target.id][ds];
+                const oldX=shiftData[target.id][x];
+                shiftData[target.id][x]='off';
+                shiftData[target.id][ds]='early';
+                const ok=!exceedsConsecutiveLimit(target.id,wds,maxConsecutiveLimit(target.id));
+                shiftData[target.id][ds]=oldDs;
+                shiftData[target.id][x]=oldX;
+                return ok;
               });
               if(swapDay){
                 shiftData[target.id][swapDay]='off';
@@ -3425,6 +3602,7 @@ function generateShift(){
       if(!anyFixed) break;
     }
     balanceWeeklyHours(STAFF.filter(s=>s.type==='full'), y, m, days, wds, fullStaff);
+    balanceDhThreeStreaks(STAFF.filter(s=>s.role==='DH'&&s.type==='full'), y, m, wds);
     syncHanowaCoverage(y, m, workDays, true);
 
     const checked=new Set();
@@ -3453,6 +3631,7 @@ function generateShift(){
       else if(h<TARGET_HOURS-0.1) addAlert('warn',  s.name+': '+h+'h(目標160h差異あり)');
     });
     addWeeklyHourAlerts(STAFF.filter(s=>s.type==='full'), y, m, days);
+    addConsecutiveAlerts(STAFF.filter(s=>s.type==='full'), wds);
 
     renderAlerts();
     btn.disabled=false;
