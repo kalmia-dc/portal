@@ -477,6 +477,90 @@
     resize: vertical;
   }
 
+  .import-modal {
+    width: min(980px, 100%);
+  }
+
+  .import-drop {
+    display: grid;
+    gap: 10px;
+    padding: 14px;
+    border: 1px dashed #9fcbd3;
+    border-radius: var(--radius);
+    background: #f7fbfc;
+  }
+
+  .import-actions,
+  .import-row-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .import-status {
+    min-height: 24px;
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 800;
+  }
+
+  .import-status.error {
+    color: #b43c3c;
+  }
+
+  .import-status.success {
+    color: var(--green);
+  }
+
+  .import-preview {
+    min-height: 120px;
+    font-family: Consolas, 'Courier New', monospace;
+    font-size: 12px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+  }
+
+  .import-candidate-list {
+    display: grid;
+    gap: 10px;
+  }
+
+  .import-candidate {
+    display: grid;
+    grid-template-columns: 28px minmax(110px, .85fr) minmax(160px, 1.2fr) minmax(90px, .7fr) minmax(70px, .55fr) minmax(120px, .9fr);
+    gap: 8px;
+    align-items: end;
+    padding: 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: #fbfdfe;
+  }
+
+  .import-candidate input,
+  .import-candidate select {
+    width: 100%;
+    min-height: 36px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 7px 8px;
+  }
+
+  .import-candidate-label {
+    display: block;
+    margin-bottom: 4px;
+    color: var(--muted);
+    font-size: 10px;
+    font-weight: 900;
+  }
+
+  .import-raw {
+    grid-column: 2 / -1;
+    color: var(--muted);
+    font-size: 11px;
+    line-height: 1.45;
+  }
+
   .toast {
     position: fixed;
     left: 50%;
@@ -502,6 +586,17 @@
     .summary-board { grid-template-columns: 1fr; align-items: stretch; }
     .toolbar { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .import-candidate {
+      grid-template-columns: 28px minmax(0, 1fr);
+    }
+
+    .import-candidate > div:not(.import-raw) {
+      grid-column: 2;
+    }
+
+    .import-raw {
+      grid-column: 1 / -1;
+    }
   }
 
   @media (max-width: 560px) {
@@ -539,6 +634,7 @@
     <span class="mode-badge" id="modeBadge">確認中</span>
     <button class="btn secondary admin-only" onclick="exportCSV()">CSV</button>
     <button class="btn secondary admin-only" onclick="window.print()">印刷</button>
+    <button class="btn secondary admin-only" onclick="openImportModal()">写真/PDF取込</button>
     <button class="btn primary admin-only" onclick="openMetricModal()">登録</button>
   </div>
 </header>
@@ -642,6 +738,58 @@
   </div>
 </div>
 
+<div class="modal-backdrop" id="importModal" onclick="closeModalOnBackdrop(event)">
+  <div class="modal import-modal">
+    <div class="modal-head">
+      <div>
+        <div class="modal-title">写真/PDFから取り込み</div>
+        <div class="panel-sub">読み取り後、候補を確認してから保存します</div>
+      </div>
+      <button class="icon-btn" onclick="closeImportModal()" title="閉じる">×</button>
+    </div>
+    <div class="form-grid">
+      <div class="field">
+        <label for="importMonth">反映する月</label>
+        <input type="month" id="importMonth">
+      </div>
+      <div class="field">
+        <label for="importDefaultSource">確認元</label>
+        <input type="text" id="importDefaultSource" placeholder="例：月計表、会計、レセコン">
+      </div>
+      <div class="field full">
+        <label for="importFile">PDF / 写真</label>
+        <div class="import-drop">
+          <input type="file" id="importFile" accept="application/pdf,.pdf,image/*" onchange="handleImportFile(this.files[0])">
+          <div class="import-actions">
+            <button class="btn secondary" type="button" onclick="document.getElementById('importFile').click()">ファイルを選択</button>
+            <button class="btn secondary" type="button" onclick="analyzeImportText()">テキストから候補作成</button>
+          </div>
+          <div class="import-status" id="importStatus">PDFは文字抽出、写真やスキャンPDFはOCRで読み取ります。</div>
+        </div>
+      </div>
+      <div class="field full">
+        <label for="importRawText">読み取りテキスト</label>
+        <textarea class="import-preview" id="importRawText" placeholder="読み取り結果がここに入ります。手入力や貼り付けでも候補作成できます。"></textarea>
+      </div>
+      <div class="field full">
+        <div class="import-row-actions">
+          <button class="btn secondary" type="button" onclick="setAllImportCandidates(true)">すべて選択</button>
+          <button class="btn secondary" type="button" onclick="setAllImportCandidates(false)">すべて解除</button>
+        </div>
+      </div>
+      <div class="field full">
+        <div class="import-candidate-list" id="importCandidates">
+          <div class="empty">ファイルを読み込むか、テキストを貼り付けて候補を作成してください。</div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn secondary" onclick="closeImportModal()">キャンセル</button>
+      <button class="btn primary" id="importSaveBtn" onclick="saveImportCandidates()">選択した候補を保存</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script type="module">
@@ -662,7 +810,12 @@ const firebaseConfig = {
 const fbApp = initializeApp(firebaseConfig);
 const db = getDatabase(fbApp);
 const DB_PATH = 'privateMetrics';
+const IMPORT_HISTORY_PATH = 'privateMetricImportHistory';
 const ADMIN_IDS = ['sugihira', 'momo'];
+const CATEGORY_OPTIONS = ['売上', '患者数', '自費', '保険', '経費', 'その他'];
+const PDFJS_URL = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+const PDFJS_WORKER_URL = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+const TESSERACT_URL = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
 const STAFF_NAMES = {
   sugihira: '杉平院長',
   shimanaka: '嶋中',
@@ -683,6 +836,10 @@ let currentUser = resolveUser();
 let allMetrics = {};
 let editingId = null;
 let saving = false;
+let importCandidates = [];
+let importFileMeta = null;
+let pdfJsLoader = null;
+let tesseractLoader = null;
 
 function resolveUser() {
   try {
@@ -894,6 +1051,442 @@ function escapeHtml(text) {
   }[ch]));
 }
 
+function categoryOptions(selectedCategory) {
+  return CATEGORY_OPTIONS
+    .map(category => `<option value="${escapeHtml(category)}"${category === selectedCategory ? ' selected' : ''}>${escapeHtml(category)}</option>`)
+    .join('');
+}
+
+function setImportStatus(message, type = '') {
+  const el = document.getElementById('importStatus');
+  if (!el) return;
+  el.textContent = message;
+  el.className = `import-status ${type}`.trim();
+}
+
+function loadScriptOnce(src, globalName) {
+  if (window[globalName]) return Promise.resolve(window[globalName]);
+  const existing = document.querySelector(`script[data-import-lib="${globalName}"]`);
+  if (existing?.dataset.ready === '1') return Promise.resolve(window[globalName]);
+  return new Promise((resolve, reject) => {
+    const script = existing || document.createElement('script');
+    script.src = src;
+    script.async = true;
+    script.crossOrigin = 'anonymous';
+    script.dataset.importLib = globalName;
+    script.onload = () => {
+      script.dataset.ready = '1';
+      window[globalName] ? resolve(window[globalName]) : reject(new Error(`${globalName}を読み込めませんでした`));
+    };
+    script.onerror = () => reject(new Error(`${globalName}の読み込みに失敗しました`));
+    if (!existing) document.head.appendChild(script);
+  });
+}
+
+function loadPdfJs() {
+  if (!pdfJsLoader) {
+    pdfJsLoader = loadScriptOnce(PDFJS_URL, 'pdfjsLib').then(pdfjs => {
+      pdfjs.GlobalWorkerOptions.workerSrc = PDFJS_WORKER_URL;
+      return pdfjs;
+    });
+  }
+  return pdfJsLoader;
+}
+
+function loadTesseract() {
+  if (!tesseractLoader) {
+    tesseractLoader = loadScriptOnce(TESSERACT_URL, 'Tesseract');
+  }
+  return tesseractLoader;
+}
+
+async function readPdfText(file) {
+  const pdfjs = await loadPdfJs();
+  const pdf = await pdfjs.getDocument({ data: new Uint8Array(await file.arrayBuffer()) }).promise;
+  const pages = [];
+  for (let pageNo = 1; pageNo <= pdf.numPages; pageNo++) {
+    setImportStatus(`PDF読み取り中 ${pageNo}/${pdf.numPages}`);
+    const page = await pdf.getPage(pageNo);
+    const content = await page.getTextContent();
+    pages.push(content.items.map(item => item.str).join('\n'));
+  }
+  const text = pages.join('\n\n').trim();
+  if (text.length >= 20) return text;
+  setImportStatus('PDFに文字データが少ないためOCRに切り替えます');
+  return readPdfByOcr(pdf);
+}
+
+async function readPdfByOcr(pdf) {
+  const Tesseract = await loadTesseract();
+  const pages = [];
+  const maxPages = Math.min(pdf.numPages, 5);
+  for (let pageNo = 1; pageNo <= maxPages; pageNo++) {
+    setImportStatus(`PDF画像OCR中 ${pageNo}/${maxPages}`);
+    const page = await pdf.getPage(pageNo);
+    const viewport = page.getViewport({ scale: 1.8 });
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    canvas.width = Math.floor(viewport.width);
+    canvas.height = Math.floor(viewport.height);
+    await page.render({ canvasContext: ctx, viewport }).promise;
+    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+    const result = await Tesseract.recognize(blob, 'jpn+eng', {
+      logger: info => {
+        if (info.status === 'recognizing text') {
+          setImportStatus(`PDF画像OCR中 ${pageNo}/${maxPages} ${Math.round((info.progress || 0) * 100)}%`);
+        }
+      }
+    });
+    pages.push(result.data.text || '');
+  }
+  return pages.join('\n\n');
+}
+
+async function readImageText(file) {
+  const Tesseract = await loadTesseract();
+  const result = await Tesseract.recognize(file, 'jpn+eng', {
+    logger: info => {
+      if (info.status) {
+        const pct = typeof info.progress === 'number' ? ` ${Math.round(info.progress * 100)}%` : '';
+        setImportStatus(`OCR中: ${info.status}${pct}`);
+      }
+    }
+  });
+  return result.data.text || '';
+}
+
+async function extractTextFromFile(file) {
+  if (!file) return '';
+  if (file.size > 25 * 1024 * 1024) {
+    throw new Error('25MB以下のファイルを選択してください');
+  }
+  const name = file.name.toLowerCase();
+  if (file.type === 'application/pdf' || name.endsWith('.pdf')) {
+    return readPdfText(file);
+  }
+  if (file.type.startsWith('image/')) {
+    return readImageText(file);
+  }
+  if (file.type.startsWith('text/') || name.endsWith('.txt')) {
+    return file.text();
+  }
+  throw new Error('PDF、画像、テキストファイルに対応しています');
+}
+
+function normalizeImportText(text) {
+  return String(text || '')
+    .normalize('NFKC')
+    .replace(/\u3000/g, ' ')
+    .replace(/[，、]/g, ',')
+    .replace(/[：]/g, ':');
+}
+
+function compactForMatch(text) {
+  return normalizeImportText(text).toLowerCase().replace(/\s+/g, '');
+}
+
+function inferCategory(text) {
+  const normalized = compactForMatch(text);
+  const rules = [
+    { category: '自費', keywords: ['自費', 'インプラント', 'ジルコニア', 'ホワイトニング'] },
+    { category: '保険', keywords: ['保険', '社保', '国保', '医保', 'レセプト'] },
+    { category: '経費', keywords: ['経費', '費用', '支出', '仕入', '人件費', '材料費', '技工'] },
+    { category: '患者数', keywords: ['患者', '来院', '初診', '再初診', '新患', '人数'] },
+    { category: '売上', keywords: ['売上', '収入', '入金', '総売上', '月商', '物販'] }
+  ];
+  for (const rule of rules) {
+    if (rule.keywords.some(keyword => normalized.includes(compactForMatch(keyword)))) return rule.category;
+  }
+  return 'その他';
+}
+
+function inferUnit(text, category) {
+  const normalized = normalizeImportText(text);
+  if (/%|％|率|割合/.test(normalized)) return '%';
+  if (/円|¥|￥/.test(normalized)) return '円';
+  if (/人/.test(normalized)) return '人';
+  if (/件/.test(normalized)) return '件';
+  if (['売上', '自費', '保険', '経費'].includes(category)) return '円';
+  if (category === '患者数') return '人';
+  return '';
+}
+
+function normalizeMetricNumber(raw, unit) {
+  let value = Number(String(raw || '').replace(/,/g, ''));
+  if (!Number.isFinite(value)) return '';
+  if (unit === '%' && value > 0 && value < 1) value *= 100;
+  return Math.abs(value - Math.round(value)) < 0.000001
+    ? String(Math.round(value))
+    : String(Number(value.toFixed(2)));
+}
+
+function findMetricValueMatch(line, month, unit) {
+  const text = normalizeImportText(line);
+  const monthNumber = Number(String(month || '').split('-')[1]);
+  if (monthNumber) {
+    const monthPattern = new RegExp(`(^|[^0-9])${monthNumber}\\s*月\\s*:?\\s*([^\\n]+)`);
+    const monthMatch = monthPattern.exec(text);
+    if (monthMatch) {
+      const segmentStart = monthMatch.index + monthMatch[0].length - monthMatch[2].length;
+      const matches = [...monthMatch[2].matchAll(/-?\d[\d,]*(?:\.\d+)?/g)];
+      if (matches.length) {
+        const match = matches[0];
+        return {
+          value: normalizeMetricNumber(match[0], unit),
+          index: segmentStart + match.index,
+          end: segmentStart + match.index + match[0].length
+        };
+      }
+    }
+  }
+  const matches = [...text.matchAll(/-?\d[\d,]*(?:\.\d+)?/g)];
+  if (!matches.length) return null;
+  const match = matches[matches.length - 1];
+  return {
+    value: normalizeMetricNumber(match[0], unit),
+    index: match.index,
+    end: match.index + match[0].length
+  };
+}
+
+function extractMetricItem(line, valueMatch) {
+  let text = normalizeImportText(line);
+  if (valueMatch) {
+    text = `${text.slice(0, valueMatch.index)} ${text.slice(valueMatch.end)}`;
+  }
+  text = text
+    .replace(/\b20\d{2}[/-]\d{1,2}(?:[/-]\d{1,2})?\b/g, ' ')
+    .replace(/\d{1,2}\s*月/g, ' ')
+    .replace(/[¥￥円人件%％]/g, ' ')
+    .replace(/[|｜,:]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  text = text.replace(/^(項目|科目|名称|内容)\s*/, '').trim();
+  return text.slice(0, 50);
+}
+
+function hasImportNumber(line) {
+  return /-?\d[\d,]*(?:\.\d+)?/.test(normalizeImportText(line));
+}
+
+function parseMetricCandidateLine(line, month, defaultSource) {
+  const category = inferCategory(line);
+  const unit = inferUnit(line, category);
+  const valueMatch = findMetricValueMatch(line, month, unit);
+  if (!valueMatch?.value) return null;
+  const item = extractMetricItem(line, valueMatch);
+  if (!item || item.length < 2) return null;
+  return {
+    enabled: true,
+    month,
+    category,
+    item,
+    value: valueMatch.value,
+    unit,
+    source: defaultSource,
+    note: '',
+    sourceText: normalizeImportText(line).slice(0, 240)
+  };
+}
+
+function buildImportCandidates(rawText, month, defaultSource) {
+  const lines = normalizeImportText(rawText)
+    .split(/\n+/)
+    .map(line => line.trim())
+    .filter(Boolean);
+  const candidates = [];
+  const seen = new Set();
+  for (let i = 0; i < lines.length; i++) {
+    let line = lines[i];
+    if (!hasImportNumber(line) && hasImportNumber(lines[i + 1] || '')) {
+      line = `${line} ${lines[i + 1]}`;
+      i++;
+    }
+    const candidate = parseMetricCandidateLine(line, month, defaultSource);
+    if (!candidate) continue;
+    const key = `${candidate.month}|${candidate.category}|${candidate.item}|${candidate.value}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    candidates.push(candidate);
+    if (candidates.length >= 80) break;
+  }
+  return candidates;
+}
+
+function renderImportCandidates() {
+  const wrap = document.getElementById('importCandidates');
+  if (!importCandidates.length) {
+    wrap.innerHTML = '<div class="empty">候補が見つかりません。読み取りテキストを修正してから候補作成してください。</div>';
+    return;
+  }
+  wrap.innerHTML = importCandidates.map((candidate, index) => `
+    <div class="import-candidate">
+      <label>
+        <span class="import-candidate-label">保存</span>
+        <input type="checkbox" ${candidate.enabled ? 'checked' : ''} onchange="updateImportCandidate(${index}, 'enabled', this.checked)">
+      </label>
+      <div>
+        <span class="import-candidate-label">区分</span>
+        <select onchange="updateImportCandidate(${index}, 'category', this.value)">${categoryOptions(candidate.category)}</select>
+      </div>
+      <div>
+        <span class="import-candidate-label">項目</span>
+        <input type="text" value="${escapeHtml(candidate.item)}" onchange="updateImportCandidate(${index}, 'item', this.value)">
+      </div>
+      <div>
+        <span class="import-candidate-label">数値</span>
+        <input type="text" inputmode="decimal" value="${escapeHtml(candidate.value)}" onchange="updateImportCandidate(${index}, 'value', this.value)">
+      </div>
+      <div>
+        <span class="import-candidate-label">単位</span>
+        <input type="text" value="${escapeHtml(candidate.unit)}" onchange="updateImportCandidate(${index}, 'unit', this.value)">
+      </div>
+      <div>
+        <span class="import-candidate-label">確認元</span>
+        <input type="text" value="${escapeHtml(candidate.source)}" onchange="updateImportCandidate(${index}, 'source', this.value)">
+      </div>
+      <div class="import-raw">${escapeHtml(candidate.sourceText || '')}</div>
+    </div>`).join('');
+}
+
+function findExistingMetric(month, item) {
+  const entry = Object.entries(allMetrics).find(([, metric]) => metric.month === month && metric.item === item);
+  return entry ? { id: entry[0], ...entry[1] } : null;
+}
+
+window.openImportModal = function() {
+  if (!isAdmin()) return;
+  document.getElementById('importMonth').value = document.getElementById('monthFilter').value || currentMonth();
+  document.getElementById('importDefaultSource').value = '';
+  document.getElementById('importSaveBtn').disabled = false;
+  setImportStatus('PDFは文字抽出、写真やスキャンPDFはOCRで読み取ります。');
+  document.getElementById('importModal').classList.add('open');
+};
+
+window.closeImportModal = function() {
+  document.getElementById('importModal').classList.remove('open');
+};
+
+window.handleImportFile = async function(file) {
+  if (!file || !isAdmin()) return;
+  importFileMeta = {
+    name: file.name,
+    type: file.type || 'unknown',
+    size: file.size
+  };
+  if (!document.getElementById('importDefaultSource').value.trim()) {
+    document.getElementById('importDefaultSource').value = file.name.replace(/\.[^.]+$/, '');
+  }
+  try {
+    setImportStatus('読み取りを開始しました');
+    document.getElementById('importRawText').value = '';
+    importCandidates = [];
+    renderImportCandidates();
+    const text = await extractTextFromFile(file);
+    document.getElementById('importRawText').value = text.trim();
+    setImportStatus(`読み取り完了: ${file.name}`, 'success');
+    analyzeImportText();
+  } catch (error) {
+    setImportStatus(`読み取りに失敗しました: ${error.message}`, 'error');
+  }
+};
+
+window.analyzeImportText = function() {
+  const rawText = document.getElementById('importRawText').value;
+  const month = document.getElementById('importMonth').value || document.getElementById('monthFilter').value || currentMonth();
+  const defaultSource = document.getElementById('importDefaultSource').value.trim();
+  importCandidates = buildImportCandidates(rawText, month, defaultSource);
+  renderImportCandidates();
+  setImportStatus(`${importCandidates.length}件の候補を作成しました。保存前に内容を確認してください。`, importCandidates.length ? 'success' : 'error');
+};
+
+window.updateImportCandidate = function(index, field, value) {
+  if (!importCandidates[index]) return;
+  importCandidates[index][field] = value;
+};
+
+window.setAllImportCandidates = function(enabled) {
+  importCandidates = importCandidates.map(candidate => ({ ...candidate, enabled }));
+  renderImportCandidates();
+};
+
+window.saveImportCandidates = async function() {
+  if (!isAdmin() || saving) return;
+  const selected = importCandidates
+    .map(candidate => ({
+      ...candidate,
+      month: String(candidate.month || '').trim(),
+      category: String(candidate.category || 'その他').trim(),
+      item: String(candidate.item || '').trim(),
+      value: String(candidate.value ?? '').trim(),
+      unit: String(candidate.unit || '').trim(),
+      source: String(candidate.source || '').trim(),
+      note: String(candidate.note || '').trim()
+    }))
+    .filter(candidate => candidate.enabled && candidate.month && candidate.item && candidate.value);
+  if (!selected.length) {
+    setImportStatus('保存対象の候補がありません', 'error');
+    return;
+  }
+
+  saving = true;
+  const saveBtn = document.getElementById('importSaveBtn');
+  saveBtn.disabled = true;
+  try {
+    let saved = 0;
+    const months = new Set();
+    for (const candidate of selected) {
+      const existing = findExistingMetric(candidate.month, candidate.item);
+      const data = {
+        ...(existing || {}),
+        month: candidate.month,
+        category: candidate.category || existing?.category || 'その他',
+        item: candidate.item,
+        value: candidate.value,
+        unit: candidate.unit || existing?.unit || '',
+        source: candidate.source || existing?.source || '',
+        note: candidate.note || existing?.note || '',
+        updatedAt: Date.now(),
+        updatedBy: currentUser.name
+      };
+      delete data.id;
+      if (existing) {
+        await set(ref(db, `${DB_PATH}/${existing.id}`), data);
+      } else {
+        await push(ref(db, DB_PATH), {
+          ...data,
+          createdAt: Date.now(),
+          createdBy: currentUser.name
+        });
+      }
+      saved++;
+      months.add(candidate.month);
+    }
+
+    await push(ref(db, IMPORT_HISTORY_PATH), {
+      fileName: importFileMeta?.name || '',
+      fileType: importFileMeta?.type || '',
+      fileSize: importFileMeta?.size || 0,
+      importedAt: Date.now(),
+      importedBy: currentUser.name,
+      importedRows: saved,
+      months: Array.from(months).sort(),
+      source: 'private-metrics-upload'
+    });
+
+    const firstMonth = Array.from(months).sort()[0];
+    if (firstMonth) document.getElementById('monthFilter').value = firstMonth;
+    closeImportModal();
+    showToast(`${saved}件を取り込みました`);
+    render();
+  } catch (error) {
+    setImportStatus(`保存に失敗しました: ${error.message}`, 'error');
+  } finally {
+    saving = false;
+    saveBtn.disabled = false;
+  }
+};
+
 window.openMetricModal = function(id = null) {
   if (!isAdmin()) return;
   editingId = id;
@@ -924,6 +1517,7 @@ window.closeMetricModal = function() {
 
 window.closeModalOnBackdrop = function(event) {
   if (event.target.id === 'metricModal') closeMetricModal();
+  if (event.target.id === 'importModal') closeImportModal();
 };
 
 window.saveMetric = async function() {
