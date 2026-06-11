@@ -1,0 +1,1026 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>非公開経営数値 | カルミアデンタル ポータル</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Zen+Maru+Gothic:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --mint: #37b8a9;
+    --mint-dark: #20796f;
+    --sky: #3f8edb;
+    --coral: #e65b5b;
+    --amber: #d89226;
+    --green: #2f9b65;
+    --bg: #f4f8fb;
+    --surface: #ffffff;
+    --surface-alt: #eef6f8;
+    --border: #d9e7ec;
+    --text: #263238;
+    --muted: #60727c;
+    --shadow: 0 3px 14px rgba(31, 64, 74, .08);
+    --radius: 8px;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Zen Maru Gothic', system-ui, sans-serif;
+    letter-spacing: 0;
+  }
+
+  button, input, select, textarea { font: inherit; }
+  button { cursor: pointer; }
+
+  header {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: 60px;
+    padding: 10px 18px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    box-shadow: 0 2px 10px rgba(31, 64, 74, .06);
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+  }
+
+  .back-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface-alt);
+    color: var(--text);
+    text-decoration: none;
+    font-weight: 900;
+  }
+
+  .title-wrap { min-width: 0; }
+  h1 {
+    margin: 0;
+    font-family: 'Nunito', sans-serif;
+    font-size: 20px;
+    line-height: 1.05;
+    font-weight: 900;
+  }
+
+  .subtitle {
+    margin-top: 2px;
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 700;
+  }
+
+  .header-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .user-badge, .mode-badge {
+    display: inline-flex;
+    align-items: center;
+    min-height: 32px;
+    padding: 6px 10px;
+    border-radius: 999px;
+    background: var(--surface-alt);
+    color: var(--muted);
+    border: 1px solid var(--border);
+    font-size: 12px;
+    font-weight: 800;
+    white-space: nowrap;
+  }
+
+  .mode-badge.admin {
+    color: var(--mint-dark);
+    background: #e6f7f4;
+    border-color: #b9e7df;
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: 36px;
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+    color: var(--text);
+    font-size: 13px;
+    font-weight: 800;
+    transition: border-color .15s, transform .15s, background .15s;
+    white-space: nowrap;
+  }
+
+  .btn:hover {
+    border-color: var(--mint);
+    transform: translateY(-1px);
+  }
+
+  .btn.primary {
+    border-color: var(--mint);
+    background: var(--mint);
+    color: #fff;
+  }
+
+  .btn.secondary { background: var(--surface-alt); }
+
+  .btn.danger {
+    border-color: #f1c2c2;
+    color: #b43c3c;
+    background: #fff5f5;
+  }
+
+  .btn:disabled {
+    opacity: .55;
+    cursor: not-allowed;
+    transform: none;
+  }
+
+  main {
+    width: min(1280px, calc(100% - 28px));
+    margin: 18px auto 40px;
+  }
+
+  .guard-note {
+    margin-bottom: 14px;
+    padding: 12px 14px;
+    border: 1px solid #efd39c;
+    border-radius: var(--radius);
+    background: #fff8e8;
+    color: #7c5516;
+    font-size: 13px;
+    font-weight: 800;
+    line-height: 1.6;
+  }
+
+  .summary-board {
+    display: grid;
+    grid-template-columns: minmax(260px, 1fr) auto;
+    gap: 16px;
+    align-items: end;
+    padding: 16px;
+    margin-bottom: 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+  }
+
+  .section-kicker {
+    color: var(--mint-dark);
+    font-size: 11px;
+    font-weight: 900;
+  }
+
+  .summary-title {
+    margin-top: 3px;
+    font-size: 22px;
+    line-height: 1.1;
+    font-weight: 900;
+  }
+
+  .summary-meta {
+    margin-top: 5px;
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 700;
+  }
+
+  .toolbar {
+    display: grid;
+    grid-template-columns: 160px 170px minmax(220px, 1fr);
+    gap: 10px;
+    padding: 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    margin-bottom: 14px;
+  }
+
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    min-width: 0;
+  }
+
+  .field label {
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 800;
+  }
+
+  .field input,
+  .field select,
+  .field textarea {
+    width: 100%;
+    min-height: 38px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: #fff;
+    color: var(--text);
+    padding: 8px 10px;
+    outline: none;
+  }
+
+  .field input:focus,
+  .field select:focus,
+  .field textarea:focus {
+    border-color: var(--mint);
+    box-shadow: 0 0 0 3px rgba(55, 184, 169, .12);
+  }
+
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+
+  .stat {
+    min-height: 88px;
+    padding: 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+  }
+
+  .stat-label {
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 800;
+  }
+
+  .stat-value {
+    margin-top: 6px;
+    font-family: 'Nunito', sans-serif;
+    font-size: 28px;
+    line-height: 1;
+    font-weight: 900;
+  }
+
+  .stat-note {
+    margin-top: 5px;
+    color: var(--muted);
+    font-size: 11px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+
+  .panel-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--border);
+    background: #fbfdfe;
+  }
+
+  .panel-title {
+    font-weight: 900;
+    font-size: 14px;
+  }
+
+  .panel-sub {
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  .table-wrap { overflow: auto; }
+
+  table {
+    width: 100%;
+    min-width: 980px;
+    border-collapse: collapse;
+  }
+
+  th, td {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+    text-align: left;
+    vertical-align: middle;
+  }
+
+  th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: #f7fbfc;
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 900;
+  }
+
+  td { font-size: 13px; }
+  tr:hover td { background: #fbfefe; }
+
+  .metric-main {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .metric-name {
+    font-weight: 900;
+    color: var(--text);
+  }
+
+  .metric-detail {
+    max-width: 360px;
+    color: var(--muted);
+    font-size: 11px;
+    line-height: 1.45;
+  }
+
+  .category-pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 24px;
+    padding: 4px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 900;
+    border: 1px solid var(--border);
+    background: var(--surface-alt);
+    white-space: nowrap;
+  }
+
+  .num {
+    font-family: 'Nunito', sans-serif;
+    font-weight: 900;
+    white-space: nowrap;
+  }
+
+  .actions-cell {
+    display: flex;
+    gap: 6px;
+    justify-content: flex-end;
+  }
+
+  .icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: auto;
+    min-width: 52px;
+    height: 34px;
+    padding: 0 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+    color: var(--text);
+    font-weight: 900;
+  }
+
+  .empty {
+    padding: 34px 18px;
+    text-align: center;
+    color: var(--muted);
+  }
+
+  .empty strong {
+    display: block;
+    color: var(--text);
+    font-size: 16px;
+    margin-bottom: 8px;
+  }
+
+  .modal-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 18px;
+    background: rgba(20, 34, 40, .45);
+  }
+
+  .modal-backdrop.open { display: flex; }
+
+  .modal {
+    width: min(760px, 100%);
+    max-height: min(90vh, 820px);
+    overflow: auto;
+    background: var(--surface);
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    box-shadow: 0 18px 50px rgba(10, 30, 40, .22);
+  }
+
+  .modal-head,
+  .modal-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .modal-foot {
+    border-top: 1px solid var(--border);
+    border-bottom: 0;
+    justify-content: flex-end;
+    background: #fbfdfe;
+  }
+
+  .modal-title { font-weight: 900; }
+
+  .form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    padding: 16px;
+  }
+
+  .field.full { grid-column: 1 / -1; }
+
+  textarea {
+    min-height: 110px;
+    resize: vertical;
+  }
+
+  .toast {
+    position: fixed;
+    left: 50%;
+    bottom: 22px;
+    z-index: 80;
+    display: none;
+    transform: translateX(-50%);
+    max-width: min(520px, calc(100% - 28px));
+    padding: 10px 14px;
+    border-radius: var(--radius);
+    background: #20323a;
+    color: #fff;
+    box-shadow: 0 10px 30px rgba(0,0,0,.18);
+    font-size: 13px;
+    font-weight: 800;
+  }
+
+  .toast.show { display: block; }
+
+  @media (max-width: 920px) {
+    header { align-items: flex-start; flex-direction: column; }
+    .header-actions { justify-content: flex-start; width: 100%; }
+    .summary-board { grid-template-columns: 1fr; align-items: stretch; }
+    .toolbar { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+
+  @media (max-width: 560px) {
+    main { width: min(100% - 18px, 1280px); }
+    .toolbar { grid-template-columns: 1fr; }
+    .stats { grid-template-columns: 1fr; }
+    .form-grid { grid-template-columns: 1fr; }
+    .btn { flex: 1 1 auto; }
+    .user-badge, .mode-badge { max-width: 100%; }
+  }
+
+  @media print {
+    header, .toolbar, .panel-head .btn, .actions-cell, .modal-backdrop, .toast {
+      display: none !important;
+    }
+    body { background: #fff; }
+    main { width: 100%; margin: 0; }
+    .panel, .stat { box-shadow: none; }
+    table { min-width: 0; font-size: 10px; }
+    th, td { padding: 6px; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <a class="back-link" href="./index.html" title="ポータルに戻る">←</a>
+    <div class="title-wrap">
+      <h1>非公開経営数値</h1>
+      <div class="subtitle">管理者専用・スタッフ非公開データ</div>
+    </div>
+  </div>
+  <div class="header-actions">
+    <span class="user-badge" id="userBadge">読み込み中</span>
+    <span class="mode-badge" id="modeBadge">確認中</span>
+    <button class="btn secondary admin-only" onclick="exportCSV()">CSV</button>
+    <button class="btn secondary admin-only" onclick="window.print()">印刷</button>
+    <button class="btn primary admin-only" onclick="openMetricModal()">登録</button>
+  </div>
+</header>
+
+<main>
+  <div class="guard-note" id="guardNote">このページは百々さんと杉平院長のみ閲覧・編集できます。</div>
+
+  <section class="summary-board admin-only" aria-label="経営数値サマリー">
+    <div>
+      <div class="section-kicker">非公開データ</div>
+      <div class="summary-title" id="summaryTitle">経営数値</div>
+      <div class="summary-meta" id="summarySub">読み込み中</div>
+    </div>
+    <button class="btn primary" onclick="openMetricModal()">経営数値を登録</button>
+  </section>
+
+  <section class="toolbar admin-only" aria-label="検索条件">
+    <div class="field">
+      <label for="monthFilter">対象月</label>
+      <input type="month" id="monthFilter" onchange="render()">
+    </div>
+    <div class="field">
+      <label for="categoryFilter">区分</label>
+      <select id="categoryFilter" onchange="render()">
+        <option value="all">すべて</option>
+        <option value="売上">売上</option>
+        <option value="患者数">患者数</option>
+        <option value="自費">自費</option>
+        <option value="保険">保険</option>
+        <option value="経費">経費</option>
+        <option value="その他">その他</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="searchInput">検索</label>
+      <input type="search" id="searchInput" placeholder="項目・メモで検索" oninput="render()">
+    </div>
+  </section>
+
+  <section class="stats admin-only" id="stats"></section>
+
+  <section class="panel admin-only">
+    <div class="panel-head">
+      <div>
+        <div class="panel-title" id="listTitle">経営数値一覧</div>
+        <div class="panel-sub" id="listSub">読み込み中</div>
+      </div>
+    </div>
+    <div class="table-wrap" id="tableWrap"></div>
+  </section>
+</main>
+
+<div class="modal-backdrop" id="metricModal" onclick="closeModalOnBackdrop(event)">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="modal-title" id="modalTitle">経営数値を登録</div>
+      <button class="icon-btn" onclick="closeMetricModal()" title="閉じる">×</button>
+    </div>
+    <div class="form-grid">
+      <div class="field">
+        <label for="fMonth">対象月</label>
+        <input type="month" id="fMonth">
+      </div>
+      <div class="field">
+        <label for="fCategory">区分</label>
+        <select id="fCategory">
+          <option value="売上">売上</option>
+          <option value="患者数">患者数</option>
+          <option value="自費">自費</option>
+          <option value="保険">保険</option>
+          <option value="経費">経費</option>
+          <option value="その他">その他</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="fItem">項目名</label>
+        <input type="text" id="fItem" placeholder="例：総売上">
+      </div>
+      <div class="field">
+        <label for="fValue">数値</label>
+        <input type="text" id="fValue" inputmode="decimal" placeholder="例：1200000">
+      </div>
+      <div class="field">
+        <label for="fUnit">単位</label>
+        <input type="text" id="fUnit" placeholder="例：円、人、件、%">
+      </div>
+      <div class="field">
+        <label for="fSource">確認元</label>
+        <input type="text" id="fSource" placeholder="例：月計表、会計、レセコン">
+      </div>
+      <div class="field full">
+        <label for="fNote">メモ</label>
+        <textarea id="fNote" placeholder="補足・確認事項"></textarea>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn danger" id="deleteBtn" onclick="deleteMetric()" style="display:none;">削除</button>
+      <button class="btn secondary" onclick="closeMetricModal()">キャンセル</button>
+      <button class="btn primary" id="saveBtn" onclick="saveMetric()">保存</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import { getDatabase, ref, push, set, remove, onValue }
+  from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
+
+const firebaseConfig = {
+  apiKey:            'AIzaSyDdMe7feUF6CKPHH0YIx7Suk-WnXtOYUu8',
+  authDomain:        'kalmia-shift.firebaseapp.com',
+  databaseURL:       'https://kalmia-shift-default-rtdb.asia-southeast1.firebasedatabase.app',
+  projectId:         'kalmia-shift',
+  storageBucket:     'kalmia-shift.firebasestorage.app',
+  messagingSenderId: '714175473480',
+  appId:             '1:714175473480:web:7d6626a46e4a9dcb1fb57d'
+};
+
+const fbApp = initializeApp(firebaseConfig);
+const db = getDatabase(fbApp);
+const DB_PATH = 'privateMetrics';
+const ADMIN_IDS = ['sugihira', 'momo'];
+const STAFF_NAMES = {
+  sugihira: '杉平院長',
+  shimanaka: '嶋中',
+  hokari: '保刈',
+  shinoda: '篠田',
+  tsuruta: '鶴田',
+  yoshida: '吉田',
+  takagi: '高木',
+  matsumoto: '松本',
+  yamada: '山田',
+  hanowa: 'ハノワ',
+  tamiya: '田宮',
+  tanaka: '田中',
+  momo: '百々'
+};
+
+let currentUser = resolveUser();
+let allMetrics = {};
+let editingId = null;
+let saving = false;
+
+function resolveUser() {
+  try {
+    const saved = sessionStorage.getItem('portalUser');
+    if (saved) {
+      const user = JSON.parse(saved);
+      if (user?.staffId) return normalizeUser(user);
+    }
+  } catch(e) {}
+
+  const params = new URLSearchParams(location.search);
+  const sid = params.get('sid') || '';
+  if (sid) {
+    return normalizeUser({
+      staffId: sid,
+      name: params.get('name') || STAFF_NAMES[sid] || sid,
+      pass: params.get('p') || ''
+    });
+  }
+
+  return { staffId: '', name: 'ゲスト', pass: '' };
+}
+
+function normalizeUser(user) {
+  const sid = user.staffId || '';
+  return {
+    ...user,
+    staffId: sid,
+    name: sid === 'sugihira' ? '杉平院長' : (user.name || STAFF_NAMES[sid] || 'ゲスト')
+  };
+}
+
+function isAdmin() {
+  return ADMIN_IDS.includes(currentUser.staffId);
+}
+
+function init() {
+  document.getElementById('monthFilter').value = currentMonth();
+  document.getElementById('userBadge').textContent = currentUser.name;
+  const modeBadge = document.getElementById('modeBadge');
+
+  if (!isAdmin()) {
+    modeBadge.textContent = '閲覧不可';
+    document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'none');
+    document.getElementById('guardNote').textContent = 'このページは管理者専用です。閲覧権限がないため、データは読み込みません。';
+    return;
+  }
+
+  modeBadge.textContent = currentUser.staffId === 'momo' ? '管理者' : '院長';
+  modeBadge.classList.add('admin');
+  document.getElementById('guardNote').textContent = '非公開データです。スタッフ向けポータルには表示されません。';
+
+  onValue(ref(db, DB_PATH), snap => {
+    allMetrics = snap.val() || {};
+    render();
+  }, err => {
+    showToast('データ読み込みに失敗しました: ' + err.message);
+  });
+}
+
+function currentMonth(date = new Date()) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function monthLabel(month) {
+  if (!month || !month.includes('-')) return '-';
+  const [y, m] = month.split('-');
+  return `${y}年${Number(m)}月`;
+}
+
+function parseNumber(value) {
+  if (value === null || value === undefined) return null;
+  const text = String(value).replace(/,/g, '').trim();
+  if (text === '') return null;
+  const n = Number(text);
+  return Number.isFinite(n) ? n : null;
+}
+
+function fmtNumber(value, unit = '') {
+  const n = parseNumber(value);
+  if (n === null) return '-';
+  const formatted = Math.abs(n) >= 1000
+    ? n.toLocaleString('ja-JP', { maximumFractionDigits: 2 })
+    : String(Number(n.toFixed(2)));
+  return unit ? `${formatted}${unit}` : formatted;
+}
+
+function filteredMetrics() {
+  const month = document.getElementById('monthFilter').value || currentMonth();
+  const category = document.getElementById('categoryFilter').value;
+  const query = document.getElementById('searchInput').value.trim().toLowerCase();
+
+  return Object.entries(allMetrics)
+    .map(([id, metric]) => ({ id, ...metric }))
+    .filter(metric => (metric.month || '') === month)
+    .filter(metric => category === 'all' || metric.category === category)
+    .filter(metric => {
+      if (!query) return true;
+      return [metric.item, metric.note, metric.category, metric.source]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+        .includes(query);
+    })
+    .sort((a, b) => {
+      const catDiff = String(a.category || '').localeCompare(String(b.category || ''), 'ja');
+      if (catDiff) return catDiff;
+      return String(a.item || '').localeCompare(String(b.item || ''), 'ja');
+    });
+}
+
+function monthMetrics(month) {
+  return Object.entries(allMetrics)
+    .map(([id, metric]) => ({ id, ...metric }))
+    .filter(metric => metric.month === month);
+}
+
+function render() {
+  const month = document.getElementById('monthFilter').value || currentMonth();
+  const metrics = filteredMetrics();
+  const totalForMonth = monthMetrics(month);
+  document.getElementById('summaryTitle').textContent = `${monthLabel(month)}の経営数値`;
+  document.getElementById('summarySub').textContent = `${metrics.length}件表示 / 月内${totalForMonth.length}件`;
+  document.getElementById('listTitle').textContent = `${monthLabel(month)} 経営数値一覧`;
+  document.getElementById('listSub').textContent = `${metrics.length}件表示 / 月内${totalForMonth.length}件`;
+  renderStats(totalForMonth);
+  renderTable(metrics, totalForMonth.length);
+}
+
+function renderStats(metrics) {
+  const total = metrics.length;
+  const filled = metrics.filter(m => parseNumber(m.value) !== null).length;
+  const categories = new Set(metrics.map(m => m.category).filter(Boolean)).size;
+  const updated = metrics
+    .map(m => m.updatedAt || m.createdAt || 0)
+    .filter(Boolean)
+    .sort((a, b) => b - a)[0];
+
+  document.getElementById('stats').innerHTML = `
+    <div class="stat"><div class="stat-label">登録数</div><div class="stat-value">${total}</div><div class="stat-note">対象月の件数</div></div>
+    <div class="stat"><div class="stat-label">数値入力済み</div><div class="stat-value" style="color:var(--green)">${filled}</div><div class="stat-note">数値が入っている件数</div></div>
+    <div class="stat"><div class="stat-label">区分数</div><div class="stat-value" style="color:var(--sky)">${categories}</div><div class="stat-note">対象月の分類数</div></div>
+    <div class="stat"><div class="stat-label">最終更新</div><div class="stat-value" style="font-size:20px;color:var(--amber)">${updated ? new Date(updated).toLocaleDateString('ja-JP') : '-'}</div><div class="stat-note">月内データ</div></div>`;
+}
+
+function renderTable(metrics, monthTotal) {
+  const wrap = document.getElementById('tableWrap');
+  if (!monthTotal) {
+    wrap.innerHTML = `
+      <div class="empty">
+        <strong>この月の経営数値は未登録です</strong>
+        <div>管理者または院長は、登録ボタンから非公開データを追加できます。</div>
+      </div>`;
+    return;
+  }
+
+  if (!metrics.length) {
+    wrap.innerHTML = `
+      <div class="empty">
+        <strong>条件に合うデータがありません</strong>
+        <div>検索条件を変更してください。</div>
+      </div>`;
+    return;
+  }
+
+  wrap.innerHTML = `
+    <table>
+      <thead>
+        <tr>
+          <th>項目</th>
+          <th>区分</th>
+          <th>数値</th>
+          <th>確認元</th>
+          <th>更新</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        ${metrics.map(metricRowHtml).join('')}
+      </tbody>
+    </table>`;
+}
+
+function metricRowHtml(metric) {
+  const updated = metric.updatedAt ? new Date(metric.updatedAt).toLocaleDateString('ja-JP') : '-';
+  return `
+    <tr>
+      <td>
+        <div class="metric-main">
+          <div class="metric-name">${escapeHtml(metric.item || '')}</div>
+          ${metric.note ? `<div class="metric-detail">メモ: ${escapeHtml(metric.note)}</div>` : ''}
+        </div>
+      </td>
+      <td><span class="category-pill">${escapeHtml(metric.category || '-')}</span></td>
+      <td><span class="num">${fmtNumber(metric.value, metric.unit)}</span></td>
+      <td><div>${escapeHtml(metric.source || '-')}</div></td>
+      <td><div>${escapeHtml(updated)}</div><div class="metric-detail">${escapeHtml(metric.updatedBy || metric.createdBy || '')}</div></td>
+      <td>
+        <div class="actions-cell">
+          <button class="icon-btn" onclick="openMetricModal('${metric.id}')" title="編集">編集</button>
+        </div>
+      </td>
+    </tr>`;
+}
+
+function escapeHtml(text) {
+  return String(text ?? '').replace(/[&<>"']/g, ch => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[ch]));
+}
+
+window.openMetricModal = function(id = null) {
+  if (!isAdmin()) return;
+  editingId = id;
+  const metric = id ? allMetrics[id] : null;
+  document.getElementById('modalTitle').textContent = metric ? '経営数値を編集' : '経営数値を登録';
+  document.getElementById('deleteBtn').style.display = metric ? 'inline-flex' : 'none';
+
+  const month = document.getElementById('monthFilter').value || currentMonth();
+  setFormValue('fMonth', metric?.month || month);
+  setFormValue('fCategory', metric?.category || '売上');
+  setFormValue('fItem', metric?.item || '');
+  setFormValue('fValue', metric?.value ?? '');
+  setFormValue('fUnit', metric?.unit || '円');
+  setFormValue('fSource', metric?.source || '');
+  setFormValue('fNote', metric?.note || '');
+
+  document.getElementById('metricModal').classList.add('open');
+};
+
+function setFormValue(id, value) {
+  document.getElementById(id).value = value;
+}
+
+window.closeMetricModal = function() {
+  document.getElementById('metricModal').classList.remove('open');
+  editingId = null;
+};
+
+window.closeModalOnBackdrop = function(event) {
+  if (event.target.id === 'metricModal') closeMetricModal();
+};
+
+window.saveMetric = async function() {
+  if (!isAdmin() || saving) return;
+  const month = document.getElementById('fMonth').value;
+  const item = document.getElementById('fItem').value.trim();
+  if (!month) { showToast('対象月を選択してください'); return; }
+  if (!item) { showToast('項目名を入力してください'); return; }
+
+  const data = {
+    month,
+    category: document.getElementById('fCategory').value,
+    item,
+    value: document.getElementById('fValue').value.trim(),
+    unit: document.getElementById('fUnit').value.trim(),
+    source: document.getElementById('fSource').value.trim(),
+    note: document.getElementById('fNote').value.trim(),
+    updatedAt: Date.now(),
+    updatedBy: currentUser.name
+  };
+
+  saving = true;
+  document.getElementById('saveBtn').disabled = true;
+  try {
+    if (editingId) {
+      const existing = allMetrics[editingId] || {};
+      await set(ref(db, `${DB_PATH}/${editingId}`), { ...existing, ...data });
+      showToast('経営数値を更新しました');
+    } else {
+      await push(ref(db, DB_PATH), {
+        ...data,
+        createdAt: Date.now(),
+        createdBy: currentUser.name
+      });
+      showToast('経営数値を登録しました');
+    }
+    document.getElementById('monthFilter').value = month;
+    closeMetricModal();
+  } catch(e) {
+    showToast('保存に失敗しました: ' + e.message);
+  } finally {
+    saving = false;
+    document.getElementById('saveBtn').disabled = false;
+  }
+};
+
+window.deleteMetric = async function() {
+  if (!isAdmin() || !editingId) return;
+  if (!confirm('この経営数値を削除しますか？')) return;
+  try {
+    await remove(ref(db, `${DB_PATH}/${editingId}`));
+    closeMetricModal();
+    showToast('削除しました');
+  } catch(e) {
+    showToast('削除に失敗しました: ' + e.message);
+  }
+};
+
+window.exportCSV = function() {
+  if (!isAdmin()) return;
+  const metrics = filteredMetrics();
+  if (!metrics.length) { showToast('出力するデータがありません'); return; }
+  const headers = ['対象月','区分','項目','数値','単位','確認元','メモ','更新者','更新日'];
+  const rows = metrics.map(metric => [
+    metric.month,
+    metric.category,
+    metric.item,
+    metric.value,
+    metric.unit,
+    metric.source,
+    metric.note,
+    metric.updatedBy || metric.createdBy || '',
+    metric.updatedAt ? new Date(metric.updatedAt).toLocaleDateString('ja-JP') : ''
+  ]);
+
+  const csv = [headers, ...rows]
+    .map(row => row.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(','))
+    .join('\n');
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `非公開経営数値_${document.getElementById('monthFilter').value || currentMonth()}.csv`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+};
+
+function showToast(message) {
+  const toast = document.getElementById('toast');
+  toast.textContent = message;
+  toast.classList.add('show');
+  clearTimeout(showToast.timer);
+  showToast.timer = setTimeout(() => toast.classList.remove('show'), 2800);
+}
+
+window.render = render;
+
+init();
+</script>
+</body>
+</html>

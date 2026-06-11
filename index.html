@@ -426,6 +426,10 @@
       <span class="tool-icon">◎</span>
       <span class="tool-name">目標管理</span>
     </a>
+    <a class="tool-item fu d2" id="privateMetricsToolBtn" href="#" onclick="goToPrivateMetricsApp();return false;" style="display:none;background:linear-gradient(135deg,#fff6f0,#ffe4d6);border:2px solid #ffb996;">
+      <span class="tool-icon">秘</span>
+      <span class="tool-name">非公開<br>経営数値</span>
+    </a>
     <a class="tool-item fu d2" href="#" onclick="goToScheduleApp();return false;" style="background:linear-gradient(135deg,#fff0f8,#ffe0f0);border:2px solid #ffb8d8;">
       <span class="tool-icon">🎉</span>
       <span class="tool-name">日程調整</span>
@@ -680,6 +684,12 @@ function goToGoalApp() {
   window.location.href = `https://kalmia-dc.github.io/portal/goal-manager.html?${params}`;
 }
 
+function goToPrivateMetricsApp() {
+  if (!currentUser || !ADMIN_STAFF.includes(currentUser.staffId)) return;
+  const params = new URLSearchParams({ sid: currentUser.staffId, name: currentUser.name, p: currentUser.pass });
+  window.location.href = `https://kalmia-dc.github.io/portal/private-metrics.html?${params}`;
+}
+
 function goToScheduleApp(eventId) {
   if (!currentUser) return;
   const params = new URLSearchParams({ sid: currentUser.staffId, name: currentUser.name, p: currentUser.pass });
@@ -804,8 +814,10 @@ async function initApp() {
   // 管理者リンクを表示（杉平・百々のみ）
   const adminBtn = document.getElementById('adminToolBtn');
   const skillBtn = document.getElementById('skillToolBtn');
+  const privateMetricsBtn = document.getElementById('privateMetricsToolBtn');
   // 管理者画面は管理者のみ
   adminBtn.style.display = ADMIN_STAFF.includes(u.staffId) ? 'block' : 'none';
+  privateMetricsBtn.style.display = ADMIN_STAFF.includes(u.staffId) ? 'block' : 'none';
   // スキルチェックは全スタッフ表示
   skillBtn.style.display = 'block';
 
@@ -1242,7 +1254,7 @@ async function loadScheduleEvents(staffId) {
 
 Object.assign(window, {
   doLogin, doLogout,
-  goToShiftApp, goToSkillApp, goToTaskApp, goToGoalApp, goToScheduleApp,
+  goToShiftApp, goToSkillApp, goToTaskApp, goToGoalApp, goToPrivateMetricsApp, goToScheduleApp,
   openPwModal, closePwModal, closePwModalIfBg, submitPwChange,
   openNoticeModal, closeNoticeModal, closeNoticeModalIfBg, submitNotice, deleteNotice
 });
