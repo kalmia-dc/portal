@@ -222,6 +222,43 @@
     margin-bottom: 14px;
   }
 
+  .utility-bar {
+    display: grid;
+    grid-template-columns: minmax(220px, 1fr) auto;
+    gap: 12px;
+    align-items: center;
+    padding: 12px 14px;
+    margin-bottom: 14px;
+    background: #fbfdfe;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+
+  .utility-title {
+    font-size: 13px;
+    font-weight: 900;
+  }
+
+  .utility-note {
+    margin-top: 3px;
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 700;
+  }
+
+  .utility-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .utility-actions .btn {
+    min-height: 32px;
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+
   .field {
     display: flex;
     flex-direction: column;
@@ -661,9 +698,9 @@
   .import-candidate {
     display: grid;
     grid-template-columns: 28px minmax(120px, 1.1fr) minmax(130px, 1.2fr) minmax(90px, .7fr) minmax(90px, .7fr);
-    gap: 8px;
+    gap: 10px;
     align-items: end;
-    padding: 10px;
+    padding: 12px;
     border: 1px solid var(--border);
     border-radius: var(--radius);
     background: #fbfdfe;
@@ -682,7 +719,7 @@
     display: block;
     margin-bottom: 4px;
     color: var(--muted);
-    font-size: 10px;
+    font-size: 11px;
     font-weight: 900;
   }
 
@@ -697,6 +734,8 @@
     header { align-items: flex-start; flex-direction: column; }
     .header-actions { justify-content: flex-start; width: 100%; }
     .month-board { grid-template-columns: 1fr; align-items: stretch; }
+    .utility-bar { grid-template-columns: 1fr; }
+    .utility-actions { justify-content: flex-start; }
     .month-controls { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .month-controls .field { grid-column: 1 / -1; }
     .toolbar { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -712,6 +751,10 @@
     .stats { grid-template-columns: 1fr; }
     .form-grid { grid-template-columns: 1fr; }
     .history-grid { grid-template-columns: 1fr; }
+    .utility-actions {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
     .btn { flex: 1 1 auto; }
     .user-badge, .mode-badge { max-width: 100%; }
   }
@@ -753,6 +796,7 @@
     }
 
     .month-board,
+    .utility-bar,
     .toolbar,
     .panel {
       box-shadow: none;
@@ -762,6 +806,7 @@
     .month-title { font-size: 20px; }
 
     .month-controls,
+    .utility-actions,
     .toolbar {
       grid-template-columns: 1fr;
     }
@@ -920,7 +965,7 @@
   }
 
   @media print {
-    header, .toolbar, .month-controls, .panel-head .btn, .actions-cell, .readonly-note, .modal-backdrop, .toast {
+    header, .toolbar, .month-controls, .utility-bar, .panel-head .btn, .actions-cell, .readonly-note, .modal-backdrop, .toast {
       display: none !important;
     }
     body { background: #fff; }
@@ -944,10 +989,6 @@
   <div class="header-actions">
     <span class="user-badge" id="userBadge">読み込み中</span>
     <span class="mode-badge" id="modeBadge">確認中</span>
-    <button class="btn secondary" onclick="exportCSV()">CSV</button>
-    <button class="btn secondary" onclick="window.print()">印刷</button>
-    <button class="btn secondary editor-only" onclick="openImportModal()">写真/PDF取込</button>
-    <button class="btn secondary editor-only" onclick="sendLineWorksSummary()">LINE WORKS通知</button>
   </div>
 </header>
 
@@ -967,6 +1008,19 @@
       </div>
       <button class="btn primary editor-only" id="seedBtn" onclick="seedTemplates()">この月の標準項目を作成</button>
       <button class="btn secondary editor-only" onclick="openGoalModal()">個別目標を追加</button>
+    </div>
+  </section>
+
+  <section class="utility-bar" aria-label="補助操作">
+    <div>
+      <div class="utility-title">出力・通知・取込</div>
+      <div class="utility-note">日常入力は上の月次入力から行い、補助操作はこちらにまとめています。</div>
+    </div>
+    <div class="utility-actions">
+      <button class="btn secondary" onclick="exportCSV()">CSV</button>
+      <button class="btn secondary" onclick="window.print()">印刷</button>
+      <button class="btn secondary editor-only" onclick="openImportModal()">写真/PDF取込</button>
+      <button class="btn secondary editor-only" onclick="sendLineWorksSummary()">LINE WORKS通知</button>
     </div>
   </section>
 

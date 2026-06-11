@@ -208,6 +208,25 @@
     font-weight: 700;
   }
 
+  .summary-actions {
+    display: grid;
+    gap: 8px;
+    justify-items: end;
+  }
+
+  .utility-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .utility-actions .btn {
+    min-height: 32px;
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+
   .toolbar {
     display: grid;
     grid-template-columns: 160px 170px minmax(220px, 1fr);
@@ -529,9 +548,9 @@
   .import-candidate {
     display: grid;
     grid-template-columns: 28px minmax(110px, .85fr) minmax(160px, 1.2fr) minmax(90px, .7fr) minmax(70px, .55fr) minmax(120px, .9fr);
-    gap: 8px;
+    gap: 10px;
     align-items: end;
-    padding: 10px;
+    padding: 12px;
     border: 1px solid var(--border);
     border-radius: var(--radius);
     background: #fbfdfe;
@@ -550,7 +569,7 @@
     display: block;
     margin-bottom: 4px;
     color: var(--muted);
-    font-size: 10px;
+    font-size: 11px;
     font-weight: 900;
   }
 
@@ -584,6 +603,8 @@
     header { align-items: flex-start; flex-direction: column; }
     .header-actions { justify-content: flex-start; width: 100%; }
     .summary-board { grid-template-columns: 1fr; align-items: stretch; }
+    .summary-actions { justify-items: stretch; }
+    .utility-actions { justify-content: flex-start; }
     .toolbar { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .import-candidate {
@@ -604,12 +625,16 @@
     .toolbar { grid-template-columns: 1fr; }
     .stats { grid-template-columns: 1fr; }
     .form-grid { grid-template-columns: 1fr; }
+    .utility-actions {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
     .btn { flex: 1 1 auto; }
     .user-badge, .mode-badge { max-width: 100%; }
   }
 
   @media print {
-    header, .toolbar, .panel-head .btn, .actions-cell, .modal-backdrop, .toast {
+    header, .toolbar, .summary-actions, .panel-head .btn, .actions-cell, .modal-backdrop, .toast {
       display: none !important;
     }
     body { background: #fff; }
@@ -632,10 +657,6 @@
   <div class="header-actions">
     <span class="user-badge" id="userBadge">読み込み中</span>
     <span class="mode-badge" id="modeBadge">確認中</span>
-    <button class="btn secondary admin-only" onclick="exportCSV()">CSV</button>
-    <button class="btn secondary admin-only" onclick="window.print()">印刷</button>
-    <button class="btn secondary admin-only" onclick="openImportModal()">写真/PDF取込</button>
-    <button class="btn primary admin-only" onclick="openMetricModal()">登録</button>
   </div>
 </header>
 
@@ -648,7 +669,14 @@
       <div class="summary-title" id="summaryTitle">経営数値</div>
       <div class="summary-meta" id="summarySub">読み込み中</div>
     </div>
-    <button class="btn primary" onclick="openMetricModal()">経営数値を登録</button>
+    <div class="summary-actions">
+      <button class="btn primary" onclick="openMetricModal()">経営数値を登録</button>
+      <div class="utility-actions">
+        <button class="btn secondary" onclick="exportCSV()">CSV</button>
+        <button class="btn secondary" onclick="window.print()">印刷</button>
+        <button class="btn secondary" onclick="openImportModal()">写真/PDF取込</button>
+      </div>
+    </div>
   </section>
 
   <section class="toolbar admin-only" aria-label="検索条件">
