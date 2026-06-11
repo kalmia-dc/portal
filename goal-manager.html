@@ -609,6 +609,90 @@
     font-weight: 800;
   }
 
+  .import-modal {
+    width: min(980px, 100%);
+  }
+
+  .import-drop {
+    display: grid;
+    gap: 10px;
+    padding: 14px;
+    border: 1px dashed #9fcbd3;
+    border-radius: var(--radius);
+    background: #f7fbfc;
+  }
+
+  .import-actions,
+  .import-row-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .import-status {
+    min-height: 24px;
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 800;
+  }
+
+  .import-status.error {
+    color: #b43c3c;
+  }
+
+  .import-status.success {
+    color: var(--green);
+  }
+
+  .import-preview {
+    min-height: 120px;
+    font-family: Consolas, 'Courier New', monospace;
+    font-size: 12px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+  }
+
+  .import-candidate-list {
+    display: grid;
+    gap: 10px;
+  }
+
+  .import-candidate {
+    display: grid;
+    grid-template-columns: 28px minmax(120px, 1.1fr) minmax(130px, 1.2fr) minmax(90px, .7fr) minmax(90px, .7fr);
+    gap: 8px;
+    align-items: end;
+    padding: 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: #fbfdfe;
+  }
+
+  .import-candidate input,
+  .import-candidate select {
+    width: 100%;
+    min-height: 36px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 7px 8px;
+  }
+
+  .import-candidate-label {
+    display: block;
+    margin-bottom: 4px;
+    color: var(--muted);
+    font-size: 10px;
+    font-weight: 900;
+  }
+
+  .import-raw {
+    grid-column: 2 / -1;
+    color: var(--muted);
+    font-size: 11px;
+    line-height: 1.45;
+  }
+
   @media (max-width: 920px) {
     header { align-items: flex-start; flex-direction: column; }
     .header-actions { justify-content: flex-start; width: 100%; }
@@ -810,6 +894,18 @@
     .history-grid {
       grid-template-columns: 1fr;
     }
+
+    .import-candidate {
+      grid-template-columns: 28px minmax(0, 1fr);
+    }
+
+    .import-candidate > div:not(.import-raw) {
+      grid-column: 2;
+    }
+
+    .import-raw {
+      grid-column: 1 / -1;
+    }
   }
 
   @media (max-width: 420px) {
@@ -850,6 +946,7 @@
     <span class="mode-badge" id="modeBadge">確認中</span>
     <button class="btn secondary" onclick="exportCSV()">CSV</button>
     <button class="btn secondary" onclick="window.print()">印刷</button>
+    <button class="btn secondary editor-only" onclick="openImportModal()">写真/PDF取込</button>
     <button class="btn secondary editor-only" onclick="sendLineWorksSummary()">LINE WORKS通知</button>
   </div>
 </header>
@@ -1003,6 +1100,57 @@
   </div>
 </div>
 
+<div class="modal-backdrop" id="importModal" onclick="closeModalOnBackdrop(event)">
+  <div class="modal import-modal">
+    <div class="modal-head">
+      <div>
+        <div class="modal-title">写真/PDFから取り込み</div>
+        <div class="panel-sub">読み取り後、候補を確認してから保存します</div>
+      </div>
+      <button class="icon-btn" onclick="closeImportModal()" title="閉じる">×</button>
+    </div>
+    <div class="form-grid">
+      <div class="form-section">ファイル</div>
+      <div class="field">
+        <label for="importMonth">反映する月</label>
+        <input type="month" id="importMonth">
+      </div>
+      <div class="field full">
+        <label for="importFile">PDF / 写真</label>
+        <div class="import-drop">
+          <input type="file" id="importFile" accept="application/pdf,.pdf,image/*" onchange="handleImportFile(this.files[0])">
+          <div class="import-actions">
+            <button class="btn secondary" type="button" onclick="document.getElementById('importFile').click()">ファイルを選択</button>
+            <button class="btn secondary" type="button" onclick="analyzeImportText()">テキストから候補作成</button>
+          </div>
+          <div class="import-status" id="importStatus">PDFは文字抽出、写真やスキャンPDFはOCRで読み取ります。</div>
+        </div>
+      </div>
+      <div class="form-section">読み取りテキスト</div>
+      <div class="field full">
+        <label for="importRawText">抽出結果</label>
+        <textarea class="import-preview" id="importRawText" placeholder="読み取り結果がここに入ります。手入力や貼り付けでも候補作成できます。"></textarea>
+      </div>
+      <div class="form-section">保存前確認</div>
+      <div class="field full">
+        <div class="import-row-actions">
+          <button class="btn secondary" type="button" onclick="setAllImportCandidates(true)">すべて選択</button>
+          <button class="btn secondary" type="button" onclick="setAllImportCandidates(false)">すべて解除</button>
+        </div>
+      </div>
+      <div class="field full">
+        <div class="import-candidate-list" id="importCandidates">
+          <div class="empty">ファイルを読み込むか、テキストを貼り付けて候補を作成してください。</div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn secondary" onclick="closeImportModal()">キャンセル</button>
+      <button class="btn primary" id="importSaveBtn" onclick="saveImportCandidates()">選択した候補を保存</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script type="module">
@@ -1023,9 +1171,13 @@ const firebaseConfig = {
 const fbApp = initializeApp(firebaseConfig);
 const db = getDatabase(fbApp);
 const DB_PATH = 'monthlyGoals';
+const IMPORT_HISTORY_PATH = 'monthlyGoalImportHistory';
 const NOTIFY_URL = 'https://kalmia-notify.chibakenmin-sugihey.workers.dev';
 const EDITOR_IDS = ['sugihira', 'momo'];
 const HISTORY_MONTH_COUNT = 6;
+const PDFJS_URL = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+const PDFJS_WORKER_URL = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+const TESSERACT_URL = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
 const STAFF_NAMES = {
   sugihira: '杉平院長',
   shimanaka: '嶋中',
@@ -1066,10 +1218,29 @@ const TEMPLATE_ITEMS = [
   { department: '院長', item: '根管治療', unit: '人', direction: 'up', detail: '根管治療の対象人数', currentValue: '', targetValue: '5', history: [{ label: '1月', value: '3' }, { label: '2月', value: '2' }, { label: '3月', value: '6' }] }
 ];
 
+const IMPORT_ITEM_ALIASES = [
+  { item: '初診', aliases: ['初診'] },
+  { item: '再初診', aliases: ['再初診'] },
+  { item: 'インプラント', aliases: ['インプラント', 'implant'] },
+  { item: '物販売上', aliases: ['物販売上', '物販', '物販 売上'] },
+  { item: '1日平均来院数', aliases: ['1日平均来院数', '1日平均 来院数', '１日平均来院数', '1日平均来院者数'] },
+  { item: 'ジルコニア', aliases: ['ジルコニア', '自費 ジルコニア'] },
+  { item: 'ホワイトニング', aliases: ['ホワイトニング', 'whitening'] },
+  { item: 'Google口コミ', aliases: ['Google口コミ', '口コミ投稿配布数', '口コミ配布数', '口コミ'] },
+  { item: 'キャンセル率', aliases: ['キャンセル率', 'キャンセル'] },
+  { item: '中断数', aliases: ['中断数', '中断'] },
+  { item: 'GBTメンテナンス', aliases: ['GBTメンテナンス', 'GBT定期健診', 'GBT'] },
+  { item: '根管治療', aliases: ['根管治療'] }
+];
+
 let currentUser = resolveUser();
 let allGoals = {};
 let editingId = null;
 let saving = false;
+let importCandidates = [];
+let importFileMeta = null;
+let pdfJsLoader = null;
+let tesseractLoader = null;
 
 function resolveUser() {
   try {
@@ -1420,6 +1591,413 @@ function escapeHtml(text) {
   }[ch]));
 }
 
+function importItemOptions(selectedItem) {
+  return TEMPLATE_ITEMS
+    .map(item => `<option value="${escapeHtml(item.item)}"${item.item === selectedItem ? ' selected' : ''}>${escapeHtml(item.item)}</option>`)
+    .join('');
+}
+
+function setImportStatus(message, type = '') {
+  const el = document.getElementById('importStatus');
+  if (!el) return;
+  el.textContent = message;
+  el.className = `import-status ${type}`.trim();
+}
+
+function loadScriptOnce(src, globalName) {
+  if (window[globalName]) return Promise.resolve(window[globalName]);
+  const existing = document.querySelector(`script[data-import-lib="${globalName}"]`);
+  if (existing?.dataset.ready === '1') return Promise.resolve(window[globalName]);
+  return new Promise((resolve, reject) => {
+    const script = existing || document.createElement('script');
+    script.src = src;
+    script.async = true;
+    script.crossOrigin = 'anonymous';
+    script.dataset.importLib = globalName;
+    script.onload = () => {
+      script.dataset.ready = '1';
+      window[globalName] ? resolve(window[globalName]) : reject(new Error(`${globalName}を読み込めませんでした`));
+    };
+    script.onerror = () => reject(new Error(`${globalName}の読み込みに失敗しました`));
+    if (!existing) document.head.appendChild(script);
+  });
+}
+
+function loadPdfJs() {
+  if (!pdfJsLoader) {
+    pdfJsLoader = loadScriptOnce(PDFJS_URL, 'pdfjsLib').then(pdfjs => {
+      pdfjs.GlobalWorkerOptions.workerSrc = PDFJS_WORKER_URL;
+      return pdfjs;
+    });
+  }
+  return pdfJsLoader;
+}
+
+function loadTesseract() {
+  if (!tesseractLoader) {
+    tesseractLoader = loadScriptOnce(TESSERACT_URL, 'Tesseract');
+  }
+  return tesseractLoader;
+}
+
+async function readPdfText(file) {
+  const pdfjs = await loadPdfJs();
+  const pdf = await pdfjs.getDocument({ data: new Uint8Array(await file.arrayBuffer()) }).promise;
+  const pages = [];
+  for (let pageNo = 1; pageNo <= pdf.numPages; pageNo++) {
+    setImportStatus(`PDF読み取り中 ${pageNo}/${pdf.numPages}`);
+    const page = await pdf.getPage(pageNo);
+    const content = await page.getTextContent();
+    pages.push(content.items.map(item => item.str).join('\n'));
+  }
+  const text = pages.join('\n\n').trim();
+  if (text.length >= 20) return text;
+  setImportStatus('PDFに文字データが少ないためOCRに切り替えます');
+  return readPdfByOcr(pdf);
+}
+
+async function readPdfByOcr(pdf) {
+  const Tesseract = await loadTesseract();
+  const pages = [];
+  const maxPages = Math.min(pdf.numPages, 5);
+  for (let pageNo = 1; pageNo <= maxPages; pageNo++) {
+    setImportStatus(`PDF画像OCR中 ${pageNo}/${maxPages}`);
+    const page = await pdf.getPage(pageNo);
+    const viewport = page.getViewport({ scale: 1.8 });
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    canvas.width = Math.floor(viewport.width);
+    canvas.height = Math.floor(viewport.height);
+    await page.render({ canvasContext: ctx, viewport }).promise;
+    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+    const result = await Tesseract.recognize(blob, 'jpn+eng', {
+      logger: info => {
+        if (info.status === 'recognizing text') {
+          setImportStatus(`PDF画像OCR中 ${pageNo}/${maxPages} ${Math.round((info.progress || 0) * 100)}%`);
+        }
+      }
+    });
+    pages.push(result.data.text || '');
+  }
+  return pages.join('\n\n');
+}
+
+async function readImageText(file) {
+  const Tesseract = await loadTesseract();
+  const result = await Tesseract.recognize(file, 'jpn+eng', {
+    logger: info => {
+      if (info.status) {
+        const pct = typeof info.progress === 'number' ? ` ${Math.round(info.progress * 100)}%` : '';
+        setImportStatus(`OCR中: ${info.status}${pct}`);
+      }
+    }
+  });
+  return result.data.text || '';
+}
+
+async function extractTextFromFile(file) {
+  if (!file) return '';
+  if (file.size > 25 * 1024 * 1024) {
+    throw new Error('25MB以下のファイルを選択してください');
+  }
+  const name = file.name.toLowerCase();
+  if (file.type === 'application/pdf' || name.endsWith('.pdf')) {
+    return readPdfText(file);
+  }
+  if (file.type.startsWith('image/')) {
+    return readImageText(file);
+  }
+  if (file.type.startsWith('text/') || name.endsWith('.txt')) {
+    return file.text();
+  }
+  throw new Error('PDF、画像、テキストファイルに対応しています');
+}
+
+function normalizeImportText(text) {
+  return String(text || '')
+    .normalize('NFKC')
+    .replace(/\u3000/g, ' ')
+    .replace(/[，、]/g, ',')
+    .replace(/[：]/g, ':');
+}
+
+function compactForMatch(text) {
+  return normalizeImportText(text).toLowerCase().replace(/\s+/g, '');
+}
+
+function findImportItemForLine(line) {
+  const normalized = compactForMatch(line);
+  const matches = [];
+  for (const config of IMPORT_ITEM_ALIASES) {
+    for (const alias of config.aliases) {
+      const key = compactForMatch(alias);
+      if (key && normalized.includes(key)) {
+        matches.push({ item: config.item, weight: key.length });
+      }
+    }
+  }
+  matches.sort((a, b) => b.weight - a.weight);
+  return matches[0]?.item || '';
+}
+
+function parseImportNumber(text, item, preferLast = false) {
+  const source = normalizeImportText(text).replace(/,/g, '');
+  const matches = [...source.matchAll(/-?\d+(?:\.\d+)?/g)];
+  if (!matches.length) return '';
+  const match = preferLast ? matches[matches.length - 1] : matches[0];
+  let value = Number(match[0]);
+  if (!Number.isFinite(value)) return '';
+  if (item === 'キャンセル率' && value > 0 && value < 1) value *= 100;
+  return Math.abs(value - Math.round(value)) < 0.000001
+    ? String(Math.round(value))
+    : String(Number(value.toFixed(2)));
+}
+
+function parseImportNumberAfterLabel(line, labelPattern, item) {
+  const normalized = normalizeImportText(line);
+  const match = normalized.match(labelPattern);
+  if (!match) return '';
+  return parseImportNumber(normalized.slice(match.index + match[0].length), item, true);
+}
+
+function parseMonthValue(block, month, item) {
+  const monthNumber = Number(month.split('-')[1]);
+  if (!monthNumber) return '';
+  const text = normalizeImportText(block);
+  const pattern = new RegExp(`(^|[^0-9])${monthNumber}\\s*月\\s*:?\\s*([^\\n]+)`, 'g');
+  let match;
+  let latest = '';
+  while ((match = pattern.exec(text))) {
+    latest = parseImportNumber(match[2], item) || latest;
+  }
+  return latest;
+}
+
+function parseTargetValue(block, item) {
+  const lines = normalizeImportText(block).split(/\n+/).map(line => line.trim()).filter(Boolean);
+  const targetLine = lines.find(line => /目標|target/i.test(line));
+  if (targetLine) return parseImportNumberAfterLabel(targetLine, /目標(?:\s*数値)?|target/i, item);
+  const joined = lines.join(' ');
+  const match = joined.match(/目標(?:\s*数値)?[^0-9-]{0,16}(-?\d[\d,]*(?:\.\d+)?)/);
+  return match ? parseImportNumber(match[1], item) : '';
+}
+
+function parseActualValue(block, month, item) {
+  const monthValue = parseMonthValue(block, month, item);
+  if (monthValue) return monthValue;
+  const lines = normalizeImportText(block).split(/\n+/).map(line => line.trim()).filter(Boolean);
+  const actualLine = lines.find(line => /実績|結果/.test(line));
+  if (actualLine) return parseImportNumberAfterLabel(actualLine, /実績|結果|actual/i, item);
+  return '';
+}
+
+function buildImportCandidates(rawText, month) {
+  const text = normalizeImportText(rawText);
+  const lines = text.split(/\n+/).map(line => line.trim()).filter(Boolean);
+  const markers = [];
+  lines.forEach((line, index) => {
+    const item = findImportItemForLine(line);
+    if (item) markers.push({ index, item });
+  });
+
+  const usedItems = new Set();
+  const candidates = [];
+  markers.forEach((marker, markerIndex) => {
+    if (usedItems.has(marker.item)) return;
+    const nextMarker = markers.slice(markerIndex + 1).find(next => next.index > marker.index);
+    const end = nextMarker ? nextMarker.index : lines.length;
+    const block = lines.slice(marker.index, end).join('\n');
+    const targetValue = parseTargetValue(block, marker.item);
+    const actualValue = parseActualValue(block, month, marker.item);
+    usedItems.add(marker.item);
+    candidates.push({
+      enabled: Boolean(targetValue || actualValue),
+      month,
+      item: marker.item,
+      targetValue,
+      actualValue,
+      sourceText: block.slice(0, 240)
+    });
+  });
+  return candidates;
+}
+
+function renderImportCandidates() {
+  const wrap = document.getElementById('importCandidates');
+  if (!importCandidates.length) {
+    wrap.innerHTML = '<div class="empty">候補が見つかりません。読み取りテキストを修正してから候補作成してください。</div>';
+    return;
+  }
+  wrap.innerHTML = importCandidates.map((candidate, index) => `
+    <div class="import-candidate">
+      <label>
+        <span class="import-candidate-label">保存</span>
+        <input type="checkbox" ${candidate.enabled ? 'checked' : ''} onchange="updateImportCandidate(${index}, 'enabled', this.checked)">
+      </label>
+      <div>
+        <span class="import-candidate-label">対象月</span>
+        <input type="month" value="${escapeHtml(candidate.month)}" onchange="updateImportCandidate(${index}, 'month', this.value)">
+      </div>
+      <div>
+        <span class="import-candidate-label">項目</span>
+        <select onchange="updateImportCandidate(${index}, 'item', this.value)">${importItemOptions(candidate.item)}</select>
+      </div>
+      <div>
+        <span class="import-candidate-label">目標</span>
+        <input type="text" inputmode="decimal" value="${escapeHtml(candidate.targetValue)}" onchange="updateImportCandidate(${index}, 'targetValue', this.value)">
+      </div>
+      <div>
+        <span class="import-candidate-label">実績</span>
+        <input type="text" inputmode="decimal" value="${escapeHtml(candidate.actualValue)}" onchange="updateImportCandidate(${index}, 'actualValue', this.value)">
+      </div>
+      <div class="import-raw">${escapeHtml(candidate.sourceText || '')}</div>
+    </div>`).join('');
+}
+
+function findExistingGoal(month, item) {
+  const entry = Object.entries(allGoals).find(([, goal]) => goal.month === month && goal.item === item);
+  return entry ? { id: entry[0], ...entry[1] } : null;
+}
+
+function templateForItem(item) {
+  return TEMPLATE_ITEMS.find(template => template.item === item) || {
+    department: '全体',
+    item,
+    unit: '',
+    direction: 'up',
+    detail: ''
+  };
+}
+
+window.openImportModal = function() {
+  if (!isEditor()) return;
+  document.getElementById('importMonth').value = document.getElementById('monthFilter').value || currentMonth();
+  document.getElementById('importSaveBtn').disabled = false;
+  setImportStatus('PDFは文字抽出、写真やスキャンPDFはOCRで読み取ります。');
+  document.getElementById('importModal').classList.add('open');
+};
+
+window.closeImportModal = function() {
+  document.getElementById('importModal').classList.remove('open');
+};
+
+window.handleImportFile = async function(file) {
+  if (!file || !isEditor()) return;
+  importFileMeta = {
+    name: file.name,
+    type: file.type || 'unknown',
+    size: file.size
+  };
+  try {
+    setImportStatus('読み取りを開始しました');
+    document.getElementById('importRawText').value = '';
+    importCandidates = [];
+    renderImportCandidates();
+    const text = await extractTextFromFile(file);
+    document.getElementById('importRawText').value = text.trim();
+    setImportStatus(`読み取り完了: ${file.name}`, 'success');
+    analyzeImportText();
+  } catch (error) {
+    setImportStatus(`読み取りに失敗しました: ${error.message}`, 'error');
+  }
+};
+
+window.analyzeImportText = function() {
+  const rawText = document.getElementById('importRawText').value;
+  const month = document.getElementById('importMonth').value || document.getElementById('monthFilter').value || currentMonth();
+  importCandidates = buildImportCandidates(rawText, month);
+  renderImportCandidates();
+  setImportStatus(`${importCandidates.length}件の候補を作成しました。保存前に数値を確認してください。`, importCandidates.length ? 'success' : 'error');
+};
+
+window.updateImportCandidate = function(index, field, value) {
+  if (!importCandidates[index]) return;
+  importCandidates[index][field] = value;
+};
+
+window.setAllImportCandidates = function(enabled) {
+  importCandidates = importCandidates.map(candidate => ({ ...candidate, enabled }));
+  renderImportCandidates();
+};
+
+window.saveImportCandidates = async function() {
+  if (!isEditor()) return;
+  const selected = importCandidates
+    .map(candidate => ({
+      ...candidate,
+      month: String(candidate.month || '').trim(),
+      item: String(candidate.item || '').trim(),
+      targetValue: String(candidate.targetValue ?? '').trim(),
+      actualValue: String(candidate.actualValue ?? '').trim()
+    }))
+    .filter(candidate => candidate.enabled && candidate.month && candidate.item && (candidate.targetValue || candidate.actualValue));
+  if (!selected.length) {
+    setImportStatus('保存対象の候補がありません', 'error');
+    return;
+  }
+
+  const saveBtn = document.getElementById('importSaveBtn');
+  saveBtn.disabled = true;
+  try {
+    let saved = 0;
+    const months = new Set();
+    for (const candidate of selected) {
+      const existing = findExistingGoal(candidate.month, candidate.item);
+      const template = templateForItem(candidate.item);
+      const data = {
+        ...(existing || {}),
+        month: candidate.month,
+        department: existing?.department || template.department,
+        item: candidate.item,
+        unit: existing?.unit || template.unit,
+        direction: existing?.direction || template.direction,
+        detail: existing?.detail || template.detail,
+        currentValue: existing?.currentValue ?? '',
+        targetValue: candidate.targetValue || existing?.targetValue || '',
+        actualValue: candidate.actualValue || existing?.actualValue || '',
+        owner: existing?.owner || currentUser.name,
+        note: existing?.note || '',
+        history: normalizeHistory(existing?.history || []),
+        updatedAt: Date.now(),
+        updatedBy: currentUser.name
+      };
+      delete data.id;
+      if (existing) {
+        await set(ref(db, `${DB_PATH}/${existing.id}`), data);
+      } else {
+        await push(ref(db, DB_PATH), {
+          ...data,
+          createdAt: Date.now(),
+          createdBy: currentUser.name
+        });
+      }
+      saved++;
+      months.add(candidate.month);
+    }
+
+    await push(ref(db, IMPORT_HISTORY_PATH), {
+      fileName: importFileMeta?.name || '',
+      fileType: importFileMeta?.type || '',
+      fileSize: importFileMeta?.size || 0,
+      importedAt: Date.now(),
+      importedBy: currentUser.name,
+      importedRows: saved,
+      months: Array.from(months).sort(),
+      source: 'goal-manager-upload'
+    });
+
+    const firstMonth = Array.from(months).sort()[0];
+    if (firstMonth) document.getElementById('monthFilter').value = firstMonth;
+    closeImportModal();
+    showToast(`${saved}件を取り込みました`);
+    render();
+  } catch (error) {
+    setImportStatus(`保存に失敗しました: ${error.message}`, 'error');
+  } finally {
+    saveBtn.disabled = false;
+  }
+};
+
 window.openGoalModal = function(id = null) {
   editingId = id;
   const goal = id ? allGoals[id] : null;
@@ -1463,6 +2041,7 @@ window.closeGoalModal = function() {
 
 window.closeModalOnBackdrop = function(event) {
   if (event.target.id === 'goalModal') closeGoalModal();
+  if (event.target.id === 'importModal') closeImportModal();
 };
 
 window.saveGoal = async function() {
