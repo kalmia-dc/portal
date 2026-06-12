@@ -331,6 +331,109 @@
     text-overflow: ellipsis;
   }
 
+  .pending-panel {
+    margin-bottom: 14px;
+    padding: 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+  }
+
+  .pending-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 10px;
+  }
+
+  .pending-title {
+    font-size: 14px;
+    font-weight: 900;
+  }
+
+  .pending-sub {
+    margin-top: 2px;
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  .pending-count {
+    display: inline-flex;
+    align-items: center;
+    min-height: 26px;
+    padding: 4px 9px;
+    border: 1px solid #efd39c;
+    border-radius: 999px;
+    background: #fff8e8;
+    color: #7c5516;
+    font-size: 12px;
+    font-weight: 900;
+    white-space: nowrap;
+  }
+
+  .pending-list {
+    display: grid;
+    gap: 8px;
+  }
+
+  .pending-card {
+    display: grid;
+    grid-template-columns: minmax(220px, 1fr) minmax(260px, 1.2fr) auto;
+    gap: 12px;
+    align-items: center;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: #fbfdfe;
+  }
+
+  .pending-name {
+    font-weight: 900;
+  }
+
+  .pending-meta,
+  .pending-values {
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1.5;
+  }
+
+  .pending-values {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .input-badge {
+    display: inline-flex;
+    align-items: center;
+    min-height: 22px;
+    padding: 3px 7px;
+    border: 1px solid #efd39c;
+    border-radius: 999px;
+    background: #fff8e8;
+    color: #7c5516;
+    font-size: 11px;
+    font-weight: 900;
+  }
+
+  .input-badge.actual { border-color: #f1c2c2; background: #fff5f5; color: #a23a3a; }
+  .input-badge.target { border-color: #c9e1f5; background: #eef7ff; color: #2f6797; }
+  .input-badge.average { border-color: #d7cee9; background: #f6f2ff; color: #6149a8; }
+
+  .pending-empty {
+    padding: 10px 12px;
+    border-radius: var(--radius);
+    background: #eef9f4;
+    color: #176d46;
+    font-size: 13px;
+    font-weight: 900;
+  }
+
   .panel {
     background: var(--surface);
     border: 1px solid var(--border);
@@ -817,6 +920,15 @@
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
+    .pending-card {
+      grid-template-columns: 1fr;
+      align-items: stretch;
+    }
+
+    .pending-card .btn {
+      width: 100%;
+    }
+
     .stat {
       min-height: 76px;
       padding: 12px;
@@ -1056,6 +1168,8 @@
   </section>
 
   <section class="stats" id="stats"></section>
+
+  <section class="pending-panel editor-only" id="pendingPanel"></section>
 
   <section class="panel">
     <div class="panel-head">
@@ -1628,7 +1742,72 @@ function render() {
   document.getElementById('listSub').textContent = `${goals.length}件表示 / この月${goalsForMonth.length}件 / 半期${goalsForPeriod.length}件`;
   renderMonthBoard(month, goalsForPeriod, goalsForMonth);
   renderStats(goalsForPeriod);
+  renderPendingGoals(goalsForMonth);
   renderTable(goals, goalsForMonth.length);
+}
+
+function missingGoalFields(goal) {
+  const fields = [];
+  const target = parseNumber(goal.targetValue);
+  const actual = parseNumber(actualValueForGoal(goal));
+  const average = parseNumber(currentValueForDisplay(goal));
+  const history = historyForDisplay(goal);
+  if (target === null || target === 0) fields.push({ key: 'target', label: '目標値' });
+  if (actual === null) fields.push({ key: 'actual', label: '実績' });
+  if (average === null && !history.length) fields.push({ key: 'average', label: '6ヶ月平均' });
+  return fields;
+}
+
+function renderPendingGoals(monthGoals) {
+  const panel = document.getElementById('pendingPanel');
+  if (!panel || !isEditor()) return;
+  const pending = monthGoals
+    .map(goal => ({ ...goal, missingFields: missingGoalFields(goal) }))
+    .filter(goal => goal.missingFields.length)
+    .sort((a, b) => b.missingFields.length - a.missingFields.length || displayGoalItem(a.item).localeCompare(displayGoalItem(b.item), 'ja'));
+  const actualMissing = pending.filter(goal => goal.missingFields.some(field => field.key === 'actual')).length;
+  const targetMissing = pending.filter(goal => goal.missingFields.some(field => field.key === 'target')).length;
+
+  panel.innerHTML = `
+    <div class="pending-head">
+      <div>
+        <div class="pending-title">入力待ち</div>
+        <div class="pending-sub">未入力の項目をここから順番に入力できます</div>
+      </div>
+      <div class="pending-count">${pending.length}件</div>
+    </div>
+    ${pending.length ? `
+      <div class="pending-sub" style="margin-bottom:8px">実績未入力 ${actualMissing}件 / 目標未設定 ${targetMissing}件</div>
+      <div class="pending-list">${pending.map(pendingGoalCardHtml).join('')}</div>
+    ` : '<div class="pending-empty">この月の入力待ちはありません</div>'}`;
+}
+
+function pendingGoalCardHtml(goal) {
+  const actualValue = actualValueForGoal(goal);
+  const fields = goal.missingFields
+    .map(field => `<span class="input-badge ${field.key}">${escapeHtml(field.label)}未入力</span>`)
+    .join('');
+  return `
+    <div class="pending-card">
+      <div>
+        <div class="pending-name">${escapeHtml(displayGoalItem(goal.item))}</div>
+        <div class="pending-meta">${escapeHtml(monthShortLabel(goal.month || ''))} / ${escapeHtml(goal.department || '-')}</div>
+        <div style="margin-top:6px">${fields}</div>
+      </div>
+      <div class="pending-values">
+        <span>目標: ${pendingValueHtml(goal.targetValue, goal.unit, true)}</span>
+        <span>実績: ${pendingValueHtml(actualValue, goal.unit)}</span>
+        <span>平均: ${pendingValueHtml(currentValueForDisplay(goal), goal.unit)}</span>
+      </div>
+      <button class="btn primary" onclick="openGoalModal('${goal.id}')">入力</button>
+    </div>`;
+}
+
+function pendingValueHtml(value, unit = '', zeroIsMissing = false) {
+  const parsed = parseNumber(value);
+  return parsed === null || (zeroIsMissing && parsed === 0)
+    ? '<span class="input-badge">未入力</span>'
+    : `<span class="num">${fmtNumber(value, unit)}</span>`;
 }
 
 function renderMonthBoard(month, periodGoals, monthGoals) {
@@ -1712,7 +1891,9 @@ function goalRowHtml(goal) {
   const itemName = displayGoalItem(goal.item);
   const currentValue = currentValueForDisplay(goal);
   const actualValue = actualValueForGoal(goal);
+  const hasAverage = parseNumber(currentValue) !== null;
   const hasActual = parseNumber(actualValue) !== null;
+  const hasTarget = parseNumber(goal.targetValue) !== null && parseNumber(goal.targetValue) !== 0;
   const history = historyText(goal);
   return `
     <tr class="goal-row ${status}">
@@ -1725,8 +1906,8 @@ function goalRowHtml(goal) {
       </td>
       <td><span class="num">${escapeHtml(monthShortLabel(goal.month || ''))}</span></td>
       <td><span class="dept-pill ${deptClass}">${escapeHtml(goal.department || '-')}</span></td>
-      <td><span class="num">${fmtNumber(currentValue, goal.unit)}</span><div class="goal-detail">${escapeHtml(history)}</div></td>
-      <td><span class="num">${fmtNumber(goal.targetValue, goal.unit)}</span><div class="goal-detail">${goal.direction === 'down' ? '少ないほど達成' : '多いほど達成'}</div></td>
+      <td>${hasAverage ? `<span class="num">${fmtNumber(currentValue, goal.unit)}</span>` : '<span class="input-badge average">平均なし</span>'}<div class="goal-detail">${escapeHtml(history)}</div></td>
+      <td>${hasTarget ? `<span class="num">${fmtNumber(goal.targetValue, goal.unit)}</span>` : '<span class="input-badge target">目標未設定</span>'}<div class="goal-detail">${goal.direction === 'down' ? '少ないほど達成' : '多いほど達成'}</div></td>
       <td>${hasActual ? `<span class="num">${fmtNumber(actualValue, goal.unit)}</span>` : '<span class="value-missing">未入力</span>'}</td>
       <td>
         <div class="progress">

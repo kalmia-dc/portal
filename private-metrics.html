@@ -311,6 +311,108 @@
     text-overflow: ellipsis;
   }
 
+  .pending-panel {
+    margin-bottom: 14px;
+    padding: 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+  }
+
+  .pending-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 10px;
+  }
+
+  .pending-title {
+    font-size: 14px;
+    font-weight: 900;
+  }
+
+  .pending-sub {
+    margin-top: 2px;
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  .pending-count {
+    display: inline-flex;
+    align-items: center;
+    min-height: 26px;
+    padding: 4px 9px;
+    border: 1px solid #efd39c;
+    border-radius: 999px;
+    background: #fff8e8;
+    color: #7c5516;
+    font-size: 12px;
+    font-weight: 900;
+    white-space: nowrap;
+  }
+
+  .pending-list {
+    display: grid;
+    gap: 8px;
+  }
+
+  .pending-card {
+    display: grid;
+    grid-template-columns: minmax(220px, 1fr) minmax(220px, 1fr) auto;
+    gap: 12px;
+    align-items: center;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: #fbfdfe;
+  }
+
+  .pending-name {
+    font-weight: 900;
+  }
+
+  .pending-meta,
+  .pending-values {
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1.5;
+  }
+
+  .pending-values {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .input-badge {
+    display: inline-flex;
+    align-items: center;
+    min-height: 22px;
+    padding: 3px 7px;
+    border: 1px solid #efd39c;
+    border-radius: 999px;
+    background: #fff8e8;
+    color: #7c5516;
+    font-size: 11px;
+    font-weight: 900;
+  }
+
+  .input-badge.value { border-color: #f1c2c2; background: #fff5f5; color: #a23a3a; }
+  .input-badge.source { border-color: #c9e1f5; background: #eef7ff; color: #2f6797; }
+
+  .pending-empty {
+    padding: 10px 12px;
+    border-radius: var(--radius);
+    background: #eef9f4;
+    color: #176d46;
+    font-size: 13px;
+    font-weight: 900;
+  }
+
   .panel {
     background: var(--surface);
     border: 1px solid var(--border);
@@ -625,6 +727,11 @@
     .toolbar { grid-template-columns: 1fr; }
     .stats { grid-template-columns: 1fr; }
     .form-grid { grid-template-columns: 1fr; }
+    .pending-card {
+      grid-template-columns: 1fr;
+      align-items: stretch;
+    }
+    .pending-card .btn { width: 100%; }
     .utility-actions {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -703,6 +810,8 @@
   </section>
 
   <section class="stats admin-only" id="stats"></section>
+
+  <section class="pending-panel admin-only" id="pendingPanel"></section>
 
   <section class="panel admin-only">
     <div class="panel-head">
@@ -1182,12 +1291,70 @@ function render() {
   document.getElementById('listTitle').textContent = `${monthLabel(month)} 経営数値一覧`;
   document.getElementById('listSub').textContent = `${metrics.length}件表示 / 月内${totalForMonth.length}件`;
   renderStats(totalForMonth);
+  renderPendingMetrics(totalForMonth);
   renderTable(metrics, totalForMonth.length);
+}
+
+function missingMetricFields(metric) {
+  const fields = [];
+  if (parseNumber(metric.value) === null) fields.push({ key: 'value', label: '数値' });
+  if (!String(metric.source || '').trim()) fields.push({ key: 'source', label: '確認元' });
+  return fields;
+}
+
+function renderPendingMetrics(metrics) {
+  const panel = document.getElementById('pendingPanel');
+  if (!panel || !isAdmin()) return;
+  const pending = metrics
+    .map(metric => ({ ...metric, missingFields: missingMetricFields(metric) }))
+    .filter(metric => metric.missingFields.length)
+    .sort((a, b) => b.missingFields.length - a.missingFields.length || String(a.item || '').localeCompare(String(b.item || ''), 'ja'));
+  const valueMissing = pending.filter(metric => metric.missingFields.some(field => field.key === 'value')).length;
+  const sourceMissing = pending.filter(metric => metric.missingFields.some(field => field.key === 'source')).length;
+
+  panel.innerHTML = `
+    <div class="pending-head">
+      <div>
+        <div class="pending-title">入力待ち</div>
+        <div class="pending-sub">未入力の経営数値をここから順番に入力できます</div>
+      </div>
+      <div class="pending-count">${pending.length}件</div>
+    </div>
+    ${pending.length ? `
+      <div class="pending-sub" style="margin-bottom:8px">数値未入力 ${valueMissing}件 / 確認元未入力 ${sourceMissing}件</div>
+      <div class="pending-list">${pending.map(pendingMetricCardHtml).join('')}</div>
+    ` : '<div class="pending-empty">この月の入力待ちはありません</div>'}`;
+}
+
+function pendingMetricCardHtml(metric) {
+  const fields = metric.missingFields
+    .map(field => `<span class="input-badge ${field.key}">${escapeHtml(field.label)}未入力</span>`)
+    .join('');
+  return `
+    <div class="pending-card">
+      <div>
+        <div class="pending-name">${escapeHtml(metric.item || '')}</div>
+        <div class="pending-meta">${escapeHtml(metric.category || '-')} / ${escapeHtml(metric.month || '-')}</div>
+        <div style="margin-top:6px">${fields}</div>
+      </div>
+      <div class="pending-values">
+        <span>数値: ${pendingMetricValueHtml(metric.value, metric.unit)}</span>
+        <span>確認元: ${metric.source ? escapeHtml(metric.source) : '<span class="input-badge source">未入力</span>'}</span>
+      </div>
+      <button class="btn primary" onclick="openMetricModal('${metric.id}')">入力</button>
+    </div>`;
+}
+
+function pendingMetricValueHtml(value, unit = '') {
+  return parseNumber(value) === null
+    ? '<span class="input-badge value">未入力</span>'
+    : `<span class="num">${fmtNumber(value, unit)}</span>`;
 }
 
 function renderStats(metrics) {
   const total = metrics.length;
   const filled = metrics.filter(m => parseNumber(m.value) !== null).length;
+  const missing = total - filled;
   const categories = new Set(metrics.map(m => m.category).filter(Boolean)).size;
   const updated = metrics
     .map(m => m.updatedAt || m.createdAt || 0)
@@ -1196,7 +1363,7 @@ function renderStats(metrics) {
 
   document.getElementById('stats').innerHTML = `
     <div class="stat"><div class="stat-label">登録数</div><div class="stat-value">${total}</div><div class="stat-note">対象月の件数</div></div>
-    <div class="stat"><div class="stat-label">数値入力済み</div><div class="stat-value" style="color:var(--green)">${filled}</div><div class="stat-note">数値が入っている件数</div></div>
+    <div class="stat"><div class="stat-label">数値入力済み</div><div class="stat-value" style="color:var(--green)">${filled}</div><div class="stat-note">未入力 ${missing}件</div></div>
     <div class="stat"><div class="stat-label">区分数</div><div class="stat-value" style="color:var(--sky)">${categories}</div><div class="stat-note">対象月の分類数</div></div>
     <div class="stat"><div class="stat-label">最終更新</div><div class="stat-value" style="font-size:20px;color:var(--amber)">${updated ? new Date(updated).toLocaleDateString('ja-JP') : '-'}</div><div class="stat-note">月内データ</div></div>`;
 }
@@ -1241,6 +1408,8 @@ function renderTable(metrics, monthTotal) {
 
 function metricRowHtml(metric) {
   const updated = metric.updatedAt ? new Date(metric.updatedAt).toLocaleDateString('ja-JP') : '-';
+  const hasValue = parseNumber(metric.value) !== null;
+  const hasSource = Boolean(String(metric.source || '').trim());
   return `
     <tr>
       <td>
@@ -1250,8 +1419,8 @@ function metricRowHtml(metric) {
         </div>
       </td>
       <td><span class="category-pill">${escapeHtml(metric.category || '-')}</span></td>
-      <td><span class="num">${fmtNumber(metric.value, metric.unit)}</span></td>
-      <td><div>${escapeHtml(metric.source || '-')}</div></td>
+      <td>${hasValue ? `<span class="num">${fmtNumber(metric.value, metric.unit)}</span>` : '<span class="input-badge value">数値未入力</span>'}</td>
+      <td><div>${hasSource ? escapeHtml(metric.source) : '<span class="input-badge source">確認元未入力</span>'}</div></td>
       <td><div>${escapeHtml(updated)}</div><div class="metric-detail">${escapeHtml(metric.updatedBy || metric.createdBy || '')}</div></td>
       <td>
         <div class="actions-cell">
