@@ -1536,14 +1536,13 @@ function statusLabel(status) {
 
 function filteredGoals() {
   const month = document.getElementById('monthFilter').value || currentMonth();
-  const periodSet = new Set(periodMonths(month));
   const dept = document.getElementById('deptFilter').value;
   const status = document.getElementById('statusFilter').value;
   const query = document.getElementById('searchInput').value.trim().toLowerCase();
 
   return Object.entries(allGoals)
     .map(([id, goal]) => ({ id, ...goal }))
-    .filter(goal => periodSet.has(goal.month || ''))
+    .filter(goal => goal.month === month)
     .filter(goal => dept === 'all' || goal.department === dept)
     .filter(goal => status === 'all' || goalStatus(goal) === status)
     .filter(goal => {
@@ -1555,8 +1554,6 @@ function filteredGoals() {
         .includes(query);
     })
     .sort((a, b) => {
-      const monthDiff = (a.month || '').localeCompare(b.month || '');
-      if (monthDiff) return monthDiff;
       const depOrder = ['全体', '院長', '受付', 'DH', 'DA'];
       const depDiff = depOrder.indexOf(a.department) - depOrder.indexOf(b.department);
       if (depDiff) return depDiff;
@@ -1582,11 +1579,11 @@ function render() {
   const goals = filteredGoals();
   const goalsForPeriod = periodGoals(month);
   const goalsForMonth = monthGoals(month);
-  document.getElementById('listTitle').textContent = `${periodLabel(month)} 半期目標一覧`;
-  document.getElementById('listSub').textContent = `${goals.length}件表示 / 期間内${goalsForPeriod.length}件`;
+  document.getElementById('listTitle').textContent = `${monthLabel(month)} 目標一覧`;
+  document.getElementById('listSub').textContent = `${goals.length}件表示 / この月${goalsForMonth.length}件 / 半期${goalsForPeriod.length}件`;
   renderMonthBoard(month, goalsForPeriod, goalsForMonth);
   renderStats(goalsForPeriod);
-  renderTable(goals, goalsForPeriod.length);
+  renderTable(goals, goalsForMonth.length);
 }
 
 function renderMonthBoard(month, periodGoals, monthGoals) {
@@ -1622,7 +1619,7 @@ function renderTable(goals, monthTotal) {
   if (!monthTotal) {
     wrap.innerHTML = `
       <div class="empty">
-        <strong>この半期の目標は未登録です</strong>
+        <strong>この月の目標は未登録です</strong>
         <div>管理者または院長は、入力月を選んで標準項目を作成できます。</div>
       </div>`;
     return;
