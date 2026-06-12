@@ -445,6 +445,7 @@
   .status-pill.done { color: #176d46; background: #e9f8ef; border-color: #c5ead4; }
   .status-pill.close { color: #8b5b0f; background: #fff5db; border-color: #efd39c; }
   .status-pill.behind { color: #a23a3a; background: #fff0f0; border-color: #edc5c5; }
+  .status-pill.noTarget { color: var(--sky); background: #eef7ff; border-color: #c9e1f5; }
   .status-pill.blank { color: var(--muted); }
 
   .value-missing {
@@ -491,6 +492,7 @@
   .bar-fill.done { background: var(--green); }
   .bar-fill.close { background: var(--amber); }
   .bar-fill.behind { background: var(--coral); }
+  .bar-fill.noTarget { background: var(--sky); }
 
   .actions-cell {
     display: flex;
@@ -1043,6 +1045,7 @@
         <option value="done">達成</option>
         <option value="close">あと少し</option>
         <option value="behind">未達</option>
+        <option value="noTarget">目標未設定</option>
         <option value="blank">実績未入力</option>
       </select>
     </div>
@@ -1556,8 +1559,11 @@ function calcRate(goal) {
 }
 
 function goalStatus(goal) {
+  const target = parseNumber(goal.targetValue);
+  const actual = parseNumber(actualValueForGoal(goal));
+  if (actual === null) return 'blank';
+  if (target === null || target === 0) return 'noTarget';
   const rate = calcRate(goal);
-  if (rate === null) return 'blank';
   if (rate >= 100) return 'done';
   if (rate >= 80) return 'close';
   return 'behind';
@@ -1568,6 +1574,7 @@ function statusLabel(status) {
     done: '達成',
     close: 'あと少し',
     behind: '未達',
+    noTarget: '目標未設定',
     blank: '実績未入力'
   }[status] || '-';
 }
@@ -1626,11 +1633,12 @@ function render() {
 
 function renderMonthBoard(month, periodGoals, monthGoals) {
   const blank = periodGoals.filter(g => goalStatus(g) === 'blank').length;
+  const noTarget = periodGoals.filter(g => goalStatus(g) === 'noTarget').length;
   const done = periodGoals.filter(g => goalStatus(g) === 'done').length;
   const seedBtn = document.getElementById('seedBtn');
   document.getElementById('monthActionTitle').textContent = periodLabel(month);
   document.getElementById('monthActionSub').textContent = periodGoals.length
-    ? `入力月: ${monthLabel(month)} / この月${monthGoals.length}件 / 期間内${periodGoals.length}件 / 未入力${blank}件 / 達成${done}件`
+    ? `入力月: ${monthLabel(month)} / この月${monthGoals.length}件 / 期間内${periodGoals.length}件 / 未入力${blank}件 / 目標未設定${noTarget}件 / 達成${done}件`
     : `入力月: ${monthLabel(month)} / この半期の目標は未作成`;
   if (seedBtn) {
     seedBtn.textContent = monthGoals.length ? '標準項目を追加' : 'この月の標準項目を作成';
@@ -1642,6 +1650,7 @@ function renderStats(goals) {
   const done = goals.filter(g => goalStatus(g) === 'done').length;
   const close = goals.filter(g => goalStatus(g) === 'close').length;
   const behind = goals.filter(g => goalStatus(g) === 'behind').length;
+  const noTarget = goals.filter(g => goalStatus(g) === 'noTarget').length;
   const blank = goals.filter(g => goalStatus(g) === 'blank').length;
   const avgRates = goals.map(calcRate).filter(v => v !== null);
   const avg = avgRates.length ? avgRates.reduce((a, b) => a + b, 0) / avgRates.length : null;
@@ -1649,7 +1658,7 @@ function renderStats(goals) {
     <div class="stat"><div class="stat-label">半期項目</div><div class="stat-value">${total}</div><div class="stat-note">集計期間の登録数</div></div>
     <div class="stat"><div class="stat-label">実績未入力</div><div class="stat-value" style="color:var(--amber)">${blank}</div><div class="stat-note">入力待ちの項目</div></div>
     <div class="stat"><div class="stat-label">達成</div><div class="stat-value" style="color:var(--green)">${done}</div><div class="stat-note">達成率100%以上</div></div>
-    <div class="stat"><div class="stat-label">要確認</div><div class="stat-value" style="color:var(--coral)">${behind}</div><div class="stat-note">あと少し ${close} / 平均 ${avg === null ? '-' : `${Math.round(avg)}%`}</div></div>`;
+    <div class="stat"><div class="stat-label">要確認</div><div class="stat-value" style="color:var(--coral)">${behind}</div><div class="stat-note">あと少し ${close} / 目標未設定 ${noTarget} / 平均 ${avg === null ? '-' : `${Math.round(avg)}%`}</div></div>`;
 }
 
 function renderTable(goals, monthTotal) {
@@ -1703,6 +1712,7 @@ function goalRowHtml(goal) {
   const itemName = displayGoalItem(goal.item);
   const currentValue = currentValueForDisplay(goal);
   const actualValue = actualValueForGoal(goal);
+  const hasActual = parseNumber(actualValue) !== null;
   const history = historyText(goal);
   return `
     <tr class="goal-row ${status}">
@@ -1717,7 +1727,7 @@ function goalRowHtml(goal) {
       <td><span class="dept-pill ${deptClass}">${escapeHtml(goal.department || '-')}</span></td>
       <td><span class="num">${fmtNumber(currentValue, goal.unit)}</span><div class="goal-detail">${escapeHtml(history)}</div></td>
       <td><span class="num">${fmtNumber(goal.targetValue, goal.unit)}</span><div class="goal-detail">${goal.direction === 'down' ? '少ないほど達成' : '多いほど達成'}</div></td>
-      <td>${status === 'blank' ? '<span class="value-missing">未入力</span>' : `<span class="num">${fmtNumber(actualValue, goal.unit)}</span>`}</td>
+      <td>${hasActual ? `<span class="num">${fmtNumber(actualValue, goal.unit)}</span>` : '<span class="value-missing">未入力</span>'}</td>
       <td>
         <div class="progress">
           <span class="num">${rate === null ? '-' : `${Math.round(rate)}%`}</span>
@@ -2510,12 +2520,13 @@ window.sendLineWorksSummary = async function() {
   if (!goals.length) { showToast('通知する目標がありません'); return; }
   const done = goals.filter(g => goalStatus(g) === 'done');
   const behind = goals.filter(g => goalStatus(g) === 'behind');
+  const noTarget = goals.filter(g => goalStatus(g) === 'noTarget');
   const blank = goals.filter(g => goalStatus(g) === 'blank');
   const avgRates = goals.map(calcRate).filter(v => v !== null);
   const avg = avgRates.length ? Math.round(avgRates.reduce((a, b) => a + b, 0) / avgRates.length) : '-';
   const lowLines = behind.slice(0, 5).map(g => {
     const rate = calcRate(g);
-    return `・${monthShortLabel(g.month)} ${g.item}: ${rate === null ? '-' : Math.round(rate) + '%'}（実績 ${fmtNumber(g.actualValue, g.unit)} / 目標 ${fmtNumber(g.targetValue, g.unit)}）`;
+    return `・${monthShortLabel(g.month)} ${g.item}: ${rate === null ? '-' : Math.round(rate) + '%'}（実績 ${fmtNumber(actualValueForGoal(g), g.unit)} / 目標 ${fmtNumber(g.targetValue, g.unit)}）`;
   });
   const text = [
     `【半期目標】${periodLabel(month)} 達成状況`,
@@ -2523,6 +2534,7 @@ window.sendLineWorksSummary = async function() {
     `登録: ${goals.length}件`,
     `達成: ${done.length}件`,
     `未達: ${behind.length}件`,
+    `目標未設定: ${noTarget.length}件`,
     `実績未入力: ${blank.length}件`,
     `平均達成率: ${avg}%`,
     lowLines.length ? '\n要確認:\n' + lowLines.join('\n') : '',
