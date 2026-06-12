@@ -826,7 +826,7 @@
 
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getDatabase, ref, push, set, remove, onValue }
+import { getDatabase, ref, push, set, remove, onValue, get }
   from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 
 const firebaseConfig = {
@@ -842,6 +842,7 @@ const firebaseConfig = {
 const fbApp = initializeApp(firebaseConfig);
 const db = getDatabase(fbApp);
 const DB_PATH = 'privateMetrics';
+const GOAL_DB_PATH = 'monthlyGoals';
 const IMPORT_HISTORY_PATH = 'privateMetricImportHistory';
 const ADMIN_IDS = ['sugihira', 'momo'];
 const CATEGORY_OPTIONS = ['売上', '患者数', '自費', '保険', '経費', 'その他'];
@@ -957,6 +958,189 @@ function fmtNumber(value, unit = '') {
     ? n.toLocaleString('ja-JP', { maximumFractionDigits: 2 })
     : String(Number(n.toFixed(2)));
   return unit ? `${formatted}${unit}` : formatted;
+}
+
+function canonicalMetricItem(item) {
+  const text = String(item || '').trim();
+  if (text === '自費売上' || text === '自費売上高') return '自費売上';
+  if (text === '保険売上' || text === '保険売上高') return '保険売上';
+  if (text === '自費率') return '自費率';
+  return text;
+}
+
+function effectiveMetricsForMonth(month, overrides = []) {
+  const map = new Map();
+  monthMetrics(month).forEach(metric => {
+    map.set(canonicalMetricItem(metric.item), metric);
+  });
+  overrides
+    .filter(metric => metric.month === month)
+    .forEach(metric => {
+      map.set(canonicalMetricItem(metric.item), metric);
+    });
+  return map;
+}
+
+function calculatedSelfPayRateValue(month, overrides = []) {
+  const metrics = effectiveMetricsForMonth(month, overrides);
+  const selfPaySales = parseNumber(metrics.get('自費売上')?.value);
+  const insuranceSales = parseNumber(metrics.get('保険売上')?.value);
+  if (selfPaySales === null || insuranceSales === null || selfPaySales + insuranceSales <= 0) return '';
+  return formatImportValue((selfPaySales / (selfPaySales + insuranceSales)) * 100, 2);
+}
+
+function selfPayRateMetricData(month, overrides = []) {
+  const value = calculatedSelfPayRateValue(month, overrides);
+  if (!value) return null;
+  return {
+    month,
+    category: '自費',
+    item: '自費率',
+    value,
+    unit: '%',
+    source: '自費売上・保険売上から自動計算',
+    note: '自費売上 ÷ (保険売上 + 自費売上) × 100'
+  };
+}
+
+function addAutoSelfPayRateCandidates(candidates) {
+  const result = [...candidates];
+  const months = [...new Set(result.map(candidate => candidate.month).filter(Boolean))];
+  months.forEach(month => {
+    const data = selfPayRateMetricData(month, result);
+    if (!data) return;
+    const existingIndex = result.findIndex(candidate => candidate.month === month && canonicalMetricItem(candidate.item) === '自費率');
+    const candidate = {
+      enabled: true,
+      ...data,
+      sourceText: data.note
+    };
+    if (existingIndex >= 0) {
+      result[existingIndex] = { ...result[existingIndex], ...candidate };
+    } else {
+      result.push(candidate);
+    }
+  });
+  return result;
+}
+
+async function savePrivateMetricData(data) {
+  const existing = findExistingMetric(data.month, data.item);
+  const payload = {
+    ...(existing || {}),
+    ...data,
+    updatedAt: Date.now(),
+    updatedBy: currentUser.name
+  };
+  delete payload.id;
+  if (existing) {
+    await set(ref(db, `${DB_PATH}/${existing.id}`), payload);
+    return existing.id;
+  }
+  const newRef = push(ref(db, DB_PATH));
+  await set(newRef, {
+    ...payload,
+    createdAt: Date.now(),
+    createdBy: currentUser.name
+  });
+  return newRef.key;
+}
+
+function addMonths(month, offset) {
+  const [year, monthNumber] = month.split('-').map(Number);
+  const date = new Date(year, monthNumber - 1 + offset, 1);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function halfYearStart(month) {
+  const [year, monthNumber] = month.split('-').map(Number);
+  if (monthNumber >= 6 && monthNumber <= 11) return `${year}-06`;
+  if (monthNumber === 12) return `${year}-12`;
+  return `${year - 1}-12`;
+}
+
+function periodMonths(month) {
+  const start = halfYearStart(month);
+  return Array.from({ length: 6 }, (_, index) => addMonths(start, index));
+}
+
+function monthShortLabel(month) {
+  if (!month || !month.includes('-')) return '-';
+  const [, m] = month.split('-');
+  return `${Number(m)}月`;
+}
+
+function computedGoalAverage(goals, targetGoal, overrides = []) {
+  const months = new Set(periodMonths(targetGoal.month));
+  const rows = Object.entries(goals)
+    .map(([id, goal]) => ({ id, ...goal }))
+    .filter(goal => months.has(goal.month || ''))
+    .filter(goal => goal.item === '自費率');
+  overrides
+    .filter(goal => months.has(goal.month || '') && goal.item === '自費率')
+    .forEach(goal => {
+      if (!rows.some(row => row.month === goal.month && row.item === goal.item)) {
+        rows.push({ ...targetGoal, ...goal });
+      }
+    });
+  const actualRows = rows
+    .map(goal => {
+      const override = overrides.find(item => item.month === goal.month && item.item === '自費率');
+      const actualValue = override?.actualValue ?? goal.actualValue;
+      return { ...goal, actualValue, actualNumber: parseNumber(actualValue) };
+    })
+    .filter(goal => goal.actualNumber !== null)
+    .sort((a, b) => (a.month || '').localeCompare(b.month || ''));
+  if (!actualRows.length) return { currentValue: '', history: [] };
+  const average = actualRows.reduce((sum, goal) => sum + goal.actualNumber, 0) / actualRows.length;
+  return {
+    currentValue: formatImportValue(average, 2),
+    history: actualRows.map(goal => ({ label: monthShortLabel(goal.month), value: goal.actualValue }))
+  };
+}
+
+async function syncGoalSelfPayRate(month, value) {
+  const snap = await get(ref(db, GOAL_DB_PATH));
+  const goals = snap.val() || {};
+  const entries = Object.entries(goals);
+  const existing = entries.find(([, goal]) => goal.month === month && goal.item === '自費率');
+  const id = existing?.[0];
+  const current = existing?.[1] || {};
+  const average = computedGoalAverage(goals, { ...current, month, item: '自費率' }, [{ month, item: '自費率', actualValue: value }]);
+  const payload = {
+    ...current,
+    month,
+    department: current.department || '全体',
+    item: '自費率',
+    unit: '%',
+    direction: current.direction || 'up',
+    detail: current.detail || '自費売上 ÷ (保険売上 + 自費売上)',
+    currentValue: average.currentValue,
+    targetValue: current.targetValue || '',
+    actualValue: value,
+    owner: current.owner || currentUser.name,
+    note: current.note || '',
+    history: average.history,
+    updatedAt: Date.now(),
+    updatedBy: currentUser.name
+  };
+  if (id) {
+    await set(ref(db, `${GOAL_DB_PATH}/${id}`), payload);
+  } else {
+    await push(ref(db, GOAL_DB_PATH), {
+      ...payload,
+      createdAt: Date.now(),
+      createdBy: currentUser.name
+    });
+  }
+}
+
+async function syncSelfPayRateForMonth(month, overrides = []) {
+  const data = selfPayRateMetricData(month, overrides);
+  if (!data) return false;
+  await savePrivateMetricData(data);
+  await syncGoalSelfPayRate(month, data.value);
+  return true;
 }
 
 function filteredMetrics() {
@@ -1454,7 +1638,7 @@ function buildMonthlyReportMetricCandidates(rawText, month, defaultSource, apoIn
 
 function buildImportCandidates(rawText, month, defaultSource, apoInitialCount = null) {
   const monthlyReportCandidates = buildMonthlyReportMetricCandidates(rawText, month, defaultSource, apoInitialCount);
-  if (monthlyReportCandidates.length) return monthlyReportCandidates;
+  if (monthlyReportCandidates.length) return addAutoSelfPayRateCandidates(monthlyReportCandidates);
 
   const lines = normalizeImportText(repairLegacyPdfText(rawText))
     .split(/\n+/)
@@ -1476,7 +1660,7 @@ function buildImportCandidates(rawText, month, defaultSource, apoInitialCount = 
     candidates.push(candidate);
     if (candidates.length >= 80) break;
   }
-  return candidates;
+  return addAutoSelfPayRateCandidates(candidates);
 }
 
 function renderImportCandidates() {
@@ -1584,7 +1768,7 @@ window.setAllImportCandidates = function(enabled) {
 
 window.saveImportCandidates = async function() {
   if (!isAdmin() || saving) return;
-  const selected = importCandidates
+  let selected = importCandidates
     .map(candidate => ({
       ...candidate,
       month: String(candidate.month || '').trim(),
@@ -1595,6 +1779,8 @@ window.saveImportCandidates = async function() {
       source: String(candidate.source || '').trim(),
       note: String(candidate.note || '').trim()
     }))
+    .filter(candidate => candidate.enabled && candidate.month && candidate.item && candidate.value);
+  selected = addAutoSelfPayRateCandidates(selected)
     .filter(candidate => candidate.enabled && candidate.month && candidate.item && candidate.value);
   if (!selected.length) {
     setImportStatus('保存対象の候補がありません', 'error');
@@ -1608,31 +1794,26 @@ window.saveImportCandidates = async function() {
     let saved = 0;
     const months = new Set();
     for (const candidate of selected) {
-      const existing = findExistingMetric(candidate.month, candidate.item);
       const data = {
-        ...(existing || {}),
         month: candidate.month,
-        category: candidate.category || existing?.category || 'その他',
+        category: candidate.category || 'その他',
         item: candidate.item,
         value: candidate.value,
-        unit: candidate.unit || existing?.unit || '',
-        source: candidate.source || existing?.source || '',
-        note: candidate.note || existing?.note || '',
-        updatedAt: Date.now(),
-        updatedBy: currentUser.name
+        unit: candidate.unit || '',
+        source: candidate.source || '',
+        note: candidate.note || ''
       };
-      delete data.id;
-      if (existing) {
-        await set(ref(db, `${DB_PATH}/${existing.id}`), data);
-      } else {
-        await push(ref(db, DB_PATH), {
-          ...data,
-          createdAt: Date.now(),
-          createdBy: currentUser.name
-        });
-      }
+      await savePrivateMetricData(data);
       saved++;
       months.add(candidate.month);
+    }
+
+    let syncedRates = 0;
+    for (const month of months) {
+      const rateData = selfPayRateMetricData(month, selected);
+      if (!rateData) continue;
+      await syncGoalSelfPayRate(month, rateData.value);
+      syncedRates++;
     }
 
     await push(ref(db, IMPORT_HISTORY_PATH), {
@@ -1649,7 +1830,7 @@ window.saveImportCandidates = async function() {
     const firstMonth = Array.from(months).sort()[0];
     if (firstMonth) document.getElementById('monthFilter').value = firstMonth;
     closeImportModal();
-    showToast(`${saved}件を取り込みました`);
+    showToast(`${saved}件を取り込みました${syncedRates ? `（自費率${syncedRates}ヶ月分を自動計算）` : ''}`);
     render();
   } catch (error) {
     setImportStatus(`保存に失敗しました: ${error.message}`, 'error');
@@ -1725,6 +1906,10 @@ window.saveMetric = async function() {
         createdBy: currentUser.name
       });
       showToast('経営数値を登録しました');
+    }
+    if (['自費売上', '保険売上'].includes(canonicalMetricItem(item))) {
+      const synced = await syncSelfPayRateForMonth(month, [data]);
+      if (synced) showToast('経営数値を保存し、自費率を自動計算しました');
     }
     document.getElementById('monthFilter').value = month;
     closeMetricModal();

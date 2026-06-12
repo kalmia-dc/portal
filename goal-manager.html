@@ -1229,6 +1229,7 @@ const firebaseConfig = {
 const fbApp = initializeApp(firebaseConfig);
 const db = getDatabase(fbApp);
 const DB_PATH = 'monthlyGoals';
+const PRIVATE_METRICS_PATH = 'privateMetrics';
 const IMPORT_HISTORY_PATH = 'monthlyGoalImportHistory';
 const NOTIFY_URL = 'https://kalmia-notify.chibakenmin-sugihey.workers.dev';
 const EDITOR_IDS = ['sugihira', 'momo'];
@@ -1295,6 +1296,7 @@ const IMPORT_ITEM_ALIASES = [
 
 let currentUser = resolveUser();
 let allGoals = {};
+let allPrivateMetrics = {};
 let editingId = null;
 let saving = false;
 let importCandidates = [];
@@ -1364,6 +1366,13 @@ function init() {
     render();
   }, err => {
     showToast('データ読み込みに失敗しました: ' + err.message);
+  });
+
+  onValue(ref(db, PRIVATE_METRICS_PATH), snap => {
+    allPrivateMetrics = snap.val() || {};
+    render();
+  }, err => {
+    showToast('経営数値の読み込みに失敗しました: ' + err.message);
   });
 }
 
@@ -1440,6 +1449,32 @@ function canonicalGoalItem(item) {
   return text;
 }
 
+function canonicalPrivateMetricItem(item) {
+  const text = String(item || '').trim();
+  if (text === '自費売上' || text === '自費売上高') return '自費売上';
+  if (text === '保険売上' || text === '保険売上高') return '保険売上';
+  return text;
+}
+
+function privateMetricValue(month, item) {
+  const itemKey = canonicalPrivateMetricItem(item);
+  const metric = Object.values(allPrivateMetrics)
+    .find(row => row.month === month && canonicalPrivateMetricItem(row.item) === itemKey);
+  return parseNumber(metric?.value);
+}
+
+function calculatedSelfPayRateValue(month) {
+  const selfPaySales = privateMetricValue(month, '自費売上');
+  const insuranceSales = privateMetricValue(month, '保険売上');
+  if (selfPaySales === null || insuranceSales === null || selfPaySales + insuranceSales <= 0) return '';
+  return formatAverageValue((selfPaySales / (selfPaySales + insuranceSales)) * 100);
+}
+
+function actualValueForGoal(goal) {
+  if (canonicalGoalItem(goal.item) !== '自費率') return goal.actualValue;
+  return calculatedSelfPayRateValue(goal.month) || goal.actualValue;
+}
+
 function displayGoalItem(item) {
   return canonicalGoalItem(item);
 }
@@ -1468,7 +1503,10 @@ function actualGoalsForAverage(goal) {
     .map(([id, item]) => ({ id, ...item }))
     .filter(item => months.has(item.month || ''))
     .filter(item => goalGroupKey(item) === key)
-    .map(item => ({ ...item, actualNumber: parseNumber(item.actualValue) }))
+    .map(item => {
+      const actualValue = actualValueForGoal(item);
+      return { ...item, actualValue, actualNumber: parseNumber(actualValue) };
+    })
     .filter(item => item.actualNumber !== null)
     .sort((a, b) => (a.month || '').localeCompare(b.month || ''));
 }
@@ -1508,7 +1546,7 @@ function fmtNumber(value, unit = '') {
 
 function calcRate(goal) {
   const target = parseNumber(goal.targetValue);
-  const actual = parseNumber(goal.actualValue);
+  const actual = parseNumber(actualValueForGoal(goal));
   if (target === null || target === 0 || actual === null) return null;
   if (goal.direction === 'down') {
     if (actual <= 0) return 100;
@@ -1664,6 +1702,7 @@ function goalRowHtml(goal) {
   const updated = goal.updatedAt ? new Date(goal.updatedAt).toLocaleDateString('ja-JP') : '-';
   const itemName = displayGoalItem(goal.item);
   const currentValue = currentValueForDisplay(goal);
+  const actualValue = actualValueForGoal(goal);
   const history = historyText(goal);
   return `
     <tr class="goal-row ${status}">
@@ -1678,7 +1717,7 @@ function goalRowHtml(goal) {
       <td><span class="dept-pill ${deptClass}">${escapeHtml(goal.department || '-')}</span></td>
       <td><span class="num">${fmtNumber(currentValue, goal.unit)}</span><div class="goal-detail">${escapeHtml(history)}</div></td>
       <td><span class="num">${fmtNumber(goal.targetValue, goal.unit)}</span><div class="goal-detail">${goal.direction === 'down' ? '少ないほど達成' : '多いほど達成'}</div></td>
-      <td>${status === 'blank' ? '<span class="value-missing">未入力</span>' : `<span class="num">${fmtNumber(goal.actualValue, goal.unit)}</span>`}</td>
+      <td>${status === 'blank' ? '<span class="value-missing">未入力</span>' : `<span class="num">${fmtNumber(actualValue, goal.unit)}</span>`}</td>
       <td>
         <div class="progress">
           <span class="num">${rate === null ? '-' : `${Math.round(rate)}%`}</span>
@@ -2288,7 +2327,7 @@ window.openGoalModal = function(id = null) {
   setFormValue('fDirection', goal?.direction || 'up');
   setFormValue('fCurrent', goal ? currentValueForDisplay({ id, ...goal }) : '');
   setFormValue('fTarget', goal?.targetValue ?? '');
-  setFormValue('fActual', goal?.actualValue ?? '');
+  setFormValue('fActual', goal ? actualValueForGoal({ id, ...goal }) : '');
   setFormValue('fOwner', goal?.owner || currentUser.name);
   setFormValue('fNote', goal?.note || '');
 
@@ -2435,7 +2474,7 @@ window.exportCSV = function() {
       currentValueForDisplay(goal),
       ...Array.from({ length: HISTORY_MONTH_COUNT }, (_, index) => historyCsvValue(goal, index)),
       goal.targetValue,
-      goal.actualValue,
+      actualValueForGoal(goal),
       rate === null ? '' : `${Math.round(rate)}%`,
       statusLabel(goalStatus(goal)),
       goal.unit,
