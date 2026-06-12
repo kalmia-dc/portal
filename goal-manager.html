@@ -1265,7 +1265,7 @@ const TEMPLATE_ITEMS = [
   { department: '全体', item: '再初診', unit: '人', direction: 'up', detail: '月計表の再初診数を確認', currentValue: '', targetValue: '35', history: [{ label: '1月', value: '31' }, { label: '2月', value: '24' }, { label: '3月', value: '40' }] },
   { department: '院長', item: 'インプラント', unit: '本', direction: 'up', detail: 'インプラント実施本数', currentValue: '', targetValue: '3', history: [{ label: '1月', value: '1' }, { label: '2月', value: '2' }, { label: '3月', value: '1' }] },
   { department: '受付', item: '物販売上', unit: '円', direction: 'up', detail: '物販の月間売上', currentValue: '', targetValue: '76000', history: [{ label: '1月', value: '67170' }, { label: '2月', value: '86230' }, { label: '3月', value: '87160' }] },
-  { department: '全体', item: '1日平均来院数', unit: '人', direction: 'up', detail: '月間来院数を診療日数で割った平均', currentValue: '', targetValue: '31', history: [{ label: '1月', value: '29.36' }, { label: '2月', value: '26' }, { label: '3月', value: '26.5' }] },
+  { department: '全体', item: '一日平均来院数', unit: '人', direction: 'up', detail: '月間来院数を診療日数で割った平均', currentValue: '', targetValue: '31', history: [{ label: '1月', value: '29.36' }, { label: '2月', value: '26' }, { label: '3月', value: '26.5' }] },
   { department: '全体', item: '自費率', unit: '%', direction: 'up', detail: '自費売上 ÷ (保険売上 + 自費売上)' },
   { department: '院長', item: 'ジルコニア', unit: '本', direction: 'up', detail: 'ジルコニア補綴の本数', currentValue: '', targetValue: '25', history: [{ label: '1月', value: '29' }, { label: '2月', value: '30' }, { label: '3月', value: '16' }] },
   { department: '院長', item: '自費売上', unit: '円', direction: 'up', detail: '会計ベースの自費売上' },
@@ -1282,7 +1282,7 @@ const IMPORT_ITEM_ALIASES = [
   { item: '再初診', aliases: ['再初診'] },
   { item: 'インプラント', aliases: ['インプラント', 'implant'] },
   { item: '物販売上', aliases: ['物販売上', '物販', '物販 売上'] },
-  { item: '1日平均来院数', aliases: ['1日平均来院数', '1日平均 来院数', '１日平均来院数', '1日平均来院者数'] },
+  { item: '一日平均来院数', aliases: ['一日平均来院数', '1日平均来院数', '1日平均 来院数', '１日平均来院数', '1日平均来院者数'] },
   { item: '自費率', aliases: ['自費率'] },
   { item: 'ジルコニア', aliases: ['ジルコニア', '自費 ジルコニア'] },
   { item: 'ホワイトニング', aliases: ['ホワイトニング', 'whitening'] },
@@ -1432,6 +1432,71 @@ function parseNumber(value) {
   return Number.isFinite(n) ? n : null;
 }
 
+function canonicalGoalItem(item) {
+  const text = String(item || '').trim();
+  if (['一日平均来院数', '1日平均来院数', '１日平均来院数', '1日平均来院者数'].includes(text)) {
+    return '一日平均来院数';
+  }
+  return text;
+}
+
+function displayGoalItem(item) {
+  return canonicalGoalItem(item);
+}
+
+function goalGroupKey(goal) {
+  return [
+    goal.department || '',
+    canonicalGoalItem(goal.item),
+    goal.unit || ''
+  ].join('|');
+}
+
+function formatAverageValue(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return '';
+  return Math.abs(n - Math.round(n)) < 0.000001
+    ? String(Math.round(n))
+    : String(Number(n.toFixed(2)));
+}
+
+function actualGoalsForAverage(goal) {
+  const baseMonth = goal.month || document.getElementById('monthFilter')?.value || currentMonth();
+  const months = new Set(periodMonths(baseMonth));
+  const key = goalGroupKey(goal);
+  return Object.entries(allGoals)
+    .map(([id, item]) => ({ id, ...item }))
+    .filter(item => months.has(item.month || ''))
+    .filter(item => goalGroupKey(item) === key)
+    .map(item => ({ ...item, actualNumber: parseNumber(item.actualValue) }))
+    .filter(item => item.actualNumber !== null)
+    .sort((a, b) => (a.month || '').localeCompare(b.month || ''));
+}
+
+function computedAverage(goal) {
+  const goals = actualGoalsForAverage(goal);
+  if (!goals.length) return { value: '', history: [] };
+  const average = goals.reduce((sum, item) => sum + item.actualNumber, 0) / goals.length;
+  return {
+    value: formatAverageValue(average),
+    history: goals.map(item => ({
+      label: monthShortLabel(item.month),
+      value: item.actualValue
+    }))
+  };
+}
+
+function currentValueForDisplay(goal) {
+  const computed = computedAverage(goal);
+  return computed.value !== '' ? computed.value : goal.currentValue;
+}
+
+function historyForDisplay(goal) {
+  const computed = computedAverage(goal);
+  if (computed.history.length) return computed.history;
+  return normalizeHistory(goal.history || []).filter(item => item.label || item.value !== '');
+}
+
 function fmtNumber(value, unit = '') {
   const n = parseNumber(value);
   if (n === null) return '-';
@@ -1483,7 +1548,7 @@ function filteredGoals() {
     .filter(goal => status === 'all' || goalStatus(goal) === status)
     .filter(goal => {
       if (!query) return true;
-      return [goal.item, goal.detail, goal.note, goal.department, goal.owner]
+      return [displayGoalItem(goal.item), goal.item, goal.detail, goal.note, goal.department, goal.owner]
         .filter(Boolean)
         .join(' ')
         .toLowerCase()
@@ -1495,7 +1560,7 @@ function filteredGoals() {
       const depOrder = ['全体', '院長', '受付', 'DH', 'DA'];
       const depDiff = depOrder.indexOf(a.department) - depOrder.indexOf(b.department);
       if (depDiff) return depDiff;
-      return (a.item || '').localeCompare(b.item || '', 'ja');
+      return displayGoalItem(a.item).localeCompare(displayGoalItem(b.item), 'ja');
     });
 }
 
@@ -1600,19 +1665,21 @@ function goalRowHtml(goal) {
   const fill = rate === null ? 0 : Math.max(0, Math.min(100, rate));
   const deptClass = DEPARTMENT_CLASSES[goal.department] || 'all';
   const updated = goal.updatedAt ? new Date(goal.updatedAt).toLocaleDateString('ja-JP') : '-';
+  const itemName = displayGoalItem(goal.item);
+  const currentValue = currentValueForDisplay(goal);
   const history = historyText(goal);
   return `
     <tr class="goal-row ${status}">
       <td>
         <div class="goal-main">
-          <div class="goal-name">${escapeHtml(goal.item || '')}</div>
+          <div class="goal-name">${escapeHtml(itemName || '')}</div>
           <div class="goal-detail">${escapeHtml(goal.detail || '')}</div>
           ${goal.note ? `<div class="goal-detail">メモ: ${escapeHtml(goal.note)}</div>` : ''}
         </div>
       </td>
       <td><span class="num">${escapeHtml(monthShortLabel(goal.month || ''))}</span></td>
       <td><span class="dept-pill ${deptClass}">${escapeHtml(goal.department || '-')}</span></td>
-      <td><span class="num">${fmtNumber(goal.currentValue, goal.unit)}</span><div class="goal-detail">${escapeHtml(history)}</div></td>
+      <td><span class="num">${fmtNumber(currentValue, goal.unit)}</span><div class="goal-detail">${escapeHtml(history)}</div></td>
       <td><span class="num">${fmtNumber(goal.targetValue, goal.unit)}</span><div class="goal-detail">${goal.direction === 'down' ? '少ないほど達成' : '多いほど達成'}</div></td>
       <td>${status === 'blank' ? '<span class="value-missing">未入力</span>' : `<span class="num">${fmtNumber(goal.actualValue, goal.unit)}</span>`}</td>
       <td>
@@ -1636,9 +1703,10 @@ function actionLabel(status) {
 }
 
 function historyText(goal) {
+  const history = historyForDisplay(goal);
   const items = Array.from({ length: HISTORY_MONTH_COUNT }, (_, index) => index + 1).map(i => {
-    const label = goal.history?.[i - 1]?.label || '';
-    const value = goal.history?.[i - 1]?.value ?? '';
+    const label = history?.[i - 1]?.label || '';
+    const value = history?.[i - 1]?.value ?? '';
     if (!label && value === '') return '';
     return `${label || `${i}ヶ月前`}: ${fmtNumber(value, goal.unit)}`;
   }).filter(Boolean);
@@ -1652,8 +1720,9 @@ function escapeHtml(text) {
 }
 
 function importItemOptions(selectedItem) {
+  const selected = canonicalGoalItem(selectedItem);
   return TEMPLATE_ITEMS
-    .map(item => `<option value="${escapeHtml(item.item)}"${item.item === selectedItem ? ' selected' : ''}>${escapeHtml(item.item)}</option>`)
+    .map(item => `<option value="${escapeHtml(item.item)}"${canonicalGoalItem(item.item) === selected ? ' selected' : ''}>${escapeHtml(displayGoalItem(item.item))}</option>`)
     .join('');
 }
 
@@ -1969,7 +2038,7 @@ function buildMonthlyReportGoalCandidates(rawText, month, apoInitialCount) {
     candidates.push({
       enabled: true,
       month,
-      item: '1日平均来院数',
+      item: '一日平均来院数',
       targetValue: '',
       actualValue: formatImportValue(report.patientTotal / report.treatmentDays, 2),
       sourceText: `月間延べ患者数${report.patientTotal} ÷ 診療日数${report.treatmentDays}`
@@ -2055,14 +2124,16 @@ function renderImportCandidates() {
 }
 
 function findExistingGoal(month, item) {
-  const entry = Object.entries(allGoals).find(([, goal]) => goal.month === month && goal.item === item);
+  const itemKey = canonicalGoalItem(item);
+  const entry = Object.entries(allGoals).find(([, goal]) => goal.month === month && canonicalGoalItem(goal.item) === itemKey);
   return entry ? { id: entry[0], ...entry[1] } : null;
 }
 
 function templateForItem(item) {
-  return TEMPLATE_ITEMS.find(template => template.item === item) || {
+  const itemKey = canonicalGoalItem(item);
+  return TEMPLATE_ITEMS.find(template => canonicalGoalItem(template.item) === itemKey) || {
     department: '全体',
-    item,
+    item: itemKey,
     unit: '',
     direction: 'up',
     detail: ''
@@ -2132,7 +2203,7 @@ window.saveImportCandidates = async function() {
     .map(candidate => ({
       ...candidate,
       month: String(candidate.month || '').trim(),
-      item: String(candidate.item || '').trim(),
+      item: canonicalGoalItem(candidate.item),
       targetValue: String(candidate.targetValue ?? '').trim(),
       actualValue: String(candidate.actualValue ?? '').trim()
     }))
@@ -2154,7 +2225,7 @@ window.saveImportCandidates = async function() {
         ...(existing || {}),
         month: candidate.month,
         department: existing?.department || template.department,
-        item: candidate.item,
+        item: canonicalGoalItem(candidate.item),
         unit: existing?.unit || template.unit,
         direction: existing?.direction || template.direction,
         detail: existing?.detail || template.detail,
@@ -2214,17 +2285,17 @@ window.openGoalModal = function(id = null) {
   const month = document.getElementById('monthFilter').value || currentMonth();
   setFormValue('fMonth', goal?.month || month);
   setFormValue('fDepartment', goal?.department || '全体');
-  setFormValue('fItem', goal?.item || '');
+  setFormValue('fItem', goal ? displayGoalItem(goal.item) : '');
   setFormValue('fUnit', goal?.unit || '');
   setFormValue('fDetail', goal?.detail || '');
   setFormValue('fDirection', goal?.direction || 'up');
-  setFormValue('fCurrent', goal?.currentValue ?? '');
+  setFormValue('fCurrent', goal ? currentValueForDisplay({ id, ...goal }) : '');
   setFormValue('fTarget', goal?.targetValue ?? '');
   setFormValue('fActual', goal?.actualValue ?? '');
   setFormValue('fOwner', goal?.owner || currentUser.name);
   setFormValue('fNote', goal?.note || '');
 
-  const history = normalizeHistory(goal?.history || []);
+  const history = goal ? normalizeHistory(historyForDisplay({ id, ...goal })) : blankHistory();
   for (let i = 1; i <= HISTORY_MONTH_COUNT; i++) {
     setFormValue(`fHistoryLabel${i}`, history[i - 1]?.label || '');
     setFormValue(`fHistoryValue${i}`, history[i - 1]?.value ?? '');
@@ -2252,7 +2323,7 @@ window.closeModalOnBackdrop = function(event) {
 
 window.saveGoal = async function() {
   if (!isEditor() || saving) return;
-  const item = document.getElementById('fItem').value.trim();
+  const item = canonicalGoalItem(document.getElementById('fItem').value);
   if (!item) { showToast('項目を入力してください'); return; }
   const month = document.getElementById('fMonth').value;
   if (!month) { showToast('対象月を選択してください'); return; }
@@ -2362,9 +2433,9 @@ window.exportCSV = function() {
       periodLabel(month),
       goal.month,
       goal.department,
-      goal.item,
+      displayGoalItem(goal.item),
       goal.detail,
-      goal.currentValue,
+      currentValueForDisplay(goal),
       ...Array.from({ length: HISTORY_MONTH_COUNT }, (_, index) => historyCsvValue(goal, index)),
       goal.targetValue,
       goal.actualValue,
@@ -2391,7 +2462,7 @@ window.exportCSV = function() {
 };
 
 function historyCsvValue(goal, index) {
-  const item = goal.history?.[index];
+  const item = historyForDisplay(goal)?.[index];
   if (!item) return '';
   return `${item.label || ''}:${item.value ?? ''}`;
 }
