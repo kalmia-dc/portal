@@ -1169,6 +1169,10 @@
         <label for="importMonth">反映する月</label>
         <input type="month" id="importMonth">
       </div>
+      <div class="field">
+        <label for="importApoInitial">アポツール初診数</label>
+        <input type="text" id="importApoInitial" inputmode="numeric" placeholder="例：70">
+      </div>
       <div class="field full">
         <label for="importFile">PDF / 写真</label>
         <div class="import-drop">
@@ -1262,6 +1266,7 @@ const TEMPLATE_ITEMS = [
   { department: '院長', item: 'インプラント', unit: '本', direction: 'up', detail: 'インプラント実施本数', currentValue: '', targetValue: '3', history: [{ label: '1月', value: '1' }, { label: '2月', value: '2' }, { label: '3月', value: '1' }] },
   { department: '受付', item: '物販売上', unit: '円', direction: 'up', detail: '物販の月間売上', currentValue: '', targetValue: '76000', history: [{ label: '1月', value: '67170' }, { label: '2月', value: '86230' }, { label: '3月', value: '87160' }] },
   { department: '全体', item: '1日平均来院数', unit: '人', direction: 'up', detail: '月間来院数を診療日数で割った平均', currentValue: '', targetValue: '31', history: [{ label: '1月', value: '29.36' }, { label: '2月', value: '26' }, { label: '3月', value: '26.5' }] },
+  { department: '全体', item: '自費率', unit: '%', direction: 'up', detail: '自費売上 ÷ (保険売上 + 自費売上)' },
   { department: '院長', item: 'ジルコニア', unit: '本', direction: 'up', detail: 'ジルコニア補綴の本数', currentValue: '', targetValue: '25', history: [{ label: '1月', value: '29' }, { label: '2月', value: '30' }, { label: '3月', value: '16' }] },
   { department: '院長', item: '自費売上', unit: '円', direction: 'up', detail: '会計ベースの自費売上' },
   { department: 'DH', item: 'ホワイトニング', unit: '件', direction: 'up', detail: 'ホワイトニング実施件数', currentValue: '', targetValue: '2', history: [{ label: '1月', value: '1' }, { label: '2月', value: '1' }, { label: '3月', value: '0' }] },
@@ -1278,6 +1283,7 @@ const IMPORT_ITEM_ALIASES = [
   { item: 'インプラント', aliases: ['インプラント', 'implant'] },
   { item: '物販売上', aliases: ['物販売上', '物販', '物販 売上'] },
   { item: '1日平均来院数', aliases: ['1日平均来院数', '1日平均 来院数', '１日平均来院数', '1日平均来院者数'] },
+  { item: '自費率', aliases: ['自費率'] },
   { item: 'ジルコニア', aliases: ['ジルコニア', '自費 ジルコニア'] },
   { item: 'ホワイトニング', aliases: ['ホワイトニング', 'whitening'] },
   { item: 'Google口コミ', aliases: ['Google口コミ', '口コミ投稿配布数', '口コミ配布数', '口コミ'] },
@@ -1694,6 +1700,36 @@ function loadTesseract() {
   return tesseractLoader;
 }
 
+function japaneseTextScore(text) {
+  const source = String(text || '');
+  const keywords = ['月計表', '合計', '患者数', '再初診', '新患', '診療報酬', '自費', '物販', '保険種別', 'レセプト'];
+  return keywords.reduce((score, keyword) => score + (source.includes(keyword) ? 2 : 0), 0)
+    + (source.match(/[ぁ-んァ-ン一-龥]/g) || []).length / 40
+    - (source.match(/[\u0080-\u009f�]/g) || []).length / 8;
+}
+
+function repairLegacyPdfText(text) {
+  const source = String(text || '');
+  if (!source || typeof TextDecoder === 'undefined') return source;
+  const legacyChars = (source.match(/[\u0080-\u009f]/g) || []).length;
+  if (legacyChars < 6) return source;
+  try {
+    const bytes = [];
+    for (const ch of source) {
+      const code = ch.charCodeAt(0);
+      if (code <= 0xff) {
+        bytes.push(code);
+      } else {
+        bytes.push(...new TextEncoder().encode(ch));
+      }
+    }
+    const decoded = new TextDecoder('shift_jis').decode(new Uint8Array(bytes));
+    return japaneseTextScore(decoded) > japaneseTextScore(source) + 2 ? decoded : source;
+  } catch (error) {
+    return source;
+  }
+}
+
 async function readPdfText(file) {
   const pdfjs = await loadPdfJs();
   const pdf = await pdfjs.getDocument({ data: new Uint8Array(await file.arrayBuffer()) }).promise;
@@ -1704,7 +1740,7 @@ async function readPdfText(file) {
     const content = await page.getTextContent();
     pages.push(content.items.map(item => item.str).join('\n'));
   }
-  const text = pages.join('\n\n').trim();
+  const text = repairLegacyPdfText(pages.join('\n\n').trim());
   if (text.length >= 20) return text;
   setImportStatus('PDFに文字データが少ないためOCRに切り替えます');
   return readPdfByOcr(pdf);
@@ -1845,8 +1881,118 @@ function parseActualValue(block, month, item) {
   return '';
 }
 
-function buildImportCandidates(rawText, month) {
-  const text = normalizeImportText(rawText);
+function formatImportValue(value, digits = 2) {
+  if (value === null || value === undefined || value === '') return '';
+  const n = Number(value);
+  if (!Number.isFinite(n)) return '';
+  return Math.abs(n - Math.round(n)) < 0.000001
+    ? String(Math.round(n))
+    : String(Number(n.toFixed(digits)));
+}
+
+function numbersFromImportLine(line) {
+  return [...normalizeImportText(line).matchAll(/-?\d[\d,]*(?:\.\d+)?/g)]
+    .map(match => Number(match[0].replace(/,/g, '')))
+    .filter(Number.isFinite);
+}
+
+function inferImportMonthFromText(rawText) {
+  const text = normalizeImportText(repairLegacyPdfText(rawText));
+  let match = text.match(/令和\s*(\d{1,2})\s*年\s*(\d{1,2})\s*月/);
+  if (match) {
+    const year = 2018 + Number(match[1]);
+    return `${year}-${String(Number(match[2])).padStart(2, '0')}`;
+  }
+  match = text.match(/(20\d{2})\s*年\s*(\d{1,2})\s*月/);
+  if (match) return `${match[1]}-${String(Number(match[2])).padStart(2, '0')}`;
+  return '';
+}
+
+function parseMonthlyReport(rawText) {
+  const text = normalizeImportText(repairLegacyPdfText(rawText));
+  if (!text.includes('月計表')) return null;
+  const lines = text.split(/\n+/).map(line => line.trim()).filter(Boolean);
+  const totalLines = lines
+    .filter(line => /^合計\s/.test(line))
+    .map(line => ({ line, nums: numbersFromImportLine(line) }));
+  const dailyTotal = totalLines.find(entry => entry.nums.length >= 15);
+  if (!dailyTotal) return null;
+  const insuranceTotal = totalLines.find(entry => /\([^)]*\)/.test(entry.line) && entry.nums.length >= 7)
+    || totalLines.find(entry => entry !== dailyTotal && entry.nums.length >= 7);
+  const treatmentDays = lines.filter(line => /^\d{1,2}\([^)]+\)\s+\d/.test(line)).length;
+  const daily = dailyTotal.nums;
+  const insurance = insuranceTotal?.nums || [];
+  const insurancePoints = insurance[2] ?? daily[4] ?? null;
+  const insuranceSales = insurance[4] ?? (Number.isFinite(insurancePoints) ? insurancePoints * 10 : null);
+  return {
+    patientTotal: daily[0],
+    reportRevisit: daily[1],
+    newPatients: daily[2],
+    selfPaySales: daily[10],
+    productSales: daily[12],
+    insurancePoints,
+    insuranceSales,
+    receiptCount: insurance[0],
+    averagePoints: insurance[3],
+    treatmentDays,
+    sourceText: `${dailyTotal.line}${insuranceTotal ? `\n${insuranceTotal.line}` : ''}`
+  };
+}
+
+function buildMonthlyReportGoalCandidates(rawText, month, apoInitialCount) {
+  const report = parseMonthlyReport(rawText);
+  if (!report) return [];
+  const candidates = [];
+  const sourceText = `月計表合計\n${report.sourceText}`.slice(0, 240);
+  const initialCount = Number(apoInitialCount);
+  if (apoInitialCount !== null && apoInitialCount !== '' && Number.isFinite(initialCount)) {
+    candidates.push({
+      enabled: true,
+      month,
+      item: '初診',
+      targetValue: '',
+      actualValue: formatImportValue(initialCount, 0),
+      sourceText: `アポツール初診数 ${formatImportValue(initialCount, 0)}`
+    });
+    if (Number.isFinite(report.newPatients) && Number.isFinite(report.reportRevisit)) {
+      candidates.push({
+        enabled: true,
+        month,
+        item: '再初診',
+        targetValue: '',
+        actualValue: formatImportValue(report.newPatients - initialCount + report.reportRevisit, 0),
+        sourceText: `月計表 新患${report.newPatients} - アポツール初診${formatImportValue(initialCount, 0)} + 月計表 再初診${report.reportRevisit}`
+      });
+    }
+  }
+  if (Number.isFinite(report.patientTotal) && report.treatmentDays > 0) {
+    candidates.push({
+      enabled: true,
+      month,
+      item: '1日平均来院数',
+      targetValue: '',
+      actualValue: formatImportValue(report.patientTotal / report.treatmentDays, 2),
+      sourceText: `月間延べ患者数${report.patientTotal} ÷ 診療日数${report.treatmentDays}`
+    });
+  }
+  if (Number.isFinite(report.selfPaySales) && Number.isFinite(report.insuranceSales) && report.selfPaySales + report.insuranceSales > 0) {
+    candidates.push({
+      enabled: true,
+      month,
+      item: '自費率',
+      targetValue: '',
+      actualValue: formatImportValue((report.selfPaySales / (report.insuranceSales + report.selfPaySales)) * 100, 2),
+      sourceText
+    });
+  }
+  return candidates;
+}
+
+function buildImportCandidates(rawText, month, apoInitialCount = null) {
+  const monthlyReportCandidates = buildMonthlyReportGoalCandidates(rawText, month, apoInitialCount);
+  if (monthlyReportCandidates.length) return monthlyReportCandidates;
+
+  const text = normalizeImportText(repairLegacyPdfText(rawText));
   const lines = text.split(/\n+/).map(line => line.trim()).filter(Boolean);
   const markers = [];
   lines.forEach((line, index) => {
@@ -1926,6 +2072,7 @@ function templateForItem(item) {
 window.openImportModal = function() {
   if (!isEditor()) return;
   document.getElementById('importMonth').value = document.getElementById('monthFilter').value || currentMonth();
+  document.getElementById('importApoInitial').value = '';
   document.getElementById('importSaveBtn').disabled = false;
   setImportStatus('PDFは文字抽出、写真やスキャンPDFはOCRで読み取ります。');
   document.getElementById('importModal').classList.add('open');
@@ -1949,6 +2096,8 @@ window.handleImportFile = async function(file) {
     renderImportCandidates();
     const text = await extractTextFromFile(file);
     document.getElementById('importRawText').value = text.trim();
+    const inferredMonth = inferImportMonthFromText(text);
+    if (inferredMonth) document.getElementById('importMonth').value = inferredMonth;
     setImportStatus(`読み取り完了: ${file.name}`, 'success');
     analyzeImportText();
   } catch (error) {
@@ -1959,9 +2108,12 @@ window.handleImportFile = async function(file) {
 window.analyzeImportText = function() {
   const rawText = document.getElementById('importRawText').value;
   const month = document.getElementById('importMonth').value || document.getElementById('monthFilter').value || currentMonth();
-  importCandidates = buildImportCandidates(rawText, month);
+  const apoInitialCount = parseNumber(document.getElementById('importApoInitial').value);
+  importCandidates = buildImportCandidates(rawText, month, apoInitialCount);
   renderImportCandidates();
-  setImportStatus(`${importCandidates.length}件の候補を作成しました。保存前に数値を確認してください。`, importCandidates.length ? 'success' : 'error');
+  const monthlyReportNeedsInitial = parseMonthlyReport(rawText) && !(apoInitialCount !== null && Number.isFinite(Number(apoInitialCount)));
+  const note = monthlyReportNeedsInitial ? ' 初診・再初診にはアポツール初診数が必要です。' : '';
+  setImportStatus(`${importCandidates.length}件の候補を作成しました。保存前に数値を確認してください。${note}`, importCandidates.length ? 'success' : 'error');
 };
 
 window.updateImportCandidate = function(index, field, value) {
