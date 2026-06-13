@@ -524,6 +524,66 @@
     line-height: 1.45;
   }
 
+  .average-col {
+    min-width: 260px;
+  }
+
+  .average-cell {
+    display: grid;
+    gap: 7px;
+  }
+
+  .average-main {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .history-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    max-width: 380px;
+  }
+
+  .history-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    min-height: 23px;
+    padding: 3px 7px;
+    border: 1px solid #d6e5ec;
+    border-radius: 999px;
+    background: #f5fbfd;
+    color: var(--text);
+    font-size: 11px;
+    font-weight: 900;
+    white-space: nowrap;
+  }
+
+  .history-chip .history-label {
+    color: var(--muted);
+    font-weight: 800;
+  }
+
+  .history-chip.missing {
+    border-color: #efd39c;
+    background: #fff8e8;
+    color: #7c5516;
+  }
+
+  .history-input-btn {
+    min-height: 28px;
+    padding: 4px 9px;
+    border: 1px solid #c9e1f5;
+    border-radius: var(--radius);
+    background: #eef7ff;
+    color: #2f6797;
+    font-size: 11px;
+    font-weight: 900;
+  }
+
   .status-pill {
     display: inline-flex;
     align-items: center;
@@ -1005,15 +1065,16 @@
       content: none;
     }
 
-    tr.goal-row td:nth-child(2)::before { content: "月"; }
-    tr.goal-row td:nth-child(3)::before { content: "6ヶ月平均"; }
-    tr.goal-row td:nth-child(4)::before { content: "目標"; }
-    tr.goal-row td:nth-child(5)::before { content: "実績"; }
-    tr.goal-row td:nth-child(6)::before { content: "達成率"; }
-    tr.goal-row td:nth-child(7)::before { content: "状況"; }
-    tr.goal-row td:nth-child(8)::before { content: "更新"; }
+    tr.goal-row td:nth-child(2)::before { content: "6ヶ月平均"; }
+    tr.goal-row td:nth-child(3)::before { content: "目標"; }
+    tr.goal-row td:nth-child(4)::before { content: "実績"; }
+    tr.goal-row td:nth-child(5)::before { content: "達成率"; }
+    tr.goal-row td:nth-child(6)::before { content: "状況"; }
+    tr.goal-row td:nth-child(7)::before { content: "更新"; }
 
     .goal-detail { max-width: none; }
+    .average-col { min-width: 0; }
+    .history-chips { max-width: none; }
     .progress { width: 100%; }
     .actions-cell,
     .action-btn { width: 100%; }
@@ -1200,7 +1261,7 @@
         <label for="fCurrent">6ヶ月平均</label>
         <input type="text" id="fCurrent" inputmode="decimal" placeholder="例：31">
       </div>
-      <div class="field full">
+      <div class="field full" id="historySection">
         <label>6ヶ月平均の内訳</label>
         <div class="history-grid">
           <input type="text" id="fHistoryLabel1" placeholder="月">
@@ -1821,8 +1882,7 @@ function renderTable(goals, monthTotal) {
       <thead>
         <tr>
           <th>項目</th>
-          <th>月</th>
-          <th>6ヶ月平均</th>
+          <th class="average-col">6ヶ月平均</th>
           <th>目標</th>
           <th>実績</th>
           <th>達成率</th>
@@ -1848,7 +1908,6 @@ function goalRowHtml(goal) {
   const hasAverage = parseNumber(currentValue) !== null;
   const hasActual = parseNumber(actualValue) !== null;
   const hasTarget = parseNumber(goal.targetValue) !== null && parseNumber(goal.targetValue) !== 0;
-  const history = historyText(goal);
   return `
     <tr class="goal-row ${status}">
       <td>
@@ -1858,8 +1917,7 @@ function goalRowHtml(goal) {
           ${goal.note ? `<div class="goal-detail">メモ: ${escapeHtml(goal.note)}</div>` : ''}
         </div>
       </td>
-      <td><span class="num">${escapeHtml(monthShortLabel(goal.month || ''))}</span></td>
-      <td>${hasAverage ? `<span class="num">${fmtNumber(currentValue, goal.unit)}</span>` : '<span class="input-badge average">平均なし</span>'}<div class="goal-detail">${escapeHtml(history)}</div></td>
+      <td class="average-col">${averageCellHtml(goal, currentValue, hasAverage)}</td>
       <td>${hasTarget ? `<span class="num">${fmtNumber(goal.targetValue, goal.unit)}</span>` : '<span class="input-badge target">目標未設定</span>'}<div class="goal-detail">${goal.direction === 'down' ? '少ないほど達成' : '多いほど達成'}</div></td>
       <td>${hasActual ? `<span class="num">${fmtNumber(actualValue, goal.unit)}</span>` : '<span class="value-missing">未入力</span>'}</td>
       <td>
@@ -1882,15 +1940,44 @@ function actionLabel(status) {
   return status === 'blank' ? '入力' : '編集';
 }
 
-function historyText(goal) {
+function historyEntriesForDisplay(goal) {
   const history = historyForDisplay(goal);
-  const items = Array.from({ length: HISTORY_MONTH_COUNT }, (_, index) => index + 1).map(i => {
-    const label = history?.[i - 1]?.label || '';
-    const value = history?.[i - 1]?.value ?? '';
-    if (!label && value === '') return '';
-    return `${label || `${i}ヶ月前`}: ${fmtNumber(value, goal.unit)}`;
-  }).filter(Boolean);
-  return items.join(' / ');
+  return history.map((item, index) => {
+    const label = String(item.label || '').trim();
+    const value = item.value ?? '';
+    const hasLabel = Boolean(label);
+    const hasValue = parseNumber(value) !== null;
+    return {
+      label: label || `${index + 1}ヶ月前`,
+      value,
+      hasLabel,
+      hasValue,
+      isEmpty: !hasLabel && !String(value ?? '').trim()
+    };
+  });
+}
+
+function averageCellHtml(goal, currentValue, hasAverage) {
+  const entries = historyEntriesForDisplay(goal);
+  const visibleEntries = entries.filter(entry => !entry.isEmpty);
+  const hasMissing = !visibleEntries.length || visibleEntries.some(entry => !entry.hasValue);
+  const chips = visibleEntries.length
+    ? visibleEntries.map(entry => entry.hasValue
+      ? `<span class="history-chip"><span class="history-label">${escapeHtml(entry.label)}</span>${fmtNumber(entry.value, goal.unit)}</span>`
+      : `<span class="history-chip missing"><span class="history-label">${escapeHtml(entry.label)}</span>未入力</span>`)
+      .join('')
+    : '<span class="history-chip missing">内訳なし</span>';
+  const inputButton = isEditor() && hasMissing
+    ? `<button class="history-input-btn" onclick="openGoalHistory('${goal.id}')">内訳を入力</button>`
+    : '';
+  return `
+    <div class="average-cell">
+      <div class="average-main">
+        ${hasAverage ? `<span class="num">${fmtNumber(currentValue, goal.unit)}</span>` : '<span class="input-badge average">平均なし</span>'}
+        ${inputButton}
+      </div>
+      <div class="history-chips">${chips}</div>
+    </div>`;
 }
 
 function escapeHtml(text) {
@@ -2484,6 +2571,26 @@ window.openGoalModal = function(id = null) {
     el.disabled = !isEditor();
   });
   document.getElementById('goalModal').classList.add('open');
+};
+
+window.openGoalHistory = function(id) {
+  if (!isEditor()) return;
+  openGoalModal(id);
+  window.setTimeout(() => {
+    const historySection = document.getElementById('historySection');
+    historySection?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    for (let i = 1; i <= HISTORY_MONTH_COUNT; i++) {
+      const labelInput = document.getElementById(`fHistoryLabel${i}`);
+      const valueInput = document.getElementById(`fHistoryValue${i}`);
+      const focusTarget = !labelInput.value.trim() ? labelInput : (parseNumber(valueInput.value) === null ? valueInput : null);
+      if (focusTarget) {
+        focusTarget.focus();
+        focusTarget.select();
+        return;
+      }
+    }
+    document.getElementById('fHistoryValue1')?.focus();
+  }, 80);
 };
 
 function setFormValue(id, value) {
