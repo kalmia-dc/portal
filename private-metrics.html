@@ -311,6 +311,192 @@
     text-overflow: ellipsis;
   }
 
+  .analysis-panel {
+    margin-bottom: 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+
+  .analysis-head {
+    display: grid;
+    grid-template-columns: minmax(260px, 1fr) auto;
+    gap: 12px;
+    align-items: end;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--border);
+    background: #fbfdfe;
+  }
+
+  .analysis-controls {
+    display: grid;
+    grid-template-columns: 110px 220px;
+    gap: 10px;
+    align-items: end;
+  }
+
+  .analysis-body {
+    display: grid;
+    gap: 12px;
+    padding: 14px;
+  }
+
+  .analysis-summary {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .analysis-chip {
+    min-height: 82px;
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: #fbfdfe;
+  }
+
+  .analysis-chip-label {
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 900;
+  }
+
+  .analysis-chip-value {
+    margin-top: 6px;
+    font-family: 'Nunito', sans-serif;
+    font-size: 22px;
+    line-height: 1;
+    font-weight: 900;
+  }
+
+  .analysis-chip-note {
+    margin-top: 5px;
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 700;
+  }
+
+  .chart-box {
+    min-height: 320px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: #fff;
+    overflow: hidden;
+  }
+
+  .analysis-chart {
+    display: block;
+    width: 100%;
+    height: 320px;
+  }
+
+  .chart-axis {
+    stroke: #b9ccd3;
+    stroke-width: 1;
+  }
+
+  .chart-grid {
+    stroke: #e7f0f3;
+    stroke-width: 1;
+  }
+
+  .chart-label {
+    fill: var(--muted);
+    font-size: 11px;
+    font-weight: 800;
+  }
+
+  .chart-line {
+    fill: none;
+    stroke-width: 3;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .chart-point {
+    stroke: #fff;
+    stroke-width: 2;
+  }
+
+  .chart-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 320px;
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 900;
+    text-align: center;
+    padding: 24px;
+  }
+
+  .analysis-legend {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 900;
+  }
+
+  .legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .legend-swatch {
+    width: 18px;
+    height: 4px;
+    border-radius: 999px;
+  }
+
+  .analysis-table-wrap {
+    overflow: auto;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+
+  .analysis-table {
+    min-width: 760px;
+  }
+
+  .analysis-table th,
+  .analysis-table td {
+    padding: 9px 10px;
+    font-size: 12px;
+  }
+
+  .yoy {
+    display: inline-flex;
+    align-items: center;
+    min-height: 22px;
+    padding: 3px 7px;
+    border-radius: 999px;
+    background: var(--surface-alt);
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 900;
+    white-space: nowrap;
+  }
+
+  .yoy.up {
+    background: #e8f7ef;
+    color: #19734a;
+  }
+
+  .yoy.down {
+    background: #fff0f0;
+    color: #b13b3b;
+  }
+
+  .yoy.flat {
+    background: #eef7ff;
+    color: #2f6797;
+  }
+
   .pending-panel {
     margin-bottom: 14px;
     padding: 14px;
@@ -709,6 +895,9 @@
     .utility-actions { justify-content: flex-start; }
     .toolbar { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .analysis-head { grid-template-columns: 1fr; align-items: stretch; }
+    .analysis-controls { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .analysis-summary { grid-template-columns: 1fr; }
     .import-candidate {
       grid-template-columns: 28px minmax(0, 1fr);
     }
@@ -726,6 +915,9 @@
     main { width: min(100% - 18px, 1280px); }
     .toolbar { grid-template-columns: 1fr; }
     .stats { grid-template-columns: 1fr; }
+    .analysis-controls { grid-template-columns: 1fr; }
+    .analysis-chart { height: 260px; }
+    .chart-box, .chart-empty { min-height: 260px; }
     .form-grid { grid-template-columns: 1fr; }
     .pending-card {
       grid-template-columns: 1fr;
@@ -809,6 +1001,39 @@
   </section>
 
   <section class="stats admin-only" id="stats"></section>
+
+  <section class="analysis-panel admin-only" aria-label="経営分析">
+    <div class="analysis-head">
+      <div>
+        <div class="panel-title">経営分析</div>
+        <div class="panel-sub" id="analysisSub">年間推移と前年同月比を確認できます</div>
+      </div>
+      <div class="analysis-controls">
+        <div class="field">
+          <label for="analysisYear">年</label>
+          <input type="number" id="analysisYear" min="2020" max="2100" step="1" onchange="renderAnalysis()">
+        </div>
+        <div class="field">
+          <label for="analysisMode">グラフ</label>
+          <select id="analysisMode" onchange="renderAnalysis()">
+            <option value="sales">売上まとめ</option>
+            <option value="selfPayRate">自費率</option>
+            <option value="patientTotal">月間延べ患者数</option>
+            <option value="dailyPatients">一日平均来院数</option>
+            <option value="patientUnitPrice">患者単価</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="analysis-body">
+      <div class="analysis-summary" id="analysisSummary"></div>
+      <div class="chart-box" id="analysisChartBox">
+        <svg class="analysis-chart" id="analysisChart" viewBox="0 0 820 320" role="img" aria-label="年間グラフ"></svg>
+      </div>
+      <div class="analysis-legend" id="analysisLegend"></div>
+      <div class="analysis-table-wrap" id="analysisTableWrap"></div>
+    </div>
+  </section>
 
   <section class="pending-panel admin-only" id="pendingPanel"></section>
 
@@ -969,6 +1194,47 @@ const METRIC_ITEM_ORDER = [
   '平均点数'
 ];
 const METRIC_ITEM_ORDER_MAP = new Map(METRIC_ITEM_ORDER.map((item, index) => [item, index]));
+const ANALYSIS_MODES = {
+  sales: {
+    label: '売上まとめ',
+    unit: '円',
+    aggregate: 'sum',
+    primaryKey: 'totalSales',
+    series: [
+      { key: 'totalSales', label: '総売上', item: '総売上', color: '#20796f' },
+      { key: 'insuranceSales', label: '保険売上', item: '保険売上', color: '#3f8edb' },
+      { key: 'selfPaySales', label: '自費売上', item: '自費売上', color: '#e65b5b' }
+    ]
+  },
+  selfPayRate: {
+    label: '自費率',
+    unit: '%',
+    aggregate: 'avg',
+    primaryKey: 'selfPayRate',
+    series: [{ key: 'selfPayRate', label: '自費率', item: '自費率', color: '#d89226' }]
+  },
+  patientTotal: {
+    label: '月間延べ患者数',
+    unit: '人',
+    aggregate: 'sum',
+    primaryKey: 'patientTotal',
+    series: [{ key: 'patientTotal', label: '月間延べ患者数', item: '月間延べ患者数', color: '#37b8a9' }]
+  },
+  dailyPatients: {
+    label: '一日平均来院数',
+    unit: '人',
+    aggregate: 'avg',
+    primaryKey: 'dailyPatients',
+    series: [{ key: 'dailyPatients', label: '一日平均来院数', item: '一日平均来院数', color: '#8a6be8' }]
+  },
+  patientUnitPrice: {
+    label: '患者単価',
+    unit: '円',
+    aggregate: 'avg',
+    primaryKey: 'patientUnitPrice',
+    series: [{ key: 'patientUnitPrice', label: '患者単価', calculated: true, color: '#2f9b65' }]
+  }
+};
 const PDFJS_URL = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
 const PDFJS_WORKER_URL = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 const TESSERACT_URL = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
@@ -1034,6 +1300,8 @@ function isAdmin() {
 
 function init() {
   document.getElementById('monthFilter').value = currentMonth();
+  const analysisYear = document.getElementById('analysisYear');
+  if (analysisYear && !analysisYear.value) analysisYear.value = new Date().getFullYear();
   document.getElementById('userBadge').textContent = currentUser.name;
   const modeBadge = document.getElementById('modeBadge');
 
@@ -1088,6 +1356,7 @@ function canonicalMetricItem(item) {
   if (text === '自費売上' || text === '自費売上高') return '自費売上';
   if (text === '保険売上' || text === '保険売上高') return '保険売上';
   if (text === '物販売上' || text === '物販売上高') return '物販合計';
+  if (text === '月間述べ患者数') return '月間延べ患者数';
   if (text === '1日平均来院数' || text === '１日平均来院数') return '一日平均来院数';
   if (text === '自費率') return '自費率';
   return text;
@@ -1340,6 +1609,7 @@ function render() {
   document.getElementById('listTitle').textContent = `${monthLabel(month)} 経営数値一覧`;
   document.getElementById('listSub').textContent = `${metrics.length}件表示 / 月内${totalForMonth.length}件`;
   renderStats(totalForMonth);
+  renderAnalysis();
   renderPendingMetrics(totalForMonth);
   renderTable(metrics, totalForMonth.length);
 }
@@ -1415,6 +1685,296 @@ function renderStats(metrics) {
     <div class="stat"><div class="stat-label">数値入力済み</div><div class="stat-value" style="color:var(--green)">${filled}</div><div class="stat-note">未入力 ${missing}件</div></div>
     <div class="stat"><div class="stat-label">区分数</div><div class="stat-value" style="color:var(--sky)">${categories}</div><div class="stat-note">対象月の分類数</div></div>
     <div class="stat"><div class="stat-label">最終更新</div><div class="stat-value" style="font-size:20px;color:var(--amber)">${updated ? new Date(updated).toLocaleDateString('ja-JP') : '-'}</div><div class="stat-note">月内データ</div></div>`;
+}
+
+function selectedAnalysisYear() {
+  const input = document.getElementById('analysisYear');
+  const year = Number(input?.value);
+  const fallback = new Date().getFullYear();
+  if (!Number.isInteger(year) || year < 2020 || year > 2100) {
+    if (input) input.value = fallback;
+    return fallback;
+  }
+  return year;
+}
+
+function selectedAnalysisMode() {
+  const key = document.getElementById('analysisMode')?.value || 'sales';
+  return ANALYSIS_MODES[key] || ANALYSIS_MODES.sales;
+}
+
+function yearMonths(year) {
+  return Array.from({ length: 12 }, (_, index) => `${year}-${String(index + 1).padStart(2, '0')}`);
+}
+
+function metricValueMap() {
+  const map = new Map();
+  Object.entries(allMetrics)
+    .map(([id, metric]) => normalizedMetricData({ id, ...metric }))
+    .forEach(metric => {
+      const value = parseNumber(metric.value);
+      if (value === null) return;
+      map.set(`${metric.month}|${canonicalMetricItem(metric.item)}`, value);
+    });
+  return map;
+}
+
+function metricValueFor(map, month, item) {
+  return map.get(`${month}|${canonicalMetricItem(item)}`) ?? null;
+}
+
+function analysisValueFor(map, month, series) {
+  if (series.key === 'patientUnitPrice') {
+    const totalSales = metricValueFor(map, month, '総売上');
+    const patientTotal = metricValueFor(map, month, '月間延べ患者数');
+    if (totalSales === null || patientTotal === null || patientTotal <= 0) return null;
+    return totalSales / patientTotal;
+  }
+  return metricValueFor(map, month, series.item);
+}
+
+function buildAnalysisSeries(mode, year, map) {
+  const months = yearMonths(year);
+  return mode.series.map(series => ({
+    ...series,
+    values: months.map(month => analysisValueFor(map, month, series))
+  }));
+}
+
+function primarySeries(mode, seriesList) {
+  return seriesList.find(series => series.key === mode.primaryKey) || seriesList[0];
+}
+
+function filledValues(values) {
+  return values.filter(value => value !== null && Number.isFinite(value));
+}
+
+function aggregateValues(values, mode) {
+  const filled = filledValues(values);
+  if (!filled.length) return null;
+  const total = filled.reduce((sum, value) => sum + value, 0);
+  return mode.aggregate === 'avg' ? total / filled.length : total;
+}
+
+function latestValueIndex(values) {
+  for (let index = values.length - 1; index >= 0; index--) {
+    if (values[index] !== null && Number.isFinite(values[index])) return index;
+  }
+  return -1;
+}
+
+function compactAxisValue(value, unit) {
+  const n = parseNumber(value);
+  if (n === null) return '-';
+  if (unit === '円' && Math.abs(n) >= 10000) return `${Number((n / 10000).toFixed(1))}万`;
+  return fmtNumber(n, unit);
+}
+
+function formatAnalysisValue(value, unit) {
+  if (value === null || value === undefined || !Number.isFinite(value)) return '-';
+  return fmtNumber(value, unit);
+}
+
+function comparisonInfo(current, previous, unit) {
+  if (current === null || !Number.isFinite(current)) return { text: '当年未入力', cls: '' };
+  if (previous === null || !Number.isFinite(previous)) return { text: '前年なし', cls: '' };
+  if (unit === '%') {
+    const diff = current - previous;
+    return {
+      text: `${diff >= 0 ? '+' : ''}${Number(diff.toFixed(1))}pt`,
+      cls: Math.abs(diff) < 0.05 ? 'flat' : diff > 0 ? 'up' : 'down'
+    };
+  }
+  if (previous === 0) return { text: '比較不可', cls: '' };
+  const rate = ((current - previous) / Math.abs(previous)) * 100;
+  return {
+    text: `${rate >= 0 ? '+' : ''}${Number(rate.toFixed(1))}%`,
+    cls: Math.abs(rate) < 0.05 ? 'flat' : rate > 0 ? 'up' : 'down'
+  };
+}
+
+function yoyCell(current, previous, unit) {
+  const info = comparisonInfo(current, previous, unit);
+  return `<span class="yoy ${info.cls}">${escapeHtml(info.text)}</span>`;
+}
+
+function renderAnalysis() {
+  const summary = document.getElementById('analysisSummary');
+  const chartBox = document.getElementById('analysisChartBox');
+  const legend = document.getElementById('analysisLegend');
+  const tableWrap = document.getElementById('analysisTableWrap');
+  if (!summary || !chartBox || !legend || !tableWrap) return;
+
+  const year = selectedAnalysisYear();
+  const mode = selectedAnalysisMode();
+  const map = metricValueMap();
+  const currentSeries = buildAnalysisSeries(mode, year, map);
+  const previousSeries = buildAnalysisSeries(mode, year - 1, map);
+  const months = yearMonths(year);
+
+  document.getElementById('analysisSub').textContent = `${year}年1月〜12月 / ${mode.label}`;
+  renderAnalysisSummary(summary, mode, currentSeries, previousSeries, months, year);
+  renderAnalysisChart(chartBox, mode, currentSeries);
+  renderAnalysisLegend(legend, currentSeries);
+  renderAnalysisTable(tableWrap, mode, currentSeries, previousSeries, months, year);
+}
+
+function renderAnalysisSummary(container, mode, currentSeries, previousSeries, months, year) {
+  const primary = primarySeries(mode, currentSeries);
+  const previousPrimary = primarySeries(mode, previousSeries);
+  const aggregate = aggregateValues(primary.values, mode);
+  const previousAggregate = aggregateValues(previousPrimary.values, mode);
+  const latestIndex = latestValueIndex(primary.values);
+  const latestValue = latestIndex >= 0 ? primary.values[latestIndex] : null;
+  const latestPrevious = latestIndex >= 0 ? previousPrimary.values[latestIndex] : null;
+  const inputCount = filledValues(primary.values).length;
+  const aggregateLabel = mode.aggregate === 'avg' ? `${primary.label}平均` : `${primary.label}合計`;
+  const latestLabel = latestIndex >= 0 ? `${Number(months[latestIndex].slice(5, 7))}月` : '-';
+
+  container.innerHTML = `
+    <div class="analysis-chip">
+      <div class="analysis-chip-label">${escapeHtml(year)}年 ${escapeHtml(aggregateLabel)}</div>
+      <div class="analysis-chip-value">${formatAnalysisValue(aggregate, mode.unit)}</div>
+      <div class="analysis-chip-note">${inputCount}ヶ月入力済み</div>
+    </div>
+    <div class="analysis-chip">
+      <div class="analysis-chip-label">最新月 ${escapeHtml(latestLabel)}</div>
+      <div class="analysis-chip-value">${formatAnalysisValue(latestValue, mode.unit)}</div>
+      <div class="analysis-chip-note">${latestIndex >= 0 ? `${primary.label}の最新値` : '入力済み月がありません'}</div>
+    </div>
+    <div class="analysis-chip">
+      <div class="analysis-chip-label">${mode.unit === '%' ? '前年同月差' : '前年同月比'}</div>
+      <div class="analysis-chip-value">${latestIndex >= 0 ? yoyCell(latestValue, latestPrevious, mode.unit) : '<span class="yoy">-</span>'}</div>
+      <div class="analysis-chip-note">年間${mode.aggregate === 'avg' ? '平均' : '合計'}: ${yoyCell(aggregate, previousAggregate, mode.unit)}</div>
+    </div>`;
+}
+
+function renderAnalysisChart(container, mode, seriesList) {
+  const values = seriesList.flatMap(series => filledValues(series.values));
+  if (!values.length) {
+    container.innerHTML = '<div class="chart-empty">この年の入力済みデータがありません</div>';
+    return;
+  }
+
+  const width = 820;
+  const height = 320;
+  const margin = { top: 22, right: 24, bottom: 42, left: 70 };
+  const plotWidth = width - margin.left - margin.right;
+  const plotHeight = height - margin.top - margin.bottom;
+  const maxValue = Math.max(...values);
+  const yMin = 0;
+  const yMax = maxValue <= 0 ? 1 : maxValue * 1.12;
+  const xFor = index => margin.left + (plotWidth / 11) * index;
+  const yFor = value => margin.top + plotHeight - ((value - yMin) / (yMax - yMin)) * plotHeight;
+  const ticks = Array.from({ length: 5 }, (_, index) => yMin + ((yMax - yMin) / 4) * index);
+
+  const grid = ticks.map(tick => {
+    const y = yFor(tick);
+    return `
+      <line class="chart-grid" x1="${margin.left}" y1="${y}" x2="${width - margin.right}" y2="${y}"></line>
+      <text class="chart-label" x="${margin.left - 8}" y="${y + 4}" text-anchor="end">${escapeHtml(compactAxisValue(tick, mode.unit))}</text>`;
+  }).join('');
+
+  const xLabels = Array.from({ length: 12 }, (_, index) => {
+    const x = xFor(index);
+    return `<text class="chart-label" x="${x}" y="${height - 14}" text-anchor="middle">${index + 1}月</text>`;
+  }).join('');
+
+  const seriesMarkup = seriesList.map(series => {
+    const segments = [];
+    let current = [];
+    series.values.forEach((value, index) => {
+      if (value === null || !Number.isFinite(value)) {
+        if (current.length) segments.push(current);
+        current = [];
+        return;
+      }
+      current.push({ index, value, x: xFor(index), y: yFor(value) });
+    });
+    if (current.length) segments.push(current);
+    const lines = segments
+      .filter(segment => segment.length > 1)
+      .map(segment => `<polyline class="chart-line" stroke="${series.color}" points="${segment.map(point => `${point.x},${point.y}`).join(' ')}"></polyline>`)
+      .join('');
+    const points = segments.flat().map(point => `
+      <circle class="chart-point" cx="${point.x}" cy="${point.y}" r="4" fill="${series.color}">
+        <title>${escapeHtml(series.label)} ${point.index + 1}月: ${escapeHtml(formatAnalysisValue(point.value, mode.unit))}</title>
+      </circle>`).join('');
+    return `${lines}${points}`;
+  }).join('');
+
+  container.innerHTML = `
+    <svg class="analysis-chart" viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeHtml(mode.label)} 年間グラフ">
+      <rect x="0" y="0" width="${width}" height="${height}" fill="#ffffff"></rect>
+      ${grid}
+      <line class="chart-axis" x1="${margin.left}" y1="${margin.top}" x2="${margin.left}" y2="${height - margin.bottom}"></line>
+      <line class="chart-axis" x1="${margin.left}" y1="${height - margin.bottom}" x2="${width - margin.right}" y2="${height - margin.bottom}"></line>
+      ${xLabels}
+      ${seriesMarkup}
+    </svg>`;
+}
+
+function renderAnalysisLegend(container, seriesList) {
+  container.innerHTML = seriesList.map(series => `
+    <span class="legend-item">
+      <span class="legend-swatch" style="background:${series.color}"></span>
+      ${escapeHtml(series.label)}
+    </span>`).join('');
+}
+
+function renderAnalysisTable(container, mode, currentSeries, previousSeries, months, year) {
+  if (mode.label === '売上まとめ') {
+    container.innerHTML = `
+      <table class="analysis-table">
+        <thead>
+          <tr>
+            <th>月</th>
+            ${currentSeries.map(series => `<th>${escapeHtml(series.label)}</th><th>前年同月比</th>`).join('')}
+          </tr>
+        </thead>
+        <tbody>
+          ${months.map((month, index) => `
+            <tr>
+              <td>${Number(month.slice(5, 7))}月</td>
+              ${currentSeries.map(series => {
+                const previous = previousSeries.find(item => item.key === series.key);
+                const currentValue = series.values[index];
+                const previousValue = previous?.values[index] ?? null;
+                return `<td><span class="num">${formatAnalysisValue(currentValue, mode.unit)}</span></td><td>${yoyCell(currentValue, previousValue, mode.unit)}</td>`;
+              }).join('')}
+            </tr>`).join('')}
+        </tbody>
+      </table>`;
+    return;
+  }
+
+  const series = currentSeries[0];
+  const previous = previousSeries[0];
+  const comparisonLabel = mode.unit === '%' ? '前年差' : '前年同月比';
+  container.innerHTML = `
+    <table class="analysis-table">
+      <thead>
+        <tr>
+          <th>月</th>
+          <th>${escapeHtml(year)}年</th>
+          <th>${escapeHtml(year - 1)}年</th>
+          <th>${comparisonLabel}</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${months.map((month, index) => {
+          const currentValue = series.values[index];
+          const previousValue = previous.values[index];
+          return `
+            <tr>
+              <td>${Number(month.slice(5, 7))}月</td>
+              <td><span class="num">${formatAnalysisValue(currentValue, mode.unit)}</span></td>
+              <td><span class="num">${formatAnalysisValue(previousValue, mode.unit)}</span></td>
+              <td>${yoyCell(currentValue, previousValue, mode.unit)}</td>
+            </tr>`;
+        }).join('')}
+      </tbody>
+    </table>`;
 }
 
 function renderTable(metrics, monthTotal) {
@@ -2195,6 +2755,7 @@ function showToast(message) {
 }
 
 window.render = render;
+window.renderAnalysis = renderAnalysis;
 
 init();
 </script>
