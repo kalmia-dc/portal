@@ -524,7 +524,7 @@
     line-height: 1.45;
   }
 
-  .dept-pill, .status-pill {
+  .status-pill {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -538,12 +538,6 @@
     background: var(--surface-alt);
     white-space: nowrap;
   }
-
-  .dept-pill.all { color: #2d6574; background: #e9f5f8; border-color: #cde5ed; }
-  .dept-pill.director { color: #7a4a14; background: #fff3df; border-color: #f2d6aa; }
-  .dept-pill.reception { color: #8b3f67; background: #fdebf5; border-color: #f2bfd9; }
-  .dept-pill.dh { color: #315f9d; background: #eaf2ff; border-color: #cbdcf6; }
-  .dept-pill.da { color: #5f4aa2; background: #f1edff; border-color: #d9cef8; }
 
   .status-pill.done { color: #176d46; background: #e9f8ef; border-color: #c5ead4; }
   .status-pill.close { color: #8b5b0f; background: #fff5db; border-color: #efd39c; }
@@ -1012,13 +1006,12 @@
     }
 
     tr.goal-row td:nth-child(2)::before { content: "月"; }
-    tr.goal-row td:nth-child(3)::before { content: "担当"; }
-    tr.goal-row td:nth-child(4)::before { content: "6ヶ月平均"; }
-    tr.goal-row td:nth-child(5)::before { content: "目標"; }
-    tr.goal-row td:nth-child(6)::before { content: "実績"; }
-    tr.goal-row td:nth-child(7)::before { content: "達成率"; }
-    tr.goal-row td:nth-child(8)::before { content: "状況"; }
-    tr.goal-row td:nth-child(9)::before { content: "更新"; }
+    tr.goal-row td:nth-child(3)::before { content: "6ヶ月平均"; }
+    tr.goal-row td:nth-child(4)::before { content: "目標"; }
+    tr.goal-row td:nth-child(5)::before { content: "実績"; }
+    tr.goal-row td:nth-child(6)::before { content: "達成率"; }
+    tr.goal-row td:nth-child(7)::before { content: "状況"; }
+    tr.goal-row td:nth-child(8)::before { content: "更新"; }
 
     .goal-detail { max-width: none; }
     .progress { width: 100%; }
@@ -1140,17 +1133,6 @@
 
   <section class="toolbar" aria-label="絞り込み">
     <div class="field">
-      <label for="deptFilter">担当区分</label>
-      <select id="deptFilter" onchange="render()">
-        <option value="all">すべて</option>
-        <option value="全体">全体</option>
-        <option value="院長">院長</option>
-        <option value="受付">受付</option>
-        <option value="DH">DH</option>
-        <option value="DA">DA</option>
-      </select>
-    </div>
-    <div class="field">
       <label for="statusFilter">達成状況</label>
       <select id="statusFilter" onchange="render()">
         <option value="all">すべて</option>
@@ -1193,16 +1175,6 @@
       <div class="field">
         <label for="fMonth">対象月</label>
         <input type="month" id="fMonth">
-      </div>
-      <div class="field">
-        <label for="fDepartment">担当区分</label>
-        <select id="fDepartment">
-          <option value="全体">全体</option>
-          <option value="院長">院長</option>
-          <option value="受付">受付</option>
-          <option value="DH">DH</option>
-          <option value="DA">DA</option>
-        </select>
       </div>
       <div class="field">
         <label for="fItem">項目</label>
@@ -1368,14 +1340,6 @@ const STAFF_NAMES = {
   tamiya: '田宮',
   tanaka: '田中',
   momo: '百々'
-};
-
-const DEPARTMENT_CLASSES = {
-  '全体': 'all',
-  '院長': 'director',
-  '受付': 'reception',
-  'DH': 'dh',
-  'DA': 'da'
 };
 
 const TEMPLATE_ITEMS = [
@@ -1598,7 +1562,6 @@ function displayGoalItem(item) {
 
 function goalGroupKey(goal) {
   return [
-    goal.department || '',
     canonicalGoalItem(goal.item),
     goal.unit || ''
   ].join('|');
@@ -1695,29 +1658,22 @@ function statusLabel(status) {
 
 function filteredGoals() {
   const month = document.getElementById('monthFilter').value || currentMonth();
-  const dept = document.getElementById('deptFilter').value;
   const status = document.getElementById('statusFilter').value;
   const query = document.getElementById('searchInput').value.trim().toLowerCase();
 
   return Object.entries(allGoals)
     .map(([id, goal]) => ({ id, ...goal }))
     .filter(goal => goal.month === month)
-    .filter(goal => dept === 'all' || goal.department === dept)
     .filter(goal => status === 'all' || goalStatus(goal) === status)
     .filter(goal => {
       if (!query) return true;
-      return [displayGoalItem(goal.item), goal.item, goal.detail, goal.note, goal.department, goal.owner]
+      return [displayGoalItem(goal.item), goal.item, goal.detail, goal.note, goal.owner]
         .filter(Boolean)
         .join(' ')
         .toLowerCase()
         .includes(query);
     })
-    .sort((a, b) => {
-      const depOrder = ['全体', '院長', '受付', 'DH', 'DA'];
-      const depDiff = depOrder.indexOf(a.department) - depOrder.indexOf(b.department);
-      if (depDiff) return depDiff;
-      return displayGoalItem(a.item).localeCompare(displayGoalItem(b.item), 'ja');
-    });
+    .sort((a, b) => displayGoalItem(a.item).localeCompare(displayGoalItem(b.item), 'ja'));
 }
 
 function monthGoals(month) {
@@ -1791,7 +1747,7 @@ function pendingGoalCardHtml(goal) {
     <div class="pending-card">
       <div>
         <div class="pending-name">${escapeHtml(displayGoalItem(goal.item))}</div>
-        <div class="pending-meta">${escapeHtml(monthShortLabel(goal.month || ''))} / ${escapeHtml(goal.department || '-')}</div>
+        <div class="pending-meta">${escapeHtml(monthShortLabel(goal.month || ''))}</div>
         <div style="margin-top:6px">${fields}</div>
       </div>
       <div class="pending-values">
@@ -1866,7 +1822,6 @@ function renderTable(goals, monthTotal) {
         <tr>
           <th>項目</th>
           <th>月</th>
-          <th>担当</th>
           <th>6ヶ月平均</th>
           <th>目標</th>
           <th>実績</th>
@@ -1886,7 +1841,6 @@ function goalRowHtml(goal) {
   const status = goalStatus(goal);
   const rate = calcRate(goal);
   const fill = rate === null ? 0 : Math.max(0, Math.min(100, rate));
-  const deptClass = DEPARTMENT_CLASSES[goal.department] || 'all';
   const updated = goal.updatedAt ? new Date(goal.updatedAt).toLocaleDateString('ja-JP') : '-';
   const itemName = displayGoalItem(goal.item);
   const currentValue = currentValueForDisplay(goal);
@@ -1905,7 +1859,6 @@ function goalRowHtml(goal) {
         </div>
       </td>
       <td><span class="num">${escapeHtml(monthShortLabel(goal.month || ''))}</span></td>
-      <td><span class="dept-pill ${deptClass}">${escapeHtml(goal.department || '-')}</span></td>
       <td>${hasAverage ? `<span class="num">${fmtNumber(currentValue, goal.unit)}</span>` : '<span class="input-badge average">平均なし</span>'}<div class="goal-detail">${escapeHtml(history)}</div></td>
       <td>${hasTarget ? `<span class="num">${fmtNumber(goal.targetValue, goal.unit)}</span>` : '<span class="input-badge target">目標未設定</span>'}<div class="goal-detail">${goal.direction === 'down' ? '少ないほど達成' : '多いほど達成'}</div></td>
       <td>${hasActual ? `<span class="num">${fmtNumber(actualValue, goal.unit)}</span>` : '<span class="value-missing">未入力</span>'}</td>
@@ -2511,7 +2464,6 @@ window.openGoalModal = function(id = null) {
 
   const month = document.getElementById('monthFilter').value || currentMonth();
   setFormValue('fMonth', goal?.month || month);
-  setFormValue('fDepartment', goal?.department || '全体');
   setFormValue('fItem', goal ? displayGoalItem(goal.item) : '');
   setFormValue('fUnit', goal?.unit || '');
   setFormValue('fDetail', goal?.detail || '');
@@ -2557,7 +2509,7 @@ window.saveGoal = async function() {
 
   const data = {
     month,
-    department: document.getElementById('fDepartment').value,
+    department: editingId ? (allGoals[editingId]?.department || '全体') : '全体',
     item,
     unit: document.getElementById('fUnit').value.trim(),
     detail: document.getElementById('fDetail').value.trim(),
@@ -2650,7 +2602,7 @@ window.exportCSV = function() {
   const goals = filteredGoals();
   if (!goals.length) { showToast('出力する目標がありません'); return; }
   const headers = [
-    '集計期間','対象月','担当区分','項目','詳細','6ヶ月平均',
+    '集計期間','対象月','項目','詳細','6ヶ月平均',
     '6ヶ月内訳1','6ヶ月内訳2','6ヶ月内訳3','6ヶ月内訳4','6ヶ月内訳5','6ヶ月内訳6',
     '目標数値','実績数値','達成率','状況','単位','判定方向','入力担当','メモ','更新者','更新日'
   ];
@@ -2659,7 +2611,6 @@ window.exportCSV = function() {
     return [
       periodLabel(month),
       goal.month,
-      goal.department,
       displayGoalItem(goal.item),
       goal.detail,
       currentValueForDisplay(goal),
