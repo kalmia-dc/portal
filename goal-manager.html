@@ -1514,6 +1514,7 @@ const HISTORY_MONTH_COUNT = 6;
 const PDFJS_URL = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
 const PDFJS_WORKER_URL = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 const TESSERACT_URL = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+const EXCLUDED_GOAL_ITEMS = new Set(['物販売上']);
 const STAFF_NAMES = {
   sugihira: '杉平院長',
   shimanaka: '嶋中',
@@ -1837,6 +1838,10 @@ function displayGoalItem(item) {
   return canonicalGoalItem(item);
 }
 
+function isExcludedGoalItem(item) {
+  return EXCLUDED_GOAL_ITEMS.has(canonicalGoalItem(item));
+}
+
 function goalGroupKey(goal) {
   return [
     canonicalGoalItem(goal.item),
@@ -1899,7 +1904,7 @@ function goalRowsForAverage(goal) {
   const key = goalGroupKey(goal);
   return Object.entries(allGoals)
     .map(([id, item]) => ({ id, ...item }))
-    .filter(item => goalGroupKey(item) === key);
+    .filter(item => goalGroupKey(item) === key && !isExcludedGoalItem(item.item));
 }
 
 function goalActualForMonth(goal, month) {
@@ -2022,14 +2027,14 @@ function statusLabel(status) {
 function monthGoals(month) {
   return Object.entries(allGoals)
     .map(([id, goal]) => ({ id, ...goal }))
-    .filter(goal => goal.month === month);
+    .filter(goal => goal.month === month && !isExcludedGoalItem(goal.item));
 }
 
 function periodGoals(month) {
   const periodSet = new Set(periodMonths(month));
   return Object.entries(allGoals)
     .map(([id, goal]) => ({ id, ...goal }))
-    .filter(goal => periodSet.has(goal.month || ''));
+    .filter(goal => periodSet.has(goal.month || '') && !isExcludedGoalItem(goal.item));
 }
 
 function periodGoalGroups(periodMonth) {
