@@ -350,20 +350,6 @@
     background: #fbfdfe;
   }
 
-  .break-even-badge {
-    display: inline-flex;
-    align-items: center;
-    min-height: 26px;
-    padding: 4px 9px;
-    border: 1px solid #c5ead4;
-    border-radius: 999px;
-    background: #eef9f4;
-    color: #176d46;
-    font-size: 12px;
-    font-weight: 900;
-    white-space: nowrap;
-  }
-
   .break-even-body {
     display: grid;
     gap: 10px;
@@ -453,12 +439,6 @@
     fill: var(--muted);
     font-size: 11px;
     font-weight: 800;
-  }
-
-  .break-even-threshold-label {
-    fill: #8b5b0f;
-    font-size: 12px;
-    font-weight: 900;
   }
 
   .break-even-months {
@@ -1497,7 +1477,6 @@
         <div class="panel-title">収支グラフ</div>
         <div class="panel-sub" id="breakEvenSub">直近1年分の売上達成率</div>
       </div>
-      <span class="break-even-badge">運営に必要な売上ライン 100%</span>
     </div>
     <div class="break-even-body">
       <div class="break-even-summary" id="breakEvenSummary"></div>
@@ -2156,7 +2135,6 @@ function breakEvenChartSvg(rows) {
       <rect x="0" y="0" width="${width}" height="${height}" fill="#ffffff"></rect>
       ${grid}
       <line class="break-even-threshold" x1="${margin.left}" y1="${thresholdY}" x2="${width - margin.right}" y2="${thresholdY}"></line>
-      <text class="break-even-threshold-label" x="${width - margin.right}" y="${thresholdY - 8}" text-anchor="end">運営に必要な売上ライン 100%</text>
       <line class="break-even-axis" x1="${margin.left}" y1="${margin.top}" x2="${margin.left}" y2="${height - margin.bottom}"></line>
       <line class="break-even-axis" x1="${margin.left}" y1="${height - margin.bottom}" x2="${width - margin.right}" y2="${height - margin.bottom}"></line>
       ${labels}
