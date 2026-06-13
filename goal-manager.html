@@ -331,6 +331,179 @@
     text-overflow: ellipsis;
   }
 
+  .break-even-panel {
+    margin-bottom: 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+
+  .break-even-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--border);
+    background: #fbfdfe;
+  }
+
+  .break-even-badge {
+    display: inline-flex;
+    align-items: center;
+    min-height: 26px;
+    padding: 4px 9px;
+    border: 1px solid #c5ead4;
+    border-radius: 999px;
+    background: #eef9f4;
+    color: #176d46;
+    font-size: 12px;
+    font-weight: 900;
+    white-space: nowrap;
+  }
+
+  .break-even-body {
+    display: grid;
+    gap: 10px;
+    padding: 14px;
+  }
+
+  .break-even-summary {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .break-even-chip {
+    min-height: 78px;
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: #fbfdfe;
+  }
+
+  .break-even-label {
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 900;
+  }
+
+  .break-even-value {
+    margin-top: 6px;
+    font-family: 'Nunito', sans-serif;
+    font-size: 24px;
+    line-height: 1;
+    font-weight: 900;
+  }
+
+  .break-even-note {
+    margin-top: 5px;
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 700;
+  }
+
+  .break-even-chart-box {
+    min-height: 300px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: #fff;
+    overflow: hidden;
+  }
+
+  .break-even-chart {
+    display: block;
+    width: 100%;
+    height: 300px;
+  }
+
+  .break-even-axis {
+    stroke: #b9ccd3;
+    stroke-width: 1;
+  }
+
+  .break-even-grid {
+    stroke: #e7f0f3;
+    stroke-width: 1;
+  }
+
+  .break-even-line {
+    fill: none;
+    stroke: var(--mint-dark);
+    stroke-width: 3;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .break-even-threshold {
+    stroke: var(--amber);
+    stroke-width: 2;
+    stroke-dasharray: 6 5;
+  }
+
+  .break-even-point {
+    fill: var(--mint-dark);
+    stroke: #fff;
+    stroke-width: 2;
+  }
+
+  .break-even-chart-label {
+    fill: var(--muted);
+    font-size: 11px;
+    font-weight: 800;
+  }
+
+  .break-even-threshold-label {
+    fill: #8b5b0f;
+    font-size: 12px;
+    font-weight: 900;
+  }
+
+  .break-even-months {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .break-even-month {
+    display: inline-flex;
+    align-items: center;
+    min-height: 24px;
+    padding: 3px 7px;
+    border: 1px solid #d6e5ec;
+    border-radius: 999px;
+    background: #f5fbfd;
+    color: var(--text);
+    font-size: 11px;
+    font-weight: 900;
+  }
+
+  .break-even-month.above {
+    border-color: #c5ead4;
+    background: #f2fbf6;
+    color: #176d46;
+  }
+
+  .break-even-month.below {
+    border-color: #edc5c5;
+    background: #fff5f5;
+    color: #a23a3a;
+  }
+
+  .break-even-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 260px;
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 900;
+    text-align: center;
+    padding: 24px;
+  }
+
   .pending-panel {
     margin-bottom: 14px;
     padding: 14px;
@@ -995,6 +1168,7 @@
     .month-controls .field { grid-column: 1 / -1; }
     .toolbar { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .break-even-summary { grid-template-columns: 1fr; }
     .history-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   }
 
@@ -1004,6 +1178,10 @@
     .month-controls .field { grid-column: auto; }
     .toolbar { grid-template-columns: 1fr; }
     .stats { grid-template-columns: 1fr; }
+    .break-even-head { flex-direction: column; }
+    .break-even-chart { height: 260px; }
+    .break-even-chart-box,
+    .break-even-empty { min-height: 260px; }
     .form-grid { grid-template-columns: 1fr; }
     .history-grid { grid-template-columns: 1fr; }
     .utility-actions {
@@ -1313,6 +1491,21 @@
 
   <section class="stats" id="stats"></section>
 
+  <section class="break-even-panel" aria-label="収支グラフ">
+    <div class="break-even-head">
+      <div>
+        <div class="panel-title">収支グラフ</div>
+        <div class="panel-sub" id="breakEvenSub">直近1年分の損益分岐達成率</div>
+      </div>
+      <span class="break-even-badge">損益分岐ライン 100%</span>
+    </div>
+    <div class="break-even-body">
+      <div class="break-even-summary" id="breakEvenSummary"></div>
+      <div class="break-even-chart-box" id="breakEvenChartBox"></div>
+      <div class="break-even-months" id="breakEvenMonths"></div>
+    </div>
+  </section>
+
   <section class="pending-panel editor-only" id="pendingPanel"></section>
 
   <section class="panel">
@@ -1511,6 +1704,7 @@ const IMPORT_HISTORY_PATH = 'monthlyGoalImportHistory';
 const NOTIFY_URL = 'https://kalmia-notify.chibakenmin-sugihey.workers.dev';
 const EDITOR_IDS = ['sugihira', 'momo'];
 const HISTORY_MONTH_COUNT = 6;
+const BREAK_EVEN_SALES = 10 ** 7;
 const PDFJS_URL = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
 const PDFJS_WORKER_URL = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 const TESSERACT_URL = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
@@ -1810,6 +2004,7 @@ function canonicalGoalItem(item) {
 
 function canonicalPrivateMetricItem(item) {
   const text = String(item || '').trim();
+  if (text === '総売上' || text === '総売上高' || text === '売上合計') return '総売上';
   if (text === '自費売上' || text === '自費売上高') return '自費売上';
   if (text === '保険売上' || text === '保険売上高') return '保険売上';
   return text;
@@ -1820,6 +2015,154 @@ function privateMetricValue(month, item) {
   const metric = Object.values(allPrivateMetrics)
     .find(row => row.month === month && canonicalPrivateMetricItem(row.item) === itemKey);
   return parseNumber(metric?.value);
+}
+
+function privateMetricMonthsForItem(item) {
+  const itemKey = canonicalPrivateMetricItem(item);
+  return Object.values(allPrivateMetrics)
+    .filter(row => canonicalPrivateMetricItem(row.item) === itemKey && parseNumber(row.value) !== null)
+    .map(row => row.month)
+    .filter(Boolean)
+    .sort();
+}
+
+function latestPrivateMetricMonth(item) {
+  const months = privateMetricMonthsForItem(item);
+  return months.length ? months[months.length - 1] : '';
+}
+
+function breakEvenMonths() {
+  const latestMonth = latestPrivateMetricMonth('総売上');
+  if (!latestMonth) return [];
+  return Array.from({ length: 12 }, (_, index) => addMonths(latestMonth, index - 11));
+}
+
+function breakEvenRateForMonth(month) {
+  const totalSales = privateMetricValue(month, '総売上');
+  if (totalSales === null || BREAK_EVEN_SALES <= 0) return null;
+  return (totalSales / BREAK_EVEN_SALES) * 100;
+}
+
+function buildBreakEvenRows() {
+  return breakEvenMonths().map(month => ({
+    month,
+    rate: breakEvenRateForMonth(month)
+  }));
+}
+
+function formatPercent(value, digits = 0) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return '-';
+  return `${Number(n.toFixed(digits))}%`;
+}
+
+function renderBreakEvenChart() {
+  const summary = document.getElementById('breakEvenSummary');
+  const chartBox = document.getElementById('breakEvenChartBox');
+  const monthsBox = document.getElementById('breakEvenMonths');
+  const sub = document.getElementById('breakEvenSub');
+  if (!summary || !chartBox || !monthsBox || !sub) return;
+
+  const rows = buildBreakEvenRows();
+  const values = rows.map(row => row.rate).filter(value => value !== null && Number.isFinite(value));
+  if (!rows.length || !values.length) {
+    summary.innerHTML = '';
+    chartBox.innerHTML = '<div class="break-even-empty">総売上の入力済みデータがありません</div>';
+    monthsBox.innerHTML = '';
+    sub.textContent = '総売上の入力後に表示されます';
+    return;
+  }
+
+  const latest = [...rows].reverse().find(row => row.rate !== null && Number.isFinite(row.rate));
+  const average = values.reduce((sum, value) => sum + value, 0) / values.length;
+  const aboveCount = values.filter(value => value >= 100).length;
+  const latestLabel = latest ? monthLabel(latest.month) : '-';
+  sub.textContent = `${monthLabel(rows[0].month)}〜${monthLabel(rows[rows.length - 1].month)} / 実額非表示`;
+
+  summary.innerHTML = `
+    <div class="break-even-chip">
+      <div class="break-even-label">最新月</div>
+      <div class="break-even-value">${formatPercent(latest?.rate, 1)}</div>
+      <div class="break-even-note">${escapeHtml(latestLabel)}の達成率</div>
+    </div>
+    <div class="break-even-chip">
+      <div class="break-even-label">直近平均</div>
+      <div class="break-even-value">${formatPercent(average, 1)}</div>
+      <div class="break-even-note">入力済み ${values.length}ヶ月</div>
+    </div>
+    <div class="break-even-chip">
+      <div class="break-even-label">100%以上</div>
+      <div class="break-even-value">${aboveCount}</div>
+      <div class="break-even-note">入力済み月のうち達成した月</div>
+    </div>`;
+
+  chartBox.innerHTML = breakEvenChartSvg(rows);
+  monthsBox.innerHTML = rows.map(row => {
+    const cls = row.rate === null ? '' : row.rate >= 100 ? 'above' : 'below';
+    return `<span class="break-even-month ${cls}">${escapeHtml(monthShortLabel(row.month))} ${formatPercent(row.rate)}</span>`;
+  }).join('');
+}
+
+function breakEvenChartSvg(rows) {
+  const values = rows.map(row => row.rate).filter(value => value !== null && Number.isFinite(value));
+  const width = 820;
+  const height = 300;
+  const margin = { top: 24, right: 28, bottom: 42, left: 58 };
+  const plotWidth = width - margin.left - margin.right;
+  const plotHeight = height - margin.top - margin.bottom;
+  const maxValue = Math.max(120, ...values) * 1.08;
+  const yMin = 0;
+  const yMax = maxValue <= 0 ? 120 : maxValue;
+  const xFor = index => margin.left + (plotWidth / Math.max(rows.length - 1, 1)) * index;
+  const yFor = value => margin.top + plotHeight - ((value - yMin) / (yMax - yMin)) * plotHeight;
+  const ticks = [0, 50, 100, Math.ceil(yMax / 50) * 50].filter((tick, index, list) => tick <= yMax && list.indexOf(tick) === index);
+  const thresholdY = yFor(100);
+
+  const grid = ticks.map(tick => {
+    const y = yFor(tick);
+    return `
+      <line class="break-even-grid" x1="${margin.left}" y1="${y}" x2="${width - margin.right}" y2="${y}"></line>
+      <text class="break-even-chart-label" x="${margin.left - 8}" y="${y + 4}" text-anchor="end">${tick}%</text>`;
+  }).join('');
+
+  const labels = rows.map((row, index) => {
+    const x = xFor(index);
+    return `<text class="break-even-chart-label" x="${x}" y="${height - 14}" text-anchor="middle">${escapeHtml(monthShortLabel(row.month))}</text>`;
+  }).join('');
+
+  const segments = [];
+  let current = [];
+  rows.forEach((row, index) => {
+    if (row.rate === null || !Number.isFinite(row.rate)) {
+      if (current.length) segments.push(current);
+      current = [];
+      return;
+    }
+    current.push({ index, value: row.rate, x: xFor(index), y: yFor(row.rate) });
+  });
+  if (current.length) segments.push(current);
+
+  const lines = segments
+    .filter(segment => segment.length > 1)
+    .map(segment => `<polyline class="break-even-line" points="${segment.map(point => `${point.x},${point.y}`).join(' ')}"></polyline>`)
+    .join('');
+  const points = segments.flat().map(point => `
+    <circle class="break-even-point" cx="${point.x}" cy="${point.y}" r="4">
+      <title>${escapeHtml(monthShortLabel(rows[point.index].month))}: ${formatPercent(point.value, 1)}</title>
+    </circle>`).join('');
+
+  return `
+    <svg class="break-even-chart" viewBox="0 0 ${width} ${height}" role="img" aria-label="直近1年分の損益分岐達成率">
+      <rect x="0" y="0" width="${width}" height="${height}" fill="#ffffff"></rect>
+      ${grid}
+      <line class="break-even-threshold" x1="${margin.left}" y1="${thresholdY}" x2="${width - margin.right}" y2="${thresholdY}"></line>
+      <text class="break-even-threshold-label" x="${width - margin.right}" y="${thresholdY - 8}" text-anchor="end">損益分岐ライン 100%</text>
+      <line class="break-even-axis" x1="${margin.left}" y1="${margin.top}" x2="${margin.left}" y2="${height - margin.bottom}"></line>
+      <line class="break-even-axis" x1="${margin.left}" y1="${height - margin.bottom}" x2="${width - margin.right}" y2="${height - margin.bottom}"></line>
+      ${labels}
+      ${lines}
+      ${points}
+    </svg>`;
 }
 
 function calculatedSelfPayRateValue(month) {
@@ -2140,6 +2483,7 @@ function render() {
   document.getElementById('listSub').textContent = `${groups.length}項目表示 / 半期${allGroups.length}項目 / 月別データ${goalsForPeriod.length}件`;
   renderMonthBoard(periodMonth, goalsForPeriod, allGroups);
   renderStats(allGroups, goalsForPeriod, periodMonth);
+  renderBreakEvenChart();
   renderPendingGoals(allGroups, periodMonth);
   renderTable(groups, allGroups.length);
 }
