@@ -381,7 +381,7 @@
 
   .pending-card {
     display: grid;
-    grid-template-columns: minmax(220px, 1fr) minmax(260px, 1.2fr) auto;
+    grid-template-columns: minmax(260px, 1fr) minmax(220px, .8fr);
     gap: 12px;
     align-items: center;
     padding: 10px 12px;
@@ -408,6 +408,12 @@
     flex-wrap: wrap;
   }
 
+  .pending-actions {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
   .input-badge {
     display: inline-flex;
     align-items: center;
@@ -424,6 +430,16 @@
   .input-badge.actual { border-color: #f1c2c2; background: #fff5f5; color: #a23a3a; }
   .input-badge.target { border-color: #c9e1f5; background: #eef7ff; color: #2f6797; }
   .input-badge.average { border-color: #d7cee9; background: #f6f2ff; color: #6149a8; }
+
+  button.input-badge {
+    cursor: pointer;
+    font-family: inherit;
+  }
+
+  button.input-badge:hover {
+    border-color: var(--mint);
+    box-shadow: 0 0 0 3px rgba(55, 184, 169, .1);
+  }
 
   .pending-empty {
     padding: 10px 12px;
@@ -795,6 +811,23 @@
   }
 
   .modal-title {
+    font-weight: 900;
+  }
+
+  .quick-input-meta {
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1.5;
+  }
+
+  .quick-input-target {
+    display: grid;
+    gap: 4px;
+    padding: 10px 12px;
+    border-radius: var(--radius);
+    background: var(--surface-alt);
+    font-size: 13px;
     font-weight: 900;
   }
 
@@ -1372,6 +1405,31 @@
   </div>
 </div>
 
+<div class="modal-backdrop" id="quickInputModal" onclick="closeModalOnBackdrop(event)">
+  <div class="modal" style="width:min(460px,100%);">
+    <div class="modal-head">
+      <div>
+        <div class="modal-title" id="quickInputTitle">数値を入力</div>
+        <div class="quick-input-meta" id="quickInputSub"></div>
+      </div>
+      <button class="icon-btn" onclick="closeQuickInputModal()" title="閉じる">×</button>
+    </div>
+    <div class="form-grid">
+      <div class="field full">
+        <div class="quick-input-target" id="quickInputTarget"></div>
+      </div>
+      <div class="field full">
+        <label for="quickInputValue" id="quickInputLabel">数値</label>
+        <input type="text" id="quickInputValue" inputmode="decimal" placeholder="数値を入力" onkeydown="if(event.key==='Enter') saveQuickGoalInput()">
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn secondary" onclick="closeQuickInputModal()">キャンセル</button>
+      <button class="btn primary" id="quickInputSaveBtn" onclick="saveQuickGoalInput()">保存</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-backdrop" id="importModal" onclick="closeModalOnBackdrop(event)">
   <div class="modal import-modal">
     <div class="modal-head">
@@ -1509,6 +1567,7 @@ let allGoals = {};
 let allPrivateMetrics = {};
 let editingId = null;
 let renderedGoalGroups = new Map();
+let quickInputContext = null;
 let saving = false;
 let importCandidates = [];
 let importFileMeta = null;
@@ -2065,22 +2124,24 @@ function renderPendingGoals(groups, periodMonth) {
 }
 
 function pendingGoalCardHtml(group) {
-  const firstMissing = group.missingMonths[0];
-  const chips = group.missingMonths
-    .map(item => `<span class="input-badge">${escapeHtml(monthShortLabel(item.month))} ${escapeHtml(item.fields.map(field => field.label).join('・'))}</span>`)
+  const buttons = group.missingMonths
+    .flatMap(item => item.fields.map(field => ({ month: item.month, field })))
+    .map(item => `
+      <button class="input-badge ${item.field.key}" onclick="openQuickGoalInput('${group.uiKey}','${item.month}','${item.field.key}')">
+        ${escapeHtml(monthShortLabel(item.month))} ${escapeHtml(item.field.label)}
+      </button>`)
     .join('');
   return `
     <div class="pending-card">
       <div>
         <div class="pending-name">${escapeHtml(displayGoalItem(group.item))}</div>
         <div class="pending-meta">${escapeHtml(group.detail || '')}</div>
-        <div style="margin-top:6px">${chips}</div>
+        <div class="pending-actions" style="margin-top:6px">${buttons}</div>
       </div>
       <div class="pending-values">
         <span>不足月: ${group.missingMonths.length}件</span>
         <span>平均: ${pendingValueHtml(currentValueForDisplay(group.prototype), group.unit)}</span>
       </div>
-      <button class="btn primary" onclick="openGoalFromGroup('${group.uiKey}','${firstMissing.month}')">入力</button>
     </div>`;
 }
 
@@ -2894,6 +2955,96 @@ function defaultGoalForGroup(group, month) {
   };
 }
 
+function quickFieldLabel(fieldKey) {
+  return fieldKey === 'target' ? '目標値' : '実績';
+}
+
+function quickFieldDataKey(fieldKey) {
+  return fieldKey === 'target' ? 'targetValue' : 'actualValue';
+}
+
+window.openQuickGoalInput = function(groupKey, month, fieldKey) {
+  if (!isEditor()) return;
+  const group = renderedGoalGroups.get(groupKey);
+  if (!group) return;
+  const row = group.rowsByMonth[month];
+  const fieldLabel = quickFieldLabel(fieldKey);
+  quickInputContext = { groupKey, month, fieldKey };
+  document.getElementById('quickInputTitle').textContent = `${fieldLabel}を入力`;
+  document.getElementById('quickInputSub').textContent = `${periodLabel(group.periodMonth)} / ${monthLabel(month)}`;
+  document.getElementById('quickInputTarget').innerHTML = `
+    <div>${escapeHtml(displayGoalItem(group.item))}</div>
+    <div class="quick-input-meta">${escapeHtml(group.detail || '')}</div>`;
+  document.getElementById('quickInputLabel').textContent = `${monthShortLabel(month)}の${fieldLabel}`;
+  document.getElementById('quickInputValue').value = row?.[quickFieldDataKey(fieldKey)] ?? '';
+  document.getElementById('quickInputSaveBtn').disabled = false;
+  document.getElementById('quickInputModal').classList.add('open');
+  window.setTimeout(() => {
+    const input = document.getElementById('quickInputValue');
+    input.focus();
+    input.select();
+  }, 60);
+};
+
+window.closeQuickInputModal = function() {
+  document.getElementById('quickInputModal').classList.remove('open');
+  quickInputContext = null;
+};
+
+window.saveQuickGoalInput = async function() {
+  if (!isEditor() || !quickInputContext || saving) return;
+  const group = renderedGoalGroups.get(quickInputContext.groupKey);
+  if (!group) return;
+  const value = document.getElementById('quickInputValue').value.trim();
+  const parsed = parseNumber(value);
+  if (parsed === null) {
+    showToast('数値を入力してください');
+    return;
+  }
+  if (quickInputContext.fieldKey === 'target' && parsed === 0) {
+    showToast('目標値は0以外で入力してください');
+    return;
+  }
+
+  const row = group.rowsByMonth[quickInputContext.month];
+  const fieldKey = quickFieldDataKey(quickInputContext.fieldKey);
+  const base = row || defaultGoalForGroup(group, quickInputContext.month);
+  const savedMonth = quickInputContext.month;
+  const savedFieldLabel = quickFieldLabel(quickInputContext.fieldKey);
+  const data = {
+    ...base,
+    [fieldKey]: value,
+    updatedAt: Date.now(),
+    updatedBy: currentUser.name
+  };
+  delete data.id;
+
+  saving = true;
+  document.getElementById('quickInputSaveBtn').disabled = true;
+  try {
+    if (row?.id) {
+      await set(ref(db, `${DB_PATH}/${row.id}`), data);
+    } else {
+      await push(ref(db, DB_PATH), {
+        ...data,
+        createdAt: Date.now(),
+        createdBy: currentUser.name
+      });
+    }
+    document.getElementById('monthFilter').value = halfYearStart(savedMonth);
+    populateEntryMonthFilter();
+    const entryMonthFilter = document.getElementById('entryMonthFilter');
+    if (entryMonthFilter) entryMonthFilter.value = savedMonth;
+    closeQuickInputModal();
+    showToast(`${monthShortLabel(savedMonth)}の${savedFieldLabel}を保存しました`);
+  } catch (e) {
+    showToast('保存に失敗しました: ' + e.message);
+    document.getElementById('quickInputSaveBtn').disabled = false;
+  } finally {
+    saving = false;
+  }
+};
+
 window.openGoalFromGroup = function(groupKey, month) {
   const group = renderedGoalGroups.get(groupKey);
   if (!group) return;
@@ -2967,6 +3118,7 @@ window.closeGoalModal = function() {
 
 window.closeModalOnBackdrop = function(event) {
   if (event.target.id === 'goalModal') closeGoalModal();
+  if (event.target.id === 'quickInputModal') closeQuickInputModal();
   if (event.target.id === 'importModal') closeImportModal();
 };
 
