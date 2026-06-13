@@ -1666,14 +1666,18 @@ function currentMonth(date = new Date()) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
 }
 
+function closedMonth(date = new Date()) {
+  return addMonths(currentMonth(date), -1);
+}
+
 function selectedPeriodMonth() {
-  return document.getElementById('monthFilter')?.value || halfYearStart(currentMonth());
+  return document.getElementById('monthFilter')?.value || halfYearStart(closedMonth());
 }
 
 function defaultInputMonthForPeriod(periodMonth = selectedPeriodMonth()) {
   const months = periodMonths(periodMonth);
-  const available = months.filter(month => month <= currentMonth());
-  return available.length ? available[available.length - 1] : months[0];
+  const available = months.filter(month => month <= closedMonth());
+  return available.length ? available[available.length - 1] : '';
 }
 
 function selectedEntryMonth() {
@@ -1682,8 +1686,8 @@ function selectedEntryMonth() {
 
 function availablePeriodStarts() {
   const starts = new Set([
-    halfYearStart(addMonths(currentMonth(), -6)),
-    halfYearStart(currentMonth())
+    halfYearStart(addMonths(closedMonth(), -6)),
+    halfYearStart(closedMonth())
   ]);
   Object.values(allGoals).forEach(goal => {
     if (goal.month) starts.add(halfYearStart(goal.month));
@@ -1701,7 +1705,7 @@ function populatePeriodFilter(preserve = true) {
   const select = document.getElementById('monthFilter');
   if (!select) return;
   const currentValue = preserve ? select.value : '';
-  const fallback = halfYearStart(currentMonth());
+  const fallback = halfYearStart(closedMonth());
   const starts = availablePeriodStarts();
   if (currentValue) starts.push(currentValue);
   select.innerHTML = Array.from(new Set(starts)).sort()
@@ -1714,11 +1718,13 @@ function populateEntryMonthFilter() {
   const select = document.getElementById('entryMonthFilter');
   if (!select) return;
   const currentValue = select.value;
-  const months = periodMonths(selectedPeriodMonth());
+  const months = periodMonths(selectedPeriodMonth()).filter(month => month <= closedMonth());
   select.innerHTML = months
     .map(month => `<option value="${month}">${monthShortLabel(month)}</option>`)
     .join('');
-  select.value = months.includes(currentValue) ? currentValue : defaultInputMonthForPeriod();
+  const fallback = defaultInputMonthForPeriod();
+  select.value = months.includes(currentValue) ? currentValue : fallback;
+  select.disabled = !months.length;
 }
 
 function monthLabel(month) {
@@ -1756,10 +1762,10 @@ function periodEndMonth(month) {
 }
 
 function averageInputMonths(month) {
-  const selectedMonth = month || document.getElementById('monthFilter')?.value || currentMonth();
+  const selectedMonth = month || document.getElementById('monthFilter')?.value || closedMonth();
   const months = periodMonths(selectedMonth);
   const periodEnd = months[months.length - 1];
-  const cutoffMonth = periodEnd <= currentMonth() ? periodEnd : currentMonth();
+  const cutoffMonth = periodEnd <= closedMonth() ? periodEnd : closedMonth();
   return months.filter(item => item <= cutoffMonth);
 }
 
@@ -1841,7 +1847,7 @@ function goalGroupKey(goal) {
 }
 
 function halfYearTargetRecord(periodMonth, item, unit = '') {
-  const targetPeriod = halfYearStart(periodMonth || currentMonth());
+  const targetPeriod = halfYearStart(periodMonth || closedMonth());
   const itemKey = canonicalGoalItem(item);
   const unitKey = unit || '';
   const entry = Object.entries(allGoalTargets).find(([, target]) =>
@@ -1938,7 +1944,7 @@ function actualForAverageMonth(goal, month) {
 }
 
 function actualGoalsForAverage(goal) {
-  const baseMonth = goal.month || document.getElementById('monthFilter')?.value || currentMonth();
+  const baseMonth = goal.month || document.getElementById('monthFilter')?.value || closedMonth();
   return averageInputMonths(baseMonth)
     .map(month => actualForAverageMonth(goal, month))
     .filter(Boolean)
@@ -2053,7 +2059,7 @@ function periodGoalGroups(periodMonth) {
 
   groups.forEach(group => {
     group.rows.sort((a, b) => (a.month || '').localeCompare(b.month || ''));
-    const latest = [...group.rows].reverse().find(row => row.month <= currentMonth()) || group.rows[group.rows.length - 1];
+    const latest = [...group.rows].reverse().find(row => row.month <= closedMonth()) || group.rows[group.rows.length - 1];
     group.prototype = latest;
     group.item = canonicalGoalItem(latest.item);
     group.unit = latest.unit || group.unit;
@@ -2085,7 +2091,7 @@ function groupSearchText(group) {
 
 function monthStatusForGroup(group, month) {
   const actual = actualForAverageMonth(group.prototype, month);
-  if (month > currentMonth() && !actual) return 'future';
+  if (month > closedMonth() && !actual) return 'future';
   const targetValue = targetValueForGroup(group);
   const target = parseNumber(targetValue);
   if (!actual) return 'blank';
@@ -2148,7 +2154,7 @@ function missingGoalFields(goal) {
 }
 
 function missingFieldsForGroupMonth(group, month) {
-  if (month > currentMonth()) return [];
+  if (month > closedMonth()) return [];
   const actual = actualForAverageMonth(group.prototype, month);
   const fields = [];
   if (!actual) fields.push({ key: 'actual', label: '実績' });
@@ -2235,10 +2241,11 @@ function renderMonthBoard(periodMonth, periodGoals, groups) {
   const entryMonth = selectedEntryMonth();
   document.getElementById('monthActionTitle').textContent = periodLabel(periodMonth);
   document.getElementById('monthActionSub').textContent = periodGoals.length
-    ? `追加する月: ${monthLabel(entryMonth)} / 半期${groups.length}項目 / 月別データ${periodGoals.length}件 / 入力待ち${blank}項目 / 目標未設定${noTarget}項目 / 達成${done}項目`
-    : `追加する月: ${monthLabel(entryMonth)} / この半期の目標は未作成`;
+    ? `追加する月: ${entryMonth ? monthLabel(entryMonth) : '締め済み月なし'} / 半期${groups.length}項目 / 月別データ${periodGoals.length}件 / 入力待ち${blank}項目 / 目標未設定${noTarget}項目 / 達成${done}項目`
+    : `追加する月: ${entryMonth ? monthLabel(entryMonth) : '締め済み月なし'} / この半期の目標は未作成`;
   if (seedBtn) {
     seedBtn.textContent = monthGoals(entryMonth).length ? '標準項目を追加' : '選択月の標準項目を作成';
+    seedBtn.disabled = !entryMonth;
   }
 }
 
@@ -2361,7 +2368,7 @@ function monthValuesHtml(group) {
 
 function monthValueChipHtml(group, month) {
   const row = group.rowsByMonth[month];
-  const isFuture = month > currentMonth();
+  const isFuture = month > closedMonth();
   const actual = actualForAverageMonth(group.prototype, month);
   const targetValue = targetValueForGroup(group);
   const target = parseNumber(targetValue);
@@ -2382,7 +2389,7 @@ function monthValueChipHtml(group, month) {
 
 function historyEntriesForDisplay(goal) {
   const history = historyForDisplay(goal);
-  const expectedMonths = averageInputMonths(goal.month || document.getElementById('monthFilter')?.value || currentMonth());
+  const expectedMonths = averageInputMonths(goal.month || document.getElementById('monthFilter')?.value || closedMonth());
   const entries = expectedMonths.map((month, index) => {
     const item = history.find(row => row.month === month || String(row.label || '').trim() === monthShortLabel(month)) || {};
     const label = String(item.label || '').trim();
@@ -3049,7 +3056,7 @@ function defaultGoalForGroup(group, month) {
 }
 
 async function saveHalfYearTarget(periodMonth, item, unit, targetValue, defaults = {}) {
-  const period = halfYearStart(periodMonth || currentMonth());
+  const period = halfYearStart(periodMonth || closedMonth());
   const existing = halfYearTargetRecord(period, item, unit);
   const value = String(targetValue ?? '').trim();
   if (!value && !existing) return false;
@@ -3361,6 +3368,10 @@ window.deleteGoal = async function() {
 window.seedTemplates = async function() {
   if (!isEditor()) return;
   const month = selectedEntryMonth();
+  if (!month) {
+    showToast('入力できる締め済み月がありません');
+    return;
+  }
   const existing = monthGoals(month);
   if (existing.length) {
     if (!confirm(`${monthLabel(month)}には既に${existing.length}件あります。標準項目を追加しますか？`)) return;
