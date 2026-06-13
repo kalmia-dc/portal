@@ -1551,6 +1551,12 @@ function periodMonths(month) {
   return Array.from({ length: 6 }, (_, index) => addMonths(start, index));
 }
 
+function averageInputMonths(month) {
+  const selectedMonth = month || document.getElementById('monthFilter')?.value || currentMonth();
+  const cutoffMonth = selectedMonth <= currentMonth() ? selectedMonth : currentMonth();
+  return periodMonths(selectedMonth).filter(item => item <= cutoffMonth);
+}
+
 function periodLabel(month) {
   const months = periodMonths(month);
   return `${monthLabel(months[0])}〜${monthLabel(months[months.length - 1])}`;
@@ -1636,19 +1642,57 @@ function formatAverageValue(value) {
     : String(Number(n.toFixed(2)));
 }
 
-function actualGoalsForAverage(goal) {
-  const baseMonth = goal.month || document.getElementById('monthFilter')?.value || currentMonth();
-  const months = new Set(periodMonths(baseMonth));
+function goalRowsForAverage(goal) {
   const key = goalGroupKey(goal);
   return Object.entries(allGoals)
     .map(([id, item]) => ({ id, ...item }))
-    .filter(item => months.has(item.month || ''))
-    .filter(item => goalGroupKey(item) === key)
-    .map(item => {
-      const actualValue = actualValueForGoal(item);
-      return { ...item, actualValue, actualNumber: parseNumber(actualValue) };
-    })
-    .filter(item => item.actualNumber !== null)
+    .filter(item => goalGroupKey(item) === key);
+}
+
+function goalActualForMonth(goal, month) {
+  const row = goalRowsForAverage(goal).find(item => item.month === month);
+  if (!row) return null;
+  const actualValue = actualValueForGoal(row);
+  const actualNumber = parseNumber(actualValue);
+  return actualNumber === null ? null : { ...row, month, actualValue, actualNumber };
+}
+
+function selfPayRateActualForMonth(month) {
+  const calculatedValue = calculatedSelfPayRateValue(month);
+  const calculatedNumber = parseNumber(calculatedValue);
+  if (calculatedNumber !== null) {
+    return {
+      month,
+      item: '自費率',
+      unit: '%',
+      actualValue: calculatedValue,
+      actualNumber: calculatedNumber
+    };
+  }
+
+  const fallback = Object.entries(allGoals)
+    .map(([id, item]) => ({ id, ...item }))
+    .find(item => item.month === month && canonicalGoalItem(item.item) === '自費率');
+  const fallbackNumber = parseNumber(fallback?.actualValue);
+  return fallbackNumber === null ? null : {
+    ...fallback,
+    month,
+    actualValue: fallback.actualValue,
+    actualNumber: fallbackNumber
+  };
+}
+
+function actualForAverageMonth(goal, month) {
+  return canonicalGoalItem(goal.item) === '自費率'
+    ? selfPayRateActualForMonth(month)
+    : goalActualForMonth(goal, month);
+}
+
+function actualGoalsForAverage(goal) {
+  const baseMonth = goal.month || document.getElementById('monthFilter')?.value || currentMonth();
+  return averageInputMonths(baseMonth)
+    .map(month => actualForAverageMonth(goal, month))
+    .filter(Boolean)
     .sort((a, b) => (a.month || '').localeCompare(b.month || ''));
 }
 
@@ -1659,6 +1703,7 @@ function computedAverage(goal) {
   return {
     value: formatAverageValue(average),
     history: goals.map(item => ({
+      month: item.month,
       label: monthShortLabel(item.month),
       value: item.actualValue
     }))
@@ -1942,17 +1987,37 @@ function actionLabel(status) {
 
 function historyEntriesForDisplay(goal) {
   const history = historyForDisplay(goal);
+  const expectedMonths = averageInputMonths(goal.month || document.getElementById('monthFilter')?.value || currentMonth());
+  const entries = expectedMonths.map((month, index) => {
+    const item = history.find(row => row.month === month || String(row.label || '').trim() === monthShortLabel(month)) || {};
+    const label = String(item.label || '').trim();
+    const value = item.value ?? '';
+    const hasLabel = Boolean(label);
+    const hasValue = parseNumber(value) !== null;
+    return {
+      month,
+      label: label || monthShortLabel(month) || `${index + 1}ヶ月前`,
+      value,
+      hasLabel,
+      hasValue,
+      isEmpty: false,
+      required: true
+    };
+  });
+  if (entries.length) return entries;
   return history.map((item, index) => {
     const label = String(item.label || '').trim();
     const value = item.value ?? '';
     const hasLabel = Boolean(label);
     const hasValue = parseNumber(value) !== null;
     return {
+      month: item.month || '',
       label: label || `${index + 1}ヶ月前`,
       value,
       hasLabel,
       hasValue,
-      isEmpty: !hasLabel && !String(value ?? '').trim()
+      isEmpty: !hasLabel && !String(value ?? '').trim(),
+      required: false
     };
   });
 }
@@ -1960,7 +2025,7 @@ function historyEntriesForDisplay(goal) {
 function averageCellHtml(goal, currentValue, hasAverage) {
   const entries = historyEntriesForDisplay(goal);
   const visibleEntries = entries.filter(entry => !entry.isEmpty);
-  const hasMissing = !visibleEntries.length || visibleEntries.some(entry => !entry.hasValue);
+  const hasMissing = entries.some(entry => entry.required && !entry.hasValue);
   const chips = visibleEntries.length
     ? visibleEntries.map(entry => entry.hasValue
       ? `<span class="history-chip"><span class="history-label">${escapeHtml(entry.label)}</span>${fmtNumber(entry.value, goal.unit)}</span>`
