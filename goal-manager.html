@@ -1505,6 +1505,7 @@ const firebaseConfig = {
 const fbApp = initializeApp(firebaseConfig);
 const db = getDatabase(fbApp);
 const DB_PATH = 'monthlyGoals';
+const TARGET_DB_PATH = 'halfYearGoalTargets';
 const PRIVATE_METRICS_PATH = 'privateMetrics';
 const IMPORT_HISTORY_PATH = 'monthlyGoalImportHistory';
 const NOTIFY_URL = 'https://kalmia-notify.chibakenmin-sugihey.workers.dev';
@@ -1564,6 +1565,7 @@ const IMPORT_ITEM_ALIASES = [
 
 let currentUser = resolveUser();
 let allGoals = {};
+let allGoalTargets = {};
 let allPrivateMetrics = {};
 let editingId = null;
 let renderedGoalGroups = new Map();
@@ -1641,6 +1643,15 @@ function init() {
     showToast('データ読み込みに失敗しました: ' + err.message);
   });
 
+  onValue(ref(db, TARGET_DB_PATH), snap => {
+    allGoalTargets = snap.val() || {};
+    populatePeriodFilter(true);
+    populateEntryMonthFilter();
+    render();
+  }, err => {
+    showToast('半期目標の読み込みに失敗しました: ' + err.message);
+  });
+
   onValue(ref(db, PRIVATE_METRICS_PATH), snap => {
     allPrivateMetrics = snap.val() || {};
     populatePeriodFilter(true);
@@ -1676,6 +1687,9 @@ function availablePeriodStarts() {
   ]);
   Object.values(allGoals).forEach(goal => {
     if (goal.month) starts.add(halfYearStart(goal.month));
+  });
+  Object.values(allGoalTargets).forEach(target => {
+    if (target.periodMonth) starts.add(halfYearStart(target.periodMonth));
   });
   Object.values(allPrivateMetrics).forEach(metric => {
     if (metric.month) starts.add(halfYearStart(metric.month));
@@ -1734,6 +1748,11 @@ function halfYearStart(month) {
 function periodMonths(month) {
   const start = halfYearStart(month);
   return Array.from({ length: 6 }, (_, index) => addMonths(start, index));
+}
+
+function periodEndMonth(month) {
+  const months = periodMonths(month);
+  return months[months.length - 1];
 }
 
 function averageInputMonths(month) {
@@ -1819,6 +1838,49 @@ function goalGroupKey(goal) {
     canonicalGoalItem(goal.item),
     goal.unit || ''
   ].join('|');
+}
+
+function halfYearTargetRecord(periodMonth, item, unit = '') {
+  const targetPeriod = halfYearStart(periodMonth || currentMonth());
+  const itemKey = canonicalGoalItem(item);
+  const unitKey = unit || '';
+  const entry = Object.entries(allGoalTargets).find(([, target]) =>
+    halfYearStart(target.periodMonth || target.month || targetPeriod) === targetPeriod &&
+    canonicalGoalItem(target.item) === itemKey &&
+    (target.unit || '') === unitKey
+  );
+  return entry ? { id: entry[0], ...entry[1] } : null;
+}
+
+function halfYearTargetForGroup(group) {
+  return halfYearTargetRecord(group.periodMonth, group.item, group.unit);
+}
+
+function halfYearTargetForGoal(goal) {
+  return halfYearTargetRecord(goal.month || selectedPeriodMonth(), goal.item, goal.unit);
+}
+
+function finalMonthTargetForGoal(goal) {
+  const finalMonth = periodEndMonth(goal.month || selectedPeriodMonth());
+  const key = goalGroupKey(goal);
+  const row = Object.values(allGoals)
+    .find(item => item.month === finalMonth && goalGroupKey(item) === key);
+  return row?.targetValue ?? '';
+}
+
+function finalMonthTargetForGroup(group) {
+  const finalMonth = periodEndMonth(group.periodMonth);
+  return group.rowsByMonth[finalMonth]?.targetValue ?? '';
+}
+
+function targetValueForGoal(goal) {
+  const target = halfYearTargetForGoal(goal);
+  return target ? (target.targetValue ?? '') : finalMonthTargetForGoal(goal);
+}
+
+function targetValueForGroup(group) {
+  const target = halfYearTargetForGroup(group);
+  return target ? (target.targetValue ?? '') : finalMonthTargetForGroup(group);
 }
 
 function formatAverageValue(value) {
@@ -1927,13 +1989,13 @@ function calcRateValues(actual, target, direction = 'up') {
 }
 
 function calcRate(goal) {
-  const target = parseNumber(goal.targetValue);
+  const target = parseNumber(targetValueForGoal(goal));
   const actual = parseNumber(actualValueForGoal(goal));
   return calcRateValues(actual, target, goal.direction);
 }
 
 function goalStatus(goal) {
-  const target = parseNumber(goal.targetValue);
+  const target = parseNumber(targetValueForGoal(goal));
   const actual = parseNumber(actualValueForGoal(goal));
   if (actual === null) return 'blank';
   if (target === null || target === 0) return 'noTarget';
@@ -1999,9 +2061,12 @@ function periodGoalGroups(periodMonth) {
     group.direction = latest.direction || group.direction;
     group.owner = latest.owner || group.owner;
     group.note = latest.note || group.note;
-    group.targetValue = latest.targetValue ?? '';
-    group.updatedAt = Math.max(...group.rows.map(row => Number(row.updatedAt || row.createdAt || 0)));
-    group.updatedBy = latest.updatedBy || latest.createdBy || '';
+    group.targetRecord = halfYearTargetForGroup(group);
+    group.targetValue = targetValueForGroup(group);
+    const rowUpdatedAt = Math.max(...group.rows.map(row => Number(row.updatedAt || row.createdAt || 0)));
+    const targetUpdatedAt = Number(group.targetRecord?.updatedAt || group.targetRecord?.createdAt || 0);
+    group.updatedAt = Math.max(rowUpdatedAt, targetUpdatedAt);
+    group.updatedBy = group.targetRecord?.updatedBy || latest.updatedBy || latest.createdBy || '';
   });
 
   return Array.from(groups.values()).sort((a, b) => displayGoalItem(a.item).localeCompare(displayGoalItem(b.item), 'ja'));
@@ -2021,7 +2086,7 @@ function groupSearchText(group) {
 function monthStatusForGroup(group, month) {
   const actual = actualForAverageMonth(group.prototype, month);
   if (month > currentMonth() && !actual) return 'future';
-  const targetValue = group.rowsByMonth[month]?.targetValue ?? group.targetValue;
+  const targetValue = targetValueForGroup(group);
   const target = parseNumber(targetValue);
   if (!actual) return 'blank';
   if (target === null || target === 0) return 'noTarget';
@@ -2072,7 +2137,7 @@ function render() {
 
 function missingGoalFields(goal) {
   const fields = [];
-  const target = parseNumber(goal.targetValue);
+  const target = parseNumber(targetValueForGoal(goal));
   const actual = parseNumber(actualValueForGoal(goal));
   const average = parseNumber(currentValueForDisplay(goal));
   const history = historyForDisplay(goal);
@@ -2084,13 +2149,15 @@ function missingGoalFields(goal) {
 
 function missingFieldsForGroupMonth(group, month) {
   if (month > currentMonth()) return [];
-  const row = group.rowsByMonth[month];
   const actual = actualForAverageMonth(group.prototype, month);
-  const targetValue = row?.targetValue ?? group.targetValue;
   const fields = [];
-  if (parseNumber(targetValue) === null || parseNumber(targetValue) === 0) fields.push({ key: 'target', label: '目標値' });
   if (!actual) fields.push({ key: 'actual', label: '実績' });
   return fields;
+}
+
+function missingTargetForGroup(group) {
+  const target = parseNumber(targetValueForGroup(group));
+  return target === null || target === 0;
 }
 
 function renderPendingGoals(groups, periodMonth) {
@@ -2099,10 +2166,13 @@ function renderPendingGoals(groups, periodMonth) {
   const inputMonths = averageInputMonths(periodMonth);
   const pending = groups
     .map(group => {
+      const targetMissing = missingTargetForGroup(group)
+        ? [{ month: group.periodMonth, fields: [{ key: 'target', label: '半期目標' }] }]
+        : [];
       const missingMonths = inputMonths
         .map(month => ({ month, fields: missingFieldsForGroupMonth(group, month) }))
         .filter(item => item.fields.length);
-      return { ...group, missingMonths };
+      return { ...group, missingMonths: [...targetMissing, ...missingMonths] };
     })
     .filter(group => group.missingMonths.length)
     .sort((a, b) => b.missingMonths.length - a.missingMonths.length || displayGoalItem(a.item).localeCompare(displayGoalItem(b.item), 'ja'));
@@ -2126,10 +2196,15 @@ function renderPendingGoals(groups, periodMonth) {
 function pendingGoalCardHtml(group) {
   const buttons = group.missingMonths
     .flatMap(item => item.fields.map(field => ({ month: item.month, field })))
-    .map(item => `
+    .map(item => {
+      const label = item.field.key === 'target'
+        ? item.field.label
+        : `${monthShortLabel(item.month)} ${item.field.label}`;
+      return `
       <button class="input-badge ${item.field.key}" onclick="openQuickGoalInput('${group.uiKey}','${item.month}','${item.field.key}')">
-        ${escapeHtml(monthShortLabel(item.month))} ${escapeHtml(item.field.label)}
-      </button>`)
+        ${escapeHtml(label)}
+      </button>`;
+    })
     .join('');
   return `
     <div class="pending-card">
@@ -2262,10 +2337,10 @@ function actionLabel(status) {
 }
 
 function groupAverageRate(group) {
+  const target = parseNumber(targetValueForGroup(group));
   const rates = averageInputMonths(group.periodMonth)
     .map(month => {
       const actual = actualForAverageMonth(group.prototype, month);
-      const target = parseNumber(group.rowsByMonth[month]?.targetValue ?? group.targetValue);
       return actual ? calcRateValues(actual.actualNumber, target, group.direction) : null;
     })
     .filter(rate => rate !== null);
@@ -2288,7 +2363,7 @@ function monthValueChipHtml(group, month) {
   const row = group.rowsByMonth[month];
   const isFuture = month > currentMonth();
   const actual = actualForAverageMonth(group.prototype, month);
-  const targetValue = row?.targetValue ?? group.targetValue;
+  const targetValue = targetValueForGroup(group);
   const target = parseNumber(targetValue);
   const rate = actual ? calcRateValues(actual.actualNumber, target, group.direction) : null;
   const status = monthStatusForGroup(group, month);
@@ -2883,35 +2958,53 @@ window.saveImportCandidates = async function() {
     for (const candidate of selected) {
       const existing = findExistingGoal(candidate.month, candidate.item);
       const template = templateForItem(candidate.item);
-      const data = {
-        ...(existing || {}),
-        month: candidate.month,
-        department: existing?.department || template.department,
-        item: canonicalGoalItem(candidate.item),
-        unit: existing?.unit || template.unit,
-        direction: existing?.direction || template.direction,
-        detail: existing?.detail || template.detail,
-        currentValue: existing?.currentValue ?? '',
-        targetValue: candidate.targetValue || existing?.targetValue || '',
-        actualValue: candidate.actualValue || existing?.actualValue || '',
-        owner: existing?.owner || currentUser.name,
-        note: existing?.note || '',
-        history: normalizeHistory(existing?.history || []),
-        updatedAt: Date.now(),
-        updatedBy: currentUser.name
-      };
-      delete data.id;
-      if (existing) {
-        await set(ref(db, `${DB_PATH}/${existing.id}`), data);
-      } else {
-        await push(ref(db, DB_PATH), {
-          ...data,
-          createdAt: Date.now(),
-          createdBy: currentUser.name
-        });
+      const unit = existing?.unit || template.unit;
+      const direction = existing?.direction || template.direction;
+      const detail = existing?.detail || template.detail;
+      const owner = existing?.owner || currentUser.name;
+      let wrote = false;
+      if (candidate.actualValue || existing) {
+        const data = {
+          ...(existing || {}),
+          month: candidate.month,
+          department: existing?.department || template.department,
+          item: canonicalGoalItem(candidate.item),
+          unit,
+          direction,
+          detail,
+          currentValue: existing?.currentValue ?? '',
+          actualValue: candidate.actualValue || existing?.actualValue || '',
+          owner,
+          note: existing?.note || '',
+          history: normalizeHistory(existing?.history || []),
+          updatedAt: Date.now(),
+          updatedBy: currentUser.name
+        };
+        delete data.id;
+        delete data.targetValue;
+        if (existing) {
+          await set(ref(db, `${DB_PATH}/${existing.id}`), data);
+        } else {
+          await push(ref(db, DB_PATH), {
+            ...data,
+            createdAt: Date.now(),
+            createdBy: currentUser.name
+          });
+        }
+        wrote = true;
       }
-      saved++;
-      months.add(candidate.month);
+      if (candidate.targetValue) {
+        await saveHalfYearTarget(candidate.month, candidate.item, unit, candidate.targetValue, {
+          direction,
+          detail,
+          owner
+        });
+        wrote = true;
+      }
+      if (wrote) {
+        saved++;
+        months.add(candidate.month);
+      }
     }
 
     await push(ref(db, IMPORT_HISTORY_PATH), {
@@ -2949,10 +3042,50 @@ function defaultGoalForGroup(group, month) {
     unit: group.unit,
     detail: group.detail,
     direction: group.direction,
-    targetValue: group.targetValue ?? '',
+    targetValue: targetValueForGroup(group),
     owner: currentUser.name,
     note: group.note || ''
   };
+}
+
+async function saveHalfYearTarget(periodMonth, item, unit, targetValue, defaults = {}) {
+  const period = halfYearStart(periodMonth || currentMonth());
+  const existing = halfYearTargetRecord(period, item, unit);
+  const value = String(targetValue ?? '').trim();
+  if (!value && !existing) return false;
+  const data = {
+    ...(existing || {}),
+    periodMonth: period,
+    item: canonicalGoalItem(item),
+    unit: unit || '',
+    direction: defaults.direction || existing?.direction || 'up',
+    detail: defaults.detail ?? existing?.detail ?? '',
+    targetValue: value,
+    owner: defaults.owner || existing?.owner || currentUser.name,
+    note: defaults.note ?? existing?.note ?? '',
+    updatedAt: Date.now(),
+    updatedBy: currentUser.name
+  };
+  delete data.id;
+  if (existing?.id) {
+    await set(ref(db, `${TARGET_DB_PATH}/${existing.id}`), data);
+  } else {
+    await push(ref(db, TARGET_DB_PATH), {
+      ...data,
+      createdAt: Date.now(),
+      createdBy: currentUser.name
+    });
+  }
+  return true;
+}
+
+async function saveHalfYearTargetForGroup(group, targetValue) {
+  return saveHalfYearTarget(group.periodMonth, group.item, group.unit, targetValue, {
+    direction: group.direction,
+    detail: group.detail,
+    owner: group.owner || currentUser.name,
+    note: group.note || ''
+  });
 }
 
 function quickFieldLabel(fieldKey) {
@@ -2969,14 +3102,21 @@ window.openQuickGoalInput = function(groupKey, month, fieldKey) {
   if (!group) return;
   const row = group.rowsByMonth[month];
   const fieldLabel = quickFieldLabel(fieldKey);
+  const isTarget = fieldKey === 'target';
   quickInputContext = { groupKey, month, fieldKey };
   document.getElementById('quickInputTitle').textContent = `${fieldLabel}を入力`;
-  document.getElementById('quickInputSub').textContent = `${periodLabel(group.periodMonth)} / ${monthLabel(month)}`;
+  document.getElementById('quickInputSub').textContent = isTarget
+    ? periodLabel(group.periodMonth)
+    : `${periodLabel(group.periodMonth)} / ${monthLabel(month)}`;
   document.getElementById('quickInputTarget').innerHTML = `
     <div>${escapeHtml(displayGoalItem(group.item))}</div>
     <div class="quick-input-meta">${escapeHtml(group.detail || '')}</div>`;
-  document.getElementById('quickInputLabel').textContent = `${monthShortLabel(month)}の${fieldLabel}`;
-  document.getElementById('quickInputValue').value = row?.[quickFieldDataKey(fieldKey)] ?? '';
+  document.getElementById('quickInputLabel').textContent = isTarget
+    ? '半期の目標値'
+    : `${monthShortLabel(month)}の${fieldLabel}`;
+  document.getElementById('quickInputValue').value = isTarget
+    ? targetValueForGroup(group)
+    : (row?.[quickFieldDataKey(fieldKey)] ?? '');
   document.getElementById('quickInputSaveBtn').disabled = false;
   document.getElementById('quickInputModal').classList.add('open');
   window.setTimeout(() => {
@@ -3006,37 +3146,46 @@ window.saveQuickGoalInput = async function() {
     return;
   }
 
-  const row = group.rowsByMonth[quickInputContext.month];
-  const fieldKey = quickFieldDataKey(quickInputContext.fieldKey);
-  const base = row || defaultGoalForGroup(group, quickInputContext.month);
   const savedMonth = quickInputContext.month;
   const savedFieldLabel = quickFieldLabel(quickInputContext.fieldKey);
-  const data = {
-    ...base,
-    [fieldKey]: value,
-    updatedAt: Date.now(),
-    updatedBy: currentUser.name
-  };
-  delete data.id;
 
   saving = true;
   document.getElementById('quickInputSaveBtn').disabled = true;
   try {
-    if (row?.id) {
-      await set(ref(db, `${DB_PATH}/${row.id}`), data);
+    const isTarget = quickInputContext.fieldKey === 'target';
+    if (isTarget) {
+      await saveHalfYearTargetForGroup(group, value);
     } else {
-      await push(ref(db, DB_PATH), {
-        ...data,
-        createdAt: Date.now(),
-        createdBy: currentUser.name
-      });
+      const row = group.rowsByMonth[quickInputContext.month];
+      const fieldKey = quickFieldDataKey(quickInputContext.fieldKey);
+      const base = row || defaultGoalForGroup(group, quickInputContext.month);
+      const data = {
+        ...base,
+        [fieldKey]: value,
+        updatedAt: Date.now(),
+        updatedBy: currentUser.name
+      };
+      delete data.id;
+      delete data.targetValue;
+      if (row?.id) {
+        await set(ref(db, `${DB_PATH}/${row.id}`), data);
+      } else {
+        await push(ref(db, DB_PATH), {
+          ...data,
+          createdAt: Date.now(),
+          createdBy: currentUser.name
+        });
+      }
     }
-    document.getElementById('monthFilter').value = halfYearStart(savedMonth);
+    document.getElementById('monthFilter').value = isTarget
+      ? group.periodMonth
+      : halfYearStart(savedMonth);
     populateEntryMonthFilter();
     const entryMonthFilter = document.getElementById('entryMonthFilter');
-    if (entryMonthFilter) entryMonthFilter.value = savedMonth;
+    if (entryMonthFilter && !isTarget) entryMonthFilter.value = savedMonth;
     closeQuickInputModal();
-    showToast(`${monthShortLabel(savedMonth)}の${savedFieldLabel}を保存しました`);
+    const savedLabel = isTarget ? periodLabel(group.periodMonth) : monthShortLabel(savedMonth);
+    showToast(`${savedLabel}の${savedFieldLabel}を保存しました`);
   } catch (e) {
     showToast('保存に失敗しました: ' + e.message);
     document.getElementById('quickInputSaveBtn').disabled = false;
@@ -3070,7 +3219,12 @@ window.openGoalModal = function(id = null, defaults = {}) {
   setFormValue('fDetail', goal?.detail || defaults.detail || '');
   setFormValue('fDirection', goal?.direction || defaults.direction || 'up');
   setFormValue('fCurrent', goal ? currentValueForDisplay({ id, ...goal }) : '');
-  setFormValue('fTarget', goal?.targetValue ?? defaults.targetValue ?? '');
+  const modalTargetValue = goal
+    ? targetValueForGoal({ id, ...goal })
+    : (defaults.targetValue ?? '');
+  const targetLabel = document.querySelector('label[for="fTarget"]');
+  if (targetLabel) targetLabel.textContent = '半期の目標値';
+  setFormValue('fTarget', modalTargetValue);
   setFormValue('fActual', goal ? actualValueForGoal({ id, ...goal }) : '');
   setFormValue('fOwner', goal?.owner || defaults.owner || currentUser.name);
   setFormValue('fNote', goal?.note || defaults.note || '');
@@ -3128,6 +3282,11 @@ window.saveGoal = async function() {
   if (!item) { showToast('項目を入力してください'); return; }
   const month = document.getElementById('fMonth').value;
   if (!month) { showToast('対象月を選択してください'); return; }
+  const targetValue = document.getElementById('fTarget').value.trim();
+  if (targetValue && parseNumber(targetValue) === 0) {
+    showToast('目標値は0以外で入力してください');
+    return;
+  }
 
   const data = {
     month,
@@ -3137,7 +3296,6 @@ window.saveGoal = async function() {
     detail: document.getElementById('fDetail').value.trim(),
     direction: document.getElementById('fDirection').value,
     currentValue: document.getElementById('fCurrent').value.trim(),
-    targetValue: document.getElementById('fTarget').value.trim(),
     actualValue: document.getElementById('fActual').value.trim(),
     owner: document.getElementById('fOwner').value.trim(),
     note: document.getElementById('fNote').value.trim(),
@@ -3152,9 +3310,20 @@ window.saveGoal = async function() {
   saving = true;
   document.getElementById('saveBtn').disabled = true;
   try {
+    const existingTarget = halfYearTargetRecord(month, item, data.unit);
+    if (targetValue || existingTarget) {
+      await saveHalfYearTarget(month, item, data.unit, targetValue, {
+        direction: data.direction,
+        detail: data.detail,
+        owner: data.owner,
+        note: data.note
+      });
+    }
     if (editingId) {
       const existing = allGoals[editingId] || {};
-      await set(ref(db, `${DB_PATH}/${editingId}`), { ...existing, ...data });
+      const rowData = { ...existing, ...data };
+      delete rowData.targetValue;
+      await set(ref(db, `${DB_PATH}/${editingId}`), rowData);
       showToast('目標を更新しました');
     } else {
       await push(ref(db, DB_PATH), {
@@ -3201,20 +3370,27 @@ window.seedTemplates = async function() {
 
   try {
     for (const template of TEMPLATE_ITEMS) {
+      const { targetValue, ...templateRow } = template;
       await push(ref(db, DB_PATH), {
-        ...template,
+        ...templateRow,
         month,
-        currentValue: template.currentValue ?? '',
-        targetValue: template.targetValue ?? '',
+        currentValue: templateRow.currentValue ?? '',
         actualValue: '',
         owner: currentUser.name,
         note: '',
-        history: normalizeHistory(template.history),
+        history: normalizeHistory(templateRow.history),
         createdAt: Date.now(),
         createdBy: currentUser.name,
         updatedAt: Date.now(),
         updatedBy: currentUser.name
       });
+      if (targetValue) {
+        await saveHalfYearTarget(month, template.item, template.unit, targetValue, {
+          direction: templateRow.direction,
+          detail: templateRow.detail,
+          owner: currentUser.name
+        });
+      }
     }
     showToast('標準項目を作成しました');
   } catch(e) {
@@ -3240,7 +3416,7 @@ window.exportCSV = function() {
       goal.detail,
       currentValueForDisplay(goal),
       ...Array.from({ length: HISTORY_MONTH_COUNT }, (_, index) => historyCsvValue(goal, index)),
-      goal.targetValue,
+      targetValueForGoal(goal),
       actualValueForGoal(goal),
       rate === null ? '' : `${Math.round(rate)}%`,
       statusLabel(goalStatus(goal)),
@@ -3283,7 +3459,7 @@ window.sendLineWorksSummary = async function() {
   const avg = avgRates.length ? Math.round(avgRates.reduce((a, b) => a + b, 0) / avgRates.length) : '-';
   const lowLines = behind.slice(0, 5).map(g => {
     const rate = calcRate(g);
-    return `・${monthShortLabel(g.month)} ${g.item}: ${rate === null ? '-' : Math.round(rate) + '%'}（実績 ${fmtNumber(actualValueForGoal(g), g.unit)} / 目標 ${fmtNumber(g.targetValue, g.unit)}）`;
+    return `・${monthShortLabel(g.month)} ${g.item}: ${rate === null ? '-' : Math.round(rate) + '%'}（実績 ${fmtNumber(actualValueForGoal(g), g.unit)} / 目標 ${fmtNumber(targetValueForGoal(g), g.unit)}）`;
   });
   const text = [
     `【半期目標】${periodLabel(month)} 達成状況`,
