@@ -2075,7 +2075,7 @@ function renderBreakEvenChart() {
 
   const latest = [...rows].reverse().find(row => row.rate !== null && Number.isFinite(row.rate));
   const average = values.reduce((sum, value) => sum + value, 0) / values.length;
-  const aboveCount = values.filter(value => value >= 100).length;
+  const annualRate = rows.reduce((sum, row) => sum + (row.rate !== null && Number.isFinite(row.rate) ? row.rate : 0), 0) / rows.length;
   const latestLabel = latest ? monthLabel(latest.month) : '-';
   sub.textContent = `${monthLabel(rows[0].month)}〜${monthLabel(rows[rows.length - 1].month)} / 実額非表示`;
 
@@ -2091,9 +2091,9 @@ function renderBreakEvenChart() {
       <div class="break-even-note">入力済み ${values.length}ヶ月</div>
     </div>
     <div class="break-even-chip">
-      <div class="break-even-label">100%以上</div>
-      <div class="break-even-value">${aboveCount}</div>
-      <div class="break-even-note">入力済み月のうち達成した月</div>
+      <div class="break-even-label">1年間の収支</div>
+      <div class="break-even-value">${formatPercent(annualRate, 1)}</div>
+      <div class="break-even-note">入力済み ${values.length}ヶ月分 / 実額非表示</div>
     </div>`;
 
   chartBox.innerHTML = breakEvenChartSvg(rows);
