@@ -367,7 +367,7 @@
 
   .break-even-summary {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 10px;
   }
 
@@ -2063,7 +2063,6 @@ function renderBreakEvenChart() {
   }
 
   const latest = [...rows].reverse().find(row => row.rate !== null && Number.isFinite(row.rate));
-  const average = values.reduce((sum, value) => sum + value, 0) / values.length;
   const annualRate = rows.reduce((sum, row) => sum + (row.rate !== null && Number.isFinite(row.rate) ? row.rate : 0), 0) / rows.length;
   const latestLabel = latest ? monthLabel(latest.month) : '-';
   sub.textContent = `${monthLabel(rows[0].month)}〜${monthLabel(rows[rows.length - 1].month)} / 実額非表示`;
@@ -2073,11 +2072,6 @@ function renderBreakEvenChart() {
       <div class="break-even-label">最新月</div>
       <div class="break-even-value">${formatPercent(latest?.rate, 1)}</div>
       <div class="break-even-note">${escapeHtml(latestLabel)}の達成率</div>
-    </div>
-    <div class="break-even-chip">
-      <div class="break-even-label">直近平均</div>
-      <div class="break-even-value">${formatPercent(average, 1)}</div>
-      <div class="break-even-note">入力済み ${values.length}ヶ月</div>
     </div>
     <div class="break-even-chip">
       <div class="break-even-label">1年間の収支</div>
