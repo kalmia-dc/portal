@@ -797,8 +797,7 @@
         <option value="all">すべて</option>
         <option value="売上">売上</option>
         <option value="患者数">患者数</option>
-        <option value="自費">自費</option>
-        <option value="保険">保険</option>
+        <option value="診療指標">診療指標</option>
         <option value="経費">経費</option>
         <option value="その他">その他</option>
       </select>
@@ -840,8 +839,7 @@
         <select id="fCategory">
           <option value="売上">売上</option>
           <option value="患者数">患者数</option>
-          <option value="自費">自費</option>
-          <option value="保険">保険</option>
+          <option value="診療指標">診療指標</option>
           <option value="経費">経費</option>
           <option value="その他">その他</option>
         </select>
@@ -954,7 +952,23 @@ const DB_PATH = 'privateMetrics';
 const GOAL_DB_PATH = 'monthlyGoals';
 const IMPORT_HISTORY_PATH = 'privateMetricImportHistory';
 const ADMIN_IDS = ['sugihira', 'momo'];
-const CATEGORY_OPTIONS = ['売上', '患者数', '自費', '保険', '経費', 'その他'];
+const CATEGORY_OPTIONS = ['売上', '患者数', '診療指標', '経費', 'その他'];
+const CATEGORY_ORDER = new Map(CATEGORY_OPTIONS.map((category, index) => [category, index]));
+const METRIC_ITEM_ORDER = [
+  '総売上',
+  '保険売上',
+  '自費売上',
+  '物販合計',
+  '月間延べ患者数',
+  '一日平均来院数',
+  '初診',
+  '再初診',
+  '自費率',
+  '保険点数',
+  'レセプト枚数',
+  '平均点数'
+];
+const METRIC_ITEM_ORDER_MAP = new Map(METRIC_ITEM_ORDER.map((item, index) => [item, index]));
 const PDFJS_URL = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
 const PDFJS_WORKER_URL = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 const TESSERACT_URL = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
@@ -1073,8 +1087,45 @@ function canonicalMetricItem(item) {
   const text = String(item || '').trim();
   if (text === '自費売上' || text === '自費売上高') return '自費売上';
   if (text === '保険売上' || text === '保険売上高') return '保険売上';
+  if (text === '物販売上' || text === '物販売上高') return '物販合計';
+  if (text === '1日平均来院数' || text === '１日平均来院数') return '一日平均来院数';
   if (text === '自費率') return '自費率';
   return text;
+}
+
+function canonicalMetricCategory(category, item = '') {
+  const itemKey = canonicalMetricItem(item);
+  if (['総売上', '保険売上', '自費売上', '物販合計'].includes(itemKey)) return '売上';
+  if (['月間延べ患者数', '一日平均来院数', '初診', '再初診'].includes(itemKey)) return '患者数';
+  if (['自費率', '保険点数', 'レセプト枚数', '平均点数'].includes(itemKey)) return '診療指標';
+
+  const categoryKey = String(category || '').trim();
+  if (categoryKey === '自費' || categoryKey === '保険') return '診療指標';
+  return CATEGORY_ORDER.has(categoryKey) ? categoryKey : 'その他';
+}
+
+function normalizedMetricData(metric) {
+  const item = canonicalMetricItem(metric.item);
+  return {
+    ...metric,
+    item,
+    category: canonicalMetricCategory(metric.category, item)
+  };
+}
+
+function metricItemRank(item) {
+  const itemKey = canonicalMetricItem(item);
+  return METRIC_ITEM_ORDER_MAP.has(itemKey) ? METRIC_ITEM_ORDER_MAP.get(itemKey) : 1000;
+}
+
+function compareMetrics(a, b) {
+  const categoryA = canonicalMetricCategory(a.category, a.item);
+  const categoryB = canonicalMetricCategory(b.category, b.item);
+  const categoryDiff = (CATEGORY_ORDER.get(categoryA) ?? 999) - (CATEGORY_ORDER.get(categoryB) ?? 999);
+  if (categoryDiff) return categoryDiff;
+  const itemDiff = metricItemRank(a.item) - metricItemRank(b.item);
+  if (itemDiff) return itemDiff;
+  return String(a.item || '').localeCompare(String(b.item || ''), 'ja');
 }
 
 function effectiveMetricsForMonth(month, overrides = []) {
@@ -1103,7 +1154,7 @@ function selfPayRateMetricData(month, overrides = []) {
   if (!value) return null;
   return {
     month,
-    category: '自費',
+    category: '診療指標',
     item: '自費率',
     value,
     unit: '%',
@@ -1134,10 +1185,11 @@ function addAutoSelfPayRateCandidates(candidates) {
 }
 
 async function savePrivateMetricData(data) {
-  const existing = findExistingMetric(data.month, data.item);
+  const normalizedData = normalizedMetricData(data);
+  const existing = findExistingMetric(normalizedData.month, normalizedData.item);
   const payload = {
     ...(existing || {}),
-    ...data,
+    ...normalizedData,
     updatedAt: Date.now(),
     updatedBy: currentUser.name
   };
@@ -1258,7 +1310,7 @@ function filteredMetrics() {
   const query = document.getElementById('searchInput').value.trim().toLowerCase();
 
   return Object.entries(allMetrics)
-    .map(([id, metric]) => ({ id, ...metric }))
+    .map(([id, metric]) => normalizedMetricData({ id, ...metric }))
     .filter(metric => (metric.month || '') === month)
     .filter(metric => category === 'all' || metric.category === category)
     .filter(metric => {
@@ -1269,17 +1321,14 @@ function filteredMetrics() {
         .toLowerCase()
         .includes(query);
     })
-    .sort((a, b) => {
-      const catDiff = String(a.category || '').localeCompare(String(b.category || ''), 'ja');
-      if (catDiff) return catDiff;
-      return String(a.item || '').localeCompare(String(b.item || ''), 'ja');
-    });
+    .sort(compareMetrics);
 }
 
 function monthMetrics(month) {
   return Object.entries(allMetrics)
-    .map(([id, metric]) => ({ id, ...metric }))
-    .filter(metric => metric.month === month);
+    .map(([id, metric]) => normalizedMetricData({ id, ...metric }))
+    .filter(metric => metric.month === month)
+    .sort(compareMetrics);
 }
 
 function render() {
@@ -1308,7 +1357,7 @@ function renderPendingMetrics(metrics) {
   const pending = metrics
     .map(metric => ({ ...metric, missingFields: missingMetricFields(metric) }))
     .filter(metric => metric.missingFields.length)
-    .sort((a, b) => b.missingFields.length - a.missingFields.length || String(a.item || '').localeCompare(String(b.item || ''), 'ja'));
+    .sort((a, b) => b.missingFields.length - a.missingFields.length || compareMetrics(a, b));
   const valueMissing = pending.filter(metric => metric.missingFields.some(field => field.key === 'value')).length;
   const sourceMissing = pending.filter(metric => metric.missingFields.some(field => field.key === 'source')).length;
 
@@ -1436,9 +1485,10 @@ function escapeHtml(text) {
   }[ch]));
 }
 
-function categoryOptions(selectedCategory) {
+function categoryOptions(selectedCategory, item = '') {
+  const selected = canonicalMetricCategory(selectedCategory, item);
   return CATEGORY_OPTIONS
-    .map(category => `<option value="${escapeHtml(category)}"${category === selectedCategory ? ' selected' : ''}>${escapeHtml(category)}</option>`)
+    .map(category => `<option value="${escapeHtml(category)}"${category === selected ? ' selected' : ''}>${escapeHtml(category)}</option>`)
     .join('');
 }
 
@@ -1603,11 +1653,10 @@ function compactForMatch(text) {
 function inferCategory(text) {
   const normalized = compactForMatch(text);
   const rules = [
-    { category: '自費', keywords: ['自費', 'インプラント', 'ジルコニア', 'ホワイトニング'] },
-    { category: '保険', keywords: ['保険', '社保', '国保', '医保', 'レセプト'] },
+    { category: '診療指標', keywords: ['自費率', '保険点数', 'レセプト', '平均点数', '診療報酬'] },
     { category: '経費', keywords: ['経費', '費用', '支出', '仕入', '人件費', '材料費', '技工'] },
     { category: '患者数', keywords: ['患者', '来院', '初診', '再初診', '新患', '人数'] },
-    { category: '売上', keywords: ['売上', '収入', '入金', '総売上', '月商', '物販'] }
+    { category: '売上', keywords: ['売上', '収入', '入金', '総売上', '月商', '物販', '自費', '保険'] }
   ];
   for (const rule of rules) {
     if (rule.keywords.some(keyword => normalized.includes(compactForMatch(keyword)))) return rule.category;
@@ -1621,7 +1670,7 @@ function inferUnit(text, category) {
   if (/円|¥|￥/.test(normalized)) return '円';
   if (/人/.test(normalized)) return '人';
   if (/件/.test(normalized)) return '件';
-  if (['売上', '自費', '保険', '経費'].includes(category)) return '円';
+  if (['売上', '経費'].includes(category)) return '円';
   if (category === '患者数') return '人';
   return '';
 }
@@ -1689,12 +1738,12 @@ function parseMetricCandidateLine(line, month, defaultSource) {
   const unit = inferUnit(line, category);
   const valueMatch = findMetricValueMatch(line, month, unit);
   if (!valueMatch?.value) return null;
-  const item = extractMetricItem(line, valueMatch);
+  const item = canonicalMetricItem(extractMetricItem(line, valueMatch));
   if (!item || item.length < 2) return null;
   return {
     enabled: true,
     month,
-    category,
+    category: canonicalMetricCategory(category, item),
     item,
     value: valueMatch.value,
     unit,
@@ -1765,11 +1814,12 @@ function parseMonthlyReport(rawText) {
 function metricCandidate(month, category, item, value, unit, source, sourceText, digits = 2) {
   const normalizedValue = formatImportValue(value, digits);
   if (!normalizedValue) return null;
+  const normalizedItem = canonicalMetricItem(item);
   return {
     enabled: true,
     month,
-    category,
-    item,
+    category: canonicalMetricCategory(category, normalizedItem),
+    item: normalizedItem,
     value: normalizedValue,
     unit,
     source,
@@ -1786,13 +1836,13 @@ function buildMonthlyReportMetricCandidates(rawText, month, defaultSource, apoIn
   const candidates = [
     metricCandidate(month, '患者数', '月間延べ患者数', report.patientTotal, '人', source, sourceText, 0),
     metricCandidate(month, '患者数', '一日平均来院数', report.treatmentDays > 0 ? report.patientTotal / report.treatmentDays : null, '人', source, `月間延べ患者数${report.patientTotal} ÷ 診療日数${report.treatmentDays}`, 2),
-    metricCandidate(month, '自費', '自費率', Number.isFinite(report.selfPaySales) && Number.isFinite(report.insuranceSales) && report.selfPaySales + report.insuranceSales > 0 ? (report.selfPaySales / (report.insuranceSales + report.selfPaySales)) * 100 : null, '%', source, sourceText, 2),
-    metricCandidate(month, '自費', '自費売上', report.selfPaySales, '円', source, sourceText, 0),
+    metricCandidate(month, '診療指標', '自費率', Number.isFinite(report.selfPaySales) && Number.isFinite(report.insuranceSales) && report.selfPaySales + report.insuranceSales > 0 ? (report.selfPaySales / (report.insuranceSales + report.selfPaySales)) * 100 : null, '%', source, sourceText, 2),
+    metricCandidate(month, '売上', '自費売上', report.selfPaySales, '円', source, sourceText, 0),
     metricCandidate(month, '売上', '物販合計', report.productSales, '円', source, sourceText, 0),
-    metricCandidate(month, '保険', '保険点数', report.insurancePoints, '点', source, sourceText, 0),
-    metricCandidate(month, '保険', '保険売上', Number.isFinite(report.insurancePoints) ? report.insurancePoints * 10 : null, '円', source, '保険点数 × 10', 0),
-    metricCandidate(month, '保険', 'レセプト枚数', report.receiptCount, '枚', source, sourceText, 0),
-    metricCandidate(month, '保険', '平均点数', report.averagePoints, '点', source, sourceText, 0)
+    metricCandidate(month, '診療指標', '保険点数', report.insurancePoints, '点', source, sourceText, 0),
+    metricCandidate(month, '売上', '保険売上', Number.isFinite(report.insurancePoints) ? report.insurancePoints * 10 : null, '円', source, '保険点数 × 10', 0),
+    metricCandidate(month, '診療指標', 'レセプト枚数', report.receiptCount, '枚', source, sourceText, 0),
+    metricCandidate(month, '診療指標', '平均点数', report.averagePoints, '点', source, sourceText, 0)
   ].filter(Boolean);
 
   const initialCount = Number(apoInitialCount);
@@ -1807,7 +1857,7 @@ function buildMonthlyReportMetricCandidates(rawText, month, defaultSource, apoIn
 
 function buildImportCandidates(rawText, month, defaultSource, apoInitialCount = null) {
   const monthlyReportCandidates = buildMonthlyReportMetricCandidates(rawText, month, defaultSource, apoInitialCount);
-  if (monthlyReportCandidates.length) return addAutoSelfPayRateCandidates(monthlyReportCandidates);
+  if (monthlyReportCandidates.length) return addAutoSelfPayRateCandidates(monthlyReportCandidates).sort(compareMetrics);
 
   const lines = normalizeImportText(repairLegacyPdfText(rawText))
     .split(/\n+/)
@@ -1829,7 +1879,7 @@ function buildImportCandidates(rawText, month, defaultSource, apoInitialCount = 
     candidates.push(candidate);
     if (candidates.length >= 80) break;
   }
-  return addAutoSelfPayRateCandidates(candidates);
+  return addAutoSelfPayRateCandidates(candidates).sort(compareMetrics);
 }
 
 function renderImportCandidates() {
@@ -1846,7 +1896,7 @@ function renderImportCandidates() {
       </label>
       <div>
         <span class="import-candidate-label">区分</span>
-        <select onchange="updateImportCandidate(${index}, 'category', this.value)">${categoryOptions(candidate.category)}</select>
+        <select onchange="updateImportCandidate(${index}, 'category', this.value)">${categoryOptions(candidate.category, candidate.item)}</select>
       </div>
       <div>
         <span class="import-candidate-label">項目</span>
@@ -1869,7 +1919,8 @@ function renderImportCandidates() {
 }
 
 function findExistingMetric(month, item) {
-  const entry = Object.entries(allMetrics).find(([, metric]) => metric.month === month && metric.item === item);
+  const itemKey = canonicalMetricItem(item);
+  const entry = Object.entries(allMetrics).find(([, metric]) => metric.month === month && canonicalMetricItem(metric.item) === itemKey);
   return entry ? { id: entry[0], ...entry[1] } : null;
 }
 
@@ -1942,11 +1993,15 @@ window.saveImportCandidates = async function() {
       ...candidate,
       month: String(candidate.month || '').trim(),
       category: String(candidate.category || 'その他').trim(),
-      item: String(candidate.item || '').trim(),
+      item: canonicalMetricItem(candidate.item),
       value: String(candidate.value ?? '').trim(),
       unit: String(candidate.unit || '').trim(),
       source: String(candidate.source || '').trim(),
       note: String(candidate.note || '').trim()
+    }))
+    .map(candidate => ({
+      ...candidate,
+      category: canonicalMetricCategory(candidate.category, candidate.item)
     }))
     .filter(candidate => candidate.enabled && candidate.month && candidate.item && candidate.value);
   selected = addAutoSelfPayRateCandidates(selected)
@@ -1965,7 +2020,7 @@ window.saveImportCandidates = async function() {
     for (const candidate of selected) {
       const data = {
         month: candidate.month,
-        category: candidate.category || 'その他',
+        category: canonicalMetricCategory(candidate.category, candidate.item),
         item: candidate.item,
         value: candidate.value,
         unit: candidate.unit || '',
@@ -2012,7 +2067,8 @@ window.saveImportCandidates = async function() {
 window.openMetricModal = function(id = null) {
   if (!isAdmin()) return;
   editingId = id;
-  const metric = id ? allMetrics[id] : null;
+  const rawMetric = id ? allMetrics[id] : null;
+  const metric = rawMetric ? normalizedMetricData(rawMetric) : null;
   document.getElementById('modalTitle').textContent = metric ? '経営数値を編集' : '経営数値を登録';
   document.getElementById('deleteBtn').style.display = metric ? 'inline-flex' : 'none';
 
@@ -2051,8 +2107,8 @@ window.saveMetric = async function() {
 
   const data = {
     month,
-    category: document.getElementById('fCategory').value,
-    item,
+    category: canonicalMetricCategory(document.getElementById('fCategory').value, item),
+    item: canonicalMetricItem(item),
     value: document.getElementById('fValue').value.trim(),
     unit: document.getElementById('fUnit').value.trim(),
     source: document.getElementById('fSource').value.trim(),
