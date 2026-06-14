@@ -549,22 +549,67 @@ const SHIFT_INFO = {
 };
 
 const ON_SHIFTS = ['通常','遅出'];
+const DEFAULT_PASSWORDS = {
+  sugihira:'1001', shimanaka:'1002', hokari:'1003', shinoda:'1004',
+  tsuruta:'2001',  yoshida:'2002',   takagi:'2003', matsumoto:'2004',
+  yamada:'2006',   hanowa:'2007',
+  tamiya:'3001',   tanaka:'3002',    momo:'3003'
+};
+
+let syncedPasswords = {};
+let passwordsReady = false;
+
+function readLocalPasswords() {
+  try {
+    return JSON.parse(localStorage.getItem('carmia_passwords') || '{}') || {};
+  } catch(e) {
+    return {};
+  }
+}
+
+function updatePasswordCache(data) {
+  if (data && typeof data === 'object') {
+    syncedPasswords = { ...syncedPasswords, ...data };
+    localStorage.setItem('carmia_passwords', JSON.stringify({ ...readLocalPasswords(), ...syncedPasswords }));
+    if (currentUser?.staffId && syncedPasswords[currentUser.staffId]) {
+      currentUser.pass = syncedPasswords[currentUser.staffId];
+      sessionStorage.setItem('portalUser', JSON.stringify(currentUser));
+    }
+  }
+  passwordsReady = true;
+}
+
+async function ensurePasswordsLoaded() {
+  if (passwordsReady) return;
+  try {
+    const snap = await get(ref(_db, 'passwords'));
+    updatePasswordCache(snap.val() || {});
+  } catch(e) {
+    console.warn('パスワード同期に失敗しました:', e);
+    passwordsReady = true;
+  }
+}
+
+function passwordForStaff(staffId, defaultPass = '') {
+  const localPasswords = readLocalPasswords();
+  return syncedPasswords[staffId] || localPasswords[staffId] || defaultPass || DEFAULT_PASSWORDS[staffId] || '';
+}
 
 // ─────────────────────────────────────────
 // セッション
 // ─────────────────────────────────────────
 let currentUser = null;
 
-function doLogin() {
+async function doLogin() {
   const sel  = document.getElementById('loginStaff').value;
   const pass = document.getElementById('loginPass').value;
   const err  = document.getElementById('loginError');
   if (!sel) { err.style.display='block'; err.textContent='スタッフを選択してください'; return; }
+  await ensurePasswordsLoaded();
   // value形式: "名前|役職|初期PW|staffId"
   const [name, role, defaultPass, staffId] = sel.split('|');
-  // パスワード照合：localStorage変更分を優先、なければ初期値
-  const storedPasswords = JSON.parse(localStorage.getItem('carmia_passwords') || '{}');
-  const correct = storedPasswords[staffId] || defaultPass;
+  // パスワード照合：Firebase同期分 → localStorage変更分 → 初期値
+  const correct = passwordForStaff(staffId, defaultPass);
   if (pass !== correct) { err.style.display='block'; err.textContent='パスワードが違います'; return; }
   currentUser = { name, role, pass, staffId };
   sessionStorage.setItem('portalUser', JSON.stringify(currentUser));
@@ -582,7 +627,7 @@ function doLogout() {
 
 // ─────────────────────────────────────────
 // パスワード変更モーダル
-// carmia_passwords（localStorage）に保存 → シフトアプリと共有
+// Firebase / passwords と carmia_passwords（localStorage）に保存 → シフトアプリと共有
 // ─────────────────────────────────────────
 function openPwModal() {
   document.getElementById('pwOld').value  = '';
@@ -601,22 +646,18 @@ function closePwModalIfBg(e) {
   if (e.target === document.getElementById('pwModal')) closePwModal();
 }
 
-function submitPwChange() {
+async function submitPwChange() {
   const oldVal = document.getElementById('pwOld').value;
   const newVal = document.getElementById('pwNew').value;
   const newVal2= document.getElementById('pwNew2').value;
   const msg    = document.getElementById('pwMsg');
 
-  // 現在パスワード取得（localStorageの変更分 or 初期値）
-  const stored   = JSON.parse(localStorage.getItem('carmia_passwords') || '{}');
+  await ensurePasswordsLoaded();
+
+  // 現在パスワード取得（Firebase同期分 or localStorageの変更分 or 初期値）
+  const stored   = readLocalPasswords();
   const sid      = currentUser.staffId;
-  const DEFAULTS = {
-    sugihira:'1001', shimanaka:'1002', hokari:'1003', shinoda:'1004',
-    tsuruta:'2001',  yoshida:'2002',   takagi:'2003', matsumoto:'2004',
-    yamada:'2006',    hanowa:'2007',
-    tamiya:'3001',   tanaka:'3002',    momo:'3003'
-  };
-  const current = stored[sid] || DEFAULTS[sid] || '';
+  const current = passwordForStaff(sid);
 
   if (oldVal !== current) {
     msg.textContent = '現在のパスワードが違います';
@@ -635,7 +676,17 @@ function submitPwChange() {
     msg.className = 'pw-msg err'; return;
   }
 
+  try {
+    await set(ref(_db, `passwords/${sid}`), newVal);
+  } catch(e) {
+    console.warn('パスワード保存に失敗しました:', e);
+    msg.textContent = 'パスワード保存に失敗しました。通信状態を確認してください';
+    msg.className = 'pw-msg err';
+    return;
+  }
+
   // 保存（シフトアプリと共有のlocalStorageキー）
+  syncedPasswords[sid] = newVal;
   stored[sid] = newVal;
   localStorage.setItem('carmia_passwords', JSON.stringify(stored));
 
@@ -903,7 +954,7 @@ async function buildTodayStaff(now) {
 // Firebase（シフトアプリと同じプロジェクト）
 // ─────────────────────────────────────────
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getDatabase, ref, push, remove, onValue, get } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
+import { getDatabase, ref, push, remove, onValue, get, set } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 
 const firebaseConfig = {
   apiKey:            'AIzaSyDdMe7feUF6CKPHH0YIx7Suk-WnXtOYUu8',
@@ -917,6 +968,10 @@ const firebaseConfig = {
 
 const _app = initializeApp(firebaseConfig);
 const _db  = getDatabase(_app);
+
+onValue(ref(_db, 'passwords'), snap => {
+  updatePasswordCache(snap.val() || {});
+});
 
 // ─────────────────────────────────────────
 // お知らせ（Firebase /notices）
