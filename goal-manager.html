@@ -1727,7 +1727,9 @@ const TEMPLATE_ITEMS = [
   { department: '全体', item: 'キャンセル率', unit: '%', direction: 'down', detail: '月間キャンセル率', currentValue: '', targetValue: '13', history: [{ label: '1月', value: '12.6' }, { label: '2月', value: '16.7' }, { label: '3月', value: '17.9' }] },
   { department: '全体', item: '中断数', unit: '件', direction: 'down', detail: 'アポツールの計算による中断数', currentValue: '', targetValue: '120', history: [{ label: '1月', value: '135' }, { label: '2月', value: '137' }, { label: '3月', value: '139' }] },
   { department: 'DH', item: 'GBTメンテナンス', unit: '件', direction: 'up', detail: 'GBTメンテナンス件数', currentValue: '', targetValue: '42', history: [{ label: '1月', value: '39' }, { label: '2月', value: '39' }, { label: '3月', value: '37' }] },
-  { department: '院長', item: '根管治療', unit: '人', direction: 'up', detail: '根管治療の対象人数', currentValue: '', targetValue: '5', history: [{ label: '1月', value: '3' }, { label: '2月', value: '2' }, { label: '3月', value: '6' }] }
+  { department: '院長', item: '根管治療', unit: '人', direction: 'up', detail: '根管治療の対象人数', currentValue: '', targetValue: '5', history: [{ label: '1月', value: '3' }, { label: '2月', value: '2' }, { label: '3月', value: '6' }] },
+  { department: 'DH', item: '小児定期健診', unit: '人', direction: 'up', detail: '小児定期健診の人数' },
+  { department: 'DH', item: '成人定期健診', unit: '人', direction: 'up', detail: '成人定期健診の人数' }
 ];
 
 const IMPORT_ITEM_ALIASES = [
@@ -1742,7 +1744,9 @@ const IMPORT_ITEM_ALIASES = [
   { item: 'キャンセル率', aliases: ['キャンセル率', 'キャンセル'] },
   { item: '中断数', aliases: ['中断数', '中断'] },
   { item: 'GBTメンテナンス', aliases: ['GBTメンテナンス', 'GBT定期健診', 'GBT'] },
-  { item: '根管治療', aliases: ['根管治療'] }
+  { item: '根管治療', aliases: ['根管治療'] },
+  { item: '小児定期健診', aliases: ['小児定期健診', '小児 定期健診'] },
+  { item: '成人定期健診', aliases: ['成人定期健診', '成人 定期健診'] }
 ];
 
 let currentUser = resolveUser();
@@ -2888,6 +2892,70 @@ async function readPdfText(file) {
   return readPdfByOcr(pdf);
 }
 
+const OCR_RECOGNIZE_OPTIONS = {
+  tessedit_pageseg_mode: '6',
+  preserve_interword_spaces: '1'
+};
+
+function enhanceCanvasForOcr(canvas) {
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  if (!ctx) return canvas;
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const data = imageData.data;
+  for (let i = 0; i < data.length; i += 4) {
+    const gray = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
+    const boosted = Math.max(0, Math.min(255, (gray - 128) * 1.45 + 148));
+    data[i] = boosted;
+    data[i + 1] = boosted;
+    data[i + 2] = boosted;
+    data[i + 3] = 255;
+  }
+  ctx.putImageData(imageData, 0, 0);
+  return canvas;
+}
+
+function canvasToPngBlob(canvas) {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(blob => {
+      if (blob) resolve(blob);
+      else reject(new Error('画像の変換に失敗しました'));
+    }, 'image/png');
+  });
+}
+
+function loadImageForOcr(file) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      resolve(img);
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error('画像を読み込めませんでした'));
+    };
+    img.src = url;
+  });
+}
+
+async function imageFileToOcrCanvas(file) {
+  const img = await loadImageForOcr(file);
+  const sourceWidth = img.naturalWidth || img.width;
+  const sourceHeight = img.naturalHeight || img.height;
+  const maxSide = Math.max(sourceWidth, sourceHeight, 1);
+  const scale = Math.min(2, Math.max(1, 3000 / maxSide));
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.round(sourceWidth * scale);
+  canvas.height = Math.round(sourceHeight * scale);
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('画像処理を開始できませんでした');
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+  return enhanceCanvasForOcr(canvas);
+}
+
 async function readPdfByOcr(pdf) {
   const Tesseract = await loadTesseract();
   const pages = [];
@@ -2901,8 +2969,9 @@ async function readPdfByOcr(pdf) {
     canvas.width = Math.floor(viewport.width);
     canvas.height = Math.floor(viewport.height);
     await page.render({ canvasContext: ctx, viewport }).promise;
-    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+    const blob = await canvasToPngBlob(enhanceCanvasForOcr(canvas));
     const result = await Tesseract.recognize(blob, 'jpn+eng', {
+      ...OCR_RECOGNIZE_OPTIONS,
       logger: info => {
         if (info.status === 'recognizing text') {
           setImportStatus(`PDF画像OCR中 ${pageNo}/${maxPages} ${Math.round((info.progress || 0) * 100)}%`);
@@ -2916,7 +2985,10 @@ async function readPdfByOcr(pdf) {
 
 async function readImageText(file) {
   const Tesseract = await loadTesseract();
-  const result = await Tesseract.recognize(file, 'jpn+eng', {
+  setImportStatus('画像をOCR向けに補正しています');
+  const canvas = await imageFileToOcrCanvas(file);
+  const result = await Tesseract.recognize(canvas, 'jpn+eng', {
+    ...OCR_RECOGNIZE_OPTIONS,
     logger: info => {
       if (info.status) {
         const pct = typeof info.progress === 'number' ? ` ${Math.round(info.progress * 100)}%` : '';
@@ -2950,7 +3022,8 @@ function normalizeImportText(text) {
     .normalize('NFKC')
     .replace(/\u3000/g, ' ')
     .replace(/[，、]/g, ',')
-    .replace(/[：]/g, ':');
+    .replace(/[：]/g, ':')
+    .replace(/[％]/g, '%');
 }
 
 function compactForMatch(text) {
@@ -3047,6 +3120,8 @@ function inferImportMonthFromText(rawText) {
   }
   match = text.match(/(20\d{2})\s*年\s*(\d{1,2})\s*月/);
   if (match) return `${match[1]}-${String(Number(match[2])).padStart(2, '0')}`;
+  match = text.match(/(20\d{2})\s*[./-]\s*(\d{1,2})\s*月?/);
+  if (match) return `${match[1]}-${String(Number(match[2])).padStart(2, '0')}`;
   return '';
 }
 
@@ -3130,9 +3205,78 @@ function buildMonthlyReportGoalCandidates(rawText, month, apoInitialCount) {
   return candidates;
 }
 
+function isTargetSettingTableText(rawText) {
+  const text = normalizeImportText(repairLegacyPdfText(rawText));
+  return /月間\s*目標|目標値設定/.test(text) && /(?:3|三)\s*[ヶかカケヵ]?\s*月\s*平均/.test(text);
+}
+
+function parseTargetSettingAverage(block, item) {
+  const text = normalizeImportText(block);
+  const match = text.match(/(?:3|三)\s*[ヶかカケヵ]?\s*月\s*平均\s*:?\s*(-?\d[\d,]*(?:\.\d+)?)/);
+  return match ? parseImportNumber(match[1], item) : '';
+}
+
+function stripTargetSettingContextValues(line) {
+  return normalizeImportText(line)
+    .replace(/(?:3|三)\s*[ヶかカケヵ]?\s*月\s*平均\s*:?\s*-?\d[\d,]*(?:\.\d+)?\s*(?:円|人|本|件|枚|%)?/g, ' ')
+    .replace(/(^|[\s(（,、/／])(?:[1-9]|1[0-2])\s*月\s*:?\s*-?\d[\d,]*(?:\.\d+)?\s*(?:円|人|本|件|枚|%)?/g, ' ')
+    .replace(/▽?\s*内訳\s*▽?/g, ' ')
+    .replace(/目標\s*数値|現状\s*数値|3\s*[ヶかカケヵ]?\s*月\s*平均/g, ' ');
+}
+
+function lineLooksLikeTargetSettingNoise(line) {
+  return /現在|なぜ|クーポン|ハガキ|はがき|送った|送つた|使用|合計/.test(line);
+}
+
+function parseTargetSettingTarget(block, item) {
+  const lines = normalizeImportText(block).split(/\n+/).map(line => line.trim()).filter(Boolean);
+  for (const line of lines) {
+    const cleaned = stripTargetSettingContextValues(line).trim();
+    if (!cleaned || lineLooksLikeTargetSettingNoise(cleaned)) continue;
+    const value = parseImportNumber(cleaned, item);
+    if (value) return value;
+  }
+  return '';
+}
+
+function buildTargetSettingTableCandidates(rawText, month) {
+  if (!isTargetSettingTableText(rawText)) return [];
+  const text = normalizeImportText(repairLegacyPdfText(rawText));
+  const lines = text.split(/\n+/).map(line => line.trim()).filter(Boolean);
+  const markers = [];
+  lines.forEach((line, index) => {
+    const item = findImportItemForLine(line);
+    if (!item || isExcludedGoalItem(item)) return;
+    markers.push({ index, item });
+  });
+  const usedItems = new Set();
+  const candidates = [];
+  markers.forEach((marker, markerIndex) => {
+    const itemKey = canonicalGoalItem(marker.item);
+    if (usedItems.has(itemKey)) return;
+    const nextMarker = markers.slice(markerIndex + 1).find(next => next.index > marker.index);
+    const end = nextMarker ? nextMarker.index : lines.length;
+    const block = lines.slice(marker.index, end).join('\n');
+    const targetValue = parseTargetSettingTarget(block, marker.item);
+    const actualValue = parseTargetSettingAverage(block, marker.item);
+    usedItems.add(itemKey);
+    candidates.push({
+      enabled: Boolean(targetValue || actualValue),
+      month,
+      item: marker.item,
+      targetValue,
+      actualValue,
+      sourceText: block.slice(0, 240)
+    });
+  });
+  return candidates;
+}
+
 function buildImportCandidates(rawText, month, apoInitialCount = null) {
   const monthlyReportCandidates = buildMonthlyReportGoalCandidates(rawText, month, apoInitialCount);
   if (monthlyReportCandidates.length) return monthlyReportCandidates;
+  const targetSettingCandidates = buildTargetSettingTableCandidates(rawText, month);
+  if (targetSettingCandidates.length) return targetSettingCandidates;
 
   const text = normalizeImportText(repairLegacyPdfText(rawText));
   const lines = text.split(/\n+/).map(line => line.trim()).filter(Boolean);
