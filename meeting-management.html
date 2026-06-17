@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>主任ミーティング管理 | カルミアデンタル ポータル</title>
+<title>ミーティング管理 | カルミアデンタル ポータル</title>
 <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800;900&family=Zen+Maru+Gothic:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -416,29 +416,29 @@ button{cursor:pointer}
   <header class="topbar">
     <a class="back-link" href="./index.html" title="ポータルに戻る">←</a>
     <div class="page-title">
-      <h1>主任ミーティング管理</h1>
-      <p id="scopeText">定着課題</p>
+      <h1>ミーティング管理</h1>
+      <p id="scopeText">取り組み</p>
     </div>
     <div class="user-chip" id="userChip"><i class="role-dot"></i><span></span></div>
   </header>
 
   <main class="main">
     <nav class="tabs" aria-label="表示切替">
-      <button class="tab-btn active" type="button" data-tab="tasks">定着課題</button>
-      <button class="tab-btn" type="button" data-tab="notices" data-restricted="true">単発お知らせ</button>
-      <button class="tab-btn" type="button" data-tab="opinions" data-restricted="true">スタッフ意見</button>
+      <button class="tab-btn active" type="button" data-tab="tasks">取り組み</button>
+      <button class="tab-btn" type="button" data-tab="notices" data-restricted="true">お知らせ</button>
+      <button class="tab-btn" type="button" data-tab="opinions" data-restricted="true">スタッフ提言</button>
     </nav>
 
     <section id="tasksSection" class="section active">
       <div class="section-head">
-        <h2>定着課題</h2>
+        <h2>取り組み</h2>
         <span class="count-badge" id="taskCount">0件</span>
       </div>
       <div class="form-panel" id="taskFormPanel" hidden>
         <form id="taskForm">
           <div class="form-grid">
             <div class="field">
-              <label for="taskTitle">課題名</label>
+              <label for="taskTitle">取り組み名</label>
               <input id="taskTitle" required maxlength="80">
             </div>
             <div class="field">
@@ -457,7 +457,7 @@ button{cursor:pointer}
           </div>
           <div class="form-actions">
             <button class="btn ghost" type="button" id="taskCancelBtn" hidden>キャンセル</button>
-            <button class="btn primary" type="submit" id="taskSubmitBtn">課題を登録</button>
+            <button class="btn primary" type="submit" id="taskSubmitBtn">取り組みを登録</button>
           </div>
         </form>
       </div>
@@ -466,7 +466,7 @@ button{cursor:pointer}
 
     <section id="noticesSection" class="section">
       <div class="section-head">
-        <h2>単発お知らせ</h2>
+        <h2>お知らせ</h2>
         <span class="count-badge" id="noticeCount">0件</span>
       </div>
       <div class="form-panel" id="noticeFormPanel" hidden>
@@ -497,14 +497,14 @@ button{cursor:pointer}
 
     <section id="opinionsSection" class="section">
       <div class="section-head">
-        <h2>スタッフ意見</h2>
+        <h2>スタッフ提言</h2>
         <span class="count-badge" id="opinionCount">0件</span>
       </div>
       <div class="form-panel" id="opinionFormPanel" hidden>
         <form id="opinionForm">
           <div class="form-grid">
             <div class="field full">
-              <label for="opinionContent">意見内容</label>
+              <label for="opinionContent">提言内容</label>
               <textarea id="opinionContent" required></textarea>
             </div>
             <div class="field full">
@@ -518,7 +518,7 @@ button{cursor:pointer}
             </div>
           </div>
           <div class="form-actions">
-            <button class="btn primary" type="submit">意見を登録</button>
+            <button class="btn primary" type="submit">提言を登録</button>
           </div>
         </form>
       </div>
@@ -657,8 +657,8 @@ function setupUser() {
   const label = role === 'director' ? '院長' : role === 'leader' ? '主任' : 'スタッフ';
   chip.querySelector('span').textContent = `${currentUser.name} / ${label}`;
   document.getElementById('scopeText').textContent = role === 'staff'
-    ? '定着課題のみ閲覧'
-    : '定着課題・単発お知らせ・スタッフ意見';
+    ? '取り組みのみ閲覧'
+    : '取り組み・お知らせ・スタッフ提言';
   document.querySelectorAll('[data-restricted="true"]').forEach(el => {
     el.hidden = !canSeeRestrictedTabs();
   });
@@ -746,7 +746,7 @@ async function saveTask(event) {
     };
     if (editingTaskId) {
       await update(ref(db, `${PATHS.tasks}/${editingTaskId}`), payload);
-      showToast('課題を更新しました');
+      showToast('取り組みを更新しました');
     } else {
       await set(push(ref(db, PATHS.tasks)), {
         ...payload,
@@ -755,7 +755,7 @@ async function saveTask(event) {
         createdAt: Date.now(),
         createdBy: currentUser.name
       });
-      showToast('課題を登録しました');
+      showToast('取り組みを登録しました');
     }
     resetTaskForm();
   } catch (err) {
@@ -767,7 +767,7 @@ function resetTaskForm() {
   editingTaskId = null;
   document.getElementById('taskForm').reset();
   document.getElementById('taskCancelBtn').hidden = true;
-  document.getElementById('taskSubmitBtn').textContent = '課題を登録';
+  document.getElementById('taskSubmitBtn').textContent = '取り組みを登録';
 }
 
 async function saveNotice(event) {
@@ -830,7 +830,7 @@ async function saveOpinion(event) {
       updatedBy: currentUser.name
     });
     document.getElementById('opinionForm').reset();
-    showToast('意見を登録しました');
+    showToast('提言を登録しました');
   } catch (err) {
     showToast(err.message || '保存できませんでした');
   }
@@ -851,13 +851,13 @@ async function handleActions(event) {
   const action = btn.dataset.action;
 
   if (action === 'edit-task') return fillTaskForm(id);
-  if (action === 'delete-task') return deleteItem(PATHS.tasks, id, '課題');
+  if (action === 'delete-task') return deleteItem(PATHS.tasks, id, '取り組み');
   if (action === 'confirm-task') return updateTaskStatus(id, 'confirmed');
   if (action === 'task-status') return updateTaskStatus(id, btn.dataset.status);
   if (action === 'save-progress') return saveProgress(id);
   if (action === 'edit-notice') return fillNoticeForm(id);
   if (action === 'delete-notice') return deleteItem(PATHS.notices, id, 'お知らせ');
-  if (action === 'delete-opinion') return deleteItem(PATHS.opinions, id, '意見');
+  if (action === 'delete-opinion') return deleteItem(PATHS.opinions, id, '提言');
   if (action === 'save-judgment') return saveJudgment(id);
 }
 
@@ -871,7 +871,7 @@ function fillTaskForm(id) {
   document.getElementById('taskCompletion').value = item.completion || '';
   document.getElementById('taskImages').value = '';
   document.getElementById('taskCancelBtn').hidden = false;
-  document.getElementById('taskSubmitBtn').textContent = '課題を更新';
+  document.getElementById('taskSubmitBtn').textContent = '取り組みを更新';
   document.getElementById('taskFormPanel').scrollIntoView({ behavior:'smooth', block:'start' });
 }
 
@@ -947,7 +947,7 @@ function renderTasks() {
   document.getElementById('taskCount').textContent = `${state.tasks.length}件`;
   const list = document.getElementById('taskList');
   if (!state.tasks.length) {
-    list.innerHTML = '<div class="empty">定着課題はありません</div>';
+    list.innerHTML = '<div class="empty">取り組みはありません</div>';
     return;
   }
   list.innerHTML = state.tasks.map(task => `
@@ -1002,7 +1002,7 @@ function renderNotices() {
   document.getElementById('noticeCount').textContent = `${state.notices.length}件`;
   const list = document.getElementById('noticeList');
   if (!state.notices.length) {
-    list.innerHTML = '<div class="empty">単発お知らせはありません</div>';
+    list.innerHTML = '<div class="empty">お知らせはありません</div>';
     return;
   }
   list.innerHTML = state.notices.map(notice => `
@@ -1032,7 +1032,7 @@ function renderOpinions() {
   document.getElementById('opinionCount').textContent = `${state.opinions.length}件`;
   const list = document.getElementById('opinionList');
   if (!state.opinions.length) {
-    list.innerHTML = '<div class="empty">スタッフ意見はありません</div>';
+    list.innerHTML = '<div class="empty">スタッフ提言はありません</div>';
     return;
   }
   list.innerHTML = state.opinions.map(opinion => `
@@ -1047,7 +1047,7 @@ function renderOpinions() {
         </div>
         <span class="badge decision-${escAttr(opinion.decision || 'pending')}">${DECISION_LABELS[opinion.decision || 'pending'] || DECISION_LABELS.pending}</span>
       </div>
-      ${textBlock('意見内容', opinion.content)}
+      ${textBlock('提言内容', opinion.content)}
       ${textBlock('背景/理由', opinion.reason)}
       ${opinion.directorMemo ? textBlock('院長判断メモ', opinion.directorMemo) : ''}
       ${imagesHtml(opinion.images)}
@@ -1155,7 +1155,7 @@ function formatDate(ts) {
 
 function shortTitle(text = '') {
   const clean = String(text).replace(/\s+/g, ' ').trim();
-  return clean.length > 34 ? `${clean.slice(0, 34)}...` : clean || 'スタッフ意見';
+  return clean.length > 34 ? `${clean.slice(0, 34)}...` : clean || 'スタッフ提言';
 }
 
 function esc(value) {
