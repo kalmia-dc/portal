@@ -648,6 +648,10 @@ function roleKey() {
 function isDirector() { return roleKey() === 'director'; }
 function isLeader() { return roleKey() === 'leader'; }
 function canSeeRestrictedTabs() { return isDirector() || isLeader(); }
+function canCreateManagedItems() { return isDirector() || isLeader(); }
+function canManageOwnItem(item) {
+  return isDirector() || (isLeader() && item?.createdById === currentUser.staffId);
+}
 
 function setupUser() {
   const role = roleKey();
@@ -662,8 +666,8 @@ function setupUser() {
   document.querySelectorAll('[data-restricted="true"]').forEach(el => {
     el.hidden = !canSeeRestrictedTabs();
   });
-  document.getElementById('taskFormPanel').hidden = !isDirector();
-  document.getElementById('noticeFormPanel').hidden = !isDirector();
+  document.getElementById('taskFormPanel').hidden = !canCreateManagedItems();
+  document.getElementById('noticeFormPanel').hidden = !canCreateManagedItems();
   document.getElementById('opinionFormPanel').hidden = !isLeader();
 }
 
@@ -730,13 +734,14 @@ function sortTasks(a, b) {
 
 async function saveTask(event) {
   event.preventDefault();
-  if (!isDirector()) return;
+  if (!canCreateManagedItems()) return;
   const title = valueOf('taskTitle');
   const detail = valueOf('taskDetail');
   const completion = valueOf('taskCompletion');
   if (!title || !detail || !completion) return showToast('未入力の項目があります');
 
   const existing = state.tasks.find(item => item.id === editingTaskId);
+  if (editingTaskId && !canManageOwnItem(existing)) return;
   try {
     const images = await imagesFromInput('taskImages', existing?.images || []);
     const payload = {
@@ -753,7 +758,8 @@ async function saveTask(event) {
         progress:'',
         status:'todo',
         createdAt: Date.now(),
-        createdBy: currentUser.name
+        createdBy: currentUser.name,
+        createdById: currentUser.staffId
       });
       showToast('取り組みを登録しました');
     }
@@ -772,12 +778,13 @@ function resetTaskForm() {
 
 async function saveNotice(event) {
   event.preventDefault();
-  if (!isDirector()) return;
+  if (!canCreateManagedItems()) return;
   const title = valueOf('noticeTitle');
   const body = valueOf('noticeBody');
   if (!title || !body) return showToast('未入力の項目があります');
 
   const existing = state.notices.find(item => item.id === editingNoticeId);
+  if (editingNoticeId && !canManageOwnItem(existing)) return;
   try {
     const images = await imagesFromInput('noticeImages', existing?.images || []);
     const payload = {
@@ -792,7 +799,8 @@ async function saveNotice(event) {
       await set(push(ref(db, PATHS.notices)), {
         ...payload,
         createdAt: Date.now(),
-        createdBy: currentUser.name
+        createdBy: currentUser.name,
+        createdById: currentUser.staffId
       });
       showToast('お知らせを登録しました');
     }
@@ -851,19 +859,19 @@ async function handleActions(event) {
   const action = btn.dataset.action;
 
   if (action === 'edit-task') return fillTaskForm(id);
-  if (action === 'delete-task') return deleteItem(PATHS.tasks, id, '取り組み');
+  if (action === 'delete-task') return deleteItem(PATHS.tasks, id, '取り組み', state.tasks.find(task => task.id === id));
   if (action === 'confirm-task') return updateTaskStatus(id, 'confirmed');
   if (action === 'task-status') return updateTaskStatus(id, btn.dataset.status);
   if (action === 'save-progress') return saveProgress(id);
   if (action === 'edit-notice') return fillNoticeForm(id);
-  if (action === 'delete-notice') return deleteItem(PATHS.notices, id, 'お知らせ');
+  if (action === 'delete-notice') return deleteItem(PATHS.notices, id, 'お知らせ', state.notices.find(notice => notice.id === id));
   if (action === 'delete-opinion') return deleteItem(PATHS.opinions, id, '提言');
   if (action === 'save-judgment') return saveJudgment(id);
 }
 
 function fillTaskForm(id) {
-  if (!isDirector()) return;
   const item = state.tasks.find(task => task.id === id);
+  if (!canManageOwnItem(item)) return;
   if (!item) return;
   editingTaskId = id;
   document.getElementById('taskTitle').value = item.title || '';
@@ -876,8 +884,8 @@ function fillTaskForm(id) {
 }
 
 function fillNoticeForm(id) {
-  if (!isDirector()) return;
   const item = state.notices.find(notice => notice.id === id);
+  if (!canManageOwnItem(item)) return;
   if (!item) return;
   editingNoticeId = id;
   document.getElementById('noticeTitle').value = item.title || '';
@@ -888,8 +896,8 @@ function fillNoticeForm(id) {
   document.getElementById('noticeFormPanel').scrollIntoView({ behavior:'smooth', block:'start' });
 }
 
-async function deleteItem(path, id, label) {
-  if (!isDirector()) return;
+async function deleteItem(path, id, label, item) {
+  if (!canManageOwnItem(item)) return;
   if (!confirm(`${label}を削除しますか？`)) return;
   await remove(ref(db, `${path}/${id}`));
   showToast(`${label}を削除しました`);
@@ -988,11 +996,11 @@ function leaderProgressHtml(task) {
 }
 
 function taskActionsHtml(task) {
-  if (!isDirector()) return '';
+  if (!canManageOwnItem(task)) return '';
   return `
     <div class="item-actions">
       <button class="btn" type="button" data-action="edit-task" data-id="${escAttr(task.id)}">編集</button>
-      ${task.status !== 'confirmed' ? `<button class="btn primary" type="button" data-action="confirm-task" data-id="${escAttr(task.id)}">定着確認済みにする</button>` : ''}
+      ${isDirector() && task.status !== 'confirmed' ? `<button class="btn primary" type="button" data-action="confirm-task" data-id="${escAttr(task.id)}">定着確認済みにする</button>` : ''}
       <button class="btn danger" type="button" data-action="delete-task" data-id="${escAttr(task.id)}">削除</button>
     </div>
   `;
@@ -1018,7 +1026,7 @@ function renderNotices() {
       </div>
       ${textBlock('本文', notice.body)}
       ${imagesHtml(notice.images)}
-      ${isDirector() ? `
+      ${canManageOwnItem(notice) ? `
         <div class="item-actions">
           <button class="btn" type="button" data-action="edit-notice" data-id="${escAttr(notice.id)}">編集</button>
           <button class="btn danger" type="button" data-action="delete-notice" data-id="${escAttr(notice.id)}">削除</button>
