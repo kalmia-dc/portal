@@ -434,6 +434,10 @@
       <span class="tool-icon">🎉</span>
       <span class="tool-name">日程調整</span>
     </a>
+    <a class="tool-item fu d2" href="#" onclick="goToMeetingManagementApp();return false;" style="background:linear-gradient(135deg,#f0fbff,#e6f7f5);border:2px solid #86d9d1;">
+      <span class="tool-icon">MT</span>
+      <span class="tool-name">主任<br>ミーティング</span>
+    </a>
     <a class="tool-item fu d2" href="https://kalmia-dc.doctor-hr.com/" target="_blank" rel="noopener">
       <span class="tool-icon">👨‍⚕️</span>
       <span class="tool-name">Doctor HR</span>
@@ -746,6 +750,12 @@ function goToScheduleApp(eventId) {
   const params = new URLSearchParams({ sid: currentUser.staffId, name: currentUser.name, p: currentUser.pass });
   if (eventId) params.set('evid', eventId);
   window.location.href = `https://kalmia-dc.github.io/portal/schedule.html?${params}`;
+}
+
+function goToMeetingManagementApp() {
+  if (!currentUser) return;
+  const params = new URLSearchParams({ sid: currentUser.staffId, name: currentUser.name, p: currentUser.pass });
+  window.location.href = `https://kalmia-dc.github.io/portal/meeting-management.html?${params}`;
 }
 
 function goToShiftApp(asAdmin = false) {
@@ -1309,7 +1319,7 @@ async function loadScheduleEvents(staffId) {
 
 Object.assign(window, {
   doLogin, doLogout,
-  goToShiftApp, goToSkillApp, goToTaskApp, goToGoalApp, goToPrivateMetricsApp, goToScheduleApp,
+  goToShiftApp, goToSkillApp, goToTaskApp, goToGoalApp, goToPrivateMetricsApp, goToScheduleApp, goToMeetingManagementApp,
   openPwModal, closePwModal, closePwModalIfBg, submitPwChange,
   openNoticeModal, closeNoticeModal, closeNoticeModalIfBg, submitNotice, deleteNotice
 });

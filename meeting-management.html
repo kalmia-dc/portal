@@ -1,0 +1,1189 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>主任ミーティング管理 | カルミアデンタル ポータル</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800;900&family=Zen+Maru+Gothic:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --mint:#4ecdc4;
+  --sky:#74b9ff;
+  --coral:#ff6b6b;
+  --yellow:#ffd93d;
+  --ink:#2f3437;
+  --muted:#7b858c;
+  --line:#e6eaed;
+  --soft:#f6f8f9;
+  --white:#fff;
+  --ok:#2e7d32;
+  --warn:#b7791f;
+  --bad:#c62828;
+}
+*{box-sizing:border-box}
+body{
+  margin:0;
+  min-height:100vh;
+  font-family:'Zen Maru Gothic',sans-serif;
+  color:var(--ink);
+  background:var(--soft);
+}
+button,input,textarea,select{font:inherit}
+button{cursor:pointer}
+.app-shell{min-height:100vh}
+.topbar{
+  position:sticky;
+  top:0;
+  z-index:10;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  padding:12px 16px;
+  background:rgba(255,255,255,.96);
+  border-bottom:1px solid var(--line);
+}
+.back-link{
+  width:38px;
+  height:38px;
+  display:grid;
+  place-items:center;
+  border-radius:8px;
+  color:var(--ink);
+  text-decoration:none;
+  border:1px solid var(--line);
+  background:#fff;
+  font-weight:900;
+}
+.page-title{min-width:0;flex:1}
+.page-title h1{
+  margin:0;
+  font-size:18px;
+  line-height:1.2;
+  font-weight:900;
+  letter-spacing:0;
+}
+.page-title p{
+  margin:4px 0 0;
+  color:var(--muted);
+  font-size:12px;
+  line-height:1.4;
+}
+.user-chip{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  min-width:0;
+  max-width:42vw;
+  padding:7px 10px;
+  border:1px solid var(--line);
+  border-radius:8px;
+  background:#fff;
+  font-size:12px;
+  font-weight:800;
+}
+.user-chip span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.role-dot{
+  width:9px;
+  height:9px;
+  border-radius:50%;
+  background:var(--mint);
+  flex:0 0 auto;
+}
+.role-director .role-dot{background:var(--coral)}
+.role-leader .role-dot{background:var(--sky)}
+.main{
+  width:min(1120px,100%);
+  margin:0 auto;
+  padding:18px 16px 80px;
+}
+.tabs{
+  display:flex;
+  gap:8px;
+  overflow:auto;
+  padding:2px 0 14px;
+  scrollbar-width:none;
+}
+.tabs::-webkit-scrollbar{display:none}
+.tab-btn{
+  border:1px solid var(--line);
+  background:#fff;
+  color:var(--muted);
+  border-radius:8px;
+  padding:10px 14px;
+  min-height:42px;
+  font-weight:900;
+  white-space:nowrap;
+}
+.tab-btn.active{
+  color:var(--ink);
+  border-color:var(--mint);
+  box-shadow:0 0 0 3px rgba(78,205,196,.18);
+}
+.section{display:none}
+.section.active{display:block}
+.section-head{
+  display:flex;
+  align-items:flex-end;
+  justify-content:space-between;
+  gap:12px;
+  margin:8px 0 12px;
+}
+.section-head h2{
+  margin:0;
+  font-size:18px;
+  line-height:1.3;
+  font-weight:900;
+}
+.count-badge{
+  flex:0 0 auto;
+  padding:5px 10px;
+  border-radius:999px;
+  background:#fff;
+  border:1px solid var(--line);
+  color:var(--muted);
+  font-size:12px;
+  font-weight:900;
+}
+.form-panel{
+  background:#fff;
+  border:1px solid var(--line);
+  border-radius:8px;
+  padding:14px;
+  margin-bottom:14px;
+}
+.form-grid{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:12px;
+}
+.field{display:flex;flex-direction:column;gap:6px}
+.field.full{grid-column:1/-1}
+.field label{
+  font-size:12px;
+  color:var(--muted);
+  font-weight:900;
+}
+.field input,.field textarea,.field select{
+  width:100%;
+  border:1px solid var(--line);
+  border-radius:8px;
+  background:#fff;
+  color:var(--ink);
+  padding:10px 11px;
+  outline:none;
+}
+.field textarea{min-height:92px;resize:vertical;line-height:1.55}
+.field input:focus,.field textarea:focus,.field select:focus{
+  border-color:var(--mint);
+  box-shadow:0 0 0 3px rgba(78,205,196,.16);
+}
+.file-note{
+  font-size:12px;
+  color:var(--muted);
+  line-height:1.5;
+}
+.form-actions{
+  display:flex;
+  justify-content:flex-end;
+  gap:8px;
+  margin-top:12px;
+  flex-wrap:wrap;
+}
+.btn{
+  border:1px solid var(--line);
+  background:#fff;
+  color:var(--ink);
+  border-radius:8px;
+  padding:9px 12px;
+  min-height:38px;
+  font-weight:900;
+}
+.btn.primary{background:var(--mint);border-color:var(--mint);color:#fff}
+.btn.sky{background:var(--sky);border-color:var(--sky);color:#fff}
+.btn.warn{background:#fff8e7;border-color:#f1c46d;color:var(--warn)}
+.btn.danger{background:#fff1f1;border-color:#ffb3b3;color:var(--bad)}
+.btn.ghost{background:#fff;color:var(--muted)}
+.btn:disabled{opacity:.48;cursor:not-allowed}
+.list{
+  display:grid;
+  gap:10px;
+}
+.item{
+  background:#fff;
+  border:1px solid var(--line);
+  border-radius:8px;
+  padding:14px;
+}
+.item-top{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:12px;
+  margin-bottom:10px;
+}
+.item-title{
+  min-width:0;
+}
+.item-title h3{
+  margin:0;
+  font-size:16px;
+  line-height:1.45;
+  font-weight:900;
+  word-break:break-word;
+}
+.meta{
+  display:flex;
+  flex-wrap:wrap;
+  gap:6px;
+  margin-top:6px;
+  color:var(--muted);
+  font-size:12px;
+  line-height:1.4;
+}
+.badge{
+  display:inline-flex;
+  align-items:center;
+  border-radius:999px;
+  padding:4px 9px;
+  font-size:12px;
+  font-weight:900;
+  border:1px solid var(--line);
+  background:#fff;
+  white-space:nowrap;
+}
+.status-todo{background:#f3f6f8;color:#68737a}
+.status-in_progress{background:#e9f7ff;color:#1769aa;border-color:#b9def7}
+.status-review{background:#fff7df;color:#9a6500;border-color:#f4d58a}
+.status-confirmed{background:#e8f5e9;color:var(--ok);border-color:#a5d6a7}
+.decision-pending{background:#f3f6f8;color:#68737a}
+.decision-approved{background:#e8f5e9;color:var(--ok);border-color:#a5d6a7}
+.decision-rejected{background:#fff1f1;color:var(--bad);border-color:#ffb3b3}
+.decision-hold{background:#fff7df;color:var(--warn);border-color:#f4d58a}
+.text-block{
+  margin:10px 0 0;
+  padding:10px 12px;
+  background:#f8fafb;
+  border:1px solid #edf1f3;
+  border-radius:8px;
+  line-height:1.65;
+  white-space:pre-wrap;
+  word-break:break-word;
+}
+.text-label{
+  margin-bottom:4px;
+  color:var(--muted);
+  font-size:12px;
+  font-weight:900;
+}
+.image-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(92px,1fr));
+  gap:8px;
+  margin-top:10px;
+}
+.image-thumb{
+  display:block;
+  width:100%;
+  aspect-ratio:1;
+  padding:0;
+  border:1px solid var(--line);
+  border-radius:8px;
+  overflow:hidden;
+  background:#fff;
+}
+.image-thumb img{
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  display:block;
+}
+.item-actions{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  margin-top:12px;
+}
+.progress-box{
+  margin-top:12px;
+  display:grid;
+  gap:8px;
+}
+.progress-box textarea{
+  width:100%;
+  min-height:88px;
+  border:1px solid var(--line);
+  border-radius:8px;
+  padding:10px 11px;
+  resize:vertical;
+}
+.decision-grid{
+  margin-top:12px;
+  display:grid;
+  grid-template-columns:180px 1fr;
+  gap:8px;
+}
+.decision-grid textarea{
+  min-height:80px;
+  border:1px solid var(--line);
+  border-radius:8px;
+  padding:10px 11px;
+  resize:vertical;
+}
+.decision-grid select{
+  border:1px solid var(--line);
+  border-radius:8px;
+  padding:10px 11px;
+  background:#fff;
+}
+.empty{
+  border:1px dashed #cfd8dc;
+  border-radius:8px;
+  background:#fff;
+  padding:22px 14px;
+  text-align:center;
+  color:var(--muted);
+  font-weight:800;
+}
+.toast{
+  position:fixed;
+  left:50%;
+  bottom:22px;
+  transform:translateX(-50%) translateY(20px);
+  z-index:40;
+  opacity:0;
+  pointer-events:none;
+  background:#263238;
+  color:#fff;
+  border-radius:8px;
+  padding:10px 14px;
+  max-width:min(92vw,420px);
+  font-weight:800;
+  transition:.2s;
+}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.viewer{
+  position:fixed;
+  inset:0;
+  z-index:50;
+  display:none;
+  align-items:center;
+  justify-content:center;
+  background:rgba(25,31,36,.78);
+  padding:18px;
+}
+.viewer.open{display:flex}
+.viewer-inner{
+  width:min(920px,100%);
+  max-height:94vh;
+  display:grid;
+  gap:10px;
+}
+.viewer img{
+  max-width:100%;
+  max-height:82vh;
+  object-fit:contain;
+  background:#fff;
+  border-radius:8px;
+}
+.viewer .btn{justify-self:end}
+.guard{
+  width:min(520px,calc(100% - 32px));
+  margin:80px auto;
+  background:#fff;
+  border:1px solid var(--line);
+  border-radius:8px;
+  padding:20px;
+}
+.guard h1{font-size:18px;margin:0 0 8px}
+.guard p{margin:0 0 14px;color:var(--muted);line-height:1.6}
+[hidden]{display:none!important}
+@media(max-width:720px){
+  .topbar{align-items:flex-start}
+  .page-title h1{font-size:16px}
+  .user-chip{max-width:34vw}
+  .main{padding:14px 12px 76px}
+  .form-grid,.decision-grid{grid-template-columns:1fr}
+  .section-head{align-items:flex-start}
+  .item-top{flex-direction:column}
+  .item-actions,.form-actions{justify-content:stretch}
+  .btn{width:100%}
+}
+</style>
+</head>
+<body>
+<div id="app" class="app-shell" hidden>
+  <header class="topbar">
+    <a class="back-link" href="./index.html" title="ポータルに戻る">←</a>
+    <div class="page-title">
+      <h1>主任ミーティング管理</h1>
+      <p id="scopeText">定着課題</p>
+    </div>
+    <div class="user-chip" id="userChip"><i class="role-dot"></i><span></span></div>
+  </header>
+
+  <main class="main">
+    <nav class="tabs" aria-label="表示切替">
+      <button class="tab-btn active" type="button" data-tab="tasks">定着課題</button>
+      <button class="tab-btn" type="button" data-tab="notices" data-restricted="true">単発お知らせ</button>
+      <button class="tab-btn" type="button" data-tab="opinions" data-restricted="true">スタッフ意見</button>
+    </nav>
+
+    <section id="tasksSection" class="section active">
+      <div class="section-head">
+        <h2>定着課題</h2>
+        <span class="count-badge" id="taskCount">0件</span>
+      </div>
+      <div class="form-panel" id="taskFormPanel" hidden>
+        <form id="taskForm">
+          <div class="form-grid">
+            <div class="field">
+              <label for="taskTitle">課題名</label>
+              <input id="taskTitle" required maxlength="80">
+            </div>
+            <div class="field">
+              <label for="taskImages">画像</label>
+              <input id="taskImages" type="file" accept="image/*" multiple>
+              <div class="file-note">最大3枚。未選択なら既存画像を保持します。</div>
+            </div>
+            <div class="field full">
+              <label for="taskDetail">詳細</label>
+              <textarea id="taskDetail" required></textarea>
+            </div>
+            <div class="field full">
+              <label for="taskCompletion">完了条件</label>
+              <textarea id="taskCompletion" required></textarea>
+            </div>
+          </div>
+          <div class="form-actions">
+            <button class="btn ghost" type="button" id="taskCancelBtn" hidden>キャンセル</button>
+            <button class="btn primary" type="submit" id="taskSubmitBtn">課題を登録</button>
+          </div>
+        </form>
+      </div>
+      <div class="list" id="taskList"></div>
+    </section>
+
+    <section id="noticesSection" class="section">
+      <div class="section-head">
+        <h2>単発お知らせ</h2>
+        <span class="count-badge" id="noticeCount">0件</span>
+      </div>
+      <div class="form-panel" id="noticeFormPanel" hidden>
+        <form id="noticeForm">
+          <div class="form-grid">
+            <div class="field">
+              <label for="noticeTitle">タイトル</label>
+              <input id="noticeTitle" required maxlength="80">
+            </div>
+            <div class="field">
+              <label for="noticeImages">画像</label>
+              <input id="noticeImages" type="file" accept="image/*" multiple>
+              <div class="file-note">最大3枚。未選択なら既存画像を保持します。</div>
+            </div>
+            <div class="field full">
+              <label for="noticeBody">本文</label>
+              <textarea id="noticeBody" required></textarea>
+            </div>
+          </div>
+          <div class="form-actions">
+            <button class="btn ghost" type="button" id="noticeCancelBtn" hidden>キャンセル</button>
+            <button class="btn primary" type="submit" id="noticeSubmitBtn">お知らせを登録</button>
+          </div>
+        </form>
+      </div>
+      <div class="list" id="noticeList"></div>
+    </section>
+
+    <section id="opinionsSection" class="section">
+      <div class="section-head">
+        <h2>スタッフ意見</h2>
+        <span class="count-badge" id="opinionCount">0件</span>
+      </div>
+      <div class="form-panel" id="opinionFormPanel" hidden>
+        <form id="opinionForm">
+          <div class="form-grid">
+            <div class="field full">
+              <label for="opinionContent">意見内容</label>
+              <textarea id="opinionContent" required></textarea>
+            </div>
+            <div class="field full">
+              <label for="opinionReason">背景/理由</label>
+              <textarea id="opinionReason" required></textarea>
+            </div>
+            <div class="field">
+              <label for="opinionImages">画像</label>
+              <input id="opinionImages" type="file" accept="image/*" multiple>
+              <div class="file-note">最大3枚。</div>
+            </div>
+          </div>
+          <div class="form-actions">
+            <button class="btn primary" type="submit">意見を登録</button>
+          </div>
+        </form>
+      </div>
+      <div class="list" id="opinionList"></div>
+    </section>
+  </main>
+</div>
+
+<div id="guard" class="guard" hidden>
+  <h1>ログイン情報が見つかりません</h1>
+  <p>ポータルから開き直してください。</p>
+  <a class="btn primary" href="./index.html">ポータルへ戻る</a>
+</div>
+
+<div class="viewer" id="viewer" aria-modal="true" role="dialog">
+  <div class="viewer-inner">
+    <button class="btn" type="button" id="viewerClose">閉じる</button>
+    <img id="viewerImage" alt="">
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import { getDatabase, ref, push, set, update, remove, onValue } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
+
+const firebaseConfig = {
+  apiKey:            'AIzaSyDdMe7feUF6CKPHH0YIx7Suk-WnXtOYUu8',
+  authDomain:        'kalmia-shift.firebaseapp.com',
+  databaseURL:       'https://kalmia-shift-default-rtdb.asia-southeast1.firebasedatabase.app',
+  projectId:         'kalmia-shift',
+  storageBucket:     'kalmia-shift.firebasestorage.app',
+  messagingSenderId: '714175473480',
+  appId:             '1:714175473480:web:7d6626a46e4a9dcb1fb57d'
+};
+
+const fbApp = initializeApp(firebaseConfig);
+const db = getDatabase(fbApp);
+
+const DIRECTOR_ID = 'sugihira';
+const LEADER_IDS = ['momo', 'yamada'];
+const STAFF_NAMES = {
+  sugihira:'杉平', shimanaka:'嶋中', hokari:'保刈', shinoda:'篠田',
+  tsuruta:'鶴田', yoshida:'吉田', takagi:'高木', matsumoto:'松本',
+  yamada:'山田', tamiya:'田宮', tanaka:'田中', momo:'百々'
+};
+const STATUS_LABELS = {
+  todo:'未着手',
+  in_progress:'進行中',
+  review:'確認依頼',
+  confirmed:'定着確認済み'
+};
+const DECISION_LABELS = {
+  pending:'未判断',
+  approved:'承認',
+  rejected:'不承認',
+  hold:'保留'
+};
+const PATHS = {
+  tasks:'meetingManagement/tasks',
+  notices:'meetingManagement/notices',
+  opinions:'meetingManagement/opinions'
+};
+
+let currentUser = readUser();
+let editingTaskId = null;
+let editingNoticeId = null;
+const state = { tasks:[], notices:[], opinions:[] };
+
+if (!currentUser?.staffId) {
+  document.getElementById('guard').hidden = false;
+} else {
+  boot();
+}
+
+function boot() {
+  setupUser();
+  setupTabs();
+  setupForms();
+  setupViewer();
+  attachDataListeners();
+  document.getElementById('app').hidden = false;
+}
+
+function readUser() {
+  const params = new URLSearchParams(location.search);
+  const paramStaffId = params.get('sid');
+  if (paramStaffId) {
+    const user = normalizeUser({
+      staffId: paramStaffId,
+      sid: paramStaffId,
+      name: params.get('name') || STAFF_NAMES[paramStaffId] || paramStaffId,
+      pass: params.get('p') || ''
+    });
+    sessionStorage.setItem('portalUser', JSON.stringify(user));
+    history.replaceState({}, '', location.pathname);
+    return user;
+  }
+
+  try {
+    const saved = sessionStorage.getItem('portalUser');
+    if (saved) {
+      const raw = JSON.parse(saved);
+      const staffId = raw.staffId || raw.sid;
+      if (staffId) return normalizeUser({ ...raw, staffId });
+    }
+  } catch(e) {}
+  return null;
+}
+
+function normalizeUser(raw) {
+  const staffId = raw.staffId || raw.sid || '';
+  return {
+    staffId,
+    sid: staffId,
+    name: raw.name || STAFF_NAMES[staffId] || staffId,
+    pass: raw.pass || raw.p || ''
+  };
+}
+
+function roleKey() {
+  if (currentUser.staffId === DIRECTOR_ID) return 'director';
+  if (LEADER_IDS.includes(currentUser.staffId)) return 'leader';
+  return 'staff';
+}
+
+function isDirector() { return roleKey() === 'director'; }
+function isLeader() { return roleKey() === 'leader'; }
+function canSeeRestrictedTabs() { return isDirector() || isLeader(); }
+
+function setupUser() {
+  const role = roleKey();
+  document.body.classList.add(`role-${role}`);
+  const chip = document.getElementById('userChip');
+  chip.classList.add(`role-${role}`);
+  const label = role === 'director' ? '院長' : role === 'leader' ? '主任' : 'スタッフ';
+  chip.querySelector('span').textContent = `${currentUser.name} / ${label}`;
+  document.getElementById('scopeText').textContent = role === 'staff'
+    ? '定着課題のみ閲覧'
+    : '定着課題・単発お知らせ・スタッフ意見';
+  document.querySelectorAll('[data-restricted="true"]').forEach(el => {
+    el.hidden = !canSeeRestrictedTabs();
+  });
+  document.getElementById('taskFormPanel').hidden = !isDirector();
+  document.getElementById('noticeFormPanel').hidden = !isDirector();
+  document.getElementById('opinionFormPanel').hidden = !isLeader();
+}
+
+function setupTabs() {
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (btn.hidden) return;
+      activateTab(btn.dataset.tab);
+    });
+  });
+}
+
+function activateTab(tab) {
+  if (!canSeeRestrictedTabs() && tab !== 'tasks') tab = 'tasks';
+  document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tab));
+  document.querySelectorAll('.section').forEach(sec => sec.classList.remove('active'));
+  document.getElementById(`${tab}Section`).classList.add('active');
+}
+
+function setupForms() {
+  document.getElementById('taskForm').addEventListener('submit', saveTask);
+  document.getElementById('taskCancelBtn').addEventListener('click', resetTaskForm);
+  document.getElementById('noticeForm').addEventListener('submit', saveNotice);
+  document.getElementById('noticeCancelBtn').addEventListener('click', resetNoticeForm);
+  document.getElementById('opinionForm').addEventListener('submit', saveOpinion);
+  document.addEventListener('click', handleActions);
+}
+
+function setupViewer() {
+  const viewer = document.getElementById('viewer');
+  document.getElementById('viewerClose').addEventListener('click', () => viewer.classList.remove('open'));
+  viewer.addEventListener('click', e => {
+    if (e.target === viewer) viewer.classList.remove('open');
+  });
+}
+
+function attachDataListeners() {
+  onValue(ref(db, PATHS.tasks), snap => {
+    state.tasks = toList(snap.val()).sort(sortTasks);
+    renderTasks();
+  });
+  if (!canSeeRestrictedTabs()) return;
+  onValue(ref(db, PATHS.notices), snap => {
+    state.notices = toList(snap.val()).sort((a,b) => (b.createdAt || 0) - (a.createdAt || 0));
+    renderNotices();
+  });
+  onValue(ref(db, PATHS.opinions), snap => {
+    state.opinions = toList(snap.val()).sort((a,b) => (b.createdAt || 0) - (a.createdAt || 0));
+    renderOpinions();
+  });
+}
+
+function toList(data) {
+  return Object.entries(data || {}).map(([id, value]) => ({ id, ...value }));
+}
+
+function sortTasks(a, b) {
+  const weight = { review:0, in_progress:1, todo:2, confirmed:3 };
+  const aw = weight[a.status || 'todo'] ?? 2;
+  const bw = weight[b.status || 'todo'] ?? 2;
+  if (aw !== bw) return aw - bw;
+  return (b.createdAt || 0) - (a.createdAt || 0);
+}
+
+async function saveTask(event) {
+  event.preventDefault();
+  if (!isDirector()) return;
+  const title = valueOf('taskTitle');
+  const detail = valueOf('taskDetail');
+  const completion = valueOf('taskCompletion');
+  if (!title || !detail || !completion) return showToast('未入力の項目があります');
+
+  const existing = state.tasks.find(item => item.id === editingTaskId);
+  try {
+    const images = await imagesFromInput('taskImages', existing?.images || []);
+    const payload = {
+      title, detail, completion, images,
+      updatedAt: Date.now(),
+      updatedBy: currentUser.name
+    };
+    if (editingTaskId) {
+      await update(ref(db, `${PATHS.tasks}/${editingTaskId}`), payload);
+      showToast('課題を更新しました');
+    } else {
+      await set(push(ref(db, PATHS.tasks)), {
+        ...payload,
+        progress:'',
+        status:'todo',
+        createdAt: Date.now(),
+        createdBy: currentUser.name
+      });
+      showToast('課題を登録しました');
+    }
+    resetTaskForm();
+  } catch (err) {
+    showToast(err.message || '保存できませんでした');
+  }
+}
+
+function resetTaskForm() {
+  editingTaskId = null;
+  document.getElementById('taskForm').reset();
+  document.getElementById('taskCancelBtn').hidden = true;
+  document.getElementById('taskSubmitBtn').textContent = '課題を登録';
+}
+
+async function saveNotice(event) {
+  event.preventDefault();
+  if (!isDirector()) return;
+  const title = valueOf('noticeTitle');
+  const body = valueOf('noticeBody');
+  if (!title || !body) return showToast('未入力の項目があります');
+
+  const existing = state.notices.find(item => item.id === editingNoticeId);
+  try {
+    const images = await imagesFromInput('noticeImages', existing?.images || []);
+    const payload = {
+      title, body, images,
+      updatedAt: Date.now(),
+      updatedBy: currentUser.name
+    };
+    if (editingNoticeId) {
+      await update(ref(db, `${PATHS.notices}/${editingNoticeId}`), payload);
+      showToast('お知らせを更新しました');
+    } else {
+      await set(push(ref(db, PATHS.notices)), {
+        ...payload,
+        createdAt: Date.now(),
+        createdBy: currentUser.name
+      });
+      showToast('お知らせを登録しました');
+    }
+    resetNoticeForm();
+  } catch (err) {
+    showToast(err.message || '保存できませんでした');
+  }
+}
+
+function resetNoticeForm() {
+  editingNoticeId = null;
+  document.getElementById('noticeForm').reset();
+  document.getElementById('noticeCancelBtn').hidden = true;
+  document.getElementById('noticeSubmitBtn').textContent = 'お知らせを登録';
+}
+
+async function saveOpinion(event) {
+  event.preventDefault();
+  if (!isLeader()) return;
+  const content = valueOf('opinionContent');
+  const reason = valueOf('opinionReason');
+  if (!content || !reason) return showToast('未入力の項目があります');
+  try {
+    const images = await imagesFromInput('opinionImages', []);
+    await set(push(ref(db, PATHS.opinions)), {
+      content,
+      reason,
+      images,
+      decision:'pending',
+      directorMemo:'',
+      createdAt: Date.now(),
+      createdBy: currentUser.name,
+      createdById: currentUser.staffId,
+      updatedAt: Date.now(),
+      updatedBy: currentUser.name
+    });
+    document.getElementById('opinionForm').reset();
+    showToast('意見を登録しました');
+  } catch (err) {
+    showToast(err.message || '保存できませんでした');
+  }
+}
+
+async function handleActions(event) {
+  const imageBtn = event.target.closest('.image-thumb');
+  if (imageBtn) {
+    const img = imageBtn.querySelector('img');
+    document.getElementById('viewerImage').src = img.src;
+    document.getElementById('viewer').classList.add('open');
+    return;
+  }
+
+  const btn = event.target.closest('[data-action]');
+  if (!btn) return;
+  const id = btn.dataset.id;
+  const action = btn.dataset.action;
+
+  if (action === 'edit-task') return fillTaskForm(id);
+  if (action === 'delete-task') return deleteItem(PATHS.tasks, id, '課題');
+  if (action === 'confirm-task') return updateTaskStatus(id, 'confirmed');
+  if (action === 'task-status') return updateTaskStatus(id, btn.dataset.status);
+  if (action === 'save-progress') return saveProgress(id);
+  if (action === 'edit-notice') return fillNoticeForm(id);
+  if (action === 'delete-notice') return deleteItem(PATHS.notices, id, 'お知らせ');
+  if (action === 'delete-opinion') return deleteItem(PATHS.opinions, id, '意見');
+  if (action === 'save-judgment') return saveJudgment(id);
+}
+
+function fillTaskForm(id) {
+  if (!isDirector()) return;
+  const item = state.tasks.find(task => task.id === id);
+  if (!item) return;
+  editingTaskId = id;
+  document.getElementById('taskTitle').value = item.title || '';
+  document.getElementById('taskDetail').value = item.detail || '';
+  document.getElementById('taskCompletion').value = item.completion || '';
+  document.getElementById('taskImages').value = '';
+  document.getElementById('taskCancelBtn').hidden = false;
+  document.getElementById('taskSubmitBtn').textContent = '課題を更新';
+  document.getElementById('taskFormPanel').scrollIntoView({ behavior:'smooth', block:'start' });
+}
+
+function fillNoticeForm(id) {
+  if (!isDirector()) return;
+  const item = state.notices.find(notice => notice.id === id);
+  if (!item) return;
+  editingNoticeId = id;
+  document.getElementById('noticeTitle').value = item.title || '';
+  document.getElementById('noticeBody').value = item.body || '';
+  document.getElementById('noticeImages').value = '';
+  document.getElementById('noticeCancelBtn').hidden = false;
+  document.getElementById('noticeSubmitBtn').textContent = 'お知らせを更新';
+  document.getElementById('noticeFormPanel').scrollIntoView({ behavior:'smooth', block:'start' });
+}
+
+async function deleteItem(path, id, label) {
+  if (!isDirector()) return;
+  if (!confirm(`${label}を削除しますか？`)) return;
+  await remove(ref(db, `${path}/${id}`));
+  showToast(`${label}を削除しました`);
+}
+
+async function updateTaskStatus(id, status) {
+  const item = state.tasks.find(task => task.id === id);
+  if (!item) return;
+  if (status === 'confirmed' && !isDirector()) return;
+  if (status !== 'confirmed' && !(isLeader() || isDirector())) return;
+  const payload = {
+    status,
+    updatedAt: Date.now(),
+    updatedBy: currentUser.name
+  };
+  if (status === 'confirmed') {
+    payload.confirmedAt = Date.now();
+    payload.confirmedBy = currentUser.name;
+  }
+  await update(ref(db, `${PATHS.tasks}/${id}`), payload);
+  showToast('ステータスを更新しました');
+}
+
+async function saveProgress(id) {
+  if (!isLeader()) return;
+  const input = document.querySelector(`[data-progress-id="${cssEscape(id)}"]`);
+  const item = state.tasks.find(task => task.id === id);
+  if (!input || !item || item.status === 'confirmed') return;
+  const payload = {
+    progress: input.value.trim(),
+    status: item.status === 'todo' ? 'in_progress' : item.status,
+    updatedAt: Date.now(),
+    updatedBy: currentUser.name
+  };
+  await update(ref(db, `${PATHS.tasks}/${id}`), payload);
+  showToast('進捗を保存しました');
+}
+
+async function saveJudgment(id) {
+  if (!isDirector()) return;
+  const decision = document.querySelector(`[data-decision-id="${cssEscape(id)}"]`)?.value || 'pending';
+  const memo = document.querySelector(`[data-memo-id="${cssEscape(id)}"]`)?.value.trim() || '';
+  await update(ref(db, `${PATHS.opinions}/${id}`), {
+    decision,
+    directorMemo: memo,
+    decidedAt: Date.now(),
+    decidedBy: currentUser.name,
+    updatedAt: Date.now(),
+    updatedBy: currentUser.name
+  });
+  showToast('判断を保存しました');
+}
+
+function renderTasks() {
+  document.getElementById('taskCount').textContent = `${state.tasks.length}件`;
+  const list = document.getElementById('taskList');
+  if (!state.tasks.length) {
+    list.innerHTML = '<div class="empty">定着課題はありません</div>';
+    return;
+  }
+  list.innerHTML = state.tasks.map(task => `
+    <article class="item">
+      <div class="item-top">
+        <div class="item-title">
+          <h3>${esc(task.title || '')}</h3>
+          <div class="meta">
+            <span>${formatDate(task.createdAt)}</span>
+            <span>登録: ${esc(task.createdBy || '-')}</span>
+            ${task.updatedBy ? `<span>更新: ${esc(task.updatedBy)}</span>` : ''}
+          </div>
+        </div>
+        <span class="badge status-${escAttr(task.status || 'todo')}">${STATUS_LABELS[task.status || 'todo'] || STATUS_LABELS.todo}</span>
+      </div>
+      ${textBlock('詳細', task.detail)}
+      ${textBlock('完了条件', task.completion)}
+      ${task.progress ? textBlock('進捗メモ', task.progress) : ''}
+      ${imagesHtml(task.images)}
+      ${leaderProgressHtml(task)}
+      ${taskActionsHtml(task)}
+    </article>
+  `).join('');
+}
+
+function leaderProgressHtml(task) {
+  if (!isLeader() || task.status === 'confirmed') return '';
+  return `
+    <div class="progress-box">
+      <textarea data-progress-id="${escAttr(task.id)}" placeholder="進捗メモ">${esc(task.progress || '')}</textarea>
+      <div class="item-actions">
+        <button class="btn sky" type="button" data-action="save-progress" data-id="${escAttr(task.id)}">進捗保存</button>
+        ${task.status === 'todo' ? `<button class="btn" type="button" data-action="task-status" data-status="in_progress" data-id="${escAttr(task.id)}">進行中にする</button>` : ''}
+        ${task.status !== 'review' ? `<button class="btn warn" type="button" data-action="task-status" data-status="review" data-id="${escAttr(task.id)}">確認依頼</button>` : ''}
+      </div>
+    </div>
+  `;
+}
+
+function taskActionsHtml(task) {
+  if (!isDirector()) return '';
+  return `
+    <div class="item-actions">
+      <button class="btn" type="button" data-action="edit-task" data-id="${escAttr(task.id)}">編集</button>
+      ${task.status !== 'confirmed' ? `<button class="btn primary" type="button" data-action="confirm-task" data-id="${escAttr(task.id)}">定着確認済みにする</button>` : ''}
+      <button class="btn danger" type="button" data-action="delete-task" data-id="${escAttr(task.id)}">削除</button>
+    </div>
+  `;
+}
+
+function renderNotices() {
+  document.getElementById('noticeCount').textContent = `${state.notices.length}件`;
+  const list = document.getElementById('noticeList');
+  if (!state.notices.length) {
+    list.innerHTML = '<div class="empty">単発お知らせはありません</div>';
+    return;
+  }
+  list.innerHTML = state.notices.map(notice => `
+    <article class="item">
+      <div class="item-top">
+        <div class="item-title">
+          <h3>${esc(notice.title || '')}</h3>
+          <div class="meta">
+            <span>${formatDate(notice.createdAt)}</span>
+            <span>登録: ${esc(notice.createdBy || '-')}</span>
+          </div>
+        </div>
+      </div>
+      ${textBlock('本文', notice.body)}
+      ${imagesHtml(notice.images)}
+      ${isDirector() ? `
+        <div class="item-actions">
+          <button class="btn" type="button" data-action="edit-notice" data-id="${escAttr(notice.id)}">編集</button>
+          <button class="btn danger" type="button" data-action="delete-notice" data-id="${escAttr(notice.id)}">削除</button>
+        </div>
+      ` : ''}
+    </article>
+  `).join('');
+}
+
+function renderOpinions() {
+  document.getElementById('opinionCount').textContent = `${state.opinions.length}件`;
+  const list = document.getElementById('opinionList');
+  if (!state.opinions.length) {
+    list.innerHTML = '<div class="empty">スタッフ意見はありません</div>';
+    return;
+  }
+  list.innerHTML = state.opinions.map(opinion => `
+    <article class="item">
+      <div class="item-top">
+        <div class="item-title">
+          <h3>${esc(shortTitle(opinion.content))}</h3>
+          <div class="meta">
+            <span>${formatDate(opinion.createdAt)}</span>
+            <span>登録: ${esc(opinion.createdBy || '-')}</span>
+          </div>
+        </div>
+        <span class="badge decision-${escAttr(opinion.decision || 'pending')}">${DECISION_LABELS[opinion.decision || 'pending'] || DECISION_LABELS.pending}</span>
+      </div>
+      ${textBlock('意見内容', opinion.content)}
+      ${textBlock('背景/理由', opinion.reason)}
+      ${opinion.directorMemo ? textBlock('院長判断メモ', opinion.directorMemo) : ''}
+      ${imagesHtml(opinion.images)}
+      ${judgmentHtml(opinion)}
+    </article>
+  `).join('');
+}
+
+function judgmentHtml(opinion) {
+  if (!isDirector()) return '';
+  return `
+    <div class="decision-grid">
+      <select data-decision-id="${escAttr(opinion.id)}">
+        ${Object.entries(DECISION_LABELS).map(([value, label]) => `<option value="${value}" ${value === (opinion.decision || 'pending') ? 'selected' : ''}>${label}</option>`).join('')}
+      </select>
+      <textarea data-memo-id="${escAttr(opinion.id)}" placeholder="院長判断メモ">${esc(opinion.directorMemo || '')}</textarea>
+    </div>
+    <div class="item-actions">
+      <button class="btn primary" type="button" data-action="save-judgment" data-id="${escAttr(opinion.id)}">判断を保存</button>
+      <button class="btn danger" type="button" data-action="delete-opinion" data-id="${escAttr(opinion.id)}">削除</button>
+    </div>
+  `;
+}
+
+function textBlock(label, value) {
+  if (!value) return '';
+  return `<div class="text-block"><div class="text-label">${esc(label)}</div>${esc(value)}</div>`;
+}
+
+function imagesHtml(images = []) {
+  if (!images.length) return '';
+  return `
+    <div class="image-grid">
+      ${images.map((image, index) => `
+        <button class="image-thumb" type="button" aria-label="添付画像${index + 1}">
+          <img src="${escAttr(image.data || image)}" alt="">
+        </button>
+      `).join('')}
+    </div>
+  `;
+}
+
+async function imagesFromInput(inputId, existingImages) {
+  const input = document.getElementById(inputId);
+  const files = Array.from(input.files || []);
+  if (!files.length) return existingImages || [];
+  if (files.length > 3) throw new Error('画像は最大3枚までです');
+  const images = [];
+  for (const file of files) {
+    if (!file.type.startsWith('image/')) throw new Error('画像ファイルを選択してください');
+    images.push(await resizeImage(file));
+  }
+  return images;
+}
+
+function resizeImage(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('画像を読み込めませんでした'));
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error('画像を読み込めませんでした'));
+      img.onload = () => {
+        const max = 1200;
+        let width = img.width;
+        let height = img.height;
+        if (width > max || height > max) {
+          const ratio = Math.min(max / width, max / height);
+          width = Math.round(width * ratio);
+          height = Math.round(height * ratio);
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(0, 0, width, height);
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve({
+          name: file.name,
+          type: 'image/jpeg',
+          data: canvas.toDataURL('image/jpeg', 0.72)
+        });
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function valueOf(id) {
+  return document.getElementById(id).value.trim();
+}
+
+function formatDate(ts) {
+  if (!ts) return '-';
+  return new Intl.DateTimeFormat('ja-JP', {
+    year:'numeric',
+    month:'2-digit',
+    day:'2-digit',
+    hour:'2-digit',
+    minute:'2-digit'
+  }).format(new Date(ts));
+}
+
+function shortTitle(text = '') {
+  const clean = String(text).replace(/\s+/g, ' ').trim();
+  return clean.length > 34 ? `${clean.slice(0, 34)}...` : clean || 'スタッフ意見';
+}
+
+function esc(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function escAttr(value) {
+  return esc(value);
+}
+
+function cssEscape(value) {
+  if (window.CSS?.escape) return CSS.escape(value);
+  return String(value).replace(/["\\]/g, '\\$&');
+}
+
+let toastTimer = null;
+function showToast(message) {
+  const toast = document.getElementById('toast');
+  toast.textContent = message;
+  toast.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toast.classList.remove('show'), 2200);
+}
+</script>
+</body>
+</html>
