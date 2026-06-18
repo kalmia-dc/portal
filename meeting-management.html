@@ -304,6 +304,62 @@ button{cursor:pointer}
   gap:8px;
   margin-top:12px;
 }
+.read-status{
+  display:inline-flex;
+  align-items:center;
+  margin-top:12px;
+  padding:7px 10px;
+  border-radius:8px;
+  border:1px solid #a5d6a7;
+  background:#e8f5e9;
+  color:var(--ok);
+  font-size:12px;
+  font-weight:900;
+}
+.read-summary{
+  margin-top:12px;
+  padding:10px 12px;
+  border:1px solid #edf1f3;
+  border-radius:8px;
+  background:#fffdf6;
+}
+.read-summary-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+  font-size:13px;
+  font-weight:900;
+}
+.read-columns{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+  margin-top:8px;
+}
+.read-group-title{
+  color:var(--muted);
+  font-size:12px;
+  font-weight:900;
+}
+.read-list{
+  display:flex;
+  flex-wrap:wrap;
+  gap:6px;
+  margin-top:6px;
+}
+.read-chip{
+  display:inline-flex;
+  align-items:center;
+  border-radius:999px;
+  padding:4px 8px;
+  font-size:12px;
+  font-weight:900;
+  border:1px solid var(--line);
+  background:#fff;
+}
+.read-chip.read{background:#e8f5e9;color:var(--ok);border-color:#a5d6a7}
+.read-chip.unread{background:#fff1f1;color:var(--bad);border-color:#ffb3b3}
 .progress-box{
   margin-top:12px;
   display:grid;
@@ -404,6 +460,7 @@ button{cursor:pointer}
   .user-chip{max-width:34vw}
   .main{padding:14px 12px 76px}
   .form-grid,.decision-grid{grid-template-columns:1fr}
+  .read-columns{grid-template-columns:1fr}
   .section-head{align-items:flex-start}
   .item-top{flex-direction:column}
   .item-actions,.form-actions{justify-content:stretch}
@@ -425,8 +482,8 @@ button{cursor:pointer}
   <main class="main">
     <nav class="tabs" aria-label="表示切替">
       <button class="tab-btn active" type="button" data-tab="tasks">取り組み</button>
-      <button class="tab-btn" type="button" data-tab="notices" data-restricted="true">お知らせ</button>
-      <button class="tab-btn" type="button" data-tab="opinions" data-restricted="true">スタッフ提言</button>
+      <button class="tab-btn" type="button" data-tab="notices">お知らせ</button>
+      <button class="tab-btn" type="button" data-tab="opinions">スタッフ提言</button>
     </nav>
 
     <section id="tasksSection" class="section active">
@@ -565,6 +622,17 @@ const STAFF_NAMES = {
   tsuruta:'鶴田', yoshida:'吉田', takagi:'高木', matsumoto:'松本',
   yamada:'山田', tamiya:'田宮', tanaka:'田中', momo:'百々'
 };
+const NOTICE_TARGETS = {
+  tsuruta:{ name:'鶴田', role:'DH' },
+  yoshida:{ name:'吉田', role:'DH' },
+  takagi:{ name:'高木', role:'DH' },
+  matsumoto:{ name:'松本', role:'DH' },
+  yamada:{ name:'山田', role:'DH' },
+  tamiya:{ name:'田宮', role:'DA' },
+  tanaka:{ name:'田中', role:'DA' },
+  momo:{ name:'百々', role:'DA' }
+};
+const NOTICE_TARGET_IDS = Object.keys(NOTICE_TARGETS);
 const STATUS_LABELS = {
   todo:'未着手',
   in_progress:'進行中',
@@ -647,7 +715,9 @@ function roleKey() {
 
 function isDirector() { return roleKey() === 'director'; }
 function isLeader() { return roleKey() === 'leader'; }
-function canSeeRestrictedTabs() { return isDirector() || isLeader(); }
+function isNoticeTarget() { return Boolean(NOTICE_TARGETS[currentUser.staffId]); }
+function canSeeNotices() { return isDirector() || isLeader() || isNoticeTarget(); }
+function canSeeOpinions() { return isDirector() || isLeader(); }
 function canCreateManagedItems() { return isDirector() || isLeader(); }
 function canManageOwnItem(item) {
   return isDirector() || (isLeader() && item?.createdById === currentUser.staffId);
@@ -658,14 +728,16 @@ function setupUser() {
   document.body.classList.add(`role-${role}`);
   const chip = document.getElementById('userChip');
   chip.classList.add(`role-${role}`);
-  const label = role === 'director' ? '院長' : role === 'leader' ? '主任' : 'スタッフ';
+  const staffRole = NOTICE_TARGETS[currentUser.staffId]?.role || 'スタッフ';
+  const label = role === 'director' ? '院長' : role === 'leader' ? '主任' : staffRole;
   chip.querySelector('span').textContent = `${currentUser.name} / ${label}`;
-  document.getElementById('scopeText').textContent = role === 'staff'
-    ? '取り組みのみ閲覧'
-    : '取り組み・お知らせ・スタッフ提言';
-  document.querySelectorAll('[data-restricted="true"]').forEach(el => {
-    el.hidden = !canSeeRestrictedTabs();
-  });
+  document.getElementById('scopeText').textContent = canSeeOpinions()
+    ? '取り組み・お知らせ・スタッフ提言'
+    : canSeeNotices()
+      ? '取り組み・お知らせ'
+      : '取り組みのみ閲覧';
+  document.querySelector('[data-tab="notices"]').hidden = !canSeeNotices();
+  document.querySelector('[data-tab="opinions"]').hidden = !canSeeOpinions();
   document.getElementById('taskFormPanel').hidden = !canCreateManagedItems();
   document.getElementById('noticeFormPanel').hidden = !canCreateManagedItems();
   document.getElementById('opinionFormPanel').hidden = !isLeader();
@@ -681,7 +753,8 @@ function setupTabs() {
 }
 
 function activateTab(tab) {
-  if (!canSeeRestrictedTabs() && tab !== 'tasks') tab = 'tasks';
+  if (tab === 'notices' && !canSeeNotices()) tab = 'tasks';
+  if (tab === 'opinions' && !canSeeOpinions()) tab = 'tasks';
   document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tab));
   document.querySelectorAll('.section').forEach(sec => sec.classList.remove('active'));
   document.getElementById(`${tab}Section`).classList.add('active');
@@ -709,15 +782,18 @@ function attachDataListeners() {
     state.tasks = toList(snap.val()).sort(sortTasks);
     renderTasks();
   });
-  if (!canSeeRestrictedTabs()) return;
-  onValue(ref(db, PATHS.notices), snap => {
-    state.notices = toList(snap.val()).sort((a,b) => (b.createdAt || 0) - (a.createdAt || 0));
-    renderNotices();
-  });
-  onValue(ref(db, PATHS.opinions), snap => {
-    state.opinions = toList(snap.val()).sort((a,b) => (b.createdAt || 0) - (a.createdAt || 0));
-    renderOpinions();
-  });
+  if (canSeeNotices()) {
+    onValue(ref(db, PATHS.notices), snap => {
+      state.notices = toList(snap.val()).sort((a,b) => (b.createdAt || 0) - (a.createdAt || 0));
+      renderNotices();
+    });
+  }
+  if (canSeeOpinions()) {
+    onValue(ref(db, PATHS.opinions), snap => {
+      state.opinions = toList(snap.val()).sort((a,b) => (b.createdAt || 0) - (a.createdAt || 0));
+      renderOpinions();
+    });
+  }
 }
 
 function toList(data) {
@@ -865,6 +941,7 @@ async function handleActions(event) {
   if (action === 'save-progress') return saveProgress(id);
   if (action === 'edit-notice') return fillNoticeForm(id);
   if (action === 'delete-notice') return deleteItem(PATHS.notices, id, 'お知らせ', state.notices.find(notice => notice.id === id));
+  if (action === 'read-notice') return markNoticeRead(id);
   if (action === 'delete-opinion') return deleteItem(PATHS.opinions, id, '提言');
   if (action === 'save-judgment') return saveJudgment(id);
 }
@@ -951,6 +1028,21 @@ async function saveJudgment(id) {
   showToast('判断を保存しました');
 }
 
+async function markNoticeRead(id) {
+  if (!isNoticeTarget()) return;
+  const notice = state.notices.find(item => item.id === id);
+  if (!notice) return;
+  const currentRead = readByMap(notice)[currentUser.staffId];
+  if (currentRead) return showToast('確認済みです');
+  await set(ref(db, `${PATHS.notices}/${id}/readBy/${currentUser.staffId}`), {
+    staffId: currentUser.staffId,
+    name: currentUser.name,
+    role: NOTICE_TARGETS[currentUser.staffId]?.role || '',
+    readAt: Date.now()
+  });
+  showToast('確認済みにしました');
+}
+
 function renderTasks() {
   document.getElementById('taskCount').textContent = `${state.tasks.length}件`;
   const list = document.getElementById('taskList');
@@ -1026,6 +1118,8 @@ function renderNotices() {
       </div>
       ${textBlock('本文', notice.body)}
       ${imagesHtml(notice.images)}
+      ${noticeReadButtonHtml(notice)}
+      ${noticeReadSummaryHtml(notice)}
       ${canManageOwnItem(notice) ? `
         <div class="item-actions">
           <button class="btn" type="button" data-action="edit-notice" data-id="${escAttr(notice.id)}">編集</button>
@@ -1034,6 +1128,57 @@ function renderNotices() {
       ` : ''}
     </article>
   `).join('');
+}
+
+function noticeReadButtonHtml(notice) {
+  if (!isNoticeTarget()) return '';
+  const read = readByMap(notice)[currentUser.staffId];
+  if (read) {
+    return `<div class="read-status">確認済み：${formatDate(read.readAt)}</div>`;
+  }
+  return `
+    <div class="item-actions">
+      <button class="btn primary" type="button" data-action="read-notice" data-id="${escAttr(notice.id)}">確認しました</button>
+    </div>
+  `;
+}
+
+function noticeReadSummaryHtml(notice) {
+  if (!canSeeOpinions()) return '';
+  const readBy = readByMap(notice);
+  const readIds = NOTICE_TARGET_IDS.filter(id => readBy[id]);
+  const unreadIds = NOTICE_TARGET_IDS.filter(id => !readBy[id]);
+  return `
+    <div class="read-summary">
+      <div class="read-summary-head">
+        <span>確認済み ${readIds.length}/${NOTICE_TARGET_IDS.length}名</span>
+      </div>
+      <div class="read-columns">
+        <div>
+          <div class="read-group-title">未確認</div>
+          <div class="read-list">
+            ${unreadIds.length ? unreadIds.map(id => readChip(id, false)).join('') : '<span class="read-chip read">全員確認済み</span>'}
+          </div>
+        </div>
+        <div>
+          <div class="read-group-title">確認済み</div>
+          <div class="read-list">
+            ${readIds.length ? readIds.map(id => readChip(id, true, readBy[id])).join('') : '<span class="read-chip unread">まだありません</span>'}
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function readByMap(notice) {
+  return notice?.readBy && typeof notice.readBy === 'object' ? notice.readBy : {};
+}
+
+function readChip(id, isRead, read) {
+  const name = NOTICE_TARGETS[id]?.name || STAFF_NAMES[id] || id;
+  const suffix = isRead && read?.readAt ? ` ${formatDate(read.readAt)}` : '';
+  return `<span class="read-chip ${isRead ? 'read' : 'unread'}">${esc(name)}${esc(suffix)}</span>`;
 }
 
 function renderOpinions() {
