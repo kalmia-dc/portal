@@ -600,7 +600,7 @@ button{cursor:pointer}
 
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getDatabase, ref, push, set, update, remove, onValue, runTransaction } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
+import { getDatabase, ref, push, set, update, remove, onValue } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 
 const firebaseConfig = {
   apiKey:            'AIzaSyDdMe7feUF6CKPHH0YIx7Suk-WnXtOYUu8',
@@ -649,8 +649,7 @@ const DECISION_LABELS = {
 const PATHS = {
   tasks:'meetingManagement/tasks',
   notices:'meetingManagement/notices',
-  opinions:'meetingManagement/opinions',
-  noticeReadDailyNotifications:'meetingManagement/noticeReadDailyNotifications'
+  opinions:'meetingManagement/opinions'
 };
 
 let currentUser = readUser();
@@ -1050,84 +1049,23 @@ async function maybeSendDailyNoticeReadNotification() {
   const dateKey = todayKey();
   if (dailyNoticeNotificationInFlight || dailyNoticeNotificationDoneFor === dateKey) return;
 
-  const pending = unreadNoticeSummaries();
-  if (!pending.length) return;
-
   dailyNoticeNotificationInFlight = true;
-  const now = Date.now();
-  const dailyRef = ref(db, `${PATHS.noticeReadDailyNotifications}/${dateKey}`);
 
   try {
-    const claim = await runTransaction(dailyRef, current => {
-      if (current?.status === 'sent') return;
-      if (current?.status === 'sending' && now - (current.claimedAt || 0) < 10 * 60 * 1000) return;
-      return {
-        status:'sending',
-        claimedAt:now,
-        claimedBy:currentUser.name,
-        claimedById:currentUser.staffId,
-        pendingCount:pending.length
-      };
-    }, { applyLocally:false });
-
-    if (!claim.committed) {
-      dailyNoticeNotificationDoneFor = dateKey;
-      return;
-    }
-
-    await postLineWorks(buildDailyNoticeReadNotificationText());
-    await update(dailyRef, {
-      status:'sent',
-      sentAt:Date.now(),
-      openedBy:currentUser.name,
-      openedById:currentUser.staffId,
-      pendingCount:pending.length
-    });
+    await requestNoticeUnreadCheck();
     dailyNoticeNotificationDoneFor = dateKey;
   } catch (err) {
     console.warn('お知らせ未確認通知に失敗しました:', err);
-    try {
-      await update(dailyRef, {
-        status:'failed',
-        failedAt:Date.now(),
-        failedBy:currentUser.name,
-        failedById:currentUser.staffId,
-        error:String(err?.message || err).slice(0, 240)
-      });
-    } catch(e) {}
   } finally {
     dailyNoticeNotificationInFlight = false;
   }
 }
 
-function unreadNoticeSummaries() {
-  return state.notices
-    .map(notice => {
-      const readBy = readByMap(notice);
-      const unreadIds = NOTICE_TARGET_IDS.filter(id => !readBy[id]);
-      return {
-        id:notice.id,
-        title:notice.title || '無題のお知らせ',
-        unreadIds,
-        unreadNames:unreadIds.map(id => NOTICE_TARGETS[id]?.name || STAFF_NAMES[id] || id)
-      };
-    })
-    .filter(item => item.unreadIds.length > 0);
-}
-
-function buildDailyNoticeReadNotificationText() {
-  return [
-    '【ミーティング管理】お知らせ未確認',
-    '未確認のお知らせがあります。',
-    'ポータルの「ミーティング管理」から確認してください。',
-  ].join('\n');
-}
-
-async function postLineWorks(text) {
+async function requestNoticeUnreadCheck() {
   const res = await fetch(NOTIFY_URL, {
     method:'POST',
     headers:{ 'Content-Type':'application/json' },
-    body:JSON.stringify({ text })
+    body:JSON.stringify({ action:'noticeUnreadCheck' })
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
 }
