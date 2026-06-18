@@ -600,7 +600,7 @@ button{cursor:pointer}
 
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getDatabase, ref, push, set, update, remove, onValue } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
+import { getDatabase, ref, push, set, update, remove, onValue, runTransaction } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 
 const firebaseConfig = {
   apiKey:            'AIzaSyDdMe7feUF6CKPHH0YIx7Suk-WnXtOYUu8',
@@ -615,6 +615,7 @@ const firebaseConfig = {
 const fbApp = initializeApp(firebaseConfig);
 const db = getDatabase(fbApp);
 
+const NOTIFY_URL = 'https://kalmia-notify.chibakenmin-sugihey.workers.dev';
 const DIRECTOR_ID = 'sugihira';
 const LEADER_IDS = ['momo', 'yamada'];
 const STAFF_NAMES = {
@@ -648,12 +649,15 @@ const DECISION_LABELS = {
 const PATHS = {
   tasks:'meetingManagement/tasks',
   notices:'meetingManagement/notices',
-  opinions:'meetingManagement/opinions'
+  opinions:'meetingManagement/opinions',
+  noticeReadDailyNotifications:'meetingManagement/noticeReadDailyNotifications'
 };
 
 let currentUser = readUser();
 let editingTaskId = null;
 let editingNoticeId = null;
+let dailyNoticeNotificationInFlight = false;
+let dailyNoticeNotificationDoneFor = '';
 const state = { tasks:[], notices:[], opinions:[] };
 
 if (!currentUser?.staffId) {
@@ -782,12 +786,11 @@ function attachDataListeners() {
     state.tasks = toList(snap.val()).sort(sortTasks);
     renderTasks();
   });
-  if (canSeeNotices()) {
-    onValue(ref(db, PATHS.notices), snap => {
-      state.notices = toList(snap.val()).sort((a,b) => (b.createdAt || 0) - (a.createdAt || 0));
-      renderNotices();
-    });
-  }
+  onValue(ref(db, PATHS.notices), snap => {
+    state.notices = toList(snap.val()).sort((a,b) => (b.createdAt || 0) - (a.createdAt || 0));
+    if (canSeeNotices()) renderNotices();
+    maybeSendDailyNoticeReadNotification();
+  });
   if (canSeeOpinions()) {
     onValue(ref(db, PATHS.opinions), snap => {
       state.opinions = toList(snap.val()).sort((a,b) => (b.createdAt || 0) - (a.createdAt || 0));
@@ -1043,6 +1046,92 @@ async function markNoticeRead(id) {
   showToast('確認済みにしました');
 }
 
+async function maybeSendDailyNoticeReadNotification() {
+  const dateKey = todayKey();
+  if (dailyNoticeNotificationInFlight || dailyNoticeNotificationDoneFor === dateKey) return;
+
+  const pending = unreadNoticeSummaries();
+  if (!pending.length) return;
+
+  dailyNoticeNotificationInFlight = true;
+  const now = Date.now();
+  const dailyRef = ref(db, `${PATHS.noticeReadDailyNotifications}/${dateKey}`);
+
+  try {
+    const claim = await runTransaction(dailyRef, current => {
+      if (current?.status === 'sent') return;
+      if (current?.status === 'sending' && now - (current.claimedAt || 0) < 10 * 60 * 1000) return;
+      return {
+        status:'sending',
+        claimedAt:now,
+        claimedBy:currentUser.name,
+        claimedById:currentUser.staffId,
+        pendingCount:pending.length
+      };
+    }, { applyLocally:false });
+
+    if (!claim.committed) {
+      dailyNoticeNotificationDoneFor = dateKey;
+      return;
+    }
+
+    await postLineWorks(buildDailyNoticeReadNotificationText());
+    await update(dailyRef, {
+      status:'sent',
+      sentAt:Date.now(),
+      openedBy:currentUser.name,
+      openedById:currentUser.staffId,
+      pendingCount:pending.length
+    });
+    dailyNoticeNotificationDoneFor = dateKey;
+  } catch (err) {
+    console.warn('お知らせ未確認通知に失敗しました:', err);
+    try {
+      await update(dailyRef, {
+        status:'failed',
+        failedAt:Date.now(),
+        failedBy:currentUser.name,
+        failedById:currentUser.staffId,
+        error:String(err?.message || err).slice(0, 240)
+      });
+    } catch(e) {}
+  } finally {
+    dailyNoticeNotificationInFlight = false;
+  }
+}
+
+function unreadNoticeSummaries() {
+  return state.notices
+    .map(notice => {
+      const readBy = readByMap(notice);
+      const unreadIds = NOTICE_TARGET_IDS.filter(id => !readBy[id]);
+      return {
+        id:notice.id,
+        title:notice.title || '無題のお知らせ',
+        unreadIds,
+        unreadNames:unreadIds.map(id => NOTICE_TARGETS[id]?.name || STAFF_NAMES[id] || id)
+      };
+    })
+    .filter(item => item.unreadIds.length > 0);
+}
+
+function buildDailyNoticeReadNotificationText() {
+  return [
+    '【ミーティング管理】お知らせ未確認',
+    '未確認のお知らせがあります。',
+    'ポータルの「ミーティング管理」から確認してください。',
+  ].join('\n');
+}
+
+async function postLineWorks(text) {
+  const res = await fetch(NOTIFY_URL, {
+    method:'POST',
+    headers:{ 'Content-Type':'application/json' },
+    body:JSON.stringify({ text })
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+}
+
 function renderTasks() {
   document.getElementById('taskCount').textContent = `${state.tasks.length}件`;
   const list = document.getElementById('taskList');
@@ -1293,6 +1382,13 @@ function resizeImage(file) {
 
 function valueOf(id) {
   return document.getElementById(id).value.trim();
+}
+
+function todayKey(date = new Date()) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 function formatDate(ts) {
