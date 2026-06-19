@@ -124,6 +124,7 @@
   .quick-training { border-color:#9edce7; }
   .quick-training .quick-icon { background:linear-gradient(135deg,#5b8def,#57d7c9); }
   .menu-panel { margin-bottom:28px; }
+  .menu-panel .primary-menu-section { display:none; }
   .tool-section { margin-bottom:16px; }
   .section-toggle {
     width:100%; border:0; background:transparent; color:var(--gray); padding:0 0 10px;
@@ -251,6 +252,7 @@
       background:#f7f9fb; padding:16px 16px calc(16px + env(safe-area-inset-bottom));
       border-radius:18px 18px 0 0; box-shadow:0 -14px 36px rgba(0,0,0,.16); z-index:101;
     }
+    .menu-panel .primary-menu-section { display:block; }
     body.menu-open .menu-panel { display:block; }
     body.menu-open .menu-backdrop { display:block; position:fixed; inset:0; background:rgba(39,50,56,.28); z-index:99; }
     .bottom-nav { display:flex; }
@@ -484,7 +486,7 @@
   <div class="menu-backdrop" id="menuBackdrop" onclick="closePortalMenu()"></div>
 
   <div class="menu-panel fu d2" id="portalMenuPanel" aria-label="メニュー">
-    <section class="tool-section open" data-menu-section>
+    <section class="tool-section open primary-menu-section" data-menu-section>
       <button class="section-toggle" type="button" onclick="toggleMenuSection(this)">
         <span><span class="section-title-text">よく使う</span><span class="section-meta">　日常業務</span></span>
         <span class="toggle-icon">⌄</span>
