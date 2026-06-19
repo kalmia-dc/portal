@@ -32,6 +32,9 @@ header{height:58px;background:var(--white);display:flex;align-items:center;justi
 .eyebrow{font-family:'Nunito',sans-serif;font-weight:800;font-size:12px;letter-spacing:.08em;opacity:.82;margin-bottom:4px}
 h1{font-size:24px;line-height:1.25;margin:0 0 8px;font-weight:900}
 .lead{margin:0;font-size:13px;line-height:1.7;opacity:.9}
+.auth-panel{background:var(--white);border-radius:16px;padding:16px;box-shadow:var(--shadow)}
+body.is-admin .auth-panel{display:none}
+.auth-grid{display:grid;grid-template-columns:150px minmax(0,1fr) auto;gap:10px;align-items:end}
 .admin-panel{display:none;background:var(--white);border-radius:16px;padding:16px;box-shadow:var(--shadow)}
 body.is-admin .admin-panel{display:block}
 .panel-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
@@ -80,6 +83,7 @@ body.is-admin .admin-actions{display:flex}
   .toolbar{grid-template-columns:1fr}
   .list{grid-template-columns:1fr}
   .form-grid{grid-template-columns:1fr}
+  .auth-grid{grid-template-columns:1fr}
 }
 </style>
 </head>
@@ -89,20 +93,34 @@ body.is-admin .admin-actions{display:flex}
   <a class="back" href="https://kalmia-dc.github.io/portal/">戻る</a>
 </header>
 
-<div class="guard" id="guard" hidden>
-  <div>
-    <h1>ポータルから開いてください</h1>
-    <p>ログイン情報が確認できないため、資料一覧を表示できません。</p>
-  </div>
-</div>
-
-<main class="app" id="app" hidden>
+<main class="app" id="app">
   <section class="top">
     <div class="title-block">
       <div class="eyebrow">IN-HOUSE TRAINING</div>
       <h1>院内研修資料</h1>
       <p class="lead">研修スライド、PDF、画像、動画などをまとめて保管し、必要なときにすぐ開けます。</p>
     </div>
+
+    <section class="auth-panel" id="authPanel" aria-label="管理者ログイン">
+      <div class="panel-head">
+        <div class="panel-title">管理者ログイン</div>
+      </div>
+      <div class="auth-grid">
+        <div class="field">
+          <label for="adminStaff">管理者</label>
+          <select id="adminStaff">
+            <option value="sugihira">院長</option>
+            <option value="momo">百々</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="adminPass">パスワード</label>
+          <input id="adminPass" type="password" inputmode="numeric" autocomplete="current-password" placeholder="パスワード">
+        </div>
+        <button class="btn primary" type="button" onclick="loginAdmin()">ログイン</button>
+      </div>
+      <div class="status" id="authStatus"></div>
+    </section>
 
     <section class="admin-panel" aria-label="資料追加">
       <div class="panel-head">
@@ -167,7 +185,7 @@ body.is-admin .admin-actions{display:flex}
 
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getDatabase, ref, push, set, update, remove, onValue }
+import { getDatabase, ref, push, set, update, remove, onValue, get }
   from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 import { getStorage, ref as storageRef, uploadBytesResumable, getDownloadURL, deleteObject }
   from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js';
@@ -187,7 +205,7 @@ const db = getDatabase(fbApp);
 const storage = getStorage(fbApp);
 const DB_PATH = 'trainingMaterials';
 const ADMIN_STAFF = ['sugihira', 'momo'];
-const PORTAL_URL = 'https://kalmia-dc.github.io/portal/';
+const DEFAULT_ADMIN_PASSWORDS = { sugihira:'1001', momo:'3003' };
 const STAFF_NAMES = {
   sugihira:'院長', shimanaka:'島中', hokari:'保刈', shinoda:'篠田',
   tsuruta:'鶴田', yoshida:'吉田', takagi:'高木', matsumoto:'松本',
@@ -207,30 +225,23 @@ let currentUser = readUser();
 let materials = [];
 let editingId = '';
 let editingMaterial = null;
+let syncedPasswords = {};
+let passwordsReady = false;
 
-if (!currentUser?.staffId) {
-  redirectToPortal();
-} else {
-  document.getElementById('app').hidden = false;
-  if (isAdmin()) document.body.classList.add('is-admin');
-  onValue(ref(db, DB_PATH), snap => {
-    const data = snap.val() || {};
-    materials = Object.entries(data).map(([id, item]) => ({ id, ...item }))
-      .sort((a, b) => (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0));
-    renderMaterials();
-  }, error => {
-    showListError(`資料一覧を読み込めませんでした: ${error.message}`);
-    setStatus(`資料一覧を読み込めませんでした: ${error.message}`, 'err');
-  });
-}
+renderAuthState();
+document.getElementById('adminPass')?.addEventListener('keydown', event => {
+  if (event.key === 'Enter') window.loginAdmin();
+});
 
-function redirectToPortal() {
-  document.getElementById('guard').hidden = false;
-  const portalUrl = new URL(PORTAL_URL);
-  portalUrl.searchParams.set('next', 'training-materials');
-  portalUrl.searchParams.set('v', String(Date.now()));
-  location.replace(portalUrl.toString());
-}
+onValue(ref(db, DB_PATH), snap => {
+  const data = snap.val() || {};
+  materials = Object.entries(data).map(([id, item]) => ({ id, ...item }))
+    .sort((a, b) => (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0));
+  renderMaterials();
+}, error => {
+  showListError(`資料一覧を読み込めませんでした: ${error.message}`);
+  setStatus(`資料一覧を読み込めませんでした: ${error.message}`, 'err');
+});
 
 function readUser() {
   const params = new URLSearchParams(location.search);
@@ -285,6 +296,77 @@ function readStoredPortalUser() {
   }
   return null;
 }
+
+function readLocalPasswords() {
+  try {
+    return JSON.parse(localStorage.getItem('carmia_passwords') || '{}') || {};
+  } catch(e) {
+    return {};
+  }
+}
+
+function updatePasswordCache(data) {
+  if (data && typeof data === 'object') {
+    syncedPasswords = { ...syncedPasswords, ...data };
+    localStorage.setItem('carmia_passwords', JSON.stringify({ ...readLocalPasswords(), ...syncedPasswords }));
+  }
+  passwordsReady = true;
+}
+
+async function ensurePasswordsLoaded() {
+  if (passwordsReady) return;
+  try {
+    const snap = await get(ref(db, 'passwords'));
+    updatePasswordCache(snap.val() || {});
+  } catch(e) {
+    passwordsReady = true;
+  }
+}
+
+function passwordForAdmin(staffId) {
+  const localPasswords = readLocalPasswords();
+  return syncedPasswords[staffId] || localPasswords[staffId] || DEFAULT_ADMIN_PASSWORDS[staffId] || '';
+}
+
+function renderAuthState() {
+  document.body.classList.toggle('is-admin', isAdmin());
+  if (isAdmin()) {
+    const staffSelect = document.getElementById('adminStaff');
+    if (staffSelect) staffSelect.value = currentUser.staffId;
+  }
+}
+
+function setAuthStatus(text, type = '') {
+  const el = document.getElementById('authStatus');
+  if (!el) return;
+  el.textContent = text || '';
+  el.className = `status ${type}`.trim();
+}
+
+window.loginAdmin = async function() {
+  const staffId = document.getElementById('adminStaff').value;
+  const pass = document.getElementById('adminPass').value;
+  if (!ADMIN_STAFF.includes(staffId)) return setAuthStatus('管理者を選択してください。', 'err');
+  if (!pass) return setAuthStatus('パスワードを入力してください。', 'err');
+
+  setAuthStatus('確認しています。');
+  await ensurePasswordsLoaded();
+
+  if (pass !== passwordForAdmin(staffId)) {
+    return setAuthStatus('パスワードが違います。', 'err');
+  }
+
+  currentUser = savePortalUser({
+    staffId,
+    sid: staffId,
+    name: STAFF_NAMES[staffId] || staffId,
+    role: STAFF_ROLES[staffId] || '',
+    pass
+  });
+  document.getElementById('adminPass').value = '';
+  renderAuthState();
+  setAuthStatus('管理者としてログインしました。', 'ok');
+};
 
 function isAdmin() {
   return ADMIN_STAFF.includes(currentUser?.staffId);
