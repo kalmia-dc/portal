@@ -101,21 +101,49 @@
   @keyframes pulse { 0%,100%{transform:scale(1);opacity:1} 50%{transform:scale(1.3);opacity:.7} }
 
   /* ── MAIN ── */
-  main { padding:20px 16px 32px; max-width:480px; margin:0 auto; }
+  main { padding:20px 16px 32px; max-width:1120px; margin:0 auto; }
   .section-title { font-family:'Nunito',sans-serif; font-weight:800; font-size:15px; color:var(--gray); letter-spacing:.05em; text-transform:uppercase; margin-bottom:12px; display:flex; align-items:center; gap:6px; }
 
   /* ── TOOLS ── */
+  .quick-actions { margin-bottom:24px; }
+  .quick-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; }
+  .quick-card {
+    min-height:126px; background:white; border-radius:16px; padding:18px;
+    box-shadow:0 4px 16px rgba(39,50,56,.08); text-decoration:none; color:var(--dark);
+    display:flex; flex-direction:column; justify-content:space-between; border:2px solid transparent;
+    transition:transform .2s, box-shadow .2s;
+  }
+  .quick-card:hover { transform:translateY(-3px); box-shadow:0 10px 28px rgba(39,50,56,.12); }
+  .quick-icon { width:42px; height:42px; border-radius:12px; display:grid; place-items:center; font-weight:900; font-size:18px; color:white; }
+  .quick-title { font-size:17px; font-weight:900; margin-top:14px; }
+  .quick-note { font-size:12px; color:var(--gray); margin-top:4px; line-height:1.45; }
+  .quick-task { border-color:#a8d8b8; }
+  .quick-task .quick-icon { background:linear-gradient(135deg,#00b894,#55efc4); }
+  .quick-meeting { border-color:#86d9d1; }
+  .quick-meeting .quick-icon { background:linear-gradient(135deg,#00a8a8,#74b9ff); }
+  .quick-training { border-color:#9edce7; }
+  .quick-training .quick-icon { background:linear-gradient(135deg,#5b8def,#57d7c9); }
+  .menu-panel { margin-bottom:28px; }
+  .tool-section { margin-bottom:16px; }
+  .section-toggle {
+    width:100%; border:0; background:transparent; color:var(--gray); padding:0 0 10px;
+    display:flex; align-items:center; justify-content:space-between; gap:10px; cursor:default;
+  }
+  .section-title-text { font-family:'Nunito',sans-serif; font-weight:900; font-size:14px; letter-spacing:.05em; text-transform:uppercase; color:var(--gray); }
+  .section-meta { font-size:11px; color:#9aa5aa; font-weight:700; }
+  .toggle-icon { display:none; font-size:16px; color:var(--gray); }
+  .category-tools { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; }
   .tools-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:12px; margin-bottom:28px; }
   .tool-item {
-    background:white; border-radius:20px; padding:20px 16px; text-align:center;
+    background:white; border-radius:12px; padding:16px 12px; text-align:center;
     cursor:pointer; transition:transform .2s, box-shadow .2s;
     box-shadow:0 2px 8px rgba(0,0,0,.05); text-decoration:none; color:var(--dark);
     display:block; position:relative;
   }
   .tool-item:hover { transform:translateY(-3px); box-shadow:0 8px 24px rgba(0,0,0,.1); }
   .tool-item.shift-tool { background:linear-gradient(135deg,#e8fdfb,#d4f5f1); border:2px solid #a8ede8; }
-  .tool-icon { font-size:28px; margin-bottom:8px; display:block; }
-  .tool-name { font-size:13px; font-weight:700; line-height:1.3; }
+  .tool-icon { font-size:24px; margin-bottom:7px; display:block; }
+  .tool-name { font-size:12px; font-weight:800; line-height:1.3; }
   .tool-linked-badge { position:absolute; top:10px; right:10px; background:var(--mint); color:white; font-size:9px; font-weight:700; padding:2px 7px; border-radius:8px; }
 
   /* ── WEEK CALENDAR ── */
@@ -206,12 +234,32 @@
   .notice-date { font-size:11px; color:var(--gray); flex-shrink:0; }
 
   /* ── BOTTOM NAV ── */
-  .bottom-nav { position:fixed; bottom:0; left:0; right:0; background:white; display:flex; border-top:1px solid var(--light-gray); padding-bottom:env(safe-area-inset-bottom); z-index:100; }
+  .menu-backdrop { display:none; }
+  .bottom-nav { position:fixed; bottom:0; left:0; right:0; background:white; display:none; border-top:1px solid var(--light-gray); padding-bottom:env(safe-area-inset-bottom); z-index:100; }
   .nav-item { flex:1; display:flex; flex-direction:column; align-items:center; padding:10px 4px 6px; cursor:pointer; gap:3px; text-decoration:none; color:var(--gray); transition:color .2s; border:none; background:none; }
   .nav-item.active { color:var(--mint); }
   .nav-icon { font-size:20px; }
   .nav-label { font-size:10px; font-weight:700; }
   .bottom-spacer { height:80px; }
+
+  @media (max-width:720px) {
+    main { max-width:480px; padding-bottom:92px; }
+    .quick-grid { grid-template-columns:1fr; }
+    .quick-card { min-height:104px; }
+    .menu-panel {
+      display:none; position:fixed; left:0; right:0; bottom:58px; max-height:72vh; overflow:auto;
+      background:#f7f9fb; padding:16px 16px calc(16px + env(safe-area-inset-bottom));
+      border-radius:18px 18px 0 0; box-shadow:0 -14px 36px rgba(0,0,0,.16); z-index:101;
+    }
+    body.menu-open .menu-panel { display:block; }
+    body.menu-open .menu-backdrop { display:block; position:fixed; inset:0; background:rgba(39,50,56,.28); z-index:99; }
+    .bottom-nav { display:flex; }
+    .section-toggle { cursor:pointer; background:white; border-radius:12px; padding:13px 14px; box-shadow:0 2px 8px rgba(0,0,0,.05); }
+    .toggle-icon { display:block; }
+    .tool-section:not(.open) .category-tools { display:none; }
+    .tool-section.open .toggle-icon { transform:rotate(180deg); }
+    .category-tools { grid-template-columns:repeat(2,minmax(0,1fr)); margin-top:10px; }
+  }
 
   /* ── PASSWORD MODAL ── */
   .modal-overlay {
@@ -319,6 +367,9 @@
         <option value="田中|DA|3002|tanaka">田中</option>
         <option value="百々|DA|3003|momo">百々</option>
       </optgroup>
+      <optgroup label="ゲスト">
+        <option value="ゲスト|ゲスト|0000|guest">ゲスト</option>
+      </optgroup>
     </select>
     <label class="login-label">パスワード（数字4桁）</label>
     <input class="login-input" type="password" id="loginPass" inputmode="numeric" maxlength="4" placeholder="●●●●">
@@ -329,6 +380,7 @@
       <strong>DR</strong>　院長:1001　嶋中:1002　保刈:1003　篠田:1004<br>
       <strong>DH</strong>　鶴田:2001　吉田:2002　高木:2003　松本:2004　山田:2006<br>
       <strong>DA</strong>　田宮:3001　田中:3002　百々:3003<br>
+      <strong>ゲスト</strong>　ゲスト:0000<br>
       <span style="color:#aaa;">※ シフトアプリで変更した場合は新パスワードを使用</span>
     </div>
   </div>
@@ -390,7 +442,7 @@
     <div class="hero-shift-main">
       <div class="hero-shift-type" id="heroShiftType">読込中...</div>
       <div class="hero-shift-time" id="heroShiftTime" style="display:none"></div>
-      <button class="hero-shift-go" onclick="goToShiftApp()">シフトアプリ →</button>
+      <button class="hero-shift-go" id="heroShiftGoBtn" onclick="goToShiftApp()">シフトアプリ →</button>
     </div>
   </div>
 
@@ -402,58 +454,119 @@
 
 <main>
 
-  <!-- 業務ツール（重複なし） -->
-  <div class="section-title fu d1">🛠️ 業務ツール</div>
-  <div class="tools-grid">
-    <a class="tool-item shift-tool fu d1" href="#" onclick="goToShiftApp();return false;">
-      <span class="tool-linked-badge">連携中</span>
-      <span class="tool-icon">📅</span>
-      <span class="tool-name">シフト管理</span>
-    </a>
-    <a class="tool-item fu d1" id="adminToolBtn" href="#" onclick="goToShiftApp(true);return false;" style="display:none;background:linear-gradient(135deg,#fff8e0,#ffefc8);border:2px solid #ffd97a;">
-      <span class="tool-icon">⚙️</span>
-      <span class="tool-name">管理者画面</span>
-    </a>
-    <a class="tool-item fu d2" id="skillToolBtn" href="#" onclick="goToSkillApp();return false;" style="display:none;background:linear-gradient(135deg,#f3f0ff,#e8e0ff);border:2px solid #c8b8ff;">
-      <span class="tool-icon">📋</span>
-      <span class="tool-name">スキル<br>チェック</span>
-    </a>
-    <a class="tool-item fu d2" href="#" onclick="goToTaskApp();return false;" style="background:linear-gradient(135deg,#eef7f0,#dff0e8);border:2px solid #a8d8b8;">
-      <span class="tool-icon">📋</span>
-      <span class="tool-name">タスク管理</span>
-    </a>
-    <a class="tool-item fu d2" href="#" onclick="goToGoalApp();return false;" style="background:linear-gradient(135deg,#eef5ff,#dbeafe);border:2px solid #9fc5f8;">
-      <span class="tool-icon">◎</span>
-      <span class="tool-name">目標管理</span>
-    </a>
-    <a class="tool-item fu d2" id="privateMetricsToolBtn" href="#" onclick="goToPrivateMetricsApp();return false;" style="display:none;background:linear-gradient(135deg,#fff6f0,#ffe4d6);border:2px solid #ffb996;">
-      <span class="tool-icon">秘</span>
-      <span class="tool-name">非公開<br>経営数値</span>
-    </a>
-    <a class="tool-item fu d2" href="#" onclick="goToScheduleApp();return false;" style="background:linear-gradient(135deg,#fff0f8,#ffe0f0);border:2px solid #ffb8d8;">
-      <span class="tool-icon">🎉</span>
-      <span class="tool-name">日程調整</span>
-    </a>
-    <a class="tool-item fu d2" href="#" onclick="goToMeetingManagementApp();return false;" style="background:linear-gradient(135deg,#f0fbff,#e6f7f5);border:2px solid #86d9d1;">
-      <span class="tool-icon">MTG</span>
-      <span class="tool-name">ミーティング</span>
-    </a>
-    <a class="tool-item fu d2" data-staff-only="true" href="#" onclick="goToTrainingMaterialsApp();return false;" style="background:linear-gradient(135deg,#f7f8ff,#e6fbff);border:2px solid #9edce7;">
-      <span class="tool-icon">LIB</span>
-      <span class="tool-name">院内研修<br>資料</span>
-    </a>
-    <a class="tool-item fu d2" href="https://kalmia-dc.doctor-hr.com/" target="_blank" rel="noopener">
-      <span class="tool-icon">👨‍⚕️</span>
-      <span class="tool-name">Doctor HR</span>
-    </a>
-    <a class="tool-item fu d3" href="https://ssl.jobcan.jp/employee" target="_blank" rel="noopener">
-      <span class="tool-icon">🕐</span>
-      <span class="tool-name">ジョブカン勤怠</span>
-    </a>
-    <a class="tool-item fu d4" href="https://apo-toolboxes.stransa.co.jp/calendar/" target="_blank" rel="noopener">
-      <span class="tool-icon">🗓️</span>
-      <span class="tool-name">予約カレンダー</span>
-    </a>
+  <section class="quick-actions fu d1" aria-label="よく使う">
+    <div class="section-title">よく使う</div>
+    <div class="quick-grid">
+      <a class="quick-card quick-task" href="#" onclick="goToTaskApp();return false;">
+        <div>
+          <span class="quick-icon">TASK</span>
+          <div class="quick-title">タスク管理</div>
+          <div class="quick-note">毎日の確認と更新</div>
+        </div>
+      </a>
+      <a class="quick-card quick-meeting" href="#" onclick="goToMeetingManagementApp();return false;">
+        <div>
+          <span class="quick-icon">MTG</span>
+          <div class="quick-title">ミーティング</div>
+          <div class="quick-note">週次の取り組み確認</div>
+        </div>
+      </a>
+      <a class="quick-card quick-training" href="#" onclick="goToTrainingMaterialsApp();return false;">
+        <div>
+          <span class="quick-icon">LIB</span>
+          <div class="quick-title">院内研修資料</div>
+          <div class="quick-note">研修資料の閲覧</div>
+        </div>
+      </a>
+    </div>
+  </section>
+
+  <div class="menu-backdrop" id="menuBackdrop" onclick="closePortalMenu()"></div>
+
+  <div class="menu-panel fu d2" id="portalMenuPanel" aria-label="メニュー">
+    <section class="tool-section open" data-menu-section>
+      <button class="section-toggle" type="button" onclick="toggleMenuSection(this)">
+        <span><span class="section-title-text">よく使う</span><span class="section-meta">　日常業務</span></span>
+        <span class="toggle-icon">⌄</span>
+      </button>
+      <div class="category-tools">
+        <a class="tool-item" href="#" onclick="goToTaskApp();return false;" style="background:linear-gradient(135deg,#eef7f0,#dff0e8);border:2px solid #a8d8b8;">
+          <span class="tool-icon">📋</span><span class="tool-name">タスク管理</span>
+        </a>
+        <a class="tool-item" href="#" onclick="goToMeetingManagementApp();return false;" style="background:linear-gradient(135deg,#f0fbff,#e6f7f5);border:2px solid #86d9d1;">
+          <span class="tool-icon">MTG</span><span class="tool-name">ミーティング</span>
+        </a>
+        <a class="tool-item" href="#" onclick="goToTrainingMaterialsApp();return false;" style="background:linear-gradient(135deg,#f7f8ff,#e6fbff);border:2px solid #9edce7;">
+          <span class="tool-icon">LIB</span><span class="tool-name">院内研修<br>資料</span>
+        </a>
+      </div>
+    </section>
+
+    <section class="tool-section" data-menu-section>
+      <button class="section-toggle" type="button" onclick="toggleMenuSection(this)">
+        <span><span class="section-title-text">月次・申請</span><span class="section-meta">　月1回から必要時</span></span>
+        <span class="toggle-icon">⌄</span>
+      </button>
+      <div class="category-tools">
+        <a class="tool-item shift-tool" data-guest-hidden="true" href="#" onclick="goToShiftApp();return false;">
+          <span class="tool-linked-badge">連携中</span><span class="tool-icon">📅</span><span class="tool-name">シフト管理</span>
+        </a>
+        <a class="tool-item" href="#" onclick="goToGoalApp();return false;" style="background:linear-gradient(135deg,#eef5ff,#dbeafe);border:2px solid #9fc5f8;">
+          <span class="tool-icon">◎</span><span class="tool-name">目標管理</span>
+        </a>
+        <a class="tool-item" href="#" onclick="goToScheduleApp();return false;" style="background:linear-gradient(135deg,#fff0f8,#ffe0f0);border:2px solid #ffb8d8;">
+          <span class="tool-icon">🎉</span><span class="tool-name">日程調整</span>
+        </a>
+        <a class="tool-item" id="skillToolBtn" data-guest-hidden="true" href="#" onclick="goToSkillApp();return false;" style="display:none;background:linear-gradient(135deg,#f3f0ff,#e8e0ff);border:2px solid #c8b8ff;">
+          <span class="tool-icon">📋</span><span class="tool-name">スキル<br>チェック</span>
+        </a>
+      </div>
+    </section>
+
+    <section class="tool-section" data-menu-section>
+      <button class="section-toggle" type="button" onclick="toggleMenuSection(this)">
+        <span><span class="section-title-text">外部サービス</span><span class="section-meta">　スマホ中心・低頻度</span></span>
+        <span class="toggle-icon">⌄</span>
+      </button>
+      <div class="category-tools">
+        <a class="tool-item" data-guest-hidden="true" href="https://ssl.jobcan.jp/employee" target="_blank" rel="noopener">
+          <span class="tool-icon">🕐</span><span class="tool-name">ジョブカン勤怠</span>
+        </a>
+        <a class="tool-item" data-guest-hidden="true" href="https://apo-toolboxes.stransa.co.jp/calendar/" target="_blank" rel="noopener">
+          <span class="tool-icon">🗓️</span><span class="tool-name">予約カレンダー</span>
+        </a>
+        <a class="tool-item" data-guest-hidden="true" href="https://kalmia-dc.doctor-hr.com/" target="_blank" rel="noopener">
+          <span class="tool-icon">👨‍⚕️</span><span class="tool-name">Doctor HR</span>
+        </a>
+      </div>
+    </section>
+
+    <section class="tool-section" data-menu-section>
+      <button class="section-toggle" type="button" onclick="toggleMenuSection(this)">
+        <span><span class="section-title-text">管理者専用</span><span class="section-meta">　権限者のみ</span></span>
+        <span class="toggle-icon">⌄</span>
+      </button>
+      <div class="category-tools">
+        <a class="tool-item" id="adminToolBtn" data-guest-hidden="true" href="#" onclick="goToShiftApp(true);return false;" style="display:none;background:linear-gradient(135deg,#fff8e0,#ffefc8);border:2px solid #ffd97a;">
+          <span class="tool-icon">⚙️</span><span class="tool-name">管理者画面</span>
+        </a>
+        <a class="tool-item" id="privateMetricsToolBtn" data-guest-hidden="true" href="#" onclick="goToPrivateMetricsApp();return false;" style="display:none;background:linear-gradient(135deg,#fff6f0,#ffe4d6);border:2px solid #ffb996;">
+          <span class="tool-icon">秘</span><span class="tool-name">非公開<br>経営数値</span>
+        </a>
+      </div>
+    </section>
+
+    <section class="tool-section" data-menu-section>
+      <button class="section-toggle" type="button" onclick="toggleMenuSection(this)">
+        <span><span class="section-title-text">アカウント設定</span><span class="section-meta">　必要時</span></span>
+        <span class="toggle-icon">⌄</span>
+      </button>
+      <div class="category-tools">
+        <button class="tool-item" type="button" onclick="openPwModal();return false;">
+          <span class="tool-icon">👤</span><span class="tool-name">パスワード<br>変更</span>
+        </button>
+      </div>
+    </section>
   </div>
 
   <!-- 日程決定済みイベント -->
@@ -487,13 +600,12 @@
   <div class="bottom-spacer"></div>
 </main>
 
-<!-- ボトムナビ（重複なし・4ツール＋マイページ） -->
+<!-- スマホ下部ナビ -->
 <nav class="bottom-nav">
-  <button class="nav-item active" onclick="goToShiftApp()"><span class="nav-icon">📅</span><span class="nav-label">シフト</span></button>
-  <a class="nav-item" href="https://kalmia-dc.doctor-hr.com/" target="_blank"><span class="nav-icon">👨‍⚕️</span><span class="nav-label">DR-HR</span></a>
-  <a class="nav-item" href="https://ssl.jobcan.jp/employee" target="_blank"><span class="nav-icon">🕐</span><span class="nav-label">勤怠</span></a>
-  <a class="nav-item" href="https://apo-toolboxes.stransa.co.jp/calendar/" target="_blank"><span class="nav-icon">🗓️</span><span class="nav-label">予約</span></a>
-  <button class="nav-item" onclick="openPwModal()"><span class="nav-icon">👤</span><span class="nav-label">マイページ</span></button>
+  <button class="nav-item active" onclick="goToTaskApp()"><span class="nav-icon">📋</span><span class="nav-label">タスク</span></button>
+  <a class="nav-item" data-guest-hidden="true" href="https://ssl.jobcan.jp/employee" target="_blank" rel="noopener"><span class="nav-icon">🕐</span><span class="nav-label">勤怠</span></a>
+  <a class="nav-item" data-guest-hidden="true" href="https://apo-toolboxes.stransa.co.jp/calendar/" target="_blank" rel="noopener"><span class="nav-icon">🗓️</span><span class="nav-label">予約</span></a>
+  <button class="nav-item" id="menuNavBtn" onclick="togglePortalMenu()"><span class="nav-icon">☰</span><span class="nav-label">メニュー</span></button>
 </nav>
 
 <!-- パスワード変更モーダル -->
@@ -561,11 +673,17 @@ const DEFAULT_PASSWORDS = {
   sugihira:'1001', shimanaka:'1002', hokari:'1003', shinoda:'1004',
   tsuruta:'2001',  yoshida:'2002',   takagi:'2003', matsumoto:'2004',
   yamada:'2006',   hanowa:'2007',
-  tamiya:'3001',   tanaka:'3002',    momo:'3003'
+  tamiya:'3001',   tanaka:'3002',    momo:'3003',
+  guest:'0000'
 };
 
 let syncedPasswords = {};
 let passwordsReady = false;
+const GUEST_STAFF_ID = 'guest';
+
+function isGuestUser(user = currentUser) {
+  return user?.staffId === GUEST_STAFF_ID;
+}
 
 function readLocalPasswords() {
   try {
@@ -581,7 +699,7 @@ function updatePasswordCache(data) {
     localStorage.setItem('carmia_passwords', JSON.stringify({ ...readLocalPasswords(), ...syncedPasswords }));
     if (currentUser?.staffId && syncedPasswords[currentUser.staffId]) {
       currentUser.pass = syncedPasswords[currentUser.staffId];
-      sessionStorage.setItem('portalUser', JSON.stringify(currentUser));
+      currentUser = savePortalUser(currentUser);
     }
   }
   passwordsReady = true;
@@ -612,7 +730,8 @@ function roleFromStaffId(staffId) {
   const roleMap = {
     sugihira:'DR', shimanaka:'DR', hokari:'DR', shinoda:'DR',
     tsuruta:'DH', yoshida:'DH', takagi:'DH', matsumoto:'DH', yamada:'DH', hanowa:'DH',
-    tamiya:'DA', tanaka:'DA', momo:'DA'
+    tamiya:'DA', tanaka:'DA', momo:'DA',
+    guest:'ゲスト'
   };
   return roleMap[staffId] || '';
 }
@@ -625,6 +744,34 @@ function normalizePortalUser(raw) {
   const role = isInvalidUserText(raw.role) ? roleFromStaffId(staffId) : String(raw.role).trim();
   const pass = isInvalidUserText(raw.pass) ? passwordForStaff(staffId, '') : String(raw.pass);
   return { ...raw, staffId, sid: staffId, name, role, pass };
+}
+
+const PORTAL_USER_STORAGE_KEY = 'portalUser';
+
+function savePortalUser(user) {
+  const normalized = normalizePortalUser(user);
+  if (!normalized) return null;
+  const serialized = JSON.stringify(normalized);
+  sessionStorage.setItem(PORTAL_USER_STORAGE_KEY, serialized);
+  localStorage.setItem(PORTAL_USER_STORAGE_KEY, serialized);
+  return normalized;
+}
+
+function removePortalUser() {
+  sessionStorage.removeItem(PORTAL_USER_STORAGE_KEY);
+  localStorage.removeItem(PORTAL_USER_STORAGE_KEY);
+}
+
+function readStoredPortalUser() {
+  for (const storage of [sessionStorage, localStorage]) {
+    try {
+      const saved = storage.getItem(PORTAL_USER_STORAGE_KEY);
+      if (!saved) continue;
+      const user = normalizePortalUser(JSON.parse(saved));
+      if (user) return savePortalUser(user);
+    } catch(e) {}
+  }
+  return null;
 }
 
 // ─────────────────────────────────────────
@@ -643,14 +790,13 @@ async function doLogin() {
   // パスワード照合：Firebase同期分 → localStorage変更分 → 初期値
   const correct = passwordForStaff(staffId, defaultPass);
   if (pass !== correct) { err.style.display='block'; err.textContent='パスワードが違います'; return; }
-  currentUser = normalizePortalUser({ name, role, pass, staffId });
-  sessionStorage.setItem('portalUser', JSON.stringify(currentUser));
+  currentUser = savePortalUser({ name, role, pass, staffId });
   err.style.display = 'none';
   showApp();
 }
 
 function doLogout() {
-  sessionStorage.removeItem('portalUser');
+  removePortalUser();
   currentUser = null;
   document.getElementById('app').style.display = 'none';
   document.getElementById('loginScreen').style.display = 'flex';
@@ -724,7 +870,7 @@ async function submitPwChange() {
 
   // セッションのパスワードも更新
   currentUser.pass = newVal;
-  sessionStorage.setItem('portalUser', JSON.stringify(currentUser));
+  currentUser = savePortalUser(currentUser);
 
   msg.textContent = '✅ パスワードを変更しました';
   msg.className = 'pw-msg ok';
@@ -799,6 +945,43 @@ function goToShiftApp(asAdmin = false) {
   window.location.href = `https://kalmia-dc.github.io/portal/shift.html?${params}`;
 }
 
+function togglePortalMenu() {
+  const open = !document.body.classList.contains('menu-open');
+  document.body.classList.toggle('menu-open', open);
+  document.getElementById('menuNavBtn')?.classList.toggle('active', open);
+}
+
+function closePortalMenu() {
+  document.body.classList.remove('menu-open');
+  document.getElementById('menuNavBtn')?.classList.remove('active');
+}
+
+function toggleMenuSection(button) {
+  if (!window.matchMedia('(max-width: 720px)').matches) return;
+  button.closest('.tool-section')?.classList.toggle('open');
+}
+
+function updateMenuVisibility() {
+  const guest = isGuestUser();
+  document.querySelectorAll('[data-guest-hidden="true"]').forEach(el => {
+    el.style.display = guest ? 'none' : '';
+  });
+
+  const adminVisible = !guest && ADMIN_STAFF.includes(currentUser?.staffId);
+  const adminBtn = document.getElementById('adminToolBtn');
+  const privateMetricsBtn = document.getElementById('privateMetricsToolBtn');
+  const skillBtn = document.getElementById('skillToolBtn');
+  if (adminBtn) adminBtn.style.display = adminVisible ? 'block' : 'none';
+  if (privateMetricsBtn) privateMetricsBtn.style.display = adminVisible ? 'block' : 'none';
+  if (skillBtn) skillBtn.style.display = guest ? 'none' : 'block';
+
+  document.querySelectorAll('[data-menu-section]').forEach(section => {
+    const hasVisibleItem = [...section.querySelectorAll('.tool-item')]
+      .some(el => el.style.display !== 'none');
+    section.style.display = hasVisibleItem ? '' : 'none';
+  });
+}
+
 // ─────────────────────────────────────────
 // Firebaseからシフトデータを読む
 // シフトアプリのキー: shifts/YYYY-MM
@@ -810,7 +993,8 @@ const STAFF_ID_MAP = {
   sugihira:'杉平', shimanaka:'嶋中', hokari:'保刈', shinoda:'篠田',
   tsuruta:'鶴田',  yoshida:'吉田',  takagi:'高木', matsumoto:'松本',
   yamada:'山田',   hanowa:'ハノワ',
-  tamiya:'田宮',   tanaka:'田中',   momo:'百々'
+  tamiya:'田宮',   tanaka:'田中',   momo:'百々',
+  guest:'ゲスト'
 };
 // staffName → staffId マップ（逆引き）
 const NAME_TO_ID = Object.fromEntries(Object.entries(STAFF_ID_MAP).map(([id,n])=>[n,id]));
@@ -872,23 +1056,34 @@ async function initApp() {
 
   // ヒーロータイトル
   const rl = u.role==='DR' ? '院長' : u.role;
-  const titleHtml = u.staffId === 'sugihira'
+  const titleHtml = isGuestUser(u)
+    ? `<span>ゲスト</span> さん`
+    : u.staffId === 'sugihira'
     ? `<span>${rl}</span> さん`
     : `<span>${rl}</span> ${u.name} さん`;
   document.getElementById('heroTitle').innerHTML = titleHtml;
 
   // 今日のシフト
-  const s = await getShift(u.name, now);
   const typeEl = document.getElementById('heroShiftType');
   const timeEl = document.getElementById('heroShiftTime');
-  if (s) {
-    const info = SHIFT_INFO[s] || { label:s, time:'', cls:'on' };
-    typeEl.textContent = info.label;
-    typeEl.className = 'hero-shift-type' + (info.cls==='off'||info.cls==='hope' ? ' dim' : '');
-    if (info.time) { timeEl.textContent=info.time; timeEl.style.display='block'; }
-  } else {
-    typeEl.textContent = 'データなし（シフトアプリで確認）';
+  const shiftGoBtn = document.getElementById('heroShiftGoBtn');
+  if (isGuestUser(u)) {
+    typeEl.textContent = '閲覧専用アカウント';
     typeEl.className = 'hero-shift-type dim';
+    timeEl.style.display = 'none';
+    if (shiftGoBtn) shiftGoBtn.style.display = 'none';
+  } else {
+    const s = await getShift(u.name, now);
+    if (shiftGoBtn) shiftGoBtn.style.display = '';
+    if (s) {
+      const info = SHIFT_INFO[s] || { label:s, time:'', cls:'on' };
+      typeEl.textContent = info.label;
+      typeEl.className = 'hero-shift-type' + (info.cls==='off'||info.cls==='hope' ? ' dim' : '');
+      if (info.time) { timeEl.textContent=info.time; timeEl.style.display='block'; }
+    } else {
+      typeEl.textContent = 'データなし（シフトアプリで確認）';
+      typeEl.className = 'hero-shift-type dim';
+    }
   }
 
   // 締切バナー（毎月25日までに翌々月分を提出）
@@ -909,14 +1104,7 @@ async function initApp() {
   }
 
   // 管理者リンクを表示（杉平・百々のみ）
-  const adminBtn = document.getElementById('adminToolBtn');
-  const skillBtn = document.getElementById('skillToolBtn');
-  const privateMetricsBtn = document.getElementById('privateMetricsToolBtn');
-  // 管理者画面は管理者のみ
-  adminBtn.style.display = ADMIN_STAFF.includes(u.staffId) ? 'block' : 'none';
-  privateMetricsBtn.style.display = ADMIN_STAFF.includes(u.staffId) ? 'block' : 'none';
-  // スキルチェックは全スタッフ表示
-  skillBtn.style.display = 'block';
+  updateMenuVisibility();
 
   // 今週カレンダー
   await buildWeek(now, u.name);
@@ -931,10 +1119,18 @@ async function initApp() {
   loadCalendar();
 
   // 自分のタスク（Firebase）
-  loadMyTasks(u.name);
+  if (!isGuestUser(u)) {
+    loadMyTasks(u.name);
+  } else {
+    document.getElementById('heroTaskCard').style.display = 'none';
+  }
 
   // 日程調整（未回答）
-  loadScheduleEvents(u.staffId);
+  if (!isGuestUser(u)) {
+    loadScheduleEvents(u.staffId);
+  } else {
+    document.getElementById('heroScheduleCard').style.display = 'none';
+  }
 }
 
 async function buildWeek(now, staffName) {
@@ -1356,6 +1552,7 @@ async function loadScheduleEvents(staffId) {
 Object.assign(window, {
   doLogin, doLogout,
   goToShiftApp, goToSkillApp, goToTaskApp, goToGoalApp, goToPrivateMetricsApp, goToScheduleApp, goToMeetingManagementApp, goToTrainingMaterialsApp,
+  togglePortalMenu, closePortalMenu, toggleMenuSection,
   openPwModal, closePwModal, closePwModalIfBg, submitPwChange,
   openNoticeModal, closeNoticeModal, closeNoticeModalIfBg, submitNotice, deleteNotice
 });

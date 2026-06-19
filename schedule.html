@@ -54,6 +54,9 @@
   .badge-DR{background:var(--purple-light);color:var(--purple-dark)}
   .badge-DH{background:var(--green-light);color:var(--green-dark)}
   .badge-DA{background:var(--amber-light);color:var(--amber)}
+  .badge-GUEST{background:#e8eef5;color:#4a5568}
+  .readonly-note{display:none;background:#fff8e0;border:1px solid #ffe08a;color:#6b5b16;border-radius:10px;padding:10px 12px;font-size:12px;font-weight:700;margin-bottom:12px}
+  body.guest-readonly .readonly-note{display:block}
 
   /* Tab */
   .tabs{display:flex;background:var(--gray);padding:4px;border-radius:10px;margin-bottom:16px;gap:4px}
@@ -157,8 +160,10 @@ const STAFF = [
   {id:'tamiya',   name:'田宮',  role:'DA', pin:'3001'},
   {id:'tanaka',   name:'田中',  role:'DA', pin:'3002'},
   {id:'momo',     name:'百々',  role:'DA', pin:'3003'},
+  {id:'guest',    name:'ゲスト', role:'GUEST', pin:'0000'},
 ];
 const ADMINS = ['sugihira','momo'];
+const EVENT_STAFF = STAFF.filter(s => s.id !== 'guest');
 
 // ─── State ────────────────────────────────────────────────
 let state = {
@@ -287,6 +292,7 @@ function toast(msg) {
 function getAvatarStyle(role) {
   if (role === 'DR') return 'background:var(--purple-light);color:var(--purple-dark)';
   if (role === 'DH') return 'background:var(--green-light);color:var(--green-dark)';
+  if (role === 'GUEST') return 'background:#e8eef5;color:#4a5568';
   return 'background:var(--amber-light);color:var(--amber)';
 }
 
@@ -305,6 +311,12 @@ function fmtDateFull(d) {
 }
 
 function getStaff(id) { return STAFF.find(s => s.id === id); }
+function isGuestUser() { return state.user?.id === 'guest'; }
+function canManageCurrentEvent() {
+  const ev = state.events[state.currentEventId];
+  const myId = state.user?.id;
+  return !!ev && !isGuestUser() && ((myId === ev.createdBy) || ADMINS.includes(myId));
+}
 function initials(name) { return name.slice(0, 2); }
 
 // 期限の状態を返す: { label, style }
@@ -327,7 +339,7 @@ function renderMemberSelect(selectedSet, prefix) {
     <div style="margin-bottom:12px">
       <label>対象者 <span style="font-size:11px;color:var(--text-hint);font-weight:400">（未選択=全員）</span></label>
       <div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:6px">
-        ${STAFF.map(s => {
+        ${EVENT_STAFF.map(s => {
           const isSel = selectedSet.has(s.id);
           const dotCol = s.role==='DR'?'var(--purple-dark)':s.role==='DH'?'var(--green)':'var(--amber)';
           return `<div data-mid="${s.id}" data-prefix="${prefix}" class="member-chip ${isSel?'member-chip-sel':''}" style="
@@ -420,13 +432,15 @@ function renderPinEntry() {
 function renderMainView() {
   const evList = Object.entries(state.events).sort((a,b) => b[1].createdAt - a[1].createdAt);
   const myId = state.user.id;
+  const guest = isGuestUser();
+  if (guest && state.tab === 'new') state.tab = 'list';
 
   const listHtml = evList.length === 0
     ? `<div class="empty">まだイベントがありません<br>「作成」から追加してください</div>`
     : evList.map(([id, ev]) => {
         const dates = ev.dates || [];
         const myRes = ev.responses?.[myId] || {};
-        const answered = dates.length > 0 && dates.every(d => myRes[d]);
+        const answered = !guest && dates.length > 0 && dates.every(d => myRes[d]);
         const creator = getStaff(ev.createdBy);
         const dl = deadlineStatus(ev.deadline);
         return `
@@ -436,16 +450,17 @@ function renderMainView() {
               <p style="font-size:11px;color:var(--text-hint)">${dates.length}件の候補日　作成: ${creator?.name || ev.createdBy}</p>
             </div>
             <div style="text-align:right;flex-shrink:0;margin-left:10px">
-              <span class="pill ${answered?'pill-done':'pill-pending'}">${answered?'回答済':'未回答'}</span>
+              <span class="pill ${guest || answered ? 'pill-done' : 'pill-pending'}">${guest ? '閲覧' : (answered ? '回答済' : '未回答')}</span>
               ${dl ? `<div style="margin-top:4px;font-size:10px;font-weight:600;padding:2px 7px;border-radius:10px;${dl.style}">${dl.label}</div>` : `<p style="font-size:10px;color:var(--text-hint);margin-top:4px">${new Date(ev.createdAt).toLocaleDateString('ja-JP',{month:'numeric',day:'numeric'})}</p>`}
             </div>
           </div>`;
       }).join('');
 
   return `
+    ${guest ? `<div class="readonly-note">ゲストは閲覧専用です。イベント作成と回答はできません。</div>` : ''}
     <div class="tabs">
       <button class="tab-btn ${state.tab==='list'?'active':''}" onclick="setTab('list')">イベント一覧</button>
-      <button class="tab-btn ${state.tab==='new'?'active':''}" onclick="setTab('new')">＋ 作成</button>
+      ${guest ? '' : `<button class="tab-btn ${state.tab==='new'?'active':''}" onclick="setTab('new')">＋ 作成</button>`}
     </div>
     ${state.tab === 'list'
       ? `<div class="card">${listHtml}</div>`
@@ -504,12 +519,12 @@ function renderNewEventForm() {
 function renderMemberSelector(membersSet, prefix) {
   const roles = { DR: 'DR', DH: 'DH', DA: 'DA' };
   const groups = { DR: [], DH: [], DA: [] };
-  STAFF.forEach(s => groups[s.role]?.push(s));
+  EVENT_STAFF.forEach(s => groups[s.role]?.push(s));
   return `
     <div style="margin-bottom:12px">
       <label>対象スタッフ <span style="font-size:11px;color:var(--text-sub);font-weight:400">（未選択の場合は全員）</span></label>
       <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px" id="${prefix}-member-list">
-        ${STAFF.map(s => {
+        ${EVENT_STAFF.map(s => {
           const sel = membersSet.size === 0 || membersSet.has(s.id);
           const bg = s.role==='DR' ? (sel?'var(--purple-dark)':'#ddd') : s.role==='DH' ? (sel?'var(--green)':'#ddd') : (sel?'var(--amber)':'#ddd');
           return `<div data-mid="${s.id}" style="padding:4px 10px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;background:${bg};color:${sel?'#fff':'#888'};transition:.15s">${s.name}</div>`;
@@ -527,7 +542,7 @@ function renderMemberSelector(membersSet, prefix) {
 function attachMemberHandlers(membersSet, prefix) {
   const updateUI = () => {
     document.querySelectorAll(`#${prefix}-member-list [data-mid]`).forEach(el => {
-      const s = STAFF.find(x => x.id === el.dataset.mid);
+      const s = EVENT_STAFF.find(x => x.id === el.dataset.mid);
       const sel = membersSet.size === 0 || membersSet.has(s.id);
       const bg = s.role==='DR' ? (sel?'var(--purple-dark)':'#ddd') : s.role==='DH' ? (sel?'var(--green)':'#ddd') : (sel?'var(--amber)':'#ddd');
       el.style.background = bg;
@@ -540,14 +555,14 @@ function attachMemberHandlers(membersSet, prefix) {
       const id = el.dataset.mid;
       if (membersSet.size === 0) {
         // 全員選択中 → 全員をセットしてから1人除く
-        STAFF.forEach(s => membersSet.add(s.id));
+        EVENT_STAFF.forEach(s => membersSet.add(s.id));
         membersSet.delete(id);
       } else if (membersSet.has(id)) {
         membersSet.delete(id);
-        if (membersSet.size === 0 || membersSet.size === STAFF.length) membersSet.clear(); // 全員 or 空→リセット
+        if (membersSet.size === 0 || membersSet.size === EVENT_STAFF.length) membersSet.clear(); // 全員 or 空→リセット
       } else {
         membersSet.add(id);
-        if (membersSet.size === STAFF.length) membersSet.clear(); // 全員になったらリセット
+        if (membersSet.size === EVENT_STAFF.length) membersSet.clear(); // 全員になったらリセット
       }
       updateUI();
     });
@@ -564,9 +579,9 @@ function attachMemberHandlers(membersSet, prefix) {
   const sh = document.getElementById(`${prefix}-sel-dh`);
   const sm = document.getElementById(`${prefix}-sel-da`);
   if (sa) sa.addEventListener('click', () => { membersSet.clear(); updateUI(); });
-  if (sd) sd.addEventListener('click', () => setGroup(STAFF.filter(s=>s.role==='DR').map(s=>s.id)));
-  if (sh) sh.addEventListener('click', () => setGroup(STAFF.filter(s=>s.role==='DH').map(s=>s.id)));
-  if (sm) sm.addEventListener('click', () => setGroup(STAFF.filter(s=>s.role==='DA').map(s=>s.id)));
+  if (sd) sd.addEventListener('click', () => setGroup(EVENT_STAFF.filter(s=>s.role==='DR').map(s=>s.id)));
+  if (sh) sh.addEventListener('click', () => setGroup(EVENT_STAFF.filter(s=>s.role==='DH').map(s=>s.id)));
+  if (sm) sm.addEventListener('click', () => setGroup(EVENT_STAFF.filter(s=>s.role==='DA').map(s=>s.id)));
 }
 
 
@@ -578,13 +593,14 @@ function renderEventDetail() {
   const ev = state.events[state.currentEventId];
   if (!ev) return '';
   const myId = state.user.id;
+  const guest = isGuestUser();
   const dates = ev.dates || [];
   const responses = ev.responses || {};
   const myRes = Object.assign({}, responses[myId] || {}, state.pendingRes);
   const creator = getStaff(ev.createdBy);
 
   // 対象メンバー（未設定なら全員）
-  const evMembers = ev.members ? STAFF.filter(s => ev.members.includes(s.id)) : STAFF;
+  const evMembers = ev.members ? EVENT_STAFF.filter(s => ev.members.includes(s.id)) : EVENT_STAFF;
   const memberLabel = ev.members ? `対象: ${evMembers.map(s=>s.name).join('・')}` : '対象: 全員';
 
   // Summary calc（対象メンバーのみ）
@@ -596,7 +612,7 @@ function renderEventDetail() {
   });
   const maxScore = Math.max(...summary.map(s => s.score), 0);
 
-  const isOwner = (myId === ev.createdBy) || ADMINS.includes(myId);
+  const isOwner = canManageCurrentEvent();
   // decided は配列または旧形式（文字列）を両対応
   const decidedRaw = ev.decided || null;
   const decidedDates = Array.isArray(decidedRaw) ? decidedRaw : (decidedRaw ? [decidedRaw] : []);
@@ -614,7 +630,7 @@ function renderEventDetail() {
       </div>
       <div class="row" style="gap:6px">
         ${isOwner ? `<button class="btn-sm" onclick="openEditEvent()">✏️ 編集</button>` : ''}
-        ${ADMINS.includes(myId) ? `<button class="btn-danger btn-sm" onclick="doDeleteEvent()">削除</button>` : ''}
+        ${!guest && ADMINS.includes(myId) ? `<button class="btn-danger btn-sm" onclick="doDeleteEvent()">削除</button>` : ''}
       </div>
     </div>
 
@@ -637,7 +653,7 @@ function renderEventDetail() {
         <span style="font-size:11px;color:var(--text-hint)">○参加 △未定 ×不参加</span>
       </div>
       <div class="card-body" style="padding-top:8px;padding-bottom:8px">
-        ${dates.map(d => `
+        ${guest ? `<div class="readonly-note" style="display:block;margin-bottom:0">ゲストは閲覧専用です。回答はできません。</div>` : dates.map(d => `
           <div class="row flex-between" style="padding:9px 0;border-bottom:1px solid var(--border)">
             <span style="font-size:13px;font-weight:500">${fmtDateFull(d)}</span>
             <div class="row" style="gap:6px">
@@ -647,14 +663,14 @@ function renderEventDetail() {
             </div>
           </div>
         `).join('')}
-        <div class="row flex-between" style="margin-top:12px">
+        ${guest ? '' : `<div class="row flex-between" style="margin-top:12px">
           <button onclick="setAllX()" style="font-size:12px;color:var(--red);border-color:var(--red);padding:6px 14px">
             全日程×（参加不可）
           </button>
           <button class="btn-primary" onclick="doSaveResponse()" ${state.saving?'disabled':''}>
             ${state.saving ? '保存中...' : '回答を保存'}
           </button>
-        </div>
+        </div>`}
       </div>
     </div>
 
@@ -778,6 +794,10 @@ window.doLogout = () => {
 };
 
 window.setTab = (t) => {
+  if (isGuestUser() && t === 'new') {
+    toast('ゲストは閲覧専用です');
+    return;
+  }
   state.tab = t;
   if (t === 'new') {
     state.newName     = '';
@@ -859,6 +879,7 @@ function refreshCalendar() {
 // フォーム描画後に一度だけリスナーを付ける
 function attachNewEventHandlers() {
   if (state.tab !== 'new') return;
+  if (isGuestUser()) return;
 
   // 月ナビ（一度だけ）
   const prev = document.getElementById('btn-cal-prev');
@@ -894,6 +915,10 @@ function attachNewEventHandlers() {
   // 作成
   const create = document.getElementById('btn-create-ev');
   if (create) create.addEventListener('click', async () => {
+    if (isGuestUser()) {
+      toast('ゲストは閲覧専用です');
+      return;
+    }
     saveFormState();
     const name     = state.newName.trim();
     const deadline = state.newDeadline;
@@ -937,6 +962,10 @@ window.backToMain = () => {
 };
 
 window.setAllX = () => {
+  if (isGuestUser()) {
+    toast('ゲストは閲覧専用です');
+    return;
+  }
   const ev = state.events[state.currentEventId];
   if (!ev) return;
   const dates = ev.dates || [];
@@ -950,6 +979,10 @@ window.setAllX = () => {
 };
 
 window.setRes = (date, val) => {
+  if (isGuestUser()) {
+    toast('ゲストは閲覧専用です');
+    return;
+  }
   state.pendingRes[date] = val;
   // 即時UI更新
   document.querySelectorAll(`[onclick="setRes('${date}','o')"]`).forEach(b => b.className = `res-btn ${val==='o'?'sel-o':''}`);
@@ -958,6 +991,10 @@ window.setRes = (date, val) => {
 };
 
 window.doSaveResponse = async () => {
+  if (isGuestUser()) {
+    toast('ゲストは閲覧専用です');
+    return;
+  }
   if (Object.keys(state.pendingRes).length === 0) { toast('回答を選択してください'); return; }
   state.saving = true;
   render();
@@ -977,6 +1014,10 @@ window.doSaveResponse = async () => {
 
 window.toggleDecide = async (date) => {
   const ev = state.events[state.currentEventId];
+  if (!canManageCurrentEvent()) {
+    toast('操作できません');
+    return;
+  }
   const raw = ev.decided || [];
   const current = Array.isArray(raw) ? [...raw] : (raw ? [raw] : []);
   let next;
@@ -998,6 +1039,10 @@ window.toggleDecide = async (date) => {
 };
 
 window.doUndecide = async () => {
+  if (!canManageCurrentEvent()) {
+    toast('操作できません');
+    return;
+  }
   if (!confirm('全ての決定を取り消しますか？')) return;
   await update(ref(db, `${DB_PATH}/${state.currentEventId}`), { decided: null });
   state.events[state.currentEventId].decided = null;
@@ -1007,6 +1052,10 @@ window.doUndecide = async () => {
 
 // ── イベント編集 ──────────────────────────────────────────
 window.openEditEvent = () => {
+  if (!canManageCurrentEvent()) {
+    toast('操作できません');
+    return;
+  }
   const ev = state.events[state.currentEventId];
   if (!ev) return;
   state.editName     = ev.name;
@@ -1138,6 +1187,10 @@ window.cancelEditEvent = () => {
 };
 
 window.doDeleteEvent = async () => {
+  if (isGuestUser() || !ADMINS.includes(state.user?.id)) {
+    toast('操作できません');
+    return;
+  }
   if (!confirm(`「${state.events[state.currentEventId]?.name}」を削除しますか？`)) return;
   await deleteEvent(state.currentEventId);
   delete state.events[state.currentEventId];
@@ -1164,14 +1217,15 @@ window.doDeleteEvent = async () => {
         state.user = staff;
         state.view = 'main';
         state.tab  = 'list';
+        document.body.classList.toggle('guest-readonly', isGuestUser());
         render();
         await loadEvents();
 
         // 期限切れ未回答を自動で×に
-        await autoFillExpired(staff.id);
+        if (!isGuestUser()) await autoFillExpired(staff.id);
 
         // 回答期限前日通知チェック
-        checkScheduleDeadlines();
+        if (!isGuestUser()) checkScheduleDeadlines();
 
         // 特定イベントへの直接遷移
         const evid = params.get('evid');
