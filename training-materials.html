@@ -48,6 +48,12 @@ textarea{min-height:86px;resize:vertical;line-height:1.6}
 input:focus,select:focus,textarea:focus{border-color:var(--mint)}
 .file-box{border:2px dashed #b9dce2;border-radius:14px;padding:14px;background:#f8fdff}
 .file-box input{border:0;padding:0;border-radius:0;background:transparent}
+.mode-toggle{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.mode-toggle label{border:2px solid var(--line);border-radius:12px;padding:10px 12px;cursor:pointer;background:white;color:var(--dark);text-align:center}
+.mode-toggle input{position:absolute;opacity:0;pointer-events:none}
+.mode-toggle label:has(input:checked){border-color:var(--mint);background:#effbfa;color:#19766f}
+.hint{font-size:12px;line-height:1.6;color:var(--gray);margin-top:6px}
+.hint.warn{color:#b96818;font-weight:800}
 .form-actions{display:flex;gap:10px;align-items:center;justify-content:flex-end;margin-top:12px;flex-wrap:wrap}
 .btn{border:0;border-radius:12px;padding:11px 14px;font-weight:900;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:6px;font-size:13px;line-height:1.2}
 .btn.primary{background:linear-gradient(135deg,var(--mint),var(--sky));color:white}
@@ -129,6 +135,13 @@ body.is-admin .admin-actions{display:flex}
       </div>
       <form id="materialForm" onsubmit="saveMaterial(event)">
         <div class="form-grid">
+          <div class="field full">
+            <label>保存方法</label>
+            <div class="mode-toggle" role="radiogroup" aria-label="保存方法">
+              <label><input type="radio" name="materialMode" value="file" checked>ファイルを保存</label>
+              <label><input type="radio" name="materialMode" value="link">URLを保存</label>
+            </div>
+          </div>
           <div class="field">
             <label for="materialTitle">タイトル</label>
             <input id="materialTitle" type="text" maxlength="80" required placeholder="例：歯周治療研修 FMD版">
@@ -154,6 +167,12 @@ body.is-admin .admin-actions{display:flex}
             <div class="file-box">
               <input id="materialFile" type="file" accept=".pdf,.ppt,.pptx,.doc,.docx,.xls,.xlsx,image/*,video/*">
             </div>
+            <div class="hint" id="fileHint">動画はYouTubeの限定公開リンク保存も使えます。</div>
+          </div>
+          <div class="field full hidden" id="linkField">
+            <label for="materialUrl">URL</label>
+            <input id="materialUrl" type="url" maxlength="500" placeholder="https://www.youtube.com/watch?v=...">
+            <div class="hint">YouTubeは限定公開でアップロードし、共有URLを貼り付けてください。</div>
           </div>
         </div>
         <div class="progress" id="uploadProgress"><div class="progress-bar" id="uploadProgressBar"></div></div>
@@ -218,7 +237,6 @@ const STAFF_ROLES = {
   tamiya:'DA', tanaka:'DA', momo:'DA',
   guest:'ゲスト'
 };
-
 const PORTAL_USER_STORAGE_KEY = 'portalUser';
 
 let currentUser = readUser();
@@ -232,6 +250,11 @@ renderAuthState();
 document.getElementById('adminPass')?.addEventListener('keydown', event => {
   if (event.key === 'Enter') window.loginAdmin();
 });
+document.querySelectorAll('input[name="materialMode"]').forEach(input => {
+  input.addEventListener('change', updateMaterialMode);
+});
+document.getElementById('materialFile')?.addEventListener('change', updateFileHint);
+updateMaterialMode();
 
 onValue(ref(db, DB_PATH), snap => {
   const data = snap.val() || {};
@@ -393,11 +416,13 @@ function renderMaterials() {
   list.innerHTML = filtered.map(item => {
     const title = esc(item.title || item.fileName || '無題の資料');
     const summary = esc(item.summary || '');
-    const fileName = esc(item.fileName || '');
-    const type = fileLabel(item.fileType, item.fileName);
+    const isLink = item.sourceType === 'link' || Boolean(item.linkUrl);
+    const fileName = esc(isLink ? (item.linkUrl || item.url || '') : (item.fileName || ''));
+    const type = fileLabel(item.fileType, item.fileName, item.url || item.linkUrl, isLink);
     const date = formatDate(item.updatedAt || item.createdAt);
     const size = formatSize(item.fileSize || 0);
-    const openUrl = escAttr(item.url || '#');
+    const openUrl = escAttr(item.url || item.linkUrl || '#');
+    const downloadButton = isLink ? '' : `<a class="btn ghost" href="${openUrl}" target="_blank" rel="noopener" download>ダウンロード</a>`;
     return `
       <article class="card">
         <div class="card-head">
@@ -416,7 +441,7 @@ function renderMaterials() {
         <div class="meta">${fileName}</div>
         <div class="card-actions">
           <a class="btn primary" href="${openUrl}" target="_blank" rel="noopener">開く</a>
-          <a class="btn ghost" href="${openUrl}" target="_blank" rel="noopener" download>ダウンロード</a>
+          ${downloadButton}
           <div class="admin-actions">
             <button class="btn secondary" type="button" onclick="startEdit('${item.id}')">編集</button>
             <button class="btn danger" type="button" onclick="deleteMaterial('${item.id}')">削除</button>
@@ -434,17 +459,24 @@ window.saveMaterial = async function(event) {
   const title = document.getElementById('materialTitle').value.trim();
   const category = document.getElementById('materialCategory').value;
   const summary = document.getElementById('materialSummary').value.trim();
+  const mode = getMaterialMode();
+  const linkUrl = document.getElementById('materialUrl').value.trim();
   const file = document.getElementById('materialFile').files[0] || null;
   if (!title) return setStatus('タイトルを入力してください。', 'err');
-  if (!editingId && !file) return setStatus('保存するファイルを選択してください。', 'err');
+  if (mode === 'link' && !linkUrl) return setStatus('保存するURLを入力してください。', 'err');
+  if (mode === 'link' && !normalizeUrl(linkUrl)) return setStatus('URLは http:// または https:// で入力してください。', 'err');
+  if (!editingId && mode === 'file' && !file) return setStatus('保存するファイルを選択してください。', 'err');
+  if (editingId && mode === 'file' && !file && (editingMaterial?.sourceType === 'link' || editingMaterial?.linkUrl)) {
+    return setStatus('ファイル資料に変更する場合はファイルを選択してください。', 'err');
+  }
 
   const saveBtn = document.getElementById('saveBtn');
   saveBtn.disabled = true;
-  setStatus(file ? 'アップロードを開始します。' : '資料情報を保存しています。');
+  setStatus(mode === 'file' && file ? 'アップロードを開始します。' : '資料情報を保存しています。');
 
   try {
-    let filePayload = {};
-    if (file) {
+    let filePayload = mode === 'link' ? linkPayload(linkUrl) : {};
+    if (mode === 'file' && file) {
       filePayload = await uploadFile(file);
     }
 
@@ -459,7 +491,7 @@ window.saveMaterial = async function(event) {
         updatedBy: currentUser.name,
         updatedById: currentUser.staffId
       });
-      if (file && editingMaterial?.storagePath && editingMaterial.storagePath !== filePayload.storagePath) {
+      if ((mode === 'link' || file) && editingMaterial?.storagePath && editingMaterial.storagePath !== filePayload.storagePath) {
         await deleteStorageFile(editingMaterial.storagePath, true);
       }
       setStatus('更新しました。', 'ok');
@@ -505,6 +537,8 @@ function uploadFile(file) {
         try {
           const url = await getDownloadURL(task.snapshot.ref);
           resolve({
+            sourceType: 'file',
+            linkUrl: null,
             fileName: file.name,
             fileType: file.type || '',
             fileSize: file.size,
@@ -529,10 +563,12 @@ window.startEdit = function(id) {
   document.getElementById('materialTitle').value = item.title || '';
   document.getElementById('materialCategory').value = item.category || 'その他';
   document.getElementById('materialSummary').value = item.summary || '';
+  setMaterialMode(item.sourceType === 'link' || item.linkUrl ? 'link' : 'file');
+  document.getElementById('materialUrl').value = item.linkUrl || (item.sourceType === 'link' ? item.url : '') || '';
   document.getElementById('materialFile').value = '';
   document.getElementById('cancelEditBtn').classList.remove('hidden');
   document.getElementById('saveBtn').textContent = '更新';
-  setStatus('ファイルを選び直さない場合は、現在のファイルをそのまま使います。');
+  setStatus(getMaterialMode() === 'link' ? 'URLを変更できます。' : 'ファイルを選び直さない場合は、現在のファイルをそのまま使います。');
   window.scrollTo({ top: 0, behavior: 'smooth' });
 };
 
@@ -568,9 +604,78 @@ function resetForm() {
   editingId = '';
   editingMaterial = null;
   document.getElementById('materialForm').reset();
+  setMaterialMode('file');
+  document.getElementById('materialUrl').value = '';
   document.getElementById('formTitle').textContent = '資料を追加';
   document.getElementById('cancelEditBtn').classList.add('hidden');
   document.getElementById('saveBtn').textContent = '保存';
+  updateFileHint();
+}
+
+function getMaterialMode() {
+  return document.querySelector('input[name="materialMode"]:checked')?.value || 'file';
+}
+
+function setMaterialMode(mode) {
+  const target = document.querySelector(`input[name="materialMode"][value="${mode}"]`);
+  if (target) target.checked = true;
+  updateMaterialMode();
+}
+
+function updateMaterialMode() {
+  const mode = getMaterialMode();
+  const fileField = document.getElementById('materialFile')?.closest('.field');
+  const linkField = document.getElementById('linkField');
+  fileField?.classList.toggle('hidden', mode === 'link');
+  linkField?.classList.toggle('hidden', mode !== 'link');
+  if (mode === 'link') {
+    document.getElementById('materialFile').value = '';
+    updateFileHint();
+  }
+}
+
+function updateFileHint() {
+  const hint = document.getElementById('fileHint');
+  const file = document.getElementById('materialFile')?.files?.[0];
+  if (!hint) return;
+  const isVideo = file?.type?.startsWith('video/') || /\.(mp4|mov|m4v|avi|wmv)$/i.test(file?.name || '');
+  hint.textContent = isVideo
+    ? '動画はアップロードに時間がかかります。YouTubeの限定公開リンク保存を推奨します。'
+    : '動画はYouTubeの限定公開リンク保存も使えます。';
+  hint.classList.toggle('warn', Boolean(isVideo));
+}
+
+function normalizeUrl(value) {
+  try {
+    const url = new URL(value);
+    if (!['http:', 'https:'].includes(url.protocol)) return '';
+    return url.toString();
+  } catch(e) {
+    return '';
+  }
+}
+
+function linkPayload(value) {
+  const url = normalizeUrl(value);
+  const isYoutube = isYouTubeUrl(url);
+  return {
+    sourceType: 'link',
+    linkUrl: url,
+    url,
+    fileName: isYoutube ? 'YouTubeリンク' : new URL(url).hostname,
+    fileType: isYoutube ? 'video/youtube' : 'text/uri-list',
+    fileSize: 0,
+    storagePath: ''
+  };
+}
+
+function isYouTubeUrl(value) {
+  try {
+    const host = new URL(value).hostname.replace(/^www\./, '').toLowerCase();
+    return host === 'youtube.com' || host === 'youtu.be' || host.endsWith('.youtube.com');
+  } catch(e) {
+    return false;
+  }
 }
 
 function setProgress(value, show) {
@@ -597,7 +702,11 @@ function safeStorageName(name) {
   return `${base || 'file'}${ext}`;
 }
 
-function fileLabel(type = '', name = '') {
+function fileLabel(type = '', name = '', url = '', isLink = false) {
+  if (isLink) {
+    if (isYouTubeUrl(url)) return { short:'YT', label:'YouTube' };
+    return { short:'URL', label:'リンク' };
+  }
   const lowerName = String(name).toLowerCase();
   if (type.includes('pdf') || lowerName.endsWith('.pdf')) return { short:'PDF', label:'PDF' };
   if (lowerName.endsWith('.ppt') || lowerName.endsWith('.pptx')) return { short:'PPT', label:'PowerPoint' };
