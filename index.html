@@ -935,6 +935,16 @@ function goToTrainingMaterialsApp() {
   window.location.href = `https://kalmia-dc.github.io/portal/training-materials.html?${params}`;
 }
 
+function redirectToRequestedApp() {
+  if (!currentUser) return false;
+  const params = new URLSearchParams(location.search);
+  const next = params.get('next') || '';
+  if (next !== 'training-materials') return false;
+  history.replaceState({}, '', location.pathname);
+  goToTrainingMaterialsApp();
+  return true;
+}
+
 function goToShiftApp(asAdmin = false) {
   if (!currentUser) return;
   const params = new URLSearchParams({ sid: currentUser.staffId, p: currentUser.pass });
@@ -1031,6 +1041,7 @@ async function getShift(staffName, date) {
 function showApp() {
   document.getElementById('loginScreen').style.display = 'none';
   document.getElementById('app').style.display = 'block';
+  if (redirectToRequestedApp()) return;
   initApp();
 }
 

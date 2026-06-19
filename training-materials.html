@@ -187,6 +187,7 @@ const db = getDatabase(fbApp);
 const storage = getStorage(fbApp);
 const DB_PATH = 'trainingMaterials';
 const ADMIN_STAFF = ['sugihira', 'momo'];
+const PORTAL_URL = 'https://kalmia-dc.github.io/portal/';
 const STAFF_NAMES = {
   sugihira:'院長', shimanaka:'島中', hokari:'保刈', shinoda:'篠田',
   tsuruta:'鶴田', yoshida:'吉田', takagi:'高木', matsumoto:'松本',
@@ -208,7 +209,7 @@ let editingId = '';
 let editingMaterial = null;
 
 if (!currentUser?.staffId) {
-  document.getElementById('guard').hidden = false;
+  redirectToPortal();
 } else {
   document.getElementById('app').hidden = false;
   if (isAdmin()) document.body.classList.add('is-admin');
@@ -221,6 +222,13 @@ if (!currentUser?.staffId) {
     showListError(`資料一覧を読み込めませんでした: ${error.message}`);
     setStatus(`資料一覧を読み込めませんでした: ${error.message}`, 'err');
   });
+}
+
+function redirectToPortal() {
+  document.getElementById('guard').hidden = false;
+  const portalUrl = new URL(PORTAL_URL);
+  portalUrl.searchParams.set('next', 'training-materials');
+  location.replace(portalUrl.toString());
 }
 
 function readUser() {
