@@ -116,7 +116,6 @@
   .quick-card:hover { transform:translateY(-3px); box-shadow:0 10px 28px rgba(39,50,56,.12); }
   .quick-icon { width:42px; height:42px; border-radius:12px; display:grid; place-items:center; font-weight:900; font-size:18px; color:white; }
   .quick-title { font-size:17px; font-weight:900; margin-top:14px; }
-  .quick-note { font-size:12px; color:var(--gray); margin-top:4px; line-height:1.45; }
   .quick-task { border-color:#a8d8b8; }
   .quick-task .quick-icon { background:linear-gradient(135deg,#00b894,#55efc4); }
   .quick-meeting { border-color:#86d9d1; }
@@ -131,7 +130,6 @@
     display:flex; align-items:center; justify-content:space-between; gap:10px; cursor:default;
   }
   .section-title-text { font-family:'Nunito',sans-serif; font-weight:900; font-size:14px; letter-spacing:.05em; text-transform:uppercase; color:var(--gray); }
-  .section-meta { font-size:11px; color:#9aa5aa; font-weight:700; }
   .toggle-icon { display:none; font-size:16px; color:var(--gray); }
   .category-tools { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; }
   .tools-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:12px; margin-bottom:28px; }
@@ -456,28 +454,25 @@
 
 <main>
 
-  <section class="quick-actions fu d1" aria-label="よく使う">
-    <div class="section-title">よく使う</div>
+  <section class="quick-actions fu d1" aria-label="クイックアクセス">
+    <div class="section-title">クイックアクセス</div>
     <div class="quick-grid">
       <a class="quick-card quick-task" href="#" onclick="goToTaskApp();return false;">
         <div>
           <span class="quick-icon">TASK</span>
           <div class="quick-title">タスク管理</div>
-          <div class="quick-note">毎日の確認と更新</div>
         </div>
       </a>
       <a class="quick-card quick-meeting" href="#" onclick="goToMeetingManagementApp();return false;">
         <div>
           <span class="quick-icon">MTG</span>
           <div class="quick-title">ミーティング</div>
-          <div class="quick-note">週次の取り組み確認</div>
         </div>
       </a>
       <a class="quick-card quick-training" href="#" onclick="goToTrainingMaterialsApp();return false;">
         <div>
           <span class="quick-icon">LIB</span>
           <div class="quick-title">院内研修資料</div>
-          <div class="quick-note">研修資料の閲覧</div>
         </div>
       </a>
     </div>
@@ -488,7 +483,7 @@
   <div class="menu-panel fu d2" id="portalMenuPanel" aria-label="メニュー">
     <section class="tool-section open primary-menu-section" data-menu-section>
       <button class="section-toggle" type="button" onclick="toggleMenuSection(this)">
-        <span><span class="section-title-text">よく使う</span><span class="section-meta">　日常業務</span></span>
+        <span><span class="section-title-text">クイックアクセス</span></span>
         <span class="toggle-icon">⌄</span>
       </button>
       <div class="category-tools">
@@ -506,7 +501,7 @@
 
     <section class="tool-section" data-menu-section>
       <button class="section-toggle" type="button" onclick="toggleMenuSection(this)">
-        <span><span class="section-title-text">月次・申請</span><span class="section-meta">　月1回から必要時</span></span>
+        <span><span class="section-title-text">申請・管理</span></span>
         <span class="toggle-icon">⌄</span>
       </button>
       <div class="category-tools">
@@ -527,7 +522,7 @@
 
     <section class="tool-section" data-menu-section>
       <button class="section-toggle" type="button" onclick="toggleMenuSection(this)">
-        <span><span class="section-title-text">外部サービス</span><span class="section-meta">　スマホ中心・低頻度</span></span>
+        <span><span class="section-title-text">外部サービス</span></span>
         <span class="toggle-icon">⌄</span>
       </button>
       <div class="category-tools">
@@ -545,7 +540,7 @@
 
     <section class="tool-section" data-menu-section>
       <button class="section-toggle" type="button" onclick="toggleMenuSection(this)">
-        <span><span class="section-title-text">管理者専用</span><span class="section-meta">　権限者のみ</span></span>
+        <span><span class="section-title-text">管理者専用</span></span>
         <span class="toggle-icon">⌄</span>
       </button>
       <div class="category-tools">
@@ -560,7 +555,7 @@
 
     <section class="tool-section" data-menu-section>
       <button class="section-toggle" type="button" onclick="toggleMenuSection(this)">
-        <span><span class="section-title-text">アカウント設定</span><span class="section-meta">　必要時</span></span>
+        <span><span class="section-title-text">アカウント設定</span></span>
         <span class="toggle-icon">⌄</span>
       </button>
       <div class="category-tools">
