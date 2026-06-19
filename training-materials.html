@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>院内研修資料 | カルミアデンタル スタッフポータル</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800;900&family=Zen+Maru+Gothic:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --mint:#4ecdc4;
+  --sky:#74b9ff;
+  --coral:#ff6b6b;
+  --bg:#f4f8fb;
+  --white:#fff;
+  --dark:#273238;
+  --gray:#64727a;
+  --light:#dfe8ed;
+  --line:#e8eef2;
+  --shadow:0 10px 28px rgba(39,50,56,.08);
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:'Zen Maru Gothic',sans-serif;background:var(--bg);color:var(--dark);min-height:100vh}
+button,input,select,textarea{font-family:inherit}
+header{height:58px;background:var(--white);display:flex;align-items:center;justify-content:space-between;padding:0 16px;box-shadow:0 2px 10px rgba(0,0,0,.07);position:sticky;top:0;z-index:10}
+.brand{display:flex;align-items:center;gap:10px;font-family:'Nunito',sans-serif;font-weight:900;font-size:16px}
+.brand-mark{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,var(--mint),var(--sky));display:grid;place-items:center;color:white;font-weight:900}
+.back{border:0;border-radius:10px;background:var(--light);color:var(--gray);font-weight:800;padding:8px 12px;text-decoration:none;font-size:13px}
+.guard{min-height:calc(100vh - 58px);display:grid;place-items:center;padding:24px;text-align:center;color:var(--gray)}
+.app{max-width:960px;margin:0 auto;padding:20px 16px 48px}
+.top{display:grid;grid-template-columns:1fr;gap:14px;margin-bottom:16px}
+.title-block{background:linear-gradient(135deg,#3fb8b3,#5a9ff0);color:white;border-radius:18px;padding:20px;box-shadow:var(--shadow)}
+.eyebrow{font-family:'Nunito',sans-serif;font-weight:800;font-size:12px;letter-spacing:.08em;opacity:.82;margin-bottom:4px}
+h1{font-size:24px;line-height:1.25;margin:0 0 8px;font-weight:900}
+.lead{margin:0;font-size:13px;line-height:1.7;opacity:.9}
+.admin-panel{display:none;background:var(--white);border-radius:16px;padding:16px;box-shadow:var(--shadow)}
+body.is-admin .admin-panel{display:block}
+.panel-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
+.panel-title{font-weight:900;font-size:16px}
+.form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.field{display:flex;flex-direction:column;gap:6px}
+.field.full{grid-column:1/-1}
+label{font-size:12px;font-weight:800;color:var(--gray)}
+input,select,textarea{width:100%;border:2px solid var(--line);border-radius:12px;background:white;color:var(--dark);padding:11px 12px;font-size:14px;outline:none}
+textarea{min-height:86px;resize:vertical;line-height:1.6}
+input:focus,select:focus,textarea:focus{border-color:var(--mint)}
+.file-box{border:2px dashed #b9dce2;border-radius:14px;padding:14px;background:#f8fdff}
+.file-box input{border:0;padding:0;border-radius:0;background:transparent}
+.form-actions{display:flex;gap:10px;align-items:center;justify-content:flex-end;margin-top:12px;flex-wrap:wrap}
+.btn{border:0;border-radius:12px;padding:11px 14px;font-weight:900;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:6px;font-size:13px;line-height:1.2}
+.btn.primary{background:linear-gradient(135deg,var(--mint),var(--sky));color:white}
+.btn.secondary{background:var(--light);color:var(--gray)}
+.btn.danger{background:#ffe7e7;color:#b43232}
+.btn.ghost{background:#edf7f8;color:#247d85}
+.btn:disabled{opacity:.55;cursor:not-allowed}
+.status{font-size:12px;color:var(--gray);min-height:18px;line-height:1.5}
+.status.ok{color:#188060;font-weight:800}
+.status.err{color:#c0392b;font-weight:800}
+.progress{height:8px;background:var(--line);border-radius:999px;overflow:hidden;display:none}
+.progress.show{display:block}
+.progress-bar{height:100%;width:0;background:linear-gradient(90deg,var(--mint),var(--sky));transition:width .2s}
+.toolbar{background:var(--white);border-radius:16px;padding:14px;box-shadow:var(--shadow);display:grid;grid-template-columns:1fr 180px;gap:10px;margin-bottom:14px}
+.count{font-size:12px;color:var(--gray);font-weight:800;margin:0 0 10px}
+.list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.card{background:white;border-radius:16px;padding:16px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:12px;min-height:214px}
+.card-head{display:flex;gap:10px;align-items:flex-start}
+.file-icon{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;background:#ecfbfa;color:#227873;font-family:'Nunito',sans-serif;font-weight:900;flex-shrink:0}
+.card-title{font-size:16px;font-weight:900;line-height:1.35;margin:0}
+.meta{display:flex;gap:6px;flex-wrap:wrap;font-size:11px;color:var(--gray)}
+.badge{border-radius:999px;background:#eef4f7;padding:4px 8px;font-weight:800}
+.summary{font-size:13px;line-height:1.65;color:#405057;white-space:pre-wrap;overflow-wrap:anywhere;margin:0;flex:1}
+.card-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:auto}
+.empty{background:white;border-radius:16px;padding:28px 18px;text-align:center;color:var(--gray);box-shadow:var(--shadow)}
+.admin-actions{display:none;gap:8px;flex-wrap:wrap}
+body.is-admin .admin-actions{display:flex}
+.hidden{display:none!important}
+@media (min-width:820px){
+  .top{grid-template-columns:1fr 1.2fr;align-items:start}
+}
+@media (max-width:680px){
+  .toolbar{grid-template-columns:1fr}
+  .list{grid-template-columns:1fr}
+  .form-grid{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand"><div class="brand-mark">LIB</div><span>Training Materials</span></div>
+  <a class="back" href="https://kalmia-dc.github.io/portal/">戻る</a>
+</header>
+
+<div class="guard" id="guard" hidden>
+  <div>
+    <h1>ポータルから開いてください</h1>
+    <p>ログイン情報が確認できないため、資料一覧を表示できません。</p>
+  </div>
+</div>
+
+<main class="app" id="app" hidden>
+  <section class="top">
+    <div class="title-block">
+      <div class="eyebrow">IN-HOUSE TRAINING</div>
+      <h1>院内研修資料</h1>
+      <p class="lead">研修スライド、PDF、画像、動画などをまとめて保管し、必要なときにすぐ開けます。</p>
+    </div>
+
+    <section class="admin-panel" aria-label="資料追加">
+      <div class="panel-head">
+        <div class="panel-title" id="formTitle">資料を追加</div>
+        <button class="btn secondary hidden" type="button" id="cancelEditBtn" onclick="cancelEdit()">編集をやめる</button>
+      </div>
+      <form id="materialForm" onsubmit="saveMaterial(event)">
+        <div class="form-grid">
+          <div class="field">
+            <label for="materialTitle">タイトル</label>
+            <input id="materialTitle" type="text" maxlength="80" required placeholder="例：歯周治療研修 FMD版">
+          </div>
+          <div class="field">
+            <label for="materialCategory">カテゴリ</label>
+            <select id="materialCategory">
+              <option>歯周治療</option>
+              <option>カウンセリング</option>
+              <option>診療補助</option>
+              <option>受付</option>
+              <option>接遇</option>
+              <option>安全管理</option>
+              <option>その他</option>
+            </select>
+          </div>
+          <div class="field full">
+            <label for="materialSummary">メモ</label>
+            <textarea id="materialSummary" maxlength="500" placeholder="対象スタッフ、研修日、補足メモなど"></textarea>
+          </div>
+          <div class="field full">
+            <label for="materialFile">ファイル</label>
+            <div class="file-box">
+              <input id="materialFile" type="file" accept=".pdf,.ppt,.pptx,.doc,.docx,.xls,.xlsx,image/*,video/*">
+            </div>
+          </div>
+        </div>
+        <div class="progress" id="uploadProgress"><div class="progress-bar" id="uploadProgressBar"></div></div>
+        <div class="form-actions">
+          <div class="status" id="formStatus"></div>
+          <button class="btn primary" id="saveBtn" type="submit">保存</button>
+        </div>
+      </form>
+    </section>
+  </section>
+
+  <section class="toolbar" aria-label="検索">
+    <input id="searchText" type="search" placeholder="タイトル・メモ・ファイル名で検索" oninput="renderMaterials()">
+    <select id="categoryFilter" onchange="renderMaterials()">
+      <option value="">すべてのカテゴリ</option>
+      <option>歯周治療</option>
+      <option>カウンセリング</option>
+      <option>診療補助</option>
+      <option>受付</option>
+      <option>接遇</option>
+      <option>安全管理</option>
+      <option>その他</option>
+    </select>
+  </section>
+
+  <p class="count" id="materialCount">読み込み中です</p>
+  <section class="list" id="materialList"></section>
+</main>
+
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import { getDatabase, ref, push, set, update, remove, onValue }
+  from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
+import { getStorage, ref as storageRef, uploadBytesResumable, getDownloadURL, deleteObject }
+  from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js';
+
+const firebaseConfig = {
+  apiKey:            'AIzaSyDdMe7feUF6CKPHH0YIx7Suk-WnXtOYUu8',
+  authDomain:        'kalmia-shift.firebaseapp.com',
+  databaseURL:       'https://kalmia-shift-default-rtdb.asia-southeast1.firebasedatabase.app',
+  projectId:         'kalmia-shift',
+  storageBucket:     'kalmia-shift.firebasestorage.app',
+  messagingSenderId: '714175473480',
+  appId:             '1:714175473480:web:7d6626a46e4a9dcb1fb57d'
+};
+
+const fbApp = initializeApp(firebaseConfig);
+const db = getDatabase(fbApp);
+const storage = getStorage(fbApp);
+const DB_PATH = 'trainingMaterials';
+const ADMIN_STAFF = ['sugihira', 'momo'];
+const STAFF_NAMES = {
+  sugihira:'院長', shimanaka:'島中', hokari:'保刈', shinoda:'篠田',
+  tsuruta:'鶴田', yoshida:'吉田', takagi:'高木', matsumoto:'松本',
+  yamada:'山田', tamiya:'田宮', tanaka:'田中', momo:'百々'
+};
+
+let currentUser = readUser();
+let materials = [];
+let editingId = '';
+let editingMaterial = null;
+
+if (!currentUser?.staffId) {
+  document.getElementById('guard').hidden = false;
+} else {
+  document.getElementById('app').hidden = false;
+  if (isAdmin()) document.body.classList.add('is-admin');
+  onValue(ref(db, DB_PATH), snap => {
+    const data = snap.val() || {};
+    materials = Object.entries(data).map(([id, item]) => ({ id, ...item }))
+      .sort((a, b) => (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0));
+    renderMaterials();
+  }, error => {
+    showListError(`資料一覧を読み込めませんでした: ${error.message}`);
+    setStatus(`資料一覧を読み込めませんでした: ${error.message}`, 'err');
+  });
+}
+
+function readUser() {
+  const params = new URLSearchParams(location.search);
+  const sid = params.get('sid') || '';
+  if (sid) {
+    const user = {
+      staffId: sid,
+      sid,
+      name: params.get('name') || STAFF_NAMES[sid] || sid,
+      pass: params.get('p') || ''
+    };
+    sessionStorage.setItem('portalUser', JSON.stringify(user));
+    history.replaceState({}, '', location.pathname);
+    return user;
+  }
+  try {
+    const saved = sessionStorage.getItem('portalUser');
+    if (saved) {
+      const raw = JSON.parse(saved);
+      const staffId = raw.staffId || raw.sid;
+      if (staffId) return { ...raw, staffId, sid: staffId };
+    }
+  } catch(e) {}
+  return null;
+}
+
+function isAdmin() {
+  return ADMIN_STAFF.includes(currentUser?.staffId);
+}
+
+function renderMaterials() {
+  const list = document.getElementById('materialList');
+  const q = document.getElementById('searchText').value.trim().toLowerCase();
+  const category = document.getElementById('categoryFilter').value;
+  const filtered = materials.filter(item => {
+    if (category && item.category !== category) return false;
+    if (!q) return true;
+    return [item.title, item.summary, item.fileName, item.category]
+      .some(value => String(value || '').toLowerCase().includes(q));
+  });
+
+  document.getElementById('materialCount').textContent = `${filtered.length}件の資料`;
+
+  if (!filtered.length) {
+    list.innerHTML = '<div class="empty">条件に合う資料はありません。</div>';
+    return;
+  }
+
+  list.innerHTML = filtered.map(item => {
+    const title = esc(item.title || item.fileName || '無題の資料');
+    const summary = esc(item.summary || '');
+    const fileName = esc(item.fileName || '');
+    const type = fileLabel(item.fileType, item.fileName);
+    const date = formatDate(item.updatedAt || item.createdAt);
+    const size = formatSize(item.fileSize || 0);
+    const openUrl = escAttr(item.url || '#');
+    return `
+      <article class="card">
+        <div class="card-head">
+          <div class="file-icon">${esc(type.short)}</div>
+          <div>
+            <h2 class="card-title">${title}</h2>
+            <div class="meta">
+              <span class="badge">${esc(item.category || 'その他')}</span>
+              <span class="badge">${esc(type.label)}</span>
+              ${size ? `<span class="badge">${size}</span>` : ''}
+              ${date ? `<span class="badge">${date}</span>` : ''}
+            </div>
+          </div>
+        </div>
+        ${summary ? `<p class="summary">${summary}</p>` : '<p class="summary">メモはありません。</p>'}
+        <div class="meta">${fileName}</div>
+        <div class="card-actions">
+          <a class="btn primary" href="${openUrl}" target="_blank" rel="noopener">開く</a>
+          <a class="btn ghost" href="${openUrl}" target="_blank" rel="noopener" download>ダウンロード</a>
+          <div class="admin-actions">
+            <button class="btn secondary" type="button" onclick="startEdit('${item.id}')">編集</button>
+            <button class="btn danger" type="button" onclick="deleteMaterial('${item.id}')">削除</button>
+          </div>
+        </div>
+      </article>
+    `;
+  }).join('');
+}
+
+window.saveMaterial = async function(event) {
+  event.preventDefault();
+  if (!isAdmin()) return;
+
+  const title = document.getElementById('materialTitle').value.trim();
+  const category = document.getElementById('materialCategory').value;
+  const summary = document.getElementById('materialSummary').value.trim();
+  const file = document.getElementById('materialFile').files[0] || null;
+  if (!title) return setStatus('タイトルを入力してください。', 'err');
+  if (!editingId && !file) return setStatus('保存するファイルを選択してください。', 'err');
+
+  const saveBtn = document.getElementById('saveBtn');
+  saveBtn.disabled = true;
+  setStatus(file ? 'アップロードを開始します。' : '資料情報を保存しています。');
+
+  try {
+    let filePayload = {};
+    if (file) {
+      filePayload = await uploadFile(file);
+    }
+
+    const now = Date.now();
+    if (editingId) {
+      await update(ref(db, `${DB_PATH}/${editingId}`), {
+        title,
+        category,
+        summary,
+        ...filePayload,
+        updatedAt: now,
+        updatedBy: currentUser.name,
+        updatedById: currentUser.staffId
+      });
+      if (file && editingMaterial?.storagePath && editingMaterial.storagePath !== filePayload.storagePath) {
+        await deleteStorageFile(editingMaterial.storagePath, true);
+      }
+      setStatus('更新しました。', 'ok');
+    } else {
+      const itemRef = push(ref(db, DB_PATH));
+      await set(itemRef, {
+        title,
+        category,
+        summary,
+        ...filePayload,
+        createdAt: now,
+        createdBy: currentUser.name,
+        createdById: currentUser.staffId,
+        updatedAt: now,
+        updatedBy: currentUser.name,
+        updatedById: currentUser.staffId
+      });
+      setStatus('保存しました。', 'ok');
+    }
+    resetForm();
+  } catch(error) {
+    setStatus(`保存できませんでした: ${error.message}`, 'err');
+  } finally {
+    saveBtn.disabled = false;
+    setProgress(0, false);
+  }
+};
+
+function uploadFile(file) {
+  return new Promise((resolve, reject) => {
+    const path = `training-materials/${Date.now()}_${safeStorageName(file.name)}`;
+    const target = storageRef(storage, path);
+    const task = uploadBytesResumable(target, file, { contentType: file.type || undefined });
+    setProgress(1, true);
+    task.on('state_changed',
+      snapshot => {
+        const pct = Math.max(1, Math.round(snapshot.bytesTransferred / snapshot.totalBytes * 100));
+        setProgress(pct, true);
+        setStatus(`アップロード中です。${pct}%`);
+      },
+      error => reject(error),
+      async () => {
+        try {
+          const url = await getDownloadURL(task.snapshot.ref);
+          resolve({
+            fileName: file.name,
+            fileType: file.type || '',
+            fileSize: file.size,
+            storagePath: path,
+            url
+          });
+        } catch(error) {
+          reject(error);
+        }
+      }
+    );
+  });
+}
+
+window.startEdit = function(id) {
+  if (!isAdmin()) return;
+  const item = materials.find(material => material.id === id);
+  if (!item) return;
+  editingId = id;
+  editingMaterial = item;
+  document.getElementById('formTitle').textContent = '資料を編集';
+  document.getElementById('materialTitle').value = item.title || '';
+  document.getElementById('materialCategory').value = item.category || 'その他';
+  document.getElementById('materialSummary').value = item.summary || '';
+  document.getElementById('materialFile').value = '';
+  document.getElementById('cancelEditBtn').classList.remove('hidden');
+  document.getElementById('saveBtn').textContent = '更新';
+  setStatus('ファイルを選び直さない場合は、現在のファイルをそのまま使います。');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+};
+
+window.cancelEdit = function() {
+  resetForm();
+  setStatus('');
+};
+
+window.deleteMaterial = async function(id) {
+  if (!isAdmin()) return;
+  const item = materials.find(material => material.id === id);
+  if (!item) return;
+  if (!confirm(`「${item.title || item.fileName || '資料'}」を削除しますか？`)) return;
+  try {
+    if (item.storagePath) await deleteStorageFile(item.storagePath, false);
+    await remove(ref(db, `${DB_PATH}/${id}`));
+    setStatus('削除しました。', 'ok');
+  } catch(error) {
+    setStatus(`削除できませんでした: ${error.message}`, 'err');
+  }
+};
+
+async function deleteStorageFile(path, silent) {
+  try {
+    await deleteObject(storageRef(storage, path));
+  } catch(error) {
+    if (error?.code === 'storage/object-not-found') return;
+    if (!silent) throw error;
+  }
+}
+
+function resetForm() {
+  editingId = '';
+  editingMaterial = null;
+  document.getElementById('materialForm').reset();
+  document.getElementById('formTitle').textContent = '資料を追加';
+  document.getElementById('cancelEditBtn').classList.add('hidden');
+  document.getElementById('saveBtn').textContent = '保存';
+}
+
+function setProgress(value, show) {
+  const wrap = document.getElementById('uploadProgress');
+  const bar = document.getElementById('uploadProgressBar');
+  wrap.classList.toggle('show', Boolean(show));
+  bar.style.width = `${value}%`;
+}
+
+function setStatus(text, type = '') {
+  const el = document.getElementById('formStatus');
+  el.textContent = text || '';
+  el.className = `status ${type}`.trim();
+}
+
+function showListError(text) {
+  document.getElementById('materialCount').textContent = '読み込みエラー';
+  document.getElementById('materialList').innerHTML = `<div class="empty">${esc(text)}</div>`;
+}
+
+function safeStorageName(name) {
+  const ext = (name.match(/\.[a-z0-9]+$/i) || [''])[0].toLowerCase();
+  const base = name.replace(/\.[^.]+$/, '').replace(/[^a-zA-Z0-9_-]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 48);
+  return `${base || 'file'}${ext}`;
+}
+
+function fileLabel(type = '', name = '') {
+  const lowerName = String(name).toLowerCase();
+  if (type.includes('pdf') || lowerName.endsWith('.pdf')) return { short:'PDF', label:'PDF' };
+  if (lowerName.endsWith('.ppt') || lowerName.endsWith('.pptx')) return { short:'PPT', label:'PowerPoint' };
+  if (lowerName.endsWith('.doc') || lowerName.endsWith('.docx')) return { short:'DOC', label:'Word' };
+  if (lowerName.endsWith('.xls') || lowerName.endsWith('.xlsx')) return { short:'XLS', label:'Excel' };
+  if (type.startsWith('image/')) return { short:'IMG', label:'画像' };
+  if (type.startsWith('video/')) return { short:'MOV', label:'動画' };
+  return { short:'FILE', label:'ファイル' };
+}
+
+function formatSize(bytes) {
+  if (!bytes) return '';
+  const units = ['B','KB','MB','GB'];
+  let size = bytes;
+  let unit = 0;
+  while (size >= 1024 && unit < units.length - 1) {
+    size /= 1024;
+    unit++;
+  }
+  return `${size >= 10 || unit === 0 ? Math.round(size) : size.toFixed(1)}${units[unit]}`;
+}
+
+function formatDate(value) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return `${date.getFullYear()}/${String(date.getMonth()+1).padStart(2,'0')}/${String(date.getDate()).padStart(2,'0')}`;
+}
+
+function esc(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function escAttr(value) {
+  return esc(value).replace(/`/g, '&#96;');
+}
+
+Object.assign(window, { renderMaterials });
+</script>
+</body>
+</html>
