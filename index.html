@@ -1035,8 +1035,7 @@ function showApp() {
 }
 
 async function initApp() {
-  currentUser = normalizePortalUser(currentUser);
-  sessionStorage.setItem('portalUser', JSON.stringify(currentUser));
+  currentUser = savePortalUser(currentUser);
   const u   = currentUser;
   const now = new Date();
   const DAY_NAMES = ['日','月','火','水','木','金','土'];
@@ -1558,16 +1557,10 @@ Object.assign(window, {
 // 起動：セッション復元
 // ─────────────────────────────────────────
 (function() {
-  const saved = sessionStorage.getItem('portalUser');
-  if (saved) {
-    try {
-      currentUser = normalizePortalUser(JSON.parse(saved));
-      if (currentUser) {
-        sessionStorage.setItem('portalUser', JSON.stringify(currentUser));
-        showApp();
-        return;
-      }
-    } catch(e) {}
+  currentUser = readStoredPortalUser();
+  if (currentUser) {
+    showApp();
+    return;
   }
   document.getElementById('loginScreen').style.display = 'flex';
 })();

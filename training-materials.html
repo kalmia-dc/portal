@@ -200,6 +200,8 @@ const STAFF_ROLES = {
   guest:'ゲスト'
 };
 
+const PORTAL_USER_STORAGE_KEY = 'portalUser';
+
 let currentUser = readUser();
 let materials = [];
 let editingId = '';
@@ -232,23 +234,11 @@ function readUser() {
       role: params.get('role'),
       pass: params.get('p') || ''
     });
-    sessionStorage.setItem('portalUser', JSON.stringify(user));
+    savePortalUser(user);
     history.replaceState({}, '', location.pathname);
     return user;
   }
-  try {
-    const saved = sessionStorage.getItem('portalUser');
-    if (saved) {
-      const raw = JSON.parse(saved);
-      const staffId = raw.staffId || raw.sid;
-      if (staffId) {
-        const user = normalizePortalUser(raw);
-        sessionStorage.setItem('portalUser', JSON.stringify(user));
-        return user;
-      }
-    }
-  } catch(e) {}
-  return null;
+  return readStoredPortalUser();
 }
 
 function isInvalidUserText(value) {
@@ -264,6 +254,27 @@ function normalizePortalUser(raw) {
   const role = isInvalidUserText(raw.role) ? (STAFF_ROLES[staffId] || '') : String(raw.role).trim();
   const pass = isInvalidUserText(raw.pass) ? '' : String(raw.pass);
   return { ...raw, staffId, sid: staffId, name, role, pass };
+}
+
+function savePortalUser(user) {
+  const normalized = normalizePortalUser(user);
+  if (!normalized) return null;
+  const serialized = JSON.stringify(normalized);
+  sessionStorage.setItem(PORTAL_USER_STORAGE_KEY, serialized);
+  localStorage.setItem(PORTAL_USER_STORAGE_KEY, serialized);
+  return normalized;
+}
+
+function readStoredPortalUser() {
+  for (const storage of [sessionStorage, localStorage]) {
+    try {
+      const saved = storage.getItem(PORTAL_USER_STORAGE_KEY);
+      if (!saved) continue;
+      const user = normalizePortalUser(JSON.parse(saved));
+      if (user) return savePortalUser(user);
+    } catch(e) {}
+  }
+  return null;
 }
 
 function isAdmin() {
