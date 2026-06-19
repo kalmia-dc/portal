@@ -228,6 +228,7 @@ function redirectToPortal() {
   document.getElementById('guard').hidden = false;
   const portalUrl = new URL(PORTAL_URL);
   portalUrl.searchParams.set('next', 'training-materials');
+  portalUrl.searchParams.set('v', String(Date.now()));
   location.replace(portalUrl.toString());
 }
 

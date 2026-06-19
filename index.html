@@ -932,6 +932,7 @@ function goToMeetingManagementApp() {
 function goToTrainingMaterialsApp() {
   if (!currentUser) return;
   const params = new URLSearchParams({ sid: currentUser.staffId, name: currentUser.name, p: currentUser.pass });
+  params.set('v', String(Date.now()));
   window.location.href = `https://kalmia-dc.github.io/portal/training-materials.html?${params}`;
 }
 
