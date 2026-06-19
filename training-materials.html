@@ -193,6 +193,12 @@ const STAFF_NAMES = {
   yamada:'山田', tamiya:'田宮', tanaka:'田中', momo:'百々'
 };
 
+const STAFF_ROLES = {
+  sugihira:'DR', shimanaka:'DR', hokari:'DR', shinoda:'DR',
+  tsuruta:'DH', yoshida:'DH', takagi:'DH', matsumoto:'DH', yamada:'DH', hanowa:'DH',
+  tamiya:'DA', tanaka:'DA', momo:'DA'
+};
+
 let currentUser = readUser();
 let materials = [];
 let editingId = '';
@@ -218,12 +224,13 @@ function readUser() {
   const params = new URLSearchParams(location.search);
   const sid = params.get('sid') || '';
   if (sid) {
-    const user = {
+    const user = normalizePortalUser({
       staffId: sid,
       sid,
-      name: params.get('name') || STAFF_NAMES[sid] || sid,
+      name: params.get('name'),
+      role: params.get('role'),
       pass: params.get('p') || ''
-    };
+    });
     sessionStorage.setItem('portalUser', JSON.stringify(user));
     history.replaceState({}, '', location.pathname);
     return user;
@@ -233,10 +240,29 @@ function readUser() {
     if (saved) {
       const raw = JSON.parse(saved);
       const staffId = raw.staffId || raw.sid;
-      if (staffId) return { ...raw, staffId, sid: staffId };
+      if (staffId) {
+        const user = normalizePortalUser(raw);
+        sessionStorage.setItem('portalUser', JSON.stringify(user));
+        return user;
+      }
     }
   } catch(e) {}
   return null;
+}
+
+function isInvalidUserText(value) {
+  const text = String(value ?? '').trim();
+  return !text || text.toLowerCase() === 'undefined' || text.toLowerCase() === 'null';
+}
+
+function normalizePortalUser(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  const staffId = raw.staffId || raw.sid || '';
+  if (!staffId) return null;
+  const name = isInvalidUserText(raw.name) ? (STAFF_NAMES[staffId] || staffId) : String(raw.name).trim();
+  const role = isInvalidUserText(raw.role) ? (STAFF_ROLES[staffId] || '') : String(raw.role).trim();
+  const pass = isInvalidUserText(raw.pass) ? '' : String(raw.pass);
+  return { ...raw, staffId, sid: staffId, name, role, pass };
 }
 
 function isAdmin() {

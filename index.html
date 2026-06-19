@@ -603,6 +603,30 @@ function passwordForStaff(staffId, defaultPass = '') {
   return syncedPasswords[staffId] || localPasswords[staffId] || defaultPass || DEFAULT_PASSWORDS[staffId] || '';
 }
 
+function isInvalidUserText(value) {
+  const text = String(value ?? '').trim();
+  return !text || text.toLowerCase() === 'undefined' || text.toLowerCase() === 'null';
+}
+
+function roleFromStaffId(staffId) {
+  const roleMap = {
+    sugihira:'DR', shimanaka:'DR', hokari:'DR', shinoda:'DR',
+    tsuruta:'DH', yoshida:'DH', takagi:'DH', matsumoto:'DH', yamada:'DH', hanowa:'DH',
+    tamiya:'DA', tanaka:'DA', momo:'DA'
+  };
+  return roleMap[staffId] || '';
+}
+
+function normalizePortalUser(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  const staffId = raw.staffId || raw.sid || '';
+  if (!staffId) return null;
+  const name = isInvalidUserText(raw.name) ? (STAFF_ID_MAP[staffId] || staffId) : String(raw.name).trim();
+  const role = isInvalidUserText(raw.role) ? roleFromStaffId(staffId) : String(raw.role).trim();
+  const pass = isInvalidUserText(raw.pass) ? passwordForStaff(staffId, '') : String(raw.pass);
+  return { ...raw, staffId, sid: staffId, name, role, pass };
+}
+
 // ─────────────────────────────────────────
 // セッション
 // ─────────────────────────────────────────
@@ -619,7 +643,7 @@ async function doLogin() {
   // パスワード照合：Firebase同期分 → localStorage変更分 → 初期値
   const correct = passwordForStaff(staffId, defaultPass);
   if (pass !== correct) { err.style.display='block'; err.textContent='パスワードが違います'; return; }
-  currentUser = { name, role, pass, staffId };
+  currentUser = normalizePortalUser({ name, role, pass, staffId });
   sessionStorage.setItem('portalUser', JSON.stringify(currentUser));
   err.style.display = 'none';
   showApp();
@@ -830,6 +854,8 @@ function showApp() {
 }
 
 async function initApp() {
+  currentUser = normalizePortalUser(currentUser);
+  sessionStorage.setItem('portalUser', JSON.stringify(currentUser));
   const u   = currentUser;
   const now = new Date();
   const DAY_NAMES = ['日','月','火','水','木','金','土'];
@@ -1340,7 +1366,14 @@ Object.assign(window, {
 (function() {
   const saved = sessionStorage.getItem('portalUser');
   if (saved) {
-    try { currentUser = JSON.parse(saved); showApp(); return; } catch(e) {}
+    try {
+      currentUser = normalizePortalUser(JSON.parse(saved));
+      if (currentUser) {
+        sessionStorage.setItem('portalUser', JSON.stringify(currentUser));
+        showApp();
+        return;
+      }
+    } catch(e) {}
   }
   document.getElementById('loginScreen').style.display = 'flex';
 })();
