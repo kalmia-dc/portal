@@ -241,6 +241,17 @@ button{cursor:pointer}
   font-size:12px;
   line-height:1.4;
 }
+.task-elapsed{
+  display:inline-flex;
+  align-items:center;
+  border:1px solid #74b48a;
+  border-radius:999px;
+  background:#e9f7ee;
+  color:#17602b;
+  padding:2px 8px;
+  font-size:13px;
+  font-weight:900;
+}
 .badge{
   display:inline-flex;
   align-items:center;
@@ -1160,7 +1171,7 @@ function renderTasks() {
           <h3>${esc(task.title || '')}</h3>
           <div class="meta">
             <span>${formatDate(task.createdAt)}</span>
-            <span>${esc(formatElapsedSince(task.createdAt))}</span>
+            <span class="task-elapsed">${esc(formatElapsedSince(task.createdAt))}</span>
             <span>登録: ${esc(displayCreatedBy(task))}</span>
             ${task.updatedBy ? `<span>更新: ${esc(task.updatedBy)}</span>` : ''}
           </div>
@@ -1454,7 +1465,7 @@ function formatElapsedSince(ts) {
   if (diffMs < 0) return '開始前';
   const days = Math.floor(diffMs / 86400000);
   const months = Math.floor(days / 30);
-  return `開始から${months}か月`;
+  return `取り組み開始から${months}か月`;
 }
 
 function displayCreatedBy(item) {
