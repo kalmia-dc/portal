@@ -1160,7 +1160,8 @@ function renderTasks() {
           <h3>${esc(task.title || '')}</h3>
           <div class="meta">
             <span>${formatDate(task.createdAt)}</span>
-            <span>登録: ${esc(task.createdBy || '-')}</span>
+            <span>${esc(formatElapsedSince(task.createdAt))}</span>
+            <span>登録: ${esc(displayCreatedBy(task))}</span>
             ${task.updatedBy ? `<span>更新: ${esc(task.updatedBy)}</span>` : ''}
           </div>
         </div>
@@ -1443,6 +1444,23 @@ function formatDate(ts) {
     hour:'2-digit',
     minute:'2-digit'
   }).format(new Date(ts));
+}
+
+function formatElapsedSince(ts) {
+  if (!ts) return '開始日未設定';
+  const start = new Date(ts);
+  if (Number.isNaN(start.getTime())) return '開始日未設定';
+  const diffMs = Date.now() - start.getTime();
+  if (diffMs < 0) return '開始前';
+  const days = Math.floor(diffMs / 86400000);
+  const months = Math.floor(days / 30);
+  return `開始から${months}か月`;
+}
+
+function displayCreatedBy(item) {
+  const name = String(item?.createdBy || '').trim();
+  if (item?.createdById === DIRECTOR_ID || name === '院長' || name === '杉平') return '院長';
+  return name || '-';
 }
 
 function shortTitle(text = '') {
