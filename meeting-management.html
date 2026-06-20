@@ -252,6 +252,13 @@ button{cursor:pointer}
   font-size:13px;
   font-weight:900;
 }
+.item-badges{
+  display:flex;
+  align-items:center;
+  justify-content:flex-end;
+  gap:8px;
+  flex-wrap:wrap;
+}
 .badge{
   display:inline-flex;
   align-items:center;
@@ -474,6 +481,7 @@ button{cursor:pointer}
   .read-columns{grid-template-columns:1fr}
   .section-head{align-items:flex-start}
   .item-top{flex-direction:column}
+  .item-badges{justify-content:flex-start}
   .item-actions,.form-actions{justify-content:stretch}
   .btn{width:100%}
 }
@@ -1171,12 +1179,14 @@ function renderTasks() {
           <h3>${esc(task.title || '')}</h3>
           <div class="meta">
             <span>${formatDate(task.createdAt)}</span>
-            <span class="task-elapsed">${esc(formatElapsedSince(task.createdAt))}</span>
             <span>登録: ${esc(displayCreatedBy(task))}</span>
             ${task.updatedBy ? `<span>更新: ${esc(task.updatedBy)}</span>` : ''}
           </div>
         </div>
-        <span class="badge status-${escAttr(task.status || 'todo')}">${STATUS_LABELS[task.status || 'todo'] || STATUS_LABELS.todo}</span>
+        <div class="item-badges">
+          <span class="task-elapsed">${esc(formatElapsedSince(task.createdAt))}</span>
+          <span class="badge status-${escAttr(task.status || 'todo')}">${STATUS_LABELS[task.status || 'todo'] || STATUS_LABELS.todo}</span>
+        </div>
       </div>
       ${textBlock('詳細', task.detail)}
       ${textBlock('完了条件', task.completion)}
