@@ -509,7 +509,12 @@ button{cursor:pointer}
             </div>
             <div class="field full">
               <label for="taskCompletion">完了条件</label>
-              <textarea id="taskCompletion" required></textarea>
+              <select id="taskCompletion" required>
+                <option value="" disabled selected>選択してください</option>
+                <option value="[取り組み内容] が1か月を目安に継続確認され、院長が定着を確認できたら完了">[取り組み内容] が1か月を目安に継続確認され、院長が定着を確認できたら完了</option>
+                <option value="実際に運用されている状態を1か月を目安に継続確認し、院長が定着を確認できたら完了">実際に運用されている状態を1か月を目安に継続確認し、院長が定着を確認できたら完了</option>
+                <option value="スタッフが正しく説明できる状態を1か月を目安に継続確認し、院長が定着を確認できたら完了">スタッフが正しく説明できる状態を1か月を目安に継続確認し、院長が定着を確認できたら完了</option>
+              </select>
             </div>
           </div>
           <div class="form-actions">
@@ -600,7 +605,7 @@ button{cursor:pointer}
 
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getDatabase, ref, push, set, update, remove, onValue } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
+import { getDatabase, ref, push, set, update, remove, onValue, get } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 
 const firebaseConfig = {
   apiKey:            'AIzaSyDdMe7feUF6CKPHH0YIx7Suk-WnXtOYUu8',
@@ -655,6 +660,8 @@ const PATHS = {
 let currentUser = readUser();
 let editingTaskId = null;
 let editingNoticeId = null;
+let dailyTaskNotificationInFlight = false;
+let dailyTaskNotificationDoneFor = '';
 let dailyNoticeNotificationInFlight = false;
 let dailyNoticeNotificationDoneFor = '';
 const state = { tasks:[], notices:[], opinions:[] };
@@ -784,6 +791,7 @@ function attachDataListeners() {
   onValue(ref(db, PATHS.tasks), snap => {
     state.tasks = toList(snap.val()).sort(sortTasks);
     renderTasks();
+    maybeSendDailyTaskReadNotification();
   });
   onValue(ref(db, PATHS.notices), snap => {
     state.notices = toList(snap.val()).sort((a,b) => (b.createdAt || 0) - (a.createdAt || 0));
@@ -850,8 +858,27 @@ async function saveTask(event) {
 function resetTaskForm() {
   editingTaskId = null;
   document.getElementById('taskForm').reset();
+  resetTaskCompletionOptions();
   document.getElementById('taskCancelBtn').hidden = true;
   document.getElementById('taskSubmitBtn').textContent = '取り組みを登録';
+}
+
+function ensureCompletionOption(value) {
+  const completion = String(value || '').trim();
+  const select = document.getElementById('taskCompletion');
+  if (!completion || !select) return;
+  if ([...select.options].some(option => option.value === completion)) return;
+  const option = document.createElement('option');
+  option.value = completion;
+  option.textContent = completion;
+  option.dataset.legacy = 'true';
+  select.appendChild(option);
+}
+
+function resetTaskCompletionOptions() {
+  document.querySelectorAll('#taskCompletion option[data-legacy="true"]').forEach(option => option.remove());
+  const select = document.getElementById('taskCompletion');
+  if (select) select.value = '';
 }
 
 async function saveNotice(event) {
@@ -941,6 +968,7 @@ async function handleActions(event) {
   if (action === 'confirm-task') return updateTaskStatus(id, 'confirmed');
   if (action === 'task-status') return updateTaskStatus(id, btn.dataset.status);
   if (action === 'save-progress') return saveProgress(id);
+  if (action === 'read-task') return markTaskRead(id);
   if (action === 'edit-notice') return fillNoticeForm(id);
   if (action === 'delete-notice') return deleteItem(PATHS.notices, id, 'お知らせ', state.notices.find(notice => notice.id === id));
   if (action === 'read-notice') return markNoticeRead(id);
@@ -955,6 +983,7 @@ function fillTaskForm(id) {
   editingTaskId = id;
   document.getElementById('taskTitle').value = item.title || '';
   document.getElementById('taskDetail').value = item.detail || '';
+  ensureCompletionOption(item.completion);
   document.getElementById('taskCompletion').value = item.completion || '';
   document.getElementById('taskImages').value = '';
   document.getElementById('taskCancelBtn').hidden = false;
@@ -1030,19 +1059,57 @@ async function saveJudgment(id) {
   showToast('判断を保存しました');
 }
 
-async function markNoticeRead(id) {
+async function markTaskRead(id) {
   if (!isNoticeTarget()) return;
-  const notice = state.notices.find(item => item.id === id);
-  if (!notice) return;
-  const currentRead = readByMap(notice)[currentUser.staffId];
+  const task = state.tasks.find(item => item.id === id);
+  if (!task) return;
+  const currentRead = readByMap(task)[currentUser.staffId];
   if (currentRead) return showToast('確認済みです');
-  await set(ref(db, `${PATHS.notices}/${id}/readBy/${currentUser.staffId}`), {
+  await set(ref(db, `${PATHS.tasks}/${id}/readBy/${currentUser.staffId}`), {
     staffId: currentUser.staffId,
     name: currentUser.name,
     role: NOTICE_TARGETS[currentUser.staffId]?.role || '',
     readAt: Date.now()
   });
   showToast('確認済みにしました');
+}
+
+async function markNoticeRead(id) {
+  if (!isNoticeTarget()) return;
+  const notice = state.notices.find(item => item.id === id);
+  if (!notice) return;
+  const currentRead = readByMap(notice)[currentUser.staffId];
+  if (currentRead) return showToast('確認済みです');
+  const readEntry = {
+    staffId: currentUser.staffId,
+    name: currentUser.name,
+    role: NOTICE_TARGETS[currentUser.staffId]?.role || '',
+    readAt: Date.now()
+  };
+  await set(ref(db, `${PATHS.notices}/${id}/readBy/${currentUser.staffId}`), readEntry);
+  const latestSnap = await get(ref(db, `${PATHS.notices}/${id}`));
+  const latestNotice = latestSnap.val();
+  if (latestNotice && isNoticeFullyRead(latestNotice, { [currentUser.staffId]: readEntry })) {
+    await remove(ref(db, `${PATHS.notices}/${id}`));
+    return showToast('全員確認済みのため、お知らせを削除しました');
+  }
+  showToast('確認済みにしました');
+}
+
+async function maybeSendDailyTaskReadNotification() {
+  const dateKey = todayKey();
+  if (dailyTaskNotificationInFlight || dailyTaskNotificationDoneFor === dateKey) return;
+
+  dailyTaskNotificationInFlight = true;
+
+  try {
+    await requestTaskUnreadCheck();
+    dailyTaskNotificationDoneFor = dateKey;
+  } catch (err) {
+    console.warn('取り組み未確認通知に失敗しました:', err);
+  } finally {
+    dailyTaskNotificationInFlight = false;
+  }
 }
 
 async function maybeSendDailyNoticeReadNotification() {
@@ -1066,6 +1133,15 @@ async function requestNoticeUnreadCheck() {
     method:'POST',
     headers:{ 'Content-Type':'application/json' },
     body:JSON.stringify({ action:'noticeUnreadCheck' })
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+}
+
+async function requestTaskUnreadCheck() {
+  const res = await fetch(NOTIFY_URL, {
+    method:'POST',
+    headers:{ 'Content-Type':'application/json' },
+    body:JSON.stringify({ action:'taskUnreadCheck' })
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
 }
@@ -1094,6 +1170,8 @@ function renderTasks() {
       ${textBlock('完了条件', task.completion)}
       ${task.progress ? textBlock('進捗メモ', task.progress) : ''}
       ${imagesHtml(task.images)}
+      ${taskReadButtonHtml(task)}
+      ${taskReadSummaryHtml(task)}
       ${leaderProgressHtml(task)}
       ${taskActionsHtml(task)}
     </article>
@@ -1123,6 +1201,24 @@ function taskActionsHtml(task) {
       <button class="btn danger" type="button" data-action="delete-task" data-id="${escAttr(task.id)}">削除</button>
     </div>
   `;
+}
+
+function taskReadButtonHtml(task) {
+  if (!isNoticeTarget()) return '';
+  const read = readByMap(task)[currentUser.staffId];
+  if (read) {
+    return `<div class="read-status">確認済み：${formatDate(read.readAt)}</div>`;
+  }
+  return `
+    <div class="item-actions">
+      <button class="btn primary" type="button" data-action="read-task" data-id="${escAttr(task.id)}">確認しました</button>
+    </div>
+  `;
+}
+
+function taskReadSummaryHtml(task) {
+  if (!canSeeOpinions()) return '';
+  return readSummaryHtml(task);
 }
 
 function renderNotices() {
@@ -1172,7 +1268,11 @@ function noticeReadButtonHtml(notice) {
 
 function noticeReadSummaryHtml(notice) {
   if (!canSeeOpinions()) return '';
-  const readBy = readByMap(notice);
+  return readSummaryHtml(notice);
+}
+
+function readSummaryHtml(item) {
+  const readBy = readByMap(item);
   const readIds = NOTICE_TARGET_IDS.filter(id => readBy[id]);
   const unreadIds = NOTICE_TARGET_IDS.filter(id => !readBy[id]);
   return `
@@ -1200,6 +1300,11 @@ function noticeReadSummaryHtml(notice) {
 
 function readByMap(notice) {
   return notice?.readBy && typeof notice.readBy === 'object' ? notice.readBy : {};
+}
+
+function isNoticeFullyRead(notice, extraReadBy = {}) {
+  const readBy = { ...readByMap(notice), ...extraReadBy };
+  return NOTICE_TARGET_IDS.length > 0 && NOTICE_TARGET_IDS.every(id => readBy[id]);
 }
 
 function readChip(id, isRead, read) {
