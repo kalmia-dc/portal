@@ -34,9 +34,11 @@ h1{font-size:24px;line-height:1.25;margin:0 0 8px;font-weight:900}
 .lead{margin:0;font-size:13px;line-height:1.7;opacity:.9}
 .auth-panel{background:var(--white);border-radius:16px;padding:16px;box-shadow:var(--shadow)}
 body.is-admin .auth-panel{display:none}
+body.is-editing-material .auth-panel{display:none}
 .auth-grid{display:grid;grid-template-columns:150px minmax(0,1fr) auto;gap:10px;align-items:end}
 .admin-panel{display:none;background:var(--white);border-radius:16px;padding:16px;box-shadow:var(--shadow)}
-body.is-admin .admin-panel{display:block}
+body.is-admin .admin-panel,
+body.is-editing-material .admin-panel{display:block}
 .panel-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
 .panel-title{font-weight:900;font-size:16px}
 .form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
@@ -79,8 +81,20 @@ input:focus,select:focus,textarea:focus{border-color:var(--mint)}
 .summary{font-size:13px;line-height:1.65;color:#405057;white-space:pre-wrap;overflow-wrap:anywhere;margin:0;flex:1}
 .card-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:auto}
 .empty{background:white;border-radius:16px;padding:28px 18px;text-align:center;color:var(--gray);box-shadow:var(--shadow)}
-.admin-actions{display:none;gap:8px;flex-wrap:wrap}
-body.is-admin .admin-actions{display:flex}
+.admin-actions{display:flex;gap:8px;flex-wrap:wrap}
+.comments{border-top:1px solid var(--line);padding-top:12px;display:flex;flex-direction:column;gap:10px}
+.comments-title{font-size:12px;font-weight:900;color:var(--gray)}
+.comment-list{display:flex;flex-direction:column;gap:8px;max-height:160px;overflow:auto}
+.comment{background:#f8fdff;border:1px solid var(--line);border-radius:8px;padding:9px 10px}
+.comment-head{display:flex;justify-content:space-between;gap:8px;font-size:11px;font-weight:900;color:var(--gray);margin-bottom:4px}
+.comment-text{font-size:13px;line-height:1.6;white-space:pre-wrap;overflow-wrap:anywhere;color:#405057}
+.comment-empty{font-size:12px;color:var(--gray);line-height:1.6}
+.comment-form{display:flex;flex-direction:column;gap:8px}
+.comment-form textarea{min-height:68px;font-size:13px}
+.comment-actions{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.comment-status{font-size:12px;color:var(--gray);line-height:1.5}
+.comment-status.ok{color:#188060;font-weight:800}
+.comment-status.err{color:#c0392b;font-weight:800}
 .hidden{display:none!important}
 @media (min-width:820px){
   .top{grid-template-columns:1fr 1.2fr;align-items:start}
@@ -395,6 +409,19 @@ function isAdmin() {
   return ADMIN_STAFF.includes(currentUser?.staffId);
 }
 
+function currentStaffId() {
+  return currentUser?.staffId || currentUser?.sid || '';
+}
+
+function canManageMaterial(item) {
+  if (isAdmin()) return true;
+  const staffId = currentStaffId();
+  if (!staffId || !item) return false;
+  if (item.createdById && item.createdById === staffId) return true;
+  const userName = currentUser?.name || STAFF_NAMES[staffId] || '';
+  return !item.createdById && userName && item.createdBy === userName;
+}
+
 function renderMaterials() {
   const list = document.getElementById('materialList');
   const q = document.getElementById('searchText').value.trim().toLowerCase();
@@ -423,6 +450,12 @@ function renderMaterials() {
     const size = formatSize(item.fileSize || 0);
     const openUrl = escAttr(item.url || item.linkUrl || '#');
     const downloadButton = isLink ? '' : `<a class="btn ghost" href="${openUrl}" target="_blank" rel="noopener" download>ダウンロード</a>`;
+    const manageActions = canManageMaterial(item)
+      ? `<div class="admin-actions">
+          <button class="btn secondary" type="button" onclick="startEdit('${escAttr(item.id)}')">編集</button>
+          <button class="btn danger" type="button" onclick="deleteMaterial('${escAttr(item.id)}')">削除</button>
+        </div>`
+      : '';
     return `
       <article class="card">
         <div class="card-head">
@@ -442,11 +475,9 @@ function renderMaterials() {
         <div class="card-actions">
           <a class="btn primary" href="${openUrl}" target="_blank" rel="noopener">開く</a>
           ${downloadButton}
-          <div class="admin-actions">
-            <button class="btn secondary" type="button" onclick="startEdit('${item.id}')">編集</button>
-            <button class="btn danger" type="button" onclick="deleteMaterial('${item.id}')">削除</button>
-          </div>
+          ${manageActions}
         </div>
+        ${renderCommentSection(item)}
       </article>
     `;
   }).join('');
@@ -454,7 +485,12 @@ function renderMaterials() {
 
 window.saveMaterial = async function(event) {
   event.preventDefault();
-  if (!isAdmin()) return;
+  const existingMaterial = editingId ? (editingMaterial || materials.find(material => material.id === editingId)) : null;
+  if (editingId) {
+    if (!canManageMaterial(existingMaterial)) return setStatus('この資料を編集できません。', 'err');
+  } else if (!isAdmin()) {
+    return setStatus('資料の追加は管理者のみ可能です。', 'err');
+  }
 
   const title = document.getElementById('materialTitle').value.trim();
   const category = document.getElementById('materialCategory').value;
@@ -488,8 +524,8 @@ window.saveMaterial = async function(event) {
         summary,
         ...filePayload,
         updatedAt: now,
-        updatedBy: currentUser.name,
-        updatedById: currentUser.staffId
+        updatedBy: currentUser?.name || '不明',
+        updatedById: currentStaffId()
       });
       if ((mode === 'link' || file) && editingMaterial?.storagePath && editingMaterial.storagePath !== filePayload.storagePath) {
         await deleteStorageFile(editingMaterial.storagePath, true);
@@ -503,11 +539,11 @@ window.saveMaterial = async function(event) {
         summary,
         ...filePayload,
         createdAt: now,
-        createdBy: currentUser.name,
-        createdById: currentUser.staffId,
+        createdBy: currentUser?.name || '不明',
+        createdById: currentStaffId(),
         updatedAt: now,
-        updatedBy: currentUser.name,
-        updatedById: currentUser.staffId
+        updatedBy: currentUser?.name || '不明',
+        updatedById: currentStaffId()
       });
       setStatus('保存しました。', 'ok');
     }
@@ -554,11 +590,12 @@ function uploadFile(file) {
 }
 
 window.startEdit = function(id) {
-  if (!isAdmin()) return;
   const item = materials.find(material => material.id === id);
   if (!item) return;
+  if (!canManageMaterial(item)) return setStatus('この資料を編集できません。', 'err');
   editingId = id;
   editingMaterial = item;
+  document.body.classList.add('is-editing-material');
   document.getElementById('formTitle').textContent = '資料を編集';
   document.getElementById('materialTitle').value = item.title || '';
   document.getElementById('materialCategory').value = item.category || 'その他';
@@ -578,9 +615,9 @@ window.cancelEdit = function() {
 };
 
 window.deleteMaterial = async function(id) {
-  if (!isAdmin()) return;
   const item = materials.find(material => material.id === id);
   if (!item) return;
+  if (!canManageMaterial(item)) return setStatus('この資料を削除できません。', 'err');
   if (!confirm(`「${item.title || item.fileName || '資料'}」を削除しますか？`)) return;
   try {
     if (item.storagePath) await deleteStorageFile(item.storagePath, false);
@@ -590,6 +627,93 @@ window.deleteMaterial = async function(id) {
     setStatus(`削除できませんでした: ${error.message}`, 'err');
   }
 };
+
+function renderCommentSection(item) {
+  const comments = normalizeComments(item.comments);
+  const materialId = escAttr(item.id);
+  const safeId = domId(item.id);
+  const canComment = Boolean(currentStaffId());
+  const disabled = canComment ? '' : 'disabled';
+  const placeholder = canComment ? '質問や確認したいことを入力' : 'ポータルから開くと質問できます';
+  const commentList = comments.length
+    ? comments.map(comment => `
+        <div class="comment">
+          <div class="comment-head">
+            <span>${esc(comment.createdBy || '不明')}</span>
+            <span>${esc(formatDateTime(comment.createdAt))}</span>
+          </div>
+          <div class="comment-text">${esc(comment.text || '')}</div>
+        </div>
+      `).join('')
+    : '<div class="comment-empty">まだ質問はありません。</div>';
+
+  return `
+    <section class="comments" aria-label="${escAttr(item.title || item.fileName || '資料')}への質問">
+      <div class="comments-title">質問・コメント</div>
+      <div class="comment-list">${commentList}</div>
+      <form class="comment-form" onsubmit="saveComment(event, '${materialId}')">
+        <textarea maxlength="500" placeholder="${escAttr(placeholder)}" ${disabled}></textarea>
+        <div class="comment-actions">
+          <span class="comment-status" id="commentStatus-${safeId}"></span>
+          <button class="btn secondary" type="submit" ${disabled}>送信</button>
+        </div>
+      </form>
+    </section>
+  `;
+}
+
+function normalizeComments(rawComments) {
+  if (!rawComments) return [];
+  const entries = Array.isArray(rawComments)
+    ? rawComments.map((comment, index) => [String(index), comment])
+    : Object.entries(rawComments);
+
+  return entries
+    .map(([id, comment]) => ({ id, ...(comment || {}) }))
+    .filter(comment => String(comment.text || '').trim())
+    .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+}
+
+window.saveComment = async function(event, id) {
+  event.preventDefault();
+  if (!currentStaffId()) return setCommentStatus(id, 'ポータルから開いてください。', 'err');
+
+  const form = event.currentTarget;
+  const textarea = form.querySelector('textarea');
+  const button = form.querySelector('button[type="submit"]');
+  const text = textarea.value.trim();
+  if (!text) return setCommentStatus(id, '質問を入力してください。', 'err');
+
+  button.disabled = true;
+  setCommentStatus(id, '送信しています。');
+
+  try {
+    const item = materials.find(material => material.id === id);
+    if (!item) throw new Error('資料が見つかりません');
+
+    const now = Date.now();
+    const commentRef = push(ref(db, `${DB_PATH}/${id}/comments`));
+    await set(commentRef, {
+      text,
+      createdAt: now,
+      createdBy: currentUser?.name || STAFF_NAMES[currentStaffId()] || '不明',
+      createdById: currentStaffId()
+    });
+    textarea.value = '';
+    setCommentStatus(id, '送信しました。', 'ok');
+  } catch(error) {
+    setCommentStatus(id, `送信できませんでした: ${error.message}`, 'err');
+  } finally {
+    button.disabled = false;
+  }
+};
+
+function setCommentStatus(id, text, type = '') {
+  const el = document.getElementById(`commentStatus-${domId(id)}`);
+  if (!el) return;
+  el.textContent = text || '';
+  el.className = `comment-status ${type}`.trim();
+}
 
 async function deleteStorageFile(path, silent) {
   try {
@@ -609,6 +733,7 @@ function resetForm() {
   document.getElementById('formTitle').textContent = '資料を追加';
   document.getElementById('cancelEditBtn').classList.add('hidden');
   document.getElementById('saveBtn').textContent = '保存';
+  document.body.classList.remove('is-editing-material');
   updateFileHint();
 }
 
@@ -734,6 +859,17 @@ function formatDate(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '';
   return `${date.getFullYear()}/${String(date.getMonth()+1).padStart(2,'0')}/${String(date.getDate()).padStart(2,'0')}`;
+}
+
+function formatDateTime(value) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return `${formatDate(value)} ${String(date.getHours()).padStart(2,'0')}:${String(date.getMinutes()).padStart(2,'0')}`;
+}
+
+function domId(value) {
+  return String(value ?? '').replace(/[^a-zA-Z0-9_-]/g, '_') || 'item';
 }
 
 function esc(value) {
