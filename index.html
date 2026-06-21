@@ -412,7 +412,7 @@
   <!-- お知らせ（Firebase連携） -->
   <div class="hero-notice-card" id="heroNoticeCard">
     <div class="hero-notice-label">
-      <span>📢 お知らせ</span>
+      <span>📢 更新情報</span>
       <button class="hero-notice-post-btn" id="noticePostBtn" onclick="openNoticeModal()">＋ 投稿</button>
     </div>
     <div id="heroNoticeList"></div>
@@ -635,10 +635,10 @@
 <div class="modal-overlay" id="noticeModal" onclick="closeNoticeModalIfBg(event)">
   <div class="modal-sheet" id="noticeModal">
     <div class="modal-handle"></div>
-    <div class="modal-title">📢 お知らせを投稿</div>
+    <div class="modal-title">📢 更新情報を投稿</div>
     <div class="pw-field">
       <label>内容</label>
-      <textarea class="notice-textarea" id="noticeText" placeholder="お知らせ内容を入力..."></textarea>
+      <textarea class="notice-textarea" id="noticeText" placeholder="更新情報を入力..."></textarea>
     </div>
     <div class="pw-msg" id="noticeMsg"></div>
     <button class="pw-btn primary" onclick="submitNotice()">投稿する</button>
@@ -1256,7 +1256,7 @@ function renderNotices(data) {
   card.classList.add('has-items');
 
   if (!items.length) {
-    list.innerHTML = '<div style="font-size:12px;opacity:.7;">まだお知らせはありません</div>';
+    list.innerHTML = '<div style="font-size:12px;opacity:.7;">まだ更新情報はありません</div>';
     return;
   }
 
@@ -1279,7 +1279,7 @@ function escHtml(str) {
 }
 
 async function deleteNotice(key) {
-  if (!confirm('このお知らせを削除しますか？')) return;
+  if (!confirm('この更新情報を削除しますか？')) return;
   await remove(ref(_db, `notices/${key}`));
 }
 
