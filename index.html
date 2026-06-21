@@ -98,13 +98,16 @@
 
   .notice-strip {
     background:rgba(255,255,255,.18); backdrop-filter:blur(8px);
-    border-radius:16px; padding:14px 16px; color:white;
+    border-radius:16px; padding:14px 16px 14px 34px; color:white;
     font-size:13px; line-height:1.45;
-    display:grid; grid-template-columns:8px minmax(0,1fr); align-items:start; column-gap:10px;
-    position:relative; z-index:1; min-height:52px;
+    display:block; position:relative; z-index:1; min-height:52px; width:100%;
   }
-  .notice-deadline-text { display:block; min-width:0; overflow-wrap:break-word; word-break:normal; }
-  .notice-dot { width:8px; height:8px; margin-top:.45em; background:var(--yellow); border-radius:50%; flex-shrink:0; animation:pulse 1.5s ease-in-out infinite; }
+  .notice-deadline-text { display:block; width:100%; min-width:0; }
+  .notice-deadline-main,
+  .notice-deadline-sub { display:block; width:100%; min-width:0; white-space:normal; overflow-wrap:break-word; }
+  .notice-deadline-main { font-weight:700; }
+  .notice-deadline-sub { margin-top:2px; font-size:12px; opacity:.9; }
+  .notice-dot { position:absolute; left:16px; top:20px; width:8px; height:8px; background:var(--yellow); border-radius:50%; animation:pulse 1.5s ease-in-out infinite; }
   @keyframes pulse { 0%,100%{transform:scale(1);opacity:1} 50%{transform:scale(1.3);opacity:.7} }
 
   /* ── MAIN ── */
@@ -455,7 +458,10 @@
 
   <div class="notice-strip">
     <div class="notice-dot"></div>
-    <span class="notice-deadline-text" id="deadlineNotice">...</span>
+    <div class="notice-deadline-text" id="deadlineNotice" aria-live="polite">
+      <span class="notice-deadline-main" id="deadlineNoticeMain">...</span>
+      <span class="notice-deadline-sub" id="deadlineNoticeSub"></span>
+    </div>
   </div>
 </div>
 
@@ -1108,14 +1114,24 @@ async function initApp() {
   const targetYear  = now.getFullYear() + Math.floor((now.getMonth() + 4) / 12);
   const targetMonthName = ((now.getMonth() + 4) % 12) + 1;
   const deadlineEl = document.getElementById('deadlineNotice');
+  const deadlineMainEl = document.getElementById('deadlineNoticeMain');
+  const deadlineSubEl = document.getElementById('deadlineNoticeSub');
+  const setDeadlineNotice = (mainText, subText) => {
+    if (deadlineMainEl && deadlineSubEl) {
+      deadlineMainEl.textContent = mainText;
+      deadlineSubEl.textContent = subText;
+    } else if (deadlineEl) {
+      deadlineEl.textContent = `${mainText} ${subText}`;
+    }
+  };
   if (now <= deadline) {
     const daysLeft = Math.ceil((deadline - now) / 86400000);
-    deadlineEl.innerHTML = `シフト提出締切：<strong>${targetMonthName}月分</strong> ／ ${now.getMonth()+1}月25日まで（残り${daysLeft}日）`;
+    setDeadlineNotice(`シフト提出締切：${targetMonthName}月分`, `${now.getMonth()+1}月25日まで（残り${daysLeft}日）`);
   } else {
     // 25日を過ぎたら翌月分を案内
     const nextDeadlineMonth = now.getMonth() + 2;
     const nextTargetMonth   = ((now.getMonth() + 5) % 12) + 1;
-    deadlineEl.innerHTML = `次回締切：<strong>${nextTargetMonth}月分</strong> ／ ${nextDeadlineMonth > 12 ? nextDeadlineMonth-12 : nextDeadlineMonth}月25日まで`;
+    setDeadlineNotice(`次回締切：${nextTargetMonth}月分`, `${nextDeadlineMonth > 12 ? nextDeadlineMonth-12 : nextDeadlineMonth}月25日まで`);
   }
 
   // 管理者リンクを表示（杉平・百々のみ）
