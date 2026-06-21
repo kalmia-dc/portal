@@ -100,11 +100,11 @@
     background:rgba(255,255,255,.18); backdrop-filter:blur(8px);
     border-radius:16px; padding:14px 16px; color:white;
     font-size:13px; line-height:1.45;
-    display:flex; align-items:flex-start; gap:10px;
+    display:grid; grid-template-columns:8px minmax(0,1fr); align-items:start; column-gap:10px;
     position:relative; z-index:1; min-height:52px;
   }
-  .notice-strip span { flex:1 1 auto; min-width:0; overflow-wrap:anywhere; }
-  .notice-dot { width:8px; height:8px; background:var(--yellow); border-radius:50%; flex-shrink:0; animation:pulse 1.5s ease-in-out infinite; }
+  .notice-deadline-text { display:block; min-width:0; overflow-wrap:break-word; word-break:normal; }
+  .notice-dot { width:8px; height:8px; margin-top:.45em; background:var(--yellow); border-radius:50%; flex-shrink:0; animation:pulse 1.5s ease-in-out infinite; }
   @keyframes pulse { 0%,100%{transform:scale(1);opacity:1} 50%{transform:scale(1.3);opacity:.7} }
 
   /* ── MAIN ── */
@@ -455,7 +455,7 @@
 
   <div class="notice-strip">
     <div class="notice-dot"></div>
-    <span id="deadlineNotice">...</span>
+    <span class="notice-deadline-text" id="deadlineNotice">...</span>
   </div>
 </div>
 
