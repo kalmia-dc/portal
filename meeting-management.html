@@ -397,6 +397,19 @@ button{cursor:pointer}
   grid-template-columns:180px 1fr;
   gap:8px;
 }
+.decision-reasons{
+  grid-column:1 / -1;
+  display:grid;
+  gap:8px;
+}
+.decision-reason-field{
+  display:grid;
+  gap:6px;
+  color:var(--muted);
+  font-size:12px;
+  font-weight:800;
+}
+.decision-reason-field[hidden]{display:none}
 .decision-grid textarea{
   min-height:80px;
   border:1px solid var(--line);
@@ -670,6 +683,7 @@ const DECISION_LABELS = {
   rejected:'不承認',
   hold:'保留'
 };
+const DECISION_REASON_KEYS = ['approved', 'rejected', 'hold'];
 const PATHS = {
   tasks:'meetingManagement/tasks',
   notices:'meetingManagement/notices',
@@ -795,6 +809,7 @@ function setupForms() {
   document.getElementById('noticeForm').addEventListener('submit', saveNotice);
   document.getElementById('noticeCancelBtn').addEventListener('click', resetNoticeForm);
   document.getElementById('opinionForm').addEventListener('submit', saveOpinion);
+  document.addEventListener('change', handleDecisionChange);
   document.addEventListener('click', handleActions);
 }
 
@@ -1066,16 +1081,49 @@ async function saveProgress(id) {
 async function saveJudgment(id) {
   if (!isDirector()) return;
   const decision = document.querySelector(`[data-decision-id="${cssEscape(id)}"]`)?.value || 'pending';
-  const memo = document.querySelector(`[data-memo-id="${cssEscape(id)}"]`)?.value.trim() || '';
+  const decisionReasons = collectDecisionReasons(id);
+  const reason = decision === 'pending' ? '' : decisionReasons[decision];
+  if (decision !== 'pending' && !reason) {
+    const activeInput = document.querySelector(`[data-reason-id="${cssEscape(id)}"][data-reason-decision="${decision}"]`);
+    if (activeInput) activeInput.focus();
+    return showToast(`${DECISION_LABELS[decision]}理由を入力してください`);
+  }
   await update(ref(db, `${PATHS.opinions}/${id}`), {
     decision,
-    directorMemo: memo,
+    decisionReasons,
+    directorMemo: reason,
     decidedAt: Date.now(),
     decidedBy: currentUser.name,
     updatedAt: Date.now(),
     updatedBy: currentUser.name
   });
   showToast('判断を保存しました');
+}
+
+function collectDecisionReasons(id) {
+  const reasons = {};
+  document.querySelectorAll(`[data-reason-id="${cssEscape(id)}"]`).forEach(input => {
+    const key = input.dataset.reasonDecision;
+    if (DECISION_REASON_KEYS.includes(key)) reasons[key] = input.value.trim();
+  });
+  return reasons;
+}
+
+function handleDecisionChange(event) {
+  const select = event.target.closest('[data-decision-id]');
+  if (!select) return;
+  updateDecisionReasonFields(select.dataset.decisionId, select.value);
+}
+
+function updateDecisionReasonFields(id, decision) {
+  document.querySelectorAll(`[data-reason-wrap="${cssEscape(id)}"]`).forEach(field => {
+    const active = field.dataset.reasonDecision === decision && DECISION_REASON_KEYS.includes(decision);
+    field.hidden = !active;
+    const input = field.querySelector('textarea');
+    if (!input) return;
+    if (active) input.setAttribute('required', '');
+    else input.removeAttribute('required');
+  });
 }
 
 async function markTaskRead(id) {
@@ -1356,7 +1404,7 @@ function renderOpinions() {
       </div>
       ${textBlock('提言内容', opinion.content)}
       ${textBlock('背景/理由', opinion.reason)}
-      ${opinion.directorMemo ? textBlock('院長判断メモ', opinion.directorMemo) : ''}
+      ${decisionReasonHtml(opinion)}
       ${imagesHtml(opinion.images)}
       ${judgmentHtml(opinion)}
     </article>
@@ -1365,18 +1413,51 @@ function renderOpinions() {
 
 function judgmentHtml(opinion) {
   if (!isDirector()) return '';
+  const decision = opinion.decision || 'pending';
+  const reasons = decisionReasonsOf(opinion);
   return `
     <div class="decision-grid">
       <select data-decision-id="${escAttr(opinion.id)}">
-        ${Object.entries(DECISION_LABELS).map(([value, label]) => `<option value="${value}" ${value === (opinion.decision || 'pending') ? 'selected' : ''}>${label}</option>`).join('')}
+        ${Object.entries(DECISION_LABELS).map(([value, label]) => `<option value="${value}" ${value === decision ? 'selected' : ''}>${label}</option>`).join('')}
       </select>
-      <textarea data-memo-id="${escAttr(opinion.id)}" placeholder="院長判断メモ">${esc(opinion.directorMemo || '')}</textarea>
+      <div class="decision-reasons">
+        ${DECISION_REASON_KEYS.map(key => {
+          const active = key === decision;
+          const label = `${DECISION_LABELS[key]}理由`;
+          const value = reasons[key] || (active ? opinion.directorMemo || '' : '');
+          return `
+            <label class="decision-reason-field" data-reason-wrap="${escAttr(opinion.id)}" data-reason-decision="${key}" ${active ? '' : 'hidden'}>
+              <span>${label}</span>
+              <textarea data-reason-id="${escAttr(opinion.id)}" data-reason-decision="${key}" placeholder="${label}" ${active ? 'required' : ''}>${esc(value)}</textarea>
+            </label>
+          `;
+        }).join('')}
+      </div>
     </div>
     <div class="item-actions">
       <button class="btn primary" type="button" data-action="save-judgment" data-id="${escAttr(opinion.id)}">判断を保存</button>
       <button class="btn danger" type="button" data-action="delete-opinion" data-id="${escAttr(opinion.id)}">削除</button>
     </div>
   `;
+}
+
+function decisionReasonHtml(opinion) {
+  const decision = opinion.decision || 'pending';
+  const reason = currentDecisionReason(opinion);
+  if (!reason) return '';
+  const label = DECISION_REASON_KEYS.includes(decision) ? `${DECISION_LABELS[decision]}理由` : '院長判断メモ';
+  return textBlock(label, reason);
+}
+
+function currentDecisionReason(opinion) {
+  const decision = opinion.decision || 'pending';
+  const reasons = decisionReasonsOf(opinion);
+  if (DECISION_REASON_KEYS.includes(decision)) return reasons[decision] || opinion.directorMemo || '';
+  return opinion.directorMemo || '';
+}
+
+function decisionReasonsOf(opinion) {
+  return opinion?.decisionReasons && typeof opinion.decisionReasons === 'object' ? opinion.decisionReasons : {};
 }
 
 function textBlock(label, value) {
