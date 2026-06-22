@@ -2273,7 +2273,7 @@ function renderIncidentReports() {
 }
 
 function visibleIncidentReports() {
-  return state.incidentReports.filter(report => isDirector() || isLeader() || report.createdById === currentUser.staffId);
+  return state.incidentReports;
 }
 
 function canManageIncidentReport() {
