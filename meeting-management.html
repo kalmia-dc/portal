@@ -504,6 +504,13 @@ button{cursor:pointer}
   border-radius:8px;
   background:#fffdf6;
 }
+.incident-edit-panel{
+  margin-top:12px;
+  padding:12px;
+  border:1px solid #edf1f3;
+  border-radius:8px;
+  background:#f8fafb;
+}
 .import-panel{
   display:grid;
   gap:12px;
@@ -1468,8 +1475,6 @@ async function saveIncidentReport() {
     reportNumber: buildIncidentReportNumber(incidentDraft),
     occurredAtText: formatIncidentOccurredAt(incidentDraft),
     countermeasure:'',
-    counterOwner:'',
-    counterDueDate:'',
     counterStatus:'pending',
     meetingReportDate:'',
     createdAt: now,
@@ -1623,8 +1628,6 @@ async function saveIncidentImports() {
       ...candidate,
       occurredAtText: formatIncidentOccurredAt(candidate),
       counterStatus: candidate.countermeasure ? 'decided' : 'pending',
-      counterOwner:'',
-      counterDueDate:'',
       importedAt: now,
       importedBy: currentUser.name,
       createdAt: now,
@@ -1842,6 +1845,8 @@ async function handleActions(event) {
   if (action === 'read-notice') return markNoticeRead(id);
   if (action === 'delete-opinion') return deleteItem(PATHS.opinions, id, '提言');
   if (action === 'save-judgment') return saveJudgment(id);
+  if (action === 'toggle-incident-edit') return toggleIncidentEdit(id);
+  if (action === 'save-incident-report') return saveIncidentReportEdit(id);
   if (action === 'save-incident-followup') return saveIncidentFollowup(id);
   if (action === 'delete-incident') return deleteIncidentReport(id);
 }
@@ -2255,10 +2260,12 @@ function renderIncidentReports() {
       ${textBlock('ミーティングへの申し送り', report.handoff)}
       ${textBlock('対策（ミーティングにて記入）', report.countermeasure)}
       ${incidentConfirmationHtml(report)}
+      ${incidentEditHtml(report)}
       ${incidentFollowupHtml(report)}
-      ${canManageIncidentReport(report) ? `
+      ${canEditIncidentReport(report) || canManageIncidentReport(report) ? `
         <div class="item-actions">
-          <button class="btn danger" type="button" data-action="delete-incident" data-id="${escAttr(report.id)}">削除</button>
+          ${canEditIncidentReport(report) ? `<button class="btn" type="button" data-action="toggle-incident-edit" data-id="${escAttr(report.id)}">編集</button>` : ''}
+          ${canManageIncidentReport(report) ? `<button class="btn danger" type="button" data-action="delete-incident" data-id="${escAttr(report.id)}">削除</button>` : ''}
         </div>
       ` : ''}
     </article>
@@ -2273,10 +2280,106 @@ function canManageIncidentReport() {
   return isDirector() || isLeader();
 }
 
+function canEditIncidentReport(report) {
+  return isDirector() || isLeader() || report?.createdById === currentUser.staffId;
+}
+
 function incidentConfirmationHtml(report) {
   if (report.counterStatus !== 'confirmed') return '';
   const confirmedDate = report.confirmedAt ? formatDate(report.confirmedAt) : '-';
   return `<div class="read-status">定着確認済み：${esc(confirmedDate)} / ${esc(report.confirmedBy || '-')}</div>`;
+}
+
+function incidentEditHtml(report) {
+  if (!canEditIncidentReport(report)) return '';
+  const categoryText = report.categoryText || incidentCategoryText(report);
+  return `
+    <div class="incident-edit-panel" data-incident-edit-panel="${escAttr(report.id)}" hidden>
+      <div class="form-grid">
+        <div class="field">
+          <label>報告番号</label>
+          <input data-incident-edit="${escAttr(report.id)}" data-field="reportNumber" value="${escAttr(report.reportNumber || buildIncidentReportNumber(report))}">
+        </div>
+        <div class="field">
+          <label>種別</label>
+          <select data-incident-edit="${escAttr(report.id)}" data-field="type">
+            ${Object.entries(INCIDENT_TYPE_LABELS).map(([value, label]) => `<option value="${escAttr(value)}" ${value === (report.type || 'near_miss') ? 'selected' : ''}>${esc(label)}</option>`).join('')}
+          </select>
+        </div>
+        <div class="field">
+          <label>発生日</label>
+          <input type="date" data-incident-edit="${escAttr(report.id)}" data-field="occurredDate" value="${escAttr(report.occurredDate || '')}">
+        </div>
+        <div class="field">
+          <label>発生時刻</label>
+          <input data-incident-edit="${escAttr(report.id)}" data-field="occurredTime" value="${escAttr(report.occurredTime || '')}">
+        </div>
+        <div class="field">
+          <label>記入日</label>
+          <input type="date" data-incident-edit="${escAttr(report.id)}" data-field="entryDate" value="${escAttr(report.entryDate || '')}">
+        </div>
+        <div class="field">
+          <label>記入者名</label>
+          <input data-incident-edit="${escAttr(report.id)}" data-field="reporterName" value="${escAttr(report.reporterName || '')}">
+        </div>
+        <div class="field">
+          <label>発見者名</label>
+          <input data-incident-edit="${escAttr(report.id)}" data-field="discovererName" value="${escAttr(report.discovererName || '')}">
+        </div>
+        <div class="field">
+          <label>危険度</label>
+          <select data-incident-edit="${escAttr(report.id)}" data-field="level">
+            ${Object.entries(INCIDENT_LEVEL_LABELS).map(([value, label]) => `<option value="${escAttr(value)}" ${value === (report.level || 'B') ? 'selected' : ''}>${esc(label)}</option>`).join('')}
+          </select>
+        </div>
+        <div class="field full">
+          <label>事象の種類</label>
+          <input data-incident-edit="${escAttr(report.id)}" data-field="categoryText" value="${escAttr(categoryText === '-' ? '' : categoryText)}">
+        </div>
+        <div class="field full">
+          <label>概要</label>
+          <textarea data-incident-edit="${escAttr(report.id)}" data-field="overview">${esc(report.overview || '')}</textarea>
+        </div>
+        <div class="field">
+          <label>場面</label>
+          <input data-incident-edit="${escAttr(report.id)}" data-field="scene" value="${escAttr(report.scene || '')}">
+        </div>
+        <div class="field full">
+          <label>どうなりそうだった？ / 発生した実害</label>
+          <textarea data-incident-edit="${escAttr(report.id)}" data-field="eventImpact">${esc(report.eventImpact || '')}</textarea>
+        </div>
+        <div class="field full">
+          <label>具体的な内容</label>
+          <textarea data-incident-edit="${escAttr(report.id)}" data-field="details">${esc(report.details || '')}</textarea>
+        </div>
+        <div class="field full">
+          <label>なぜ防げたか（ヒヤリハットのみ）</label>
+          <textarea data-incident-edit="${escAttr(report.id)}" data-field="goodPoint">${esc(report.goodPoint || '')}</textarea>
+        </div>
+        <div class="field full">
+          <label>原因【人・行動】</label>
+          <textarea data-incident-edit="${escAttr(report.id)}" data-field="causeHuman">${esc(report.causeHuman || '')}</textarea>
+        </div>
+        <div class="field full">
+          <label>原因【環境・連携】</label>
+          <textarea data-incident-edit="${escAttr(report.id)}" data-field="causeEnvironment">${esc(report.causeEnvironment || '')}</textarea>
+        </div>
+        <div class="field full">
+          <label>ミーティングへの申し送り</label>
+          <textarea data-incident-edit="${escAttr(report.id)}" data-field="handoff">${esc(report.handoff || '')}</textarea>
+        </div>
+      </div>
+      <div class="item-actions">
+        <button class="btn primary" type="button" data-action="save-incident-report" data-id="${escAttr(report.id)}">報告内容を保存</button>
+      </div>
+    </div>
+  `;
+}
+
+function toggleIncidentEdit(id) {
+  const panel = document.querySelector(`[data-incident-edit-panel="${cssEscape(id)}"]`);
+  if (!panel) return;
+  panel.hidden = !panel.hidden;
 }
 
 function incidentFollowupHtml(report) {
@@ -2289,14 +2392,6 @@ function incidentFollowupHtml(report) {
         <div class="field full">
           <label>対策内容</label>
           <textarea data-incident-followup="${escAttr(report.id)}" data-field="countermeasure">${esc(report.countermeasure || '')}</textarea>
-        </div>
-        <div class="field">
-          <label>担当者</label>
-          <input data-incident-followup="${escAttr(report.id)}" data-field="counterOwner" value="${escAttr(report.counterOwner || '')}">
-        </div>
-        <div class="field">
-          <label>実施期限</label>
-          <input type="date" data-incident-followup="${escAttr(report.id)}" data-field="counterDueDate" value="${escAttr(report.counterDueDate || '')}">
         </div>
         <div class="field">
           <label>実施状況</label>
@@ -2323,6 +2418,47 @@ function incidentStatusOptionsHtml(currentStatus) {
   }).join('');
 }
 
+async function saveIncidentReportEdit(id) {
+  const report = state.incidentReports.find(item => item.id === id);
+  if (!report || !canEditIncidentReport(report)) return;
+  const value = field => document.querySelector(`[data-incident-edit="${cssEscape(id)}"][data-field="${field}"]`)?.value.trim() || '';
+  const reportNumber = value('reportNumber') || buildIncidentReportNumber(report);
+  const duplicate = state.incidentReports.find(item => item.id !== id && item.reportNumber === reportNumber);
+  if (duplicate) return showToast('同じ報告番号の報告が既にあります');
+  const occurredDate = value('occurredDate');
+  const type = value('type');
+  const details = value('details');
+  if (!reportNumber || !type || !occurredDate || !details) {
+    return showToast('報告番号・種別・発生日・具体的な内容は必須です');
+  }
+  const categoryText = value('categoryText');
+  const payload = {
+    reportNumber,
+    type,
+    occurredDate,
+    occurredTime: value('occurredTime'),
+    occurredAtText: formatIncidentOccurredAt({ occurredDate, occurredTime: value('occurredTime') }),
+    entryDate: value('entryDate'),
+    reporterName: value('reporterName'),
+    discovererName: value('discovererName'),
+    categoryText,
+    category: parseCategoryCodes(categoryText),
+    level: value('level'),
+    overview: value('overview'),
+    scene: value('scene'),
+    eventImpact: value('eventImpact'),
+    details,
+    goodPoint: type === 'near_miss' ? value('goodPoint') : '',
+    causeHuman: value('causeHuman'),
+    causeEnvironment: value('causeEnvironment'),
+    handoff: value('handoff'),
+    updatedAt: Date.now(),
+    updatedBy: currentUser.name
+  };
+  await update(ref(db, `${PATHS.incidentReports}/${id}`), payload);
+  showToast('報告内容を保存しました');
+}
+
 async function saveIncidentFollowup(id) {
   if (!canManageIncidentReport()) return;
   const report = state.incidentReports.find(item => item.id === id);
@@ -2335,8 +2471,6 @@ async function saveIncidentFollowup(id) {
   }
   const payload = {
     countermeasure: incidentFollowupField(id, 'countermeasure'),
-    counterOwner: incidentFollowupField(id, 'counterOwner'),
-    counterDueDate: incidentFollowupField(id, 'counterDueDate'),
     counterStatus: nextStatus,
     meetingReportDate: incidentFollowupField(id, 'meetingReportDate'),
     updatedAt: Date.now(),
