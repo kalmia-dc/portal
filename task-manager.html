@@ -888,6 +888,7 @@ let currentFilter = currentUser?.staffId === 'guest' ? 'everyone' : 'all';
 let currentView   = 'board';
 let editingId     = null;
 let saving        = false;
+const taskStatusUpdateInFlight = new Set();
 
 const isIncho = () => currentUser?.staffId === 'sugihira' || currentUser?.name === '院長';
 const isGuestUser = () => currentUser?.staffId === 'guest';
@@ -1471,6 +1472,11 @@ const NOTIFY_URL = 'https://kalmia-notify.chibakenmin-sugihey.workers.dev';
 const NOTIFY_START_HOUR = 8;
 const NOTIFY_END_HOUR   = 19;
 const NOTIFY_QUEUE_KEY  = 'task_notify_queue';
+const NOTIFY_SENT_KEY   = 'task_notify_sent_ids';
+const NOTIFY_FLUSH_LOCK_KEY = 'task_notify_flush_lock';
+const NOTIFY_SEND_LOCK_PREFIX = 'task_notify_send_lock:';
+const NOTIFY_LOCK_TTL_MS = 60 * 1000;
+const NOTIFY_SENT_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 
 let taskMaintenanceStarted = false;
 let deadlineCheckTimer = null;
@@ -1497,10 +1503,89 @@ function saveNotifyQueue(queue) {
   localStorage.setItem(NOTIFY_QUEUE_KEY, JSON.stringify(queue));
 }
 
-function queueNotify(text) {
+function hashNotifyText(text) {
+  let hash = 0;
+  for (let i = 0; i < String(text || '').length; i++) {
+    hash = ((hash << 5) - hash + String(text).charCodeAt(i)) | 0;
+  }
+  return Math.abs(hash).toString(36);
+}
+
+function notifyItemId(item) {
+  if (!item) return '';
+  if (item.id) return String(item.id);
+  return `legacy:${hashNotifyText(item.text || '')}`;
+}
+
+function getNotifySentMap() {
+  let map = {};
+  try { map = JSON.parse(localStorage.getItem(NOTIFY_SENT_KEY) || '{}') || {}; }
+  catch(e) { map = {}; }
+
+  const cutoff = Date.now() - NOTIFY_SENT_RETENTION_MS;
+  let changed = false;
+  for (const [id, value] of Object.entries(map)) {
+    const sentAt = typeof value === 'number' ? value : Number(value?.sentAt || 0);
+    if (!sentAt || sentAt < cutoff) {
+      delete map[id];
+      changed = true;
+    } else if (value !== sentAt) {
+      map[id] = sentAt;
+      changed = true;
+    }
+  }
+  if (changed) localStorage.setItem(NOTIFY_SENT_KEY, JSON.stringify(map));
+  return map;
+}
+
+function isNotifySent(id) {
+  return id ? Boolean(getNotifySentMap()[id]) : false;
+}
+
+function markNotifySent(id) {
+  if (!id) return;
+  const map = getNotifySentMap();
+  map[id] = Date.now();
+  localStorage.setItem(NOTIFY_SENT_KEY, JSON.stringify(map));
+}
+
+function acquireLocalStorageLock(key) {
+  const now = Date.now();
+  try {
+    const current = JSON.parse(localStorage.getItem(key) || 'null');
+    if (current?.token && now - Number(current.lockedAt || 0) < NOTIFY_LOCK_TTL_MS) return '';
+  } catch(e) {}
+
+  const token = `${now}-${Math.random().toString(36).slice(2)}`;
+  try {
+    localStorage.setItem(key, JSON.stringify({ token, lockedAt: now }));
+    const stored = JSON.parse(localStorage.getItem(key) || 'null');
+    return stored?.token === token ? token : '';
+  } catch(e) {
+    return token;
+  }
+}
+
+function releaseLocalStorageLock(key, token) {
+  if (!token) return;
+  try {
+    const current = JSON.parse(localStorage.getItem(key) || 'null');
+    if (current?.token === token) localStorage.removeItem(key);
+  } catch(e) {}
+}
+
+function notifySendLockKey(id) {
+  return `${NOTIFY_SEND_LOCK_PREFIX}${encodeURIComponent(id || '')}`;
+}
+
+function queueNotify(text, id = '') {
+  const notifyId = id || `text:${todayStr()}:${hashNotifyText(text)}`;
+  if (isNotifySent(notifyId)) return false;
   const queue = getNotifyQueue();
-  queue.push({ text, queuedAt: Date.now() });
+  if (queue.some(item => notifyItemId(item) === notifyId)) return false;
+  queue.push({ id: notifyId, text, queuedAt: Date.now() });
   saveNotifyQueue(queue);
+  return true;
 }
 
 async function postNotify(text) {
@@ -1514,34 +1599,59 @@ async function postNotify(text) {
 
 async function flushNotifyQueue() {
   if (!isNotifyWindow()) return;
-  const queue = getNotifyQueue();
-  if (!queue.length) return;
+  const flushToken = acquireLocalStorageLock(NOTIFY_FLUSH_LOCK_KEY);
+  if (!flushToken) return;
 
-  const remaining = [];
-  for (const item of queue) {
-    try { await postNotify(item.text); }
-    catch(e) {
-      console.warn('保留通知の送信失敗:', e);
-      remaining.push(item);
+  try {
+    const queue = getNotifyQueue();
+    if (!queue.length) return;
+
+    const remaining = [];
+    const seen = new Set();
+    for (const item of queue) {
+      const notifyId = notifyItemId(item);
+      if (!item?.text || seen.has(notifyId) || isNotifySent(notifyId)) continue;
+      seen.add(notifyId);
+
+      try {
+        await postNotify(item.text);
+        markNotifySent(notifyId);
+      } catch(e) {
+        console.warn('保留通知の送信失敗:', e);
+        remaining.push(item);
+      }
     }
+    saveNotifyQueue(remaining);
+  } finally {
+    releaseLocalStorageLock(NOTIFY_FLUSH_LOCK_KEY, flushToken);
   }
-  saveNotifyQueue(remaining);
 }
 
-async function sendNotify(text) {
+async function sendNotify(text, id = '') {
+  const notifyId = id || `text:${todayStr()}:${hashNotifyText(text)}`;
+  if (isNotifySent(notifyId)) return true;
+
   if (!isNotifyWindow()) {
-    queueNotify(text);
+    queueNotify(text, notifyId);
     scheduleDeadlineCheck();
     return false;
   }
 
+  const sendLockKey = notifySendLockKey(notifyId);
+  const sendToken = acquireLocalStorageLock(sendLockKey);
+  if (!sendToken) return true;
+
   try {
     await flushNotifyQueue();
+    if (isNotifySent(notifyId)) return true;
     await postNotify(text);
+    markNotifySent(notifyId);
     return true;
   } catch(e) {
     console.warn('通知失敗:', e);
     return false;
+  } finally {
+    releaseLocalStorageLock(sendLockKey, sendToken);
   }
 }
 
@@ -1614,11 +1724,11 @@ async function checkTaskDeadlines() {
     const createdBy = t.createdBy || '不明';
     const taskTitle = t.title || '';
     if (t.date === today) {
-      if (await sendNotify(`⚠️ 【本日期限】タスクの期限は今日です！\n${taskTitle}\n担当者：${assigneeStr}\n作成者：${createdBy}`)) notified.add(tid);
+      if (await sendNotify(`⚠️ 【本日期限】タスクの期限は今日です！\n${taskTitle}\n担当者：${assigneeStr}\n作成者：${createdBy}`, `deadline:${today}:today:${tid}`)) notified.add(tid);
     } else if (t.date === tomorrow) {
-      if (await sendNotify(`📅 【明日期限】タスクの期限は明日です。\n${taskTitle}\n担当者：${assigneeStr}\n作成者：${createdBy}`)) notified.add(tid);
+      if (await sendNotify(`📅 【明日期限】タスクの期限は明日です。\n${taskTitle}\n担当者：${assigneeStr}\n作成者：${createdBy}`, `deadline:${today}:tomorrow:${tid}`)) notified.add(tid);
     } else if (t.date < today) {
-      if (await sendNotify(`🔴 【期限切れ】タスクの期限が過ぎています。\n${taskTitle}\n担当者：${assigneeStr}\n作成者：${createdBy}`)) notified.add(tid);
+      if (await sendNotify(`🔴 【期限切れ】タスクの期限が過ぎています。\n${taskTitle}\n担当者：${assigneeStr}\n作成者：${createdBy}`, `deadline:${today}:overdue:${tid}`)) notified.add(tid);
     }
   }
   localStorage.setItem(storageKey, JSON.stringify([...notified]));
@@ -1665,19 +1775,19 @@ async function saveTask() {
       if (newStatus === '完了' && existing.status !== '完了') {
         const assigneeStr = data.assignees?.length ? data.assignees.join('・') : 'なし';
         const createdBy = existing.createdBy || '不明';
-        await sendNotify(`✅ タスクが完了しました\n${ { ...existing, ...data }.title || ''}\n担当者：${assigneeStr}\n作成者：${createdBy}`);
+        await sendNotify(`✅ タスクが完了しました\n${ { ...existing, ...data }.title || ''}\n担当者：${assigneeStr}\n作成者：${createdBy}`, `task-completed:${editingId}:${todayStr()}`);
       }
       showToast('更新しました');
     } else {
       data.createdAt = Date.now();
       data.createdBy = currentUser?.name||'不明';
       if (newStatus === '完了') data.completedAt = Date.now();
-      await push(ref(db, 'tasks'), data);
+      const createdRef = await push(ref(db, 'tasks'), data);
       showToast('追加しました');
       // LINEワークス通知
       const assigneeStr = data.assignees?.length ? data.assignees.join('・') : 'なし';
       const dateStr = data.date ? `期限：${data.date}` : '期限なし';
-      await sendNotify(`📋 新しいタスクが作成されました\n${data.title}\n担当者：${assigneeStr}\n${dateStr}\n作成者：${data.createdBy}`);
+      await sendNotify(`📋 新しいタスクが作成されました\n${data.title}\n担当者：${assigneeStr}\n${dateStr}\n作成者：${data.createdBy}`, `task-created:${createdRef.key || data.createdAt}`);
     }
     closeModal();
   } catch(e) { showToast('保存に失敗しました'); }
@@ -1723,28 +1833,33 @@ window._openTask = (id) => openModal(id);
 window.quickComplete = async function() {
   if (isGuestUser()) { showToast('ゲストは閲覧専用です'); return; }
   if (!editingId || !tasks[editingId]) return;
-  const current = tasks[editingId].status;
+  const targetId = editingId;
+  if (taskStatusUpdateInFlight.has(targetId)) return;
+  taskStatusUpdateInFlight.add(targetId);
+  const current = tasks[targetId].status;
   const newStatus = current === '完了' ? '未着手' : '完了';
   try {
     const now = Date.now();
-    await set(ref(db, `tasks/${editingId}/status`), newStatus);
-    await set(ref(db, `tasks/${editingId}/updatedAt`), now);
-    await set(ref(db, `tasks/${editingId}/updatedBy`), currentUser?.name || '不明');
-    if (newStatus === '完了') await set(ref(db, `tasks/${editingId}/completedAt`), now);
-    else await remove(ref(db, `tasks/${editingId}/completedAt`));
-    if (newStatus === '完了' && tasks[editingId].googleTaskId) {
-      await completeGoogleTask(tasks[editingId].googleTaskId, tasks[editingId].googleListId);
+    await set(ref(db, `tasks/${targetId}/status`), newStatus);
+    await set(ref(db, `tasks/${targetId}/updatedAt`), now);
+    await set(ref(db, `tasks/${targetId}/updatedBy`), currentUser?.name || '不明');
+    if (newStatus === '完了') await set(ref(db, `tasks/${targetId}/completedAt`), now);
+    else await remove(ref(db, `tasks/${targetId}/completedAt`));
+    if (newStatus === '完了' && tasks[targetId].googleTaskId) {
+      await completeGoogleTask(tasks[targetId].googleTaskId, tasks[targetId].googleListId);
     }
     if (newStatus === '完了') {
-      const t = tasks[editingId];
+      const t = tasks[targetId];
       const assigneeStr = (t.assignees||[]).join('・') || 'なし';
       const createdBy = t.createdBy || '不明';
-      await sendNotify(`✅ タスクが完了しました\n${t.title||''}\n担当者：${assigneeStr}\n作成者：${createdBy}`);
+      await sendNotify(`✅ タスクが完了しました\n${t.title||''}\n担当者：${assigneeStr}\n作成者：${createdBy}`, `task-completed:${targetId}:${todayStr()}`);
     }
     showToast(newStatus === '完了' ? '✅ 完了にしました' : '↩ 未着手に戻しました');
     closeModal();
   } catch(e) {
     showToast('更新に失敗しました');
+  } finally {
+    taskStatusUpdateInFlight.delete(targetId);
   }
 };
 
@@ -1753,6 +1868,8 @@ window._toggleDone = async function(e, id) {
   e.stopPropagation(); // カードのクリックイベントを止める
   if (isGuestUser()) { showToast('ゲストは閲覧専用です'); return; }
   if (!tasks[id]) return;
+  if (taskStatusUpdateInFlight.has(id)) return;
+  taskStatusUpdateInFlight.add(id);
   const current = tasks[id].status;
   const newStatus = current === '完了' ? '未着手' : '完了';
   try {
@@ -1770,11 +1887,13 @@ window._toggleDone = async function(e, id) {
       const t = tasks[id];
       const assigneeStr = (t.assignees||[]).join('・') || 'なし';
       const createdBy = t.createdBy || '不明';
-      await sendNotify(`✅ タスクが完了しました\n${t.title||''}\n担当者：${assigneeStr}\n作成者：${createdBy}`);
+      await sendNotify(`✅ タスクが完了しました\n${t.title||''}\n担当者：${assigneeStr}\n作成者：${createdBy}`, `task-completed:${id}:${todayStr()}`);
     }
     showToast(newStatus === '完了' ? '✅ 完了にしました' : '↩ 未着手に戻しました');
   } catch(err) {
     showToast('更新に失敗しました');
+  } finally {
+    taskStatusUpdateInFlight.delete(id);
   }
 };
 
