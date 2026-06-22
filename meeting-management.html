@@ -278,6 +278,13 @@ button{cursor:pointer}
 .decision-approved{background:#e8f5e9;color:var(--ok);border-color:#a5d6a7}
 .decision-rejected{background:#fff1f1;color:var(--bad);border-color:#ffb3b3}
 .decision-hold{background:#fff7df;color:var(--warn);border-color:#f4d58a}
+.incident-type-near_miss{background:#e8f5e9;color:var(--ok);border-color:#a5d6a7}
+.incident-type-accident{background:#fff1f1;color:var(--bad);border-color:#ffb3b3}
+.incident-status-pending{background:#f3f6f8;color:#68737a}
+.incident-status-decided{background:#e9f7ff;color:#1769aa;border-color:#b9def7}
+.incident-status-in_progress{background:#fff7df;color:#9a6500;border-color:#f4d58a}
+.incident-status-followup_pending{background:#fff8e7;color:var(--warn);border-color:#f1c46d}
+.incident-status-confirmed{background:#e8f5e9;color:var(--ok);border-color:#a5d6a7}
 .text-block{
   margin:10px 0 0;
   padding:10px 12px;
@@ -423,6 +430,138 @@ button{cursor:pointer}
   padding:10px 11px;
   background:#fff;
 }
+.incident-wizard{
+  display:grid;
+  gap:12px;
+}
+.wizard-progress{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  color:var(--muted);
+  font-size:12px;
+  font-weight:900;
+}
+.wizard-support{
+  padding:10px 12px;
+  border:1px solid #dbeff0;
+  border-radius:8px;
+  background:#f0fbfa;
+  color:#236a66;
+  line-height:1.6;
+  font-size:13px;
+  font-weight:800;
+}
+.choice-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+  gap:8px;
+}
+.choice-card{
+  display:grid;
+  grid-template-columns:auto 1fr;
+  gap:8px;
+  align-items:flex-start;
+  border:1px solid var(--line);
+  border-radius:8px;
+  padding:10px;
+  background:#fff;
+}
+.choice-card:has(input:checked){
+  border-color:var(--mint);
+  box-shadow:0 0 0 3px rgba(78,205,196,.14);
+}
+.choice-text{display:grid;gap:3px}
+.choice-label{font-size:13px;font-weight:900}
+.choice-hint{color:var(--muted);font-size:12px;line-height:1.5}
+.incident-review{
+  display:grid;
+  gap:8px;
+}
+.review-grid{
+  display:grid;
+  grid-template-columns:150px 1fr;
+  gap:6px 10px;
+  padding:10px 12px;
+  border:1px solid #edf1f3;
+  border-radius:8px;
+  background:#f8fafb;
+}
+.review-label{
+  color:var(--muted);
+  font-size:12px;
+  font-weight:900;
+}
+.review-value{
+  line-height:1.55;
+  word-break:break-word;
+  white-space:pre-wrap;
+}
+.incident-followup{
+  padding:12px;
+  border:1px solid #edf1f3;
+  border-radius:8px;
+  background:#fffdf6;
+}
+.import-panel{
+  display:grid;
+  gap:12px;
+}
+.import-title{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:12px;
+}
+.import-title h3{
+  margin:0;
+  font-size:15px;
+  line-height:1.4;
+  font-weight:900;
+}
+.import-status{
+  color:var(--muted);
+  font-size:12px;
+  line-height:1.6;
+  font-weight:800;
+}
+.import-preview{
+  display:grid;
+  gap:10px;
+}
+.import-card{
+  border:1px solid #edf1f3;
+  border-radius:8px;
+  background:#fff;
+  padding:12px;
+}
+.import-card-head{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:10px;
+  margin-bottom:10px;
+}
+.import-card-head h4{
+  margin:0;
+  font-size:14px;
+  line-height:1.45;
+  font-weight:900;
+}
+.ocr-raw{
+  max-height:160px;
+  overflow:auto;
+  border:1px solid #edf1f3;
+  border-radius:8px;
+  background:#f8fafb;
+  padding:10px 12px;
+  white-space:pre-wrap;
+  word-break:break-word;
+  color:#4b565c;
+  font-size:12px;
+  line-height:1.55;
+}
 .empty{
   border:1px dashed #cfd8dc;
   border-radius:8px;
@@ -491,6 +630,7 @@ button{cursor:pointer}
   .user-chip{max-width:34vw}
   .main{padding:14px 12px 76px}
   .form-grid,.decision-grid{grid-template-columns:1fr}
+  .review-grid{grid-template-columns:1fr}
   .read-columns{grid-template-columns:1fr}
   .section-head{align-items:flex-start}
   .item-top{flex-direction:column}
@@ -516,6 +656,7 @@ button{cursor:pointer}
       <button class="tab-btn active" type="button" data-tab="tasks">取り組み</button>
       <button class="tab-btn" type="button" data-tab="notices">お知らせ</button>
       <button class="tab-btn" type="button" data-tab="opinions">スタッフ提言</button>
+      <button class="tab-btn" type="button" data-tab="incidents">ヒヤリハット・アクシデント報告</button>
     </nav>
 
     <section id="tasksSection" class="section active">
@@ -618,6 +759,56 @@ button{cursor:pointer}
       </div>
       <div class="list" id="opinionList"></div>
     </section>
+
+    <section id="incidentsSection" class="section">
+      <div class="section-head">
+        <h2>ヒヤリハット・アクシデント報告</h2>
+        <span class="count-badge" id="incidentCount">0件</span>
+      </div>
+      <div class="form-panel">
+        <form id="incidentForm" class="incident-wizard">
+          <div class="wizard-progress">
+            <span id="incidentStepText">STEP 1</span>
+            <span id="incidentStepCount">1/1</span>
+          </div>
+          <div class="wizard-support" id="incidentSupportText" hidden></div>
+          <div class="field full" id="incidentQuestionField"></div>
+          <div class="form-actions">
+            <button class="btn ghost" type="button" id="incidentResetBtn">最初から</button>
+            <button class="btn" type="button" id="incidentBackBtn">戻る</button>
+            <button class="btn primary" type="submit" id="incidentNextBtn">次へ</button>
+          </div>
+        </form>
+      </div>
+      <div class="form-panel import-panel">
+        <div class="import-title">
+          <div>
+            <h3>過去報告書の取り込み</h3>
+            <div class="import-status">HTML報告書、または印刷物を撮影した画像を選択してください。取り込み前に内容を確認・修正できます。</div>
+          </div>
+        </div>
+        <div class="form-grid">
+          <div class="field full">
+            <label for="incidentHtmlFiles">HTML報告書</label>
+            <input id="incidentHtmlFiles" type="file" accept=".html,text/html" multiple>
+            <div class="file-note">スキルで作成した `incident-report_...html` を複数選択できます。</div>
+          </div>
+          <div class="field full">
+            <label for="incidentImageFiles">印刷物の写真</label>
+            <input id="incidentImageFiles" type="file" accept="image/*" multiple>
+            <div class="file-note">写真は端まで入るように撮影してください。OCR後に必ず内容を確認してください。</div>
+          </div>
+        </div>
+        <div class="import-status" id="incidentImportStatus"></div>
+        <div class="form-actions">
+          <button class="btn ghost" type="button" id="incidentImportClearBtn" hidden>プレビューを消す</button>
+          <button class="btn primary" type="button" id="incidentImportParseBtn">取り込み内容を確認</button>
+          <button class="btn sky" type="button" id="incidentImportSaveBtn" hidden>確認した内容を取り込む</button>
+        </div>
+        <div class="import-preview" id="incidentImportPreview"></div>
+      </div>
+      <div class="list" id="incidentList"></div>
+    </section>
   </main>
 </div>
 
@@ -684,10 +875,109 @@ const DECISION_LABELS = {
   hold:'保留'
 };
 const DECISION_REASON_KEYS = ['approved', 'rejected', 'hold'];
+const INCIDENT_TYPE_LABELS = {
+  near_miss:'ヒヤリハット',
+  accident:'アクシデント'
+};
+const INCIDENT_LEVEL_LABELS = {
+  A:'レベルA：ゾッとした',
+  B:'レベルB：ハッとした'
+};
+const INCIDENT_STATUS_LABELS = {
+  pending:'未検討',
+  decided:'対策決定',
+  in_progress:'実施中',
+  followup_pending:'定着確認待ち',
+  confirmed:'定着確認済み'
+};
+const INCIDENT_CATEGORIES = [
+  { value:'A', label:'A. 確認不足', hint:'ダブルチェック未実施、声かけなしで処置開始' },
+  { value:'B', label:'B. 連絡・引き継ぎ不足', hint:'申し送りミス、カルテ情報の共有漏れ' },
+  { value:'C', label:'C. 手順の逸脱', hint:'マニュアルと異なる手順で実施、省略' },
+  { value:'D', label:'D. 技術・知識不足', hint:'手技の誤り、薬剤知識の不足' },
+  { value:'E', label:'E. 環境・設備', hint:'物の配置、機器の不具合、導線の悪さ' },
+  { value:'F', label:'F. 患者様側の要因', hint:'急な体動、申告漏れ、体調急変' },
+  { value:'G', label:'G. その他', hint:'上記に当てはまらない場合' }
+];
+const TESSERACT_CDN = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+const INCIDENT_QUESTIONS = [
+  {
+    key:'overview',
+    step:'STEP 1',
+    title:'概要把握',
+    prompt:'まず、何が起きたか（または起きそうになったか）を自由に教えてください。',
+    type:'textarea',
+    required:true,
+    support:'全部で8つのステップで進めます。途中で戻りながら内容を確認できます。'
+  },
+  {
+    key:'type',
+    step:'STEP 2',
+    title:'判定',
+    prompt:'事象の種別を確認してください。',
+    type:'choice',
+    required:true,
+    options:() => Object.entries(INCIDENT_TYPE_LABELS).map(([value, label]) => ({ value, label })),
+    support:data => `気づいて報告してくださってありがとうございます。一緒に整理していきましょう。候補は「${INCIDENT_TYPE_LABELS[inferIncidentType(data)]}」です。`
+  },
+  { key:'occurredDate', step:'STEP 3', title:'基本情報', prompt:'発生日を入力してください。', type:'date', required:true },
+  { key:'occurredTime', step:'STEP 3', title:'基本情報', prompt:'発生時刻を入力してください。時刻不明の場合は「午前」「午後」「不明」でも構いません。', type:'text', required:true, placeholder:'例：16:00ごろ / 午後 / 不明' },
+  { key:'entryDate', step:'STEP 3', title:'基本情報', prompt:'記入日を確認してください。', type:'date', required:true, defaultValue:() => todayKey() },
+  {
+    key:'reporterName',
+    step:'STEP 3',
+    title:'基本情報',
+    prompt:'記入者名を確認してください。',
+    type:'text',
+    required:true,
+    defaultValue:() => currentUser.name || '',
+    support:'報告書を提出すること自体が安全改善への貢献として扱われます。安心して記入してください。'
+  },
+  { key:'discovererName', step:'STEP 3', title:'基本情報', prompt:'発見者名を入力してください。記入者と同じ場合は同じ名前で構いません。', type:'text', required:true, defaultValue:() => currentUser.name || '' },
+  {
+    key:'category',
+    step:'STEP 4',
+    title:'状況の深掘り',
+    prompt:'事象の種類を確認してください。複数選択できます。',
+    type:'choice',
+    multiple:true,
+    required:true,
+    options:() => INCIDENT_CATEGORIES,
+    support:data => `候補は「${incidentCategoryText({ category:inferIncidentCategory(data) })}」です。必要に応じて変更してください。`
+  },
+  { key:'categoryOther', step:'STEP 4', title:'状況の深掘り', prompt:'その他の内容を入力してください。', type:'text', required:true, onlyWhen:data => Array.isArray(data.category) && data.category.includes('G') },
+  { key:'scene', step:'STEP 4', title:'状況の深掘り', prompt:'どんな場面で起きましたか？', type:'text', required:true, placeholder:'例：診察中、処置中、受付対応中、院内移動中' },
+  { key:'eventImpact', step:'STEP 4', title:'状況の深掘り', prompt:'どうなりそうだったか、または発生した実害を入力してください。', type:'textarea', required:true },
+  {
+    key:'level',
+    step:'STEP 4',
+    title:'状況の深掘り',
+    prompt:'危険度を確認してください。',
+    type:'choice',
+    required:true,
+    options:() => Object.entries(INCIDENT_LEVEL_LABELS).map(([value, label]) => ({ value, label })),
+    support:data => `候補は「${INCIDENT_LEVEL_LABELS[inferIncidentLevel(data)]}」です。必要に応じて変更してください。`
+  },
+  { key:'details', step:'STEP 4', title:'状況の深掘り', prompt:'具体的な内容を5W1Hで入力してください。', type:'textarea', required:true },
+  { key:'goodPoint', step:'STEP 5', title:'なぜ防げたか', prompt:'どんな行動・気づきが防止につながりましたか？', type:'textarea', required:true, onlyWhen:data => data.type === 'near_miss' },
+  {
+    key:'causeHuman',
+    step:'STEP 6',
+    title:'振り返り',
+    prompt:'【人・行動】の観点で、原因として考えられる状況を入力してください。',
+    type:'textarea',
+    required:true,
+    support:'ここが一番大事なパートです。個人のミスだけでなく、手順・思い込み・忙しさなど状況も含めて整理します。'
+  },
+  { key:'causeEnvironment', step:'STEP 6', title:'振り返り', prompt:'【環境・連携】の観点で、情報共有・配置・導線・設備面など気になる点を入力してください。', type:'textarea', required:true },
+  { key:'handoff', step:'STEP 7', title:'ミーティングへの申し送り', prompt:'ミーティングで共有したいこと、原因として感じていることを一言で入力してください。', type:'textarea', required:true, support:'対策はミーティングで検討します。ここでは気になっていることを残してください。' },
+  { key:'review', step:'STEP 8', title:'確認して登録', prompt:'内容を確認して登録してください。', type:'review' }
+];
 const PATHS = {
   tasks:'meetingManagement/tasks',
   notices:'meetingManagement/notices',
-  opinions:'meetingManagement/opinions'
+  opinions:'meetingManagement/opinions',
+  incidentReports:'meetingManagement/incidentReports'
 };
 
 let currentUser = readUser();
@@ -697,7 +987,10 @@ let dailyTaskNotificationInFlight = false;
 let dailyTaskNotificationDoneFor = '';
 let dailyNoticeNotificationInFlight = false;
 let dailyNoticeNotificationDoneFor = '';
-const state = { tasks:[], notices:[], opinions:[] };
+let incidentStepIndex = 0;
+let incidentDraft = {};
+let incidentImportCandidates = [];
+const state = { tasks:[], notices:[], opinions:[], incidentReports:[] };
 
 if (!currentUser?.staffId) {
   document.getElementById('guard').hidden = false;
@@ -775,10 +1068,10 @@ function setupUser() {
   const label = role === 'director' ? '院長' : role === 'leader' ? '主任' : staffRole;
   chip.querySelector('span').textContent = `${currentUser.name} / ${label}`;
   document.getElementById('scopeText').textContent = canSeeOpinions()
-    ? '取り組み・お知らせ・スタッフ提言'
+    ? '取り組み・お知らせ・スタッフ提言・報告'
     : canSeeNotices()
-      ? '取り組み・お知らせ'
-      : '取り組みのみ閲覧';
+      ? '取り組み・お知らせ・報告'
+      : '取り組み・報告';
   document.querySelector('[data-tab="notices"]').hidden = !canSeeNotices();
   document.querySelector('[data-tab="opinions"]').hidden = !canSeeOpinions();
   document.getElementById('taskFormPanel').hidden = !canCreateManagedItems();
@@ -809,8 +1102,15 @@ function setupForms() {
   document.getElementById('noticeForm').addEventListener('submit', saveNotice);
   document.getElementById('noticeCancelBtn').addEventListener('click', resetNoticeForm);
   document.getElementById('opinionForm').addEventListener('submit', saveOpinion);
+  document.getElementById('incidentForm').addEventListener('submit', handleIncidentNext);
+  document.getElementById('incidentBackBtn').addEventListener('click', handleIncidentBack);
+  document.getElementById('incidentResetBtn').addEventListener('click', handleIncidentReset);
+  document.getElementById('incidentImportParseBtn').addEventListener('click', prepareIncidentImports);
+  document.getElementById('incidentImportClearBtn').addEventListener('click', clearIncidentImports);
+  document.getElementById('incidentImportSaveBtn').addEventListener('click', saveIncidentImports);
   document.addEventListener('change', handleDecisionChange);
   document.addEventListener('click', handleActions);
+  resetIncidentWizard();
 }
 
 function setupViewer() {
@@ -838,6 +1138,10 @@ function attachDataListeners() {
       renderOpinions();
     });
   }
+  onValue(ref(db, PATHS.incidentReports), snap => {
+    state.incidentReports = toList(snap.val()).sort(sortIncidentReports);
+    renderIncidentReports();
+  });
 }
 
 function toList(data) {
@@ -848,6 +1152,14 @@ function sortTasks(a, b) {
   const weight = { review:0, in_progress:1, todo:2, confirmed:3 };
   const aw = weight[a.status || 'todo'] ?? 2;
   const bw = weight[b.status || 'todo'] ?? 2;
+  if (aw !== bw) return aw - bw;
+  return (b.createdAt || 0) - (a.createdAt || 0);
+}
+
+function sortIncidentReports(a, b) {
+  const weight = { pending:0, decided:1, in_progress:2, followup_pending:3, confirmed:4 };
+  const aw = weight[a.counterStatus || 'pending'] ?? 0;
+  const bw = weight[b.counterStatus || 'pending'] ?? 0;
   if (aw !== bw) return aw - bw;
   return (b.createdAt || 0) - (a.createdAt || 0);
 }
@@ -983,6 +1295,528 @@ async function saveOpinion(event) {
   }
 }
 
+function resetIncidentWizard() {
+  incidentStepIndex = 0;
+  incidentDraft = {
+    entryDate: todayKey(),
+    reporterName: currentUser.name || '',
+    discovererName: currentUser.name || ''
+  };
+  renderIncidentQuestion();
+}
+
+function handleIncidentReset() {
+  if (!isIncidentDraftBlank() && !confirm('入力中の報告を最初からやり直しますか？')) return;
+  resetIncidentWizard();
+}
+
+function handleIncidentBack() {
+  storeCurrentIncidentAnswer({ allowEmpty:true });
+  incidentStepIndex = Math.max(0, incidentStepIndex - 1);
+  renderIncidentQuestion();
+}
+
+async function handleIncidentNext(event) {
+  event.preventDefault();
+  const activeQuestions = activeIncidentQuestions();
+  const question = activeQuestions[incidentStepIndex];
+  if (!question) return;
+  if (question.type === 'review') return saveIncidentReport();
+  if (!storeCurrentIncidentAnswer()) return;
+  if (question.key === 'type' && incidentDraft.type === 'accident') delete incidentDraft.goodPoint;
+  incidentStepIndex = Math.min(incidentStepIndex + 1, activeIncidentQuestions().length - 1);
+  renderIncidentQuestion();
+}
+
+function activeIncidentQuestions() {
+  return INCIDENT_QUESTIONS.filter(question => !question.onlyWhen || question.onlyWhen(incidentDraft));
+}
+
+function renderIncidentQuestion() {
+  const activeQuestions = activeIncidentQuestions();
+  if (!activeQuestions.length) return;
+  incidentStepIndex = Math.min(incidentStepIndex, activeQuestions.length - 1);
+  const question = activeQuestions[incidentStepIndex];
+  applyIncidentDefault(question);
+
+  document.getElementById('incidentStepText').textContent = `${question.step}｜${question.title}`;
+  document.getElementById('incidentStepCount').textContent = `${incidentStepIndex + 1}/${activeQuestions.length}`;
+  document.getElementById('incidentBackBtn').hidden = incidentStepIndex === 0;
+  document.getElementById('incidentNextBtn').textContent = question.type === 'review' ? '報告を登録' : '次へ';
+
+  const support = typeof question.support === 'function' ? question.support(incidentDraft) : question.support;
+  const supportEl = document.getElementById('incidentSupportText');
+  supportEl.hidden = !support;
+  supportEl.textContent = support || '';
+
+  const field = document.getElementById('incidentQuestionField');
+  field.innerHTML = `
+    <label>${esc(question.prompt)}</label>
+    ${incidentQuestionInputHtml(question)}
+  `;
+}
+
+function applyIncidentDefault(question) {
+  if (!question || incidentDraft[question.key] !== undefined) return;
+  if (question.key === 'type') incidentDraft.type = inferIncidentType(incidentDraft);
+  else if (question.key === 'category') incidentDraft.category = inferIncidentCategory(incidentDraft);
+  else if (question.key === 'level') incidentDraft.level = inferIncidentLevel(incidentDraft);
+  else if (question.defaultValue) incidentDraft[question.key] = question.defaultValue();
+}
+
+function incidentQuestionInputHtml(question) {
+  if (question.type === 'review') return incidentReviewHtml();
+  const current = incidentDraft[question.key] ?? '';
+  if (question.type === 'textarea') {
+    return `<textarea id="incidentAnswer" ${question.required ? 'required' : ''}>${esc(current)}</textarea>`;
+  }
+  if (question.type === 'choice') {
+    const values = Array.isArray(current) ? current : [current].filter(Boolean);
+    const inputType = question.multiple ? 'checkbox' : 'radio';
+    return `
+      <div class="choice-grid">
+        ${question.options(incidentDraft).map(option => `
+          <label class="choice-card">
+            <input type="${inputType}" name="incidentAnswer" value="${escAttr(option.value)}" ${values.includes(option.value) ? 'checked' : ''}>
+            <span class="choice-text">
+              <span class="choice-label">${esc(option.label)}</span>
+              ${option.hint ? `<span class="choice-hint">${esc(option.hint)}</span>` : ''}
+            </span>
+          </label>
+        `).join('')}
+      </div>
+    `;
+  }
+  return `<input id="incidentAnswer" type="${question.type}" value="${escAttr(current)}" ${question.placeholder ? `placeholder="${escAttr(question.placeholder)}"` : ''}>`;
+}
+
+function storeCurrentIncidentAnswer(options = {}) {
+  const question = activeIncidentQuestions()[incidentStepIndex];
+  if (!question || question.type === 'review') return true;
+  const value = readIncidentAnswer(question);
+  if (!options.allowEmpty && question.required && isIncidentEmpty(value)) {
+    showToast('未入力の項目があります');
+    return false;
+  }
+  incidentDraft[question.key] = value;
+  return true;
+}
+
+function readIncidentAnswer(question) {
+  if (question.type === 'choice') {
+    const checked = Array.from(document.querySelectorAll('[name="incidentAnswer"]:checked')).map(input => input.value);
+    return question.multiple ? checked : checked[0] || '';
+  }
+  return document.getElementById('incidentAnswer')?.value.trim() || '';
+}
+
+function isIncidentEmpty(value) {
+  return Array.isArray(value) ? value.length === 0 : !String(value || '').trim();
+}
+
+function isIncidentDraftBlank() {
+  return !Object.entries(incidentDraft).some(([key, value]) => {
+    if (['entryDate', 'reporterName', 'discovererName'].includes(key)) return false;
+    return !isIncidentEmpty(value);
+  });
+}
+
+function incidentReviewHtml() {
+  const rows = [
+    ['種別', INCIDENT_TYPE_LABELS[incidentDraft.type] || '-'],
+    ['報告番号', buildIncidentReportNumber(incidentDraft)],
+    ['発生日時', formatIncidentOccurredAt(incidentDraft)],
+    ['記入日', formatDateOnly(incidentDraft.entryDate)],
+    ['記入者名', incidentDraft.reporterName || '-'],
+    ['発見者名', incidentDraft.discovererName || '-'],
+    ['事象の種類', incidentCategoryText(incidentDraft)],
+    ['場面', incidentDraft.scene || '-'],
+    ['危険度', INCIDENT_LEVEL_LABELS[incidentDraft.level] || '-']
+  ];
+  return `
+    <div class="incident-review">
+      <div class="review-grid">
+        ${rows.map(([label, value]) => `
+          <div class="review-label">${esc(label)}</div>
+          <div class="review-value">${esc(value)}</div>
+        `).join('')}
+      </div>
+      ${textBlock('概要', incidentDraft.overview)}
+      ${textBlock('どうなりそうだった？ / 発生した実害', incidentDraft.eventImpact)}
+      ${textBlock('具体的な内容', incidentDraft.details)}
+      ${incidentDraft.type === 'near_miss' ? textBlock('なぜ防げたか', incidentDraft.goodPoint) : ''}
+      ${textBlock('原因【人・行動】', incidentDraft.causeHuman)}
+      ${textBlock('原因【環境・連携】', incidentDraft.causeEnvironment)}
+      ${textBlock('ミーティングへの申し送り', incidentDraft.handoff)}
+    </div>
+  `;
+}
+
+async function saveIncidentReport() {
+  const missing = activeIncidentQuestions().filter(question => {
+    return question.type !== 'review' && question.required && isIncidentEmpty(incidentDraft[question.key]);
+  });
+  if (missing.length) {
+    incidentStepIndex = activeIncidentQuestions().findIndex(question => question.key === missing[0].key);
+    renderIncidentQuestion();
+    return showToast('未入力の項目があります');
+  }
+
+  const now = Date.now();
+  const payload = {
+    ...incidentDraft,
+    reportNumber: buildIncidentReportNumber(incidentDraft),
+    occurredAtText: formatIncidentOccurredAt(incidentDraft),
+    countermeasure:'',
+    counterOwner:'',
+    counterDueDate:'',
+    counterStatus:'pending',
+    meetingReportDate:'',
+    createdAt: now,
+    createdBy: currentUser.name,
+    createdById: currentUser.staffId,
+    updatedAt: now,
+    updatedBy: currentUser.name
+  };
+  await set(push(ref(db, PATHS.incidentReports)), payload);
+  resetIncidentWizard();
+  showToast('報告を登録しました');
+}
+
+async function prepareIncidentImports() {
+  const htmlFiles = Array.from(document.getElementById('incidentHtmlFiles').files || []);
+  const imageFiles = Array.from(document.getElementById('incidentImageFiles').files || []);
+  if (!htmlFiles.length && !imageFiles.length) return showToast('取り込むファイルを選択してください');
+
+  const status = document.getElementById('incidentImportStatus');
+  const parseBtn = document.getElementById('incidentImportParseBtn');
+  parseBtn.disabled = true;
+  incidentImportCandidates = [];
+  renderIncidentImportPreview();
+
+  try {
+    for (const file of htmlFiles) {
+      status.textContent = `${file.name} を読み取っています`;
+      const html = await readFileAsText(file);
+      incidentImportCandidates.push(normalizeIncidentImport(parseIncidentHtmlReport(html, file.name)));
+    }
+
+    if (imageFiles.length) {
+      const ocrResults = await recognizeIncidentImageFiles(imageFiles, status);
+      ocrResults.forEach(result => {
+        incidentImportCandidates.push(normalizeIncidentImport(parseIncidentOcrText(result.text, result.file.name)));
+      });
+    }
+
+    status.textContent = `${incidentImportCandidates.length}件の候補を作成しました。内容を確認してから取り込んでください。`;
+    renderIncidentImportPreview();
+  } catch (err) {
+    console.error(err);
+    status.textContent = err.message || '取り込み候補を作成できませんでした';
+    showToast(status.textContent);
+  } finally {
+    parseBtn.disabled = false;
+  }
+}
+
+function clearIncidentImports() {
+  incidentImportCandidates = [];
+  document.getElementById('incidentHtmlFiles').value = '';
+  document.getElementById('incidentImageFiles').value = '';
+  document.getElementById('incidentImportStatus').textContent = '';
+  renderIncidentImportPreview();
+}
+
+function renderIncidentImportPreview() {
+  const preview = document.getElementById('incidentImportPreview');
+  document.getElementById('incidentImportSaveBtn').hidden = !incidentImportCandidates.length;
+  document.getElementById('incidentImportClearBtn').hidden = !incidentImportCandidates.length;
+  if (!incidentImportCandidates.length) {
+    preview.innerHTML = '';
+    return;
+  }
+  const existingNumbers = new Set(state.incidentReports.map(report => report.reportNumber).filter(Boolean));
+  preview.innerHTML = incidentImportCandidates.map((candidate, index) => {
+    const duplicate = candidate.reportNumber && existingNumbers.has(candidate.reportNumber);
+    return `
+      <div class="import-card" data-import-index="${index}">
+        <div class="import-card-head">
+          <div>
+            <h4>${esc(candidate.sourceFileName || `取り込み候補 ${index + 1}`)}</h4>
+            <div class="meta">
+              <span>${candidate.source === 'image' ? '写真OCR' : 'HTML'}</span>
+              ${duplicate ? '<span class="badge incident-status-confirmed">同じ報告番号あり</span>' : ''}
+            </div>
+          </div>
+        </div>
+        <div class="form-grid">
+          ${importInputHtml(index, 'reportNumber', '報告番号', candidate.reportNumber)}
+          ${importSelectHtml(index, 'type', '種別', candidate.type, INCIDENT_TYPE_LABELS)}
+          ${importInputHtml(index, 'occurredDate', '発生日', candidate.occurredDate, 'date')}
+          ${importInputHtml(index, 'occurredTime', '発生時刻', candidate.occurredTime)}
+          ${importInputHtml(index, 'entryDate', '記入日', candidate.entryDate, 'date')}
+          ${importInputHtml(index, 'reporterName', '記入者名', candidate.reporterName)}
+          ${importInputHtml(index, 'discovererName', '発見者名', candidate.discovererName)}
+          ${importInputHtml(index, 'categoryText', '事象の種類', candidate.categoryText || incidentCategoryText(candidate))}
+          ${importInputHtml(index, 'scene', '場面', candidate.scene)}
+          ${importSelectHtml(index, 'level', '危険度', candidate.level, INCIDENT_LEVEL_LABELS)}
+          ${importTextareaHtml(index, 'overview', '概要', candidate.overview)}
+          ${importTextareaHtml(index, 'eventImpact', 'どうなりそうだった？ / 発生した実害', candidate.eventImpact)}
+          ${importTextareaHtml(index, 'details', '具体的な内容', candidate.details)}
+          ${importTextareaHtml(index, 'goodPoint', 'なぜ防げたか', candidate.goodPoint)}
+          ${importTextareaHtml(index, 'causeHuman', '原因【人・行動】', candidate.causeHuman)}
+          ${importTextareaHtml(index, 'causeEnvironment', '原因【環境・連携】', candidate.causeEnvironment)}
+          ${importTextareaHtml(index, 'handoff', 'ミーティングへの申し送り', candidate.handoff)}
+          ${importTextareaHtml(index, 'countermeasure', '対策（記入済みの場合）', candidate.countermeasure)}
+          ${importInputHtml(index, 'meetingReportDate', 'ミーティング報告日', candidate.meetingReportDate, 'date')}
+        </div>
+        ${candidate.rawText ? `<div class="field full"><label>OCR元テキスト</label><div class="ocr-raw">${esc(candidate.rawText)}</div></div>` : ''}
+      </div>
+    `;
+  }).join('');
+}
+
+function importInputHtml(index, field, label, value = '', type = 'text') {
+  return `
+    <div class="field">
+      <label>${esc(label)}</label>
+      <input type="${type}" data-import-field="${field}" data-import-index="${index}" value="${escAttr(value || '')}">
+    </div>
+  `;
+}
+
+function importTextareaHtml(index, field, label, value = '') {
+  return `
+    <div class="field full">
+      <label>${esc(label)}</label>
+      <textarea data-import-field="${field}" data-import-index="${index}">${esc(value || '')}</textarea>
+    </div>
+  `;
+}
+
+function importSelectHtml(index, field, label, value, options) {
+  return `
+    <div class="field">
+      <label>${esc(label)}</label>
+      <select data-import-field="${field}" data-import-index="${index}">
+        ${Object.entries(options).map(([optionValue, optionLabel]) => `<option value="${escAttr(optionValue)}" ${optionValue === value ? 'selected' : ''}>${esc(optionLabel)}</option>`).join('')}
+      </select>
+    </div>
+  `;
+}
+
+async function saveIncidentImports() {
+  const candidates = incidentImportCandidates.map((candidate, index) => readIncidentImportCandidate(candidate, index));
+  const missing = candidates.find(candidate => !candidate.reportNumber || !candidate.type || !candidate.occurredDate || !candidate.details);
+  if (missing) return showToast('報告番号・種別・発生日・具体的な内容は必須です');
+
+  const existingNumbers = new Set(state.incidentReports.map(report => report.reportNumber).filter(Boolean));
+  let saved = 0;
+  let skipped = 0;
+  for (const candidate of candidates) {
+    if (existingNumbers.has(candidate.reportNumber)) {
+      skipped += 1;
+      continue;
+    }
+    const now = Date.now();
+    await set(push(ref(db, PATHS.incidentReports)), {
+      ...candidate,
+      occurredAtText: formatIncidentOccurredAt(candidate),
+      counterStatus: candidate.countermeasure ? 'decided' : 'pending',
+      counterOwner:'',
+      counterDueDate:'',
+      importedAt: now,
+      importedBy: currentUser.name,
+      createdAt: now,
+      createdBy: candidate.reporterName || currentUser.name,
+      createdById: currentUser.staffId,
+      updatedAt: now,
+      updatedBy: currentUser.name
+    });
+    existingNumbers.add(candidate.reportNumber);
+    saved += 1;
+  }
+  clearIncidentImports();
+  showToast(skipped ? `${saved}件を取り込みました。${skipped}件は重複のためスキップしました` : `${saved}件を取り込みました`);
+}
+
+function readIncidentImportCandidate(base, index) {
+  const root = document.querySelector(`[data-import-index="${index}"]`);
+  const value = field => root?.querySelector(`[data-import-field="${field}"]`)?.value.trim() || '';
+  const categoryText = value('categoryText');
+  return normalizeIncidentImport({
+    ...base,
+    reportNumber: value('reportNumber'),
+    type: value('type'),
+    occurredDate: value('occurredDate'),
+    occurredTime: value('occurredTime'),
+    entryDate: value('entryDate'),
+    reporterName: value('reporterName'),
+    discovererName: value('discovererName'),
+    categoryText,
+    category: parseCategoryCodes(categoryText),
+    scene: value('scene'),
+    level: value('level'),
+    overview: value('overview'),
+    eventImpact: value('eventImpact'),
+    details: value('details'),
+    goodPoint: value('goodPoint'),
+    causeHuman: value('causeHuman'),
+    causeEnvironment: value('causeEnvironment'),
+    handoff: value('handoff'),
+    countermeasure: value('countermeasure'),
+    meetingReportDate: value('meetingReportDate')
+  });
+}
+
+function normalizeIncidentImport(raw) {
+  const category = raw.category?.length ? raw.category : parseCategoryCodes(raw.categoryText || raw.details || raw.rawText || '');
+  const normalized = {
+    source: raw.source || 'html',
+    sourceFileName: raw.sourceFileName || '',
+    reportNumber: raw.reportNumber || '',
+    type: raw.type || inferIncidentType(raw),
+    occurredDate: raw.occurredDate || '',
+    occurredTime: raw.occurredTime || '',
+    entryDate: raw.entryDate || todayKey(),
+    reporterName: raw.reporterName || '',
+    discovererName: raw.discovererName || raw.reporterName || '',
+    category,
+    categoryText: raw.categoryText || incidentCategoryText({ category }) || '',
+    scene: raw.scene || '',
+    level: raw.level || inferIncidentLevel(raw),
+    overview: raw.overview || shortTitle(raw.details || raw.rawText || ''),
+    eventImpact: raw.eventImpact || '',
+    details: raw.details || raw.rawText || '',
+    goodPoint: raw.goodPoint || '',
+    causeHuman: raw.causeHuman || '',
+    causeEnvironment: raw.causeEnvironment || '',
+    handoff: raw.handoff || '',
+    countermeasure: raw.countermeasure || '',
+    meetingReportDate: raw.meetingReportDate || '',
+    rawText: raw.rawText || ''
+  };
+  if (!normalized.reportNumber && normalized.occurredDate) normalized.reportNumber = buildIncidentReportNumber(normalized);
+  return normalized;
+}
+
+function readFileAsText(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error(`${file.name} を読み込めませんでした`));
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.readAsText(file, 'utf-8');
+  });
+}
+
+async function recognizeIncidentImageFiles(files, statusEl) {
+  const Tesseract = await ensureTesseract();
+  statusEl.textContent = 'OCRエンジンを準備しています';
+  const worker = await Tesseract.createWorker('jpn+eng', 1, {
+    logger: message => {
+      if (!message?.status) return;
+      const progress = Number.isFinite(message.progress) ? ` ${Math.round(message.progress * 100)}%` : '';
+      statusEl.textContent = `写真OCR: ${message.status}${progress}`;
+    }
+  });
+  const results = [];
+  try {
+    for (let i = 0; i < files.length; i += 1) {
+      const file = files[i];
+      statusEl.textContent = `写真OCR中 ${i + 1}/${files.length}: ${file.name}`;
+      const result = await worker.recognize(file);
+      results.push({ file, text: result?.data?.text || '' });
+    }
+  } finally {
+    await worker.terminate();
+  }
+  return results;
+}
+
+function ensureTesseract() {
+  if (window.Tesseract) return Promise.resolve(window.Tesseract);
+  return new Promise((resolve, reject) => {
+    const existing = document.querySelector(`script[src="${TESSERACT_CDN}"]`);
+    if (existing) {
+      existing.addEventListener('load', () => resolve(window.Tesseract));
+      existing.addEventListener('error', () => reject(new Error('OCRライブラリを読み込めませんでした')));
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = TESSERACT_CDN;
+    script.onload = () => window.Tesseract ? resolve(window.Tesseract) : reject(new Error('OCRライブラリを初期化できませんでした'));
+    script.onerror = () => reject(new Error('OCRライブラリを読み込めませんでした。ネットワーク接続を確認してください'));
+    document.head.appendChild(script);
+  });
+}
+
+function parseIncidentHtmlReport(html, sourceFileName) {
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  const bodyText = normalizeImportedText(doc.body?.innerText || '');
+  const reportNumber = extractReportNumber(bodyText);
+  const typeText = cleanImportedText(doc.querySelector('.report-header .badge')?.textContent || doc.title || bodyText);
+  const info = extractIncidentInfoGrid(doc);
+  const occurred = parseIncidentDateTime(info['発生日時'] || bodyText);
+  const situation = incidentSection(doc, '状況');
+  const categoryText = sectionValue(incidentSection(doc, '事象の種類')) || extractLabeledText(bodyText, ['事象の種類'], ['状況', 'どんな場面']);
+  const levelText = cleanImportedText(situation?.querySelector('.level-badges')?.textContent || bodyText);
+  const meeting = incidentSection(doc, 'ミーティングへの申し送り');
+  return {
+    source:'html',
+    sourceFileName,
+    reportNumber,
+    type: /アクシデント/.test(typeText) ? 'accident' : 'near_miss',
+    occurredDate: occurred.date,
+    occurredTime: occurred.time,
+    entryDate: parseLooseDate(info['記入日']),
+    reporterName: info['記入者名'] || '',
+    discovererName: info['発見者名'] || '',
+    category: parseCategoryCodes(categoryText),
+    categoryText,
+    scene: fieldValue(situation, 'どんな場面'),
+    eventImpact: fieldValue(situation, 'どうなりそう') || fieldValue(situation, '発生した実害'),
+    level: /レベルA|ゾッ/.test(levelText) && /☑\s*レベルA|active-a|ゾッ/.test(html + levelText) ? 'A' : 'B',
+    details: fieldValue(situation, '具体的な内容') || fieldValue(situation, '具体的内容'),
+    goodPoint: sectionValue(incidentSection(doc, 'なぜ防げたか')),
+    causeHuman: causeValue(incidentSection(doc, '振り返り'), '人・行動'),
+    causeEnvironment: causeValue(incidentSection(doc, '振り返り'), '環境・連携'),
+    handoff: fieldValue(meeting, '報告者より') || fieldValue(meeting, '申し送り'),
+    countermeasure: fieldValue(meeting, '対策'),
+    meetingReportDate: parseLooseDate(fieldValue(meeting, '報告日'))
+  };
+}
+
+function parseIncidentOcrText(text, sourceFileName) {
+  const rawText = normalizeImportedText(text);
+  const reportNumber = extractReportNumber(rawText);
+  const occurred = parseIncidentDateTime(extractLabeledText(rawText, ['発生日時', '発生日'], ['記入日', '記入者']) || rawText);
+  const categoryText = extractLabeledText(rawText, ['事象の種類'], ['状況', 'どんな場面']) || incidentCategoryText({ category:parseCategoryCodes(rawText) });
+  return {
+    source:'image',
+    sourceFileName,
+    rawText,
+    reportNumber,
+    type: /アクシデント/.test(rawText) ? 'accident' : 'near_miss',
+    occurredDate: occurred.date,
+    occurredTime: occurred.time,
+    entryDate: parseLooseDate(extractLabeledText(rawText, ['記入日'], ['記入者名', '記入者'])) || todayKey(),
+    reporterName: extractLabeledText(rawText, ['記入者名', '記入者'], ['発見者名', '発見者', '事象の種類']),
+    discovererName: extractLabeledText(rawText, ['発見者名', '発見者'], ['事象の種類', '状況']),
+    category: parseCategoryCodes(categoryText || rawText),
+    categoryText,
+    scene: extractLabeledText(rawText, ['どんな場面で', '場面'], ['どうなりそう', '発生した実害', '危険度']),
+    eventImpact: extractLabeledText(rawText, ['どうなりそうだった', '発生した実害', '事象'], ['危険度', '具体的']),
+    level: /レベルA|ゾッ/.test(rawText) ? 'A' : 'B',
+    details: extractLabeledText(rawText, ['具体的な内容', '具体的内容', '具体的'], ['なぜ防げたか', '振り返り', '原因']) || rawText,
+    goodPoint: extractLabeledText(rawText, ['なぜ防げたか', 'Good Point'], ['振り返り', '原因']),
+    causeHuman: extractLabeledText(rawText, ['人・行動'], ['環境・連携', 'ミーティング']),
+    causeEnvironment: extractLabeledText(rawText, ['環境・連携'], ['ミーティング', '申し送り']),
+    handoff: extractLabeledText(rawText, ['報告者より', '申し送り'], ['対策', '報告日']),
+    countermeasure: extractLabeledText(rawText, ['対策'], ['報告日']),
+    meetingReportDate: parseLooseDate(extractLabeledText(rawText, ['報告日'], []))
+  };
+}
+
 async function handleActions(event) {
   const imageBtn = event.target.closest('.image-thumb');
   if (imageBtn) {
@@ -1008,6 +1842,8 @@ async function handleActions(event) {
   if (action === 'read-notice') return markNoticeRead(id);
   if (action === 'delete-opinion') return deleteItem(PATHS.opinions, id, '提言');
   if (action === 'save-judgment') return saveJudgment(id);
+  if (action === 'save-incident-followup') return saveIncidentFollowup(id);
+  if (action === 'delete-incident') return deleteIncidentReport(id);
 }
 
 function fillTaskForm(id) {
@@ -1383,6 +2219,152 @@ function readChip(id, isRead, read) {
   return `<span class="read-chip ${isRead ? 'read' : 'unread'}">${esc(name)}${esc(suffix)}</span>`;
 }
 
+function renderIncidentReports() {
+  const reports = visibleIncidentReports();
+  document.getElementById('incidentCount').textContent = `${reports.length}件`;
+  const list = document.getElementById('incidentList');
+  if (!reports.length) {
+    list.innerHTML = '<div class="empty">報告はありません</div>';
+    return;
+  }
+  list.innerHTML = reports.map(report => `
+    <article class="item">
+      <div class="item-top">
+        <div class="item-title">
+          <h3>${esc(report.reportNumber || buildIncidentReportNumber(report))}</h3>
+          <div class="meta">
+            <span>${esc(formatIncidentOccurredAt(report))}</span>
+            <span>記入者: ${esc(report.reporterName || report.createdBy || '-')}</span>
+            <span>登録: ${esc(report.createdBy || '-')}</span>
+          </div>
+        </div>
+        <div class="item-badges">
+          <span class="badge incident-type-${escAttr(report.type || 'near_miss')}">${esc(INCIDENT_TYPE_LABELS[report.type] || '-')}</span>
+          <span class="badge">${esc(INCIDENT_LEVEL_LABELS[report.level] || '-')}</span>
+          <span class="badge incident-status-${escAttr(report.counterStatus || 'pending')}">${esc(INCIDENT_STATUS_LABELS[report.counterStatus || 'pending'])}</span>
+        </div>
+      </div>
+      ${textBlock('概要', report.overview)}
+      ${textBlock('事象の種類', incidentCategoryText(report))}
+      ${textBlock('場面', report.scene)}
+      ${textBlock('どうなりそうだった？ / 発生した実害', report.eventImpact)}
+      ${textBlock('具体的な内容', report.details)}
+      ${report.type === 'near_miss' ? textBlock('なぜ防げたか（Good Point）', report.goodPoint) : ''}
+      ${textBlock('原因【人・行動】', report.causeHuman)}
+      ${textBlock('原因【環境・連携】', report.causeEnvironment)}
+      ${textBlock('ミーティングへの申し送り', report.handoff)}
+      ${textBlock('対策（ミーティングにて記入）', report.countermeasure)}
+      ${incidentConfirmationHtml(report)}
+      ${incidentFollowupHtml(report)}
+      ${canManageIncidentReport(report) ? `
+        <div class="item-actions">
+          <button class="btn danger" type="button" data-action="delete-incident" data-id="${escAttr(report.id)}">削除</button>
+        </div>
+      ` : ''}
+    </article>
+  `).join('');
+}
+
+function visibleIncidentReports() {
+  return state.incidentReports.filter(report => isDirector() || isLeader() || report.createdById === currentUser.staffId);
+}
+
+function canManageIncidentReport() {
+  return isDirector() || isLeader();
+}
+
+function incidentConfirmationHtml(report) {
+  if (report.counterStatus !== 'confirmed') return '';
+  const confirmedDate = report.confirmedAt ? formatDate(report.confirmedAt) : '-';
+  return `<div class="read-status">定着確認済み：${esc(confirmedDate)} / ${esc(report.confirmedBy || '-')}</div>`;
+}
+
+function incidentFollowupHtml(report) {
+  if (!canManageIncidentReport(report)) return '';
+  const status = report.counterStatus || 'pending';
+  const statusDisabled = status === 'confirmed' && !isDirector() ? 'disabled' : '';
+  return `
+    <div class="progress-box incident-followup">
+      <div class="form-grid">
+        <div class="field full">
+          <label>対策内容</label>
+          <textarea data-incident-followup="${escAttr(report.id)}" data-field="countermeasure">${esc(report.countermeasure || '')}</textarea>
+        </div>
+        <div class="field">
+          <label>担当者</label>
+          <input data-incident-followup="${escAttr(report.id)}" data-field="counterOwner" value="${escAttr(report.counterOwner || '')}">
+        </div>
+        <div class="field">
+          <label>実施期限</label>
+          <input type="date" data-incident-followup="${escAttr(report.id)}" data-field="counterDueDate" value="${escAttr(report.counterDueDate || '')}">
+        </div>
+        <div class="field">
+          <label>実施状況</label>
+          <select data-incident-followup="${escAttr(report.id)}" data-field="counterStatus" ${statusDisabled}>
+            ${incidentStatusOptionsHtml(status)}
+          </select>
+        </div>
+        <div class="field">
+          <label>ミーティング報告日</label>
+          <input type="date" data-incident-followup="${escAttr(report.id)}" data-field="meetingReportDate" value="${escAttr(report.meetingReportDate || '')}">
+        </div>
+      </div>
+      <div class="item-actions">
+        <button class="btn primary" type="button" data-action="save-incident-followup" data-id="${escAttr(report.id)}">ミーティング対応を保存</button>
+      </div>
+    </div>
+  `;
+}
+
+function incidentStatusOptionsHtml(currentStatus) {
+  return Object.entries(INCIDENT_STATUS_LABELS).map(([value, label]) => {
+    const disabled = value === 'confirmed' && !isDirector() && currentStatus !== 'confirmed';
+    return `<option value="${value}" ${value === currentStatus ? 'selected' : ''} ${disabled ? 'disabled' : ''}>${label}</option>`;
+  }).join('');
+}
+
+async function saveIncidentFollowup(id) {
+  if (!canManageIncidentReport()) return;
+  const report = state.incidentReports.find(item => item.id === id);
+  if (!report) return;
+  const currentStatus = report.counterStatus || 'pending';
+  let nextStatus = incidentFollowupField(id, 'counterStatus') || currentStatus;
+  if (!isDirector() && currentStatus === 'confirmed') nextStatus = 'confirmed';
+  if (!isDirector() && nextStatus === 'confirmed' && currentStatus !== 'confirmed') {
+    return showToast('定着確認済みにできるのは院長のみです');
+  }
+  const payload = {
+    countermeasure: incidentFollowupField(id, 'countermeasure'),
+    counterOwner: incidentFollowupField(id, 'counterOwner'),
+    counterDueDate: incidentFollowupField(id, 'counterDueDate'),
+    counterStatus: nextStatus,
+    meetingReportDate: incidentFollowupField(id, 'meetingReportDate'),
+    updatedAt: Date.now(),
+    updatedBy: currentUser.name
+  };
+  if (nextStatus === 'confirmed' && currentStatus !== 'confirmed') {
+    payload.confirmedAt = Date.now();
+    payload.confirmedBy = currentUser.name;
+  }
+  if (nextStatus !== 'confirmed' && currentStatus === 'confirmed' && isDirector()) {
+    payload.confirmedAt = null;
+    payload.confirmedBy = null;
+  }
+  await update(ref(db, `${PATHS.incidentReports}/${id}`), payload);
+  showToast('ミーティング対応を保存しました');
+}
+
+function incidentFollowupField(id, field) {
+  return document.querySelector(`[data-incident-followup="${cssEscape(id)}"][data-field="${field}"]`)?.value.trim() || '';
+}
+
+async function deleteIncidentReport(id) {
+  if (!canManageIncidentReport()) return;
+  if (!confirm('報告を削除しますか？')) return;
+  await remove(ref(db, `${PATHS.incidentReports}/${id}`));
+  showToast('報告を削除しました');
+}
+
 function renderOpinions() {
   document.getElementById('opinionCount').textContent = `${state.opinions.length}件`;
   const list = document.getElementById('opinionList');
@@ -1458,6 +2440,194 @@ function currentDecisionReason(opinion) {
 
 function decisionReasonsOf(opinion) {
   return opinion?.decisionReasons && typeof opinion.decisionReasons === 'object' ? opinion.decisionReasons : {};
+}
+
+function normalizeImportedText(text) {
+  return String(text || '')
+    .replace(/\u00a0/g, ' ')
+    .replace(/[ \t]+/g, ' ')
+    .replace(/\r\n?/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+function cleanImportedText(text) {
+  return normalizeImportedText(text).replace(/\n+/g, ' ').trim();
+}
+
+function extractReportNumber(text) {
+  return cleanImportedText(text).match(/KD-\d{4}-\d{4}-(?:\d{4}|AM|PM|UNK)/i)?.[0] || '';
+}
+
+function extractIncidentInfoGrid(doc) {
+  const info = {};
+  doc.querySelectorAll('.info-grid .info-label').forEach(label => {
+    const key = cleanImportedText(label.textContent);
+    const valueEl = label.nextElementSibling;
+    if (key && valueEl?.classList.contains('info-value')) info[key] = cleanImportedText(valueEl.textContent);
+  });
+  return info;
+}
+
+function incidentSection(doc, titlePart) {
+  return Array.from(doc.querySelectorAll('.section')).find(section => {
+    return cleanImportedText(section.querySelector('.section-title')?.textContent || '').includes(titlePart);
+  });
+}
+
+function sectionValue(section) {
+  if (!section) return '';
+  const value = section.querySelector('.field-value');
+  return cleanImportedText(value?.textContent || '');
+}
+
+function fieldValue(section, labelPart) {
+  if (!section) return '';
+  const group = Array.from(section.querySelectorAll('.field-group')).find(item => {
+    return cleanImportedText(item.querySelector('.field-label')?.textContent || '').includes(labelPart);
+  });
+  return cleanImportedText(group?.querySelector('.field-value')?.textContent || '');
+}
+
+function causeValue(section, labelPart) {
+  if (!section) return '';
+  const box = Array.from(section.querySelectorAll('.cause-box')).find(item => {
+    return cleanImportedText(item.querySelector('.cause-label')?.textContent || '').includes(labelPart);
+  });
+  return cleanImportedText(box?.querySelector('.cause-value')?.textContent || '');
+}
+
+function extractLabeledText(text, labels, nextLabels) {
+  const source = normalizeImportedText(text);
+  const startMatch = labels
+    .map(label => ({ label, index: source.indexOf(label) }))
+    .filter(item => item.index >= 0)
+    .sort((a, b) => a.index - b.index)[0];
+  if (!startMatch) return '';
+  let start = startMatch.index + startMatch.label.length;
+  let rest = source.slice(start).replace(/^[\s:：｜|・\-ー]+/, '');
+  const nextIndex = nextLabels
+    .map(label => rest.indexOf(label))
+    .filter(index => index > 0)
+    .sort((a, b) => a - b)[0];
+  if (Number.isFinite(nextIndex)) rest = rest.slice(0, nextIndex);
+  return normalizeImportedText(rest);
+}
+
+function parseIncidentDateTime(text) {
+  const source = cleanImportedText(text);
+  const date = parseLooseDate(source);
+  const timeMatch = source.match(/(\d{1,2})[:：時](\d{2})?/);
+  let time = '';
+  if (timeMatch) {
+    const hour = String(Math.min(23, Number(timeMatch[1]))).padStart(2, '0');
+    const minute = String(timeMatch[2] ? Math.min(59, Number(timeMatch[2])) : 0).padStart(2, '0');
+    time = `${hour}:${minute}ごろ`;
+  } else if (/午前|AM/i.test(source)) {
+    time = '午前';
+  } else if (/午後|PM/i.test(source)) {
+    time = '午後';
+  } else if (/不明/.test(source)) {
+    time = '不明';
+  }
+  return { date, time };
+}
+
+function parseLooseDate(text) {
+  const match = String(text || '').match(/(20\d{2})[年\/\-. ]\s*(\d{1,2})[月\/\-. ]\s*(\d{1,2})/);
+  if (!match) return '';
+  const year = match[1];
+  const month = String(Number(match[2])).padStart(2, '0');
+  const day = String(Number(match[3])).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function parseCategoryCodes(text) {
+  const source = cleanImportedText(text);
+  const codes = [];
+  INCIDENT_CATEGORIES.forEach(category => {
+    const name = category.label.replace(/^[A-G]\.\s*/, '');
+    const pattern = new RegExp(`(^|[^A-Z])${category.value}(\\.|．|\\s|$)|${escapeRegExp(name)}`);
+    if (pattern.test(source)) codes.push(category.value);
+  });
+  return [...new Set(codes)];
+}
+
+function inferIncidentType(data) {
+  const text = incidentSearchText(data);
+  return /怪我|誤飲|誤嚥|状態悪化|クレーム|実害|出血|痛み|事故|転倒|破損|謝罪/.test(text)
+    ? 'accident'
+    : 'near_miss';
+}
+
+function inferIncidentLevel(data) {
+  const text = incidentSearchText(data);
+  return /怪我|誤飲|誤嚥|状態悪化|クレーム|実害|出血|転倒|重大|ゾッ|事故/.test(text) ? 'A' : 'B';
+}
+
+function inferIncidentCategory(data) {
+  const text = incidentSearchText(data);
+  const matches = [];
+  if (/申し送り|引き継ぎ|共有|連絡|カルテ|伝達|シフト/.test(text)) matches.push('B');
+  if (/手順|マニュアル|省略|ルール|流れ|手順書/.test(text)) matches.push('C');
+  if (/技術|知識|手技|薬剤|材料|操作/.test(text)) matches.push('D');
+  if (/配置|機器|設備|導線|物|環境|故障|不具合/.test(text)) matches.push('E');
+  if (/患者|体動|アレルギー|申告|体調|急変/.test(text)) matches.push('F');
+  if (/確認|チェック|声かけ|見落と|思い込み/.test(text)) matches.push('A');
+  return matches.length ? [...new Set(matches)] : ['A'];
+}
+
+function incidentSearchText(data) {
+  return [
+    data?.overview,
+    data?.eventImpact,
+    data?.details,
+    data?.causeHuman,
+    data?.causeEnvironment
+  ].filter(Boolean).join(' ');
+}
+
+function incidentCategoryText(item) {
+  const values = Array.isArray(item?.category) ? item.category : [item?.category].filter(Boolean);
+  if (!values.length) return item?.categoryText || '-';
+  return values.map(value => {
+    const category = INCIDENT_CATEGORIES.find(entry => entry.value === value);
+    const label = category?.label || value;
+    if (value === 'G' && item?.categoryOther) return `${label}（${item.categoryOther}）`;
+    return label;
+  }).join('、');
+}
+
+function buildIncidentReportNumber(item) {
+  const date = String(item?.occurredDate || '').trim();
+  const match = date.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  const datePart = match ? `${match[1]}-${match[2]}${match[3]}` : todayKey().replace(/^(\d{4})-(\d{2})-(\d{2})$/, '$1-$2$3');
+  return `KD-${datePart}-${incidentTimeCode(item?.occurredTime)}`;
+}
+
+function incidentTimeCode(value) {
+  const text = String(value || '').trim();
+  const time = text.match(/(\d{1,2})[:：時](\d{2})?/);
+  if (time) {
+    const hour = String(Math.min(23, Number(time[1]))).padStart(2, '0');
+    const minute = String(time[2] ? Math.min(59, Number(time[2])) : 0).padStart(2, '0');
+    return `${hour}${minute}`;
+  }
+  if (/午前|AM/i.test(text)) return 'AM';
+  if (/午後|PM/i.test(text)) return 'PM';
+  return 'UNK';
+}
+
+function formatIncidentOccurredAt(item) {
+  const date = formatDateOnly(item?.occurredDate);
+  const time = item?.occurredTime ? `${item.occurredTime}` : '時刻不明';
+  return `${date} ${time}`;
+}
+
+function formatDateOnly(value) {
+  const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return value || '-';
+  return `${match[1]}/${match[2]}/${match[3]}`;
 }
 
 function textBlock(label, value) {
@@ -1586,6 +2756,10 @@ function escAttr(value) {
 function cssEscape(value) {
   if (window.CSS?.escape) return CSS.escape(value);
   return String(value).replace(/["\\]/g, '\\$&');
+}
+
+function escapeRegExp(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 let toastTimer = null;
