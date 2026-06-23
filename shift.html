@@ -5205,6 +5205,12 @@ function cancelRequest(id){
   renderStaffMonthGrid(currentUser.staffId);
 }
 
+function renderStaffRequestList(){
+  if(!currentUser || currentUser.role !== 'staff') return;
+  renderRequestHistory(currentUser.staffId);
+  renderStaffMonthGrid(currentUser.staffId);
+}
+
 function renderRequestHistory(sid){
   const el   = document.getElementById('requestHistory');
   const reqs = requestData.filter(r=>r.staffId===sid&&!r.cancelled).reverse();
