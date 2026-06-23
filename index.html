@@ -359,6 +359,9 @@
     <label class="login-label">スタッフを選択</label>
     <select class="login-select" id="loginStaff">
       <option value="">── 選択してください ──</option>
+      <optgroup label="ゲスト">
+        <option value="ゲスト|ゲスト|0000|guest">ゲスト</option>
+      </optgroup>
       <optgroup label="DR（歯科医師）">
         <option value="院長|DR|1001|sugihira">院長</option>
         <option value="嶋中|DR|1002|shimanaka">嶋中</option>
@@ -376,9 +379,6 @@
         <option value="田宮|DA|3001|tamiya">田宮</option>
         <option value="田中|DA|3002|tanaka">田中</option>
         <option value="百々|DA|3003|momo">百々</option>
-      </optgroup>
-      <optgroup label="ゲスト">
-        <option value="ゲスト|ゲスト|0000|guest">ゲスト</option>
       </optgroup>
     </select>
     <label class="login-label">パスワード（数字4桁）</label>
@@ -566,7 +566,7 @@
       </div>
     </section>
 
-    <section class="tool-section" data-menu-section>
+    <section class="tool-section" data-menu-section data-guest-hidden="true">
       <button class="section-toggle" type="button" onclick="toggleMenuSection(this)">
         <span><span class="section-title-text">アカウント設定</span></span>
         <span class="toggle-icon">⌄</span>
@@ -707,7 +707,7 @@ function updatePasswordCache(data) {
   if (data && typeof data === 'object') {
     syncedPasswords = { ...syncedPasswords, ...data };
     localStorage.setItem('carmia_passwords', JSON.stringify({ ...readLocalPasswords(), ...syncedPasswords }));
-    if (currentUser?.staffId && syncedPasswords[currentUser.staffId]) {
+    if (currentUser?.staffId && !isGuestUser() && syncedPasswords[currentUser.staffId]) {
       currentUser.pass = syncedPasswords[currentUser.staffId];
       currentUser = savePortalUser(currentUser);
     }
@@ -727,6 +727,7 @@ async function ensurePasswordsLoaded() {
 }
 
 function passwordForStaff(staffId, defaultPass = '') {
+  if (staffId === GUEST_STAFF_ID) return DEFAULT_PASSWORDS[GUEST_STAFF_ID] || '0000';
   const localPasswords = readLocalPasswords();
   return syncedPasswords[staffId] || localPasswords[staffId] || defaultPass || DEFAULT_PASSWORDS[staffId] || '';
 }
@@ -752,7 +753,9 @@ function normalizePortalUser(raw) {
   if (!staffId) return null;
   const name = isInvalidUserText(raw.name) ? (STAFF_ID_MAP[staffId] || staffId) : String(raw.name).trim();
   const role = isInvalidUserText(raw.role) ? roleFromStaffId(staffId) : String(raw.role).trim();
-  const pass = isInvalidUserText(raw.pass) ? passwordForStaff(staffId, '') : String(raw.pass);
+  const pass = staffId === GUEST_STAFF_ID
+    ? passwordForStaff(staffId, '')
+    : (isInvalidUserText(raw.pass) ? passwordForStaff(staffId, '') : String(raw.pass));
   return { ...raw, staffId, sid: staffId, name, role, pass };
 }
 
@@ -818,6 +821,7 @@ function doLogout() {
 // Firebase / passwords と carmia_passwords（localStorage）に保存 → シフトアプリと共有
 // ─────────────────────────────────────────
 function openPwModal() {
+  if (isGuestUser()) return;
   document.getElementById('pwOld').value  = '';
   document.getElementById('pwNew').value  = '';
   document.getElementById('pwNew2').value = '';
@@ -839,6 +843,12 @@ async function submitPwChange() {
   const newVal = document.getElementById('pwNew').value;
   const newVal2= document.getElementById('pwNew2').value;
   const msg    = document.getElementById('pwMsg');
+
+  if (isGuestUser()) {
+    msg.textContent = 'ゲストのパスワードは変更できません';
+    msg.className = 'pw-msg err';
+    return;
+  }
 
   await ensurePasswordsLoaded();
 
