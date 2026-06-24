@@ -164,12 +164,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--mint)}
             <label for="materialCategory">カテゴリ</label>
             <select id="materialCategory">
               <option>歯周治療</option>
-              <option>カウンセリング</option>
-              <option>診療補助</option>
-              <option>受付</option>
-              <option>接遇</option>
-              <option>安全管理</option>
-              <option>その他</option>
+              <option>インプラント</option>
             </select>
           </div>
           <div class="field full">
@@ -203,12 +198,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--mint)}
     <select id="categoryFilter" onchange="renderMaterials()">
       <option value="">すべてのカテゴリ</option>
       <option>歯周治療</option>
-      <option>カウンセリング</option>
-      <option>診療補助</option>
-      <option>受付</option>
-      <option>接遇</option>
-      <option>安全管理</option>
-      <option>その他</option>
+      <option>インプラント</option>
     </select>
   </section>
 
@@ -239,6 +229,7 @@ const storage = getStorage(fbApp);
 const DB_PATH = 'trainingMaterials';
 const ADMIN_STAFF = ['sugihira', 'momo'];
 const DEFAULT_ADMIN_PASSWORDS = { sugihira:'1001', momo:'3003' };
+const MATERIAL_CATEGORY_ALIASES = { 'その他':'インプラント' };
 const STAFF_NAMES = {
   sugihira:'院長', shimanaka:'島中', hokari:'保刈', shinoda:'篠田',
   tsuruta:'鶴田', yoshida:'吉田', takagi:'高木', matsumoto:'松本',
@@ -422,14 +413,20 @@ function canManageMaterial(item) {
   return !item.createdById && userName && item.createdBy === userName;
 }
 
+function materialCategoryValue(category) {
+  const value = String(category || '').trim();
+  return MATERIAL_CATEGORY_ALIASES[value] || value || 'インプラント';
+}
+
 function renderMaterials() {
   const list = document.getElementById('materialList');
   const q = document.getElementById('searchText').value.trim().toLowerCase();
   const category = document.getElementById('categoryFilter').value;
   const filtered = materials.filter(item => {
-    if (category && item.category !== category) return false;
+    const itemCategory = materialCategoryValue(item.category);
+    if (category && itemCategory !== category) return false;
     if (!q) return true;
-    return [item.title, item.summary, item.fileName, item.category]
+    return [item.title, item.summary, item.fileName, itemCategory]
       .some(value => String(value || '').toLowerCase().includes(q));
   });
 
@@ -443,6 +440,7 @@ function renderMaterials() {
   list.innerHTML = filtered.map(item => {
     const title = esc(item.title || item.fileName || '無題の資料');
     const summary = esc(item.summary || '');
+    const category = materialCategoryValue(item.category);
     const isLink = item.sourceType === 'link' || Boolean(item.linkUrl);
     const fileName = esc(isLink ? (item.linkUrl || item.url || '') : (item.fileName || ''));
     const type = fileLabel(item.fileType, item.fileName, item.url || item.linkUrl, isLink);
@@ -463,7 +461,7 @@ function renderMaterials() {
           <div>
             <h2 class="card-title">${title}</h2>
             <div class="meta">
-              <span class="badge">${esc(item.category || 'その他')}</span>
+              <span class="badge">${esc(category)}</span>
               <span class="badge">${esc(type.label)}</span>
               ${size ? `<span class="badge">${size}</span>` : ''}
               ${date ? `<span class="badge">${date}</span>` : ''}
@@ -493,7 +491,7 @@ window.saveMaterial = async function(event) {
   }
 
   const title = document.getElementById('materialTitle').value.trim();
-  const category = document.getElementById('materialCategory').value;
+  const category = materialCategoryValue(document.getElementById('materialCategory').value);
   const summary = document.getElementById('materialSummary').value.trim();
   const mode = getMaterialMode();
   const linkUrl = document.getElementById('materialUrl').value.trim();
@@ -598,7 +596,7 @@ window.startEdit = function(id) {
   document.body.classList.add('is-editing-material');
   document.getElementById('formTitle').textContent = '資料を編集';
   document.getElementById('materialTitle').value = item.title || '';
-  document.getElementById('materialCategory').value = item.category || 'その他';
+  document.getElementById('materialCategory').value = materialCategoryValue(item.category);
   document.getElementById('materialSummary').value = item.summary || '';
   setMaterialMode(item.sourceType === 'link' || item.linkUrl ? 'link' : 'file');
   document.getElementById('materialUrl').value = item.linkUrl || (item.sourceType === 'link' ? item.url : '') || '';
