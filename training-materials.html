@@ -44,10 +44,13 @@ body.is-editing-material .admin-panel{display:block}
 .form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
 .field{display:flex;flex-direction:column;gap:6px}
 .field.full{grid-column:1/-1}
+.category-admin{display:none}
+body.is-admin .category-admin{display:flex}
 label{font-size:12px;font-weight:800;color:var(--gray)}
 input,select,textarea{width:100%;border:2px solid var(--line);border-radius:12px;background:white;color:var(--dark);padding:11px 12px;font-size:14px;outline:none}
 textarea{min-height:86px;resize:vertical;line-height:1.6}
 input:focus,select:focus,textarea:focus{border-color:var(--mint)}
+.inline-form{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:start}
 .file-box{border:2px dashed #b9dce2;border-radius:14px;padding:14px;background:#f8fdff}
 .file-box input{border:0;padding:0;border-radius:0;background:transparent}
 .mode-toggle{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
@@ -167,6 +170,14 @@ input:focus,select:focus,textarea:focus{border-color:var(--mint)}
               <option>インプラント</option>
             </select>
           </div>
+          <div class="field full category-admin">
+            <label for="newMaterialCategory">新しいカテゴリ</label>
+            <div class="inline-form">
+              <input id="newMaterialCategory" type="text" maxlength="30" placeholder="例：矯正">
+              <button class="btn secondary" id="addCategoryBtn" type="button" onclick="addMaterialCategory()">追加</button>
+            </div>
+            <div class="status" id="categoryStatus"></div>
+          </div>
           <div class="field full">
             <label for="materialSummary">メモ</label>
             <textarea id="materialSummary" maxlength="500" placeholder="対象スタッフ、研修日、補足メモなど"></textarea>
@@ -227,8 +238,10 @@ const fbApp = initializeApp(firebaseConfig);
 const db = getDatabase(fbApp);
 const storage = getStorage(fbApp);
 const DB_PATH = 'trainingMaterials';
+const CATEGORY_DB_PATH = 'trainingMaterialCategories';
 const ADMIN_STAFF = ['sugihira', 'momo'];
 const DEFAULT_ADMIN_PASSWORDS = { sugihira:'1001', momo:'3003' };
+const DEFAULT_MATERIAL_CATEGORIES = ['歯周治療', 'インプラント'];
 const MATERIAL_CATEGORY_ALIASES = { 'その他':'インプラント' };
 const STAFF_NAMES = {
   sugihira:'院長', shimanaka:'島中', hokari:'保刈', shinoda:'篠田',
@@ -246,6 +259,7 @@ const PORTAL_USER_STORAGE_KEY = 'portalUser';
 
 let currentUser = readUser();
 let materials = [];
+let materialCategories = [...DEFAULT_MATERIAL_CATEGORIES];
 let editingId = '';
 let editingMaterial = null;
 let syncedPasswords = {};
@@ -259,7 +273,22 @@ document.querySelectorAll('input[name="materialMode"]').forEach(input => {
   input.addEventListener('change', updateMaterialMode);
 });
 document.getElementById('materialFile')?.addEventListener('change', updateFileHint);
+document.getElementById('newMaterialCategory')?.addEventListener('keydown', event => {
+  if (event.key !== 'Enter') return;
+  event.preventDefault();
+  window.addMaterialCategory();
+});
+renderCategoryControls();
 updateMaterialMode();
+
+onValue(ref(db, CATEGORY_DB_PATH), snap => {
+  materialCategories = normalizeMaterialCategories(snap.val());
+  renderCategoryControls();
+  renderMaterials();
+}, error => {
+  setCategoryStatus(`カテゴリを読み込めませんでした: ${error.message}`, 'err');
+  renderCategoryControls();
+});
 
 onValue(ref(db, DB_PATH), snap => {
   const data = snap.val() || {};
@@ -413,9 +442,85 @@ function canManageMaterial(item) {
   return !item.createdById && userName && item.createdBy === userName;
 }
 
-function materialCategoryValue(category) {
+function cleanMaterialCategoryName(category) {
   const value = String(category || '').trim();
-  return MATERIAL_CATEGORY_ALIASES[value] || value || 'インプラント';
+  return MATERIAL_CATEGORY_ALIASES[value] || value;
+}
+
+function materialCategoryValue(category) {
+  return cleanMaterialCategoryName(category) || DEFAULT_MATERIAL_CATEGORIES[1];
+}
+
+function normalizeMaterialCategories(raw) {
+  const names = [...DEFAULT_MATERIAL_CATEGORIES];
+  if (raw && typeof raw === 'object') {
+    Object.values(raw).forEach(entry => {
+      const name = cleanMaterialCategoryName(typeof entry === 'string' ? entry : entry?.name);
+      if (name) names.push(name);
+    });
+  }
+  return [...new Set(names)];
+}
+
+function renderCategoryControls(selectedMaterialCategory, selectedFilterCategory) {
+  const categories = materialCategories.length ? materialCategories : [...DEFAULT_MATERIAL_CATEGORIES];
+  const materialSelect = document.getElementById('materialCategory');
+  const filterSelect = document.getElementById('categoryFilter');
+
+  if (materialSelect) {
+    const selected = materialCategoryValue(selectedMaterialCategory ?? materialSelect.value);
+    materialSelect.innerHTML = categories
+      .map(category => `<option value="${escAttr(category)}">${esc(category)}</option>`)
+      .join('');
+    materialSelect.value = categories.includes(selected) ? selected : categories[0];
+  }
+
+  if (filterSelect) {
+    const selected = cleanMaterialCategoryName(selectedFilterCategory ?? filterSelect.value);
+    filterSelect.innerHTML = '<option value="">すべてのカテゴリ</option>' + categories
+      .map(category => `<option value="${escAttr(category)}">${esc(category)}</option>`)
+      .join('');
+    filterSelect.value = categories.includes(selected) ? selected : '';
+  }
+}
+
+window.addMaterialCategory = async function() {
+  if (!isAdmin()) return setCategoryStatus('カテゴリ追加は管理者のみ可能です。', 'err');
+
+  const input = document.getElementById('newMaterialCategory');
+  const button = document.getElementById('addCategoryBtn');
+  const category = cleanMaterialCategoryName(input?.value);
+  if (!category) return setCategoryStatus('カテゴリ名を入力してください。', 'err');
+  if (materialCategories.includes(category)) return setCategoryStatus('すでに登録されています。', 'err');
+
+  button.disabled = true;
+  setCategoryStatus('追加しています。');
+
+  try {
+    const now = Date.now();
+    const categoryRef = push(ref(db, CATEGORY_DB_PATH));
+    await set(categoryRef, {
+      name: category,
+      createdAt: now,
+      createdBy: currentUser?.name || '不明',
+      createdById: currentStaffId()
+    });
+    input.value = '';
+    materialCategories = normalizeMaterialCategories([...materialCategories, category]);
+    renderCategoryControls(category, document.getElementById('categoryFilter')?.value);
+    setCategoryStatus('追加しました。', 'ok');
+  } catch(error) {
+    setCategoryStatus(`追加できませんでした: ${error.message}`, 'err');
+  } finally {
+    button.disabled = false;
+  }
+};
+
+function setCategoryStatus(text, type = '') {
+  const el = document.getElementById('categoryStatus');
+  if (!el) return;
+  el.textContent = text || '';
+  el.className = `status ${type}`.trim();
 }
 
 function renderMaterials() {
@@ -726,6 +831,7 @@ function resetForm() {
   editingId = '';
   editingMaterial = null;
   document.getElementById('materialForm').reset();
+  renderCategoryControls();
   setMaterialMode('file');
   document.getElementById('materialUrl').value = '';
   document.getElementById('formTitle').textContent = '資料を追加';
