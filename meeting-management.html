@@ -872,7 +872,7 @@ const NOTICE_TARGETS = {
 const NOTICE_TARGET_IDS = Object.keys(NOTICE_TARGETS);
 const STATUS_LABELS = {
   todo:'ミーティング未共有',
-  in_progress:'進行中',
+  in_progress:'取り組み中',
   review:'確認依頼',
   confirmed:'定着確認済み'
 };
@@ -1891,7 +1891,7 @@ async function deleteItem(path, id, label, item) {
 async function rejectTaskReview(id) {
   const item = state.tasks.find(task => task.id === id);
   if (!item || !isDirector() || item.status !== 'review') return;
-  if (!confirm('定着確認依頼を却下して、進行中に戻しますか？')) return;
+  if (!confirm('定着確認依頼を却下して、取り組み中に戻しますか？')) return;
   return updateTaskStatus(id, 'in_progress', { rejected: true });
 }
 
@@ -2120,7 +2120,7 @@ function leaderProgressHtml(task) {
       <textarea data-progress-id="${escAttr(task.id)}" placeholder="進捗メモ">${esc(task.progress || '')}</textarea>
       <div class="item-actions">
         <button class="btn sky" type="button" data-action="save-progress" data-id="${escAttr(task.id)}">進捗保存</button>
-        ${task.status === 'todo' ? `<button class="btn" type="button" data-action="task-status" data-status="in_progress" data-id="${escAttr(task.id)}">進行中にする</button>` : ''}
+        ${task.status === 'todo' ? `<button class="btn" type="button" data-action="task-status" data-status="in_progress" data-id="${escAttr(task.id)}">ミーティングで共有した</button>` : ''}
         ${task.status !== 'review' ? `<button class="btn warn" type="button" data-action="task-status" data-status="review" data-id="${escAttr(task.id)}">確認依頼</button>` : ''}
       </div>
     </div>
