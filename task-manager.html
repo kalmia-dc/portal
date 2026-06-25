@@ -59,24 +59,38 @@
     box-shadow: 0 2px 12px rgba(78,205,196,0.1);
   }
 
-  .header-title {
-    font-family: 'Nunito', sans-serif;
+  .header-title { display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .back-link {
+    width: 38px;
+    height: 38px;
+    flex: 0 0 38px;
+    display: grid;
+    place-items: center;
+    border-radius: 10px;
+    border: 2px solid var(--border);
+    background: white;
+    color: var(--text);
+    text-decoration: none;
     font-weight: 900;
+    font-size: 16px;
+  }
+  .back-link:hover { border-color: var(--mint); color: var(--mint); }
+  .title-wrap { min-width: 0; }
+  .title-wrap h1 {
+    margin: 0;
     font-size: 18px;
-    background: linear-gradient(135deg, var(--mint), var(--sky));
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+    line-height: 1.15;
+    font-weight: 900;
+    color: var(--text);
     white-space: nowrap;
   }
-
-  .header-title span {
-    font-family: 'Zen Maru Gothic', sans-serif;
-    font-size: 10px;
-    font-weight: 400;
-    color: var(--text-muted);
+  .title-wrap span {
     display: block;
-    -webkit-text-fill-color: var(--text-muted);
+    margin-top: 2px;
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--text-muted);
+    white-space: nowrap;
   }
 
   .header-center { flex: 1; display: flex; justify-content: center; }
@@ -695,9 +709,12 @@
 <!-- ===== HEADER ===== -->
 <header>
   <div class="header-title">
-    <a href="https://kalmia-dc.github.io/portal/" style="text-decoration:none;display:flex;align-items:center;gap:6px;">
-      <span style="font-size:13px;color:var(--text-muted);">◀</span>
-      <span style="font-family:'Nunito',sans-serif;font-weight:900;font-size:18px;background:linear-gradient(135deg,var(--mint),var(--sky));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">ポータル</span>
+    <a class="back-link" href="./index.html" title="ポータルに戻る" aria-label="ポータルに戻る">←</a>
+    <a href="./index.html" style="text-decoration:none;">
+      <div class="title-wrap">
+        <h1>タスク管理</h1>
+        <span>共有タスク・進捗管理</span>
+      </div>
     </a>
   </div>
   <div class="header-center">

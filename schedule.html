@@ -17,10 +17,18 @@
   body{font-family:-apple-system,BlinkMacSystemFont,'Helvetica Neue',sans-serif;font-size:14px;color:var(--text);background:var(--gray);min-height:100vh}
 
   /* Header */
-  .header{background:#fff;border-bottom:1px solid var(--border);padding:0 16px;height:52px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+  .header{background:#fff;border-bottom:1px solid var(--border);padding:0 16px;height:52px;display:flex;align-items:center;justify-content:space-between;gap:10px;position:sticky;top:0;z-index:100}
+  .header-brand{display:flex;align-items:center;gap:10px;min-width:0}
+  .back-link{width:34px;height:34px;flex:0 0 34px;display:grid;place-items:center;border:1px solid var(--border);border-radius:8px;background:#fff;color:var(--text);text-decoration:none;font-weight:800}
+  .back-link:hover{background:var(--gray)}
+  .header-copy{min-width:0}
   .header-title{font-size:15px;font-weight:600;color:var(--text)}
   .header-sub{font-size:11px;color:var(--text-sub);margin-top:1px}
-  .header-user{display:flex;align-items:center;gap:8px}
+  .header-user{display:flex;align-items:center;gap:8px;min-width:0}
+  @media(max-width:520px){
+    .header{height:auto;min-height:52px;padding:8px 12px;align-items:flex-start}
+    .header-user{margin-left:auto;flex-wrap:wrap;justify-content:flex-end}
+  }
 
   /* Main */
   .main{max-width:480px;margin:0 auto;padding:16px}
@@ -363,7 +371,6 @@ function render() {
         <div class="avatar" style="width:30px;height:30px;font-size:11px;${getAvatarStyle(state.user.role)}">${initials(state.user.name)}</div>
         <span style="font-size:13px;font-weight:500">${state.user.name}</span>
         <span class="badge badge-${state.user.role}">${state.user.role}</span>
-        <button id="btn-logout" style="padding:4px 10px;font-size:12px">← ポータル</button>
       </div>`
     : '';
 
@@ -376,12 +383,6 @@ function render() {
     case 'newEvent':    main.innerHTML = renderNewEvent();    break;
     case 'editEvent':   main.innerHTML = renderEditEventForm(); attachEditEventHandlers(); break;
   }
-
-  // ログアウトボタン
-  const logoutBtn = document.getElementById('btn-logout');
-  if (logoutBtn) logoutBtn.addEventListener('click', () => {
-    window.location.href = 'https://kalmia-dc.github.io/portal/';
-  });
 
   // 作成フォームのハンドラ
   attachNewEventHandlers();
@@ -1246,9 +1247,12 @@ window.doDeleteEvent = async () => {
 
 <!-- HTML structure -->
 <header class="header">
-  <div>
-    <div class="header-title">日程調整</div>
-    <div class="header-sub">カルミアデンタルクリニック</div>
+  <div class="header-brand">
+    <a class="back-link" href="./index.html" title="ポータルに戻る" aria-label="ポータルに戻る">←</a>
+    <div class="header-copy">
+      <div class="header-title">日程調整</div>
+      <div class="header-sub">カルミアデンタルクリニック</div>
+    </div>
   </div>
   <div class="header-user" id="header-info"></div>
 </header>

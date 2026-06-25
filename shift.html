@@ -10,12 +10,30 @@
   /* ── LOGIN SCREEN ── */
   #loginScreen {
     min-height: 100vh;
+    width: 100%;
     background: linear-gradient(145deg, #004D40 0%, #00897B 50%, #26A69A 100%);
     display: flex;
     align-items: center;
     justify-content: center;
     padding: 24px;
+    position: relative;
+    overflow-x: hidden;
   }
+  .portal-back-link {
+    width: 38px;
+    height: 38px;
+    display: grid;
+    place-items: center;
+    border-radius: 10px;
+    background: rgba(255,255,255,.18);
+    border: 1px solid rgba(255,255,255,.35);
+    color: #fff;
+    text-decoration: none;
+    font-weight: 900;
+    font-size: 16px;
+  }
+  .portal-back-link:hover { background: rgba(255,255,255,.28); }
+  .login-portal-back { position: absolute; top: 16px; left: 16px; z-index: 2; }
   .login-card {
     background: #fff;
     border-radius: 24px;
@@ -24,6 +42,11 @@
     max-width: 380px;
     box-shadow: 0 24px 64px rgba(0,0,0,.22);
     animation: loginFadeIn .4s ease;
+  }
+  @media (max-width: 480px) {
+    #loginScreen { padding: 18px; }
+    .login-card { max-width: 100%; padding: 34px 24px; }
+    .login-role-tab { font-size: .8rem; }
   }
   @keyframes loginFadeIn {
     from { opacity:0; transform:translateY(20px); }
@@ -172,6 +195,16 @@
     transition: background .15s;
   }
   .staff-header .logout-btn:active { background: rgba(255,255,255,.3); }
+  body.portal-return-visible #staffScreen .staff-header { padding-left: 72px; }
+  #backToPortalBtn.logout-btn {
+    left: 16px;
+    right: auto;
+    width: 38px;
+    height: 38px;
+    padding: 0;
+    border-radius: 50%;
+    font-size: 1rem;
+  }
 
   /* セクション */
   .staff-section { padding: 16px 16px 8px; }
@@ -376,6 +409,17 @@
     background: rgba(255,255,255,.15); border: none; color: #fff;
     padding: 6px 12px; border-radius: 8px; font-size: .78rem;
     cursor: pointer; font-family: inherit; margin-left: 8px;
+  }
+  #adminBackToPortalBtn.admin-logout {
+    order: -1;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    margin-left: 0;
+    margin-right: 0;
+    border: 1px solid rgba(255,255,255,.25);
+    border-radius: 10px;
+    font-size: 1rem;
   }
 
   /* Hide app by default (login first) */
@@ -887,6 +931,7 @@
 
 <!-- ════════ LOGIN SCREEN ════════ -->
 <div id="loginScreen">
+  <a class="portal-back-link login-portal-back" href="./index.html" title="ポータルに戻る" aria-label="ポータルに戻る">←</a>
   <div class="login-card">
     <div class="login-logo">
       <span class="icon">🦷</span>
@@ -949,7 +994,7 @@
     <div class="greeting">おつかれさまです 👋</div>
     <div class="name" id="staffGreetName">---</div>
     <div style="display:flex;gap:6px;align-items:center;">
-      <button class="logout-btn" id="backToPortalBtn" onclick="goBackToPortal()" style="display:none;background:rgba(255,255,255,.15);">← ポータル</button>
+      <button class="logout-btn" id="backToPortalBtn" onclick="goBackToPortal()" style="display:none;background:rgba(255,255,255,.15);" title="ポータルに戻る" aria-label="ポータルに戻る">←</button>
       <button class="logout-btn" id="staffLogoutBtn" onclick="doLogout()">ログアウト</button>
     </div>
   </div>
@@ -1144,7 +1189,7 @@
     <span id="monthLabel"></span>
     <button id="btnNextMonth" onclick="changeMonth(1)">›</button>
   </div>
-  <button class="admin-logout" id="adminBackToPortalBtn" onclick="goBackToPortal()" style="display:none;">← ポータル</button>
+  <button class="admin-logout" id="adminBackToPortalBtn" onclick="goBackToPortal()" style="display:none;" title="ポータルに戻る" aria-label="ポータルに戻る">←</button>
   <button class="admin-logout" onclick="doLogout()">ログアウト</button>
 </header>
 
@@ -4867,7 +4912,7 @@ function showAdminApp(){
 }
 
 function goBackToPortal(){
-  window.location.href = 'https://kalmia-dc.github.io/portal/';
+  window.location.href = './index.html';
 }
 
 // URLパラメータ ?admin で管理画面に直接入る
@@ -4875,6 +4920,7 @@ function goBackToPortal(){
 window.addEventListener('load', ()=>{
   const params = new URLSearchParams(location.search);
   const fromPortal = params.get('sid') || location.search.includes('admin');
+  if(fromPortal) document.body.classList.add('portal-return-visible');
 
   if(location.search.includes('admin') || location.hash === '#admin'){
     currentUser = { role:'admin', name:'管理者' };

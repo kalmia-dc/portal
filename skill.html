@@ -12,16 +12,17 @@
   --bg:#f0f8ff; --white:#fff; --dark:#2d3436; --gray:#636e72; --light:#dfe6e9;
 }
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:'Zen Maru Gothic',sans-serif;background:var(--bg);color:var(--dark);min-height:100vh}
+body{font-family:'Zen Maru Gothic',sans-serif;background:var(--bg);color:var(--dark);min-height:100vh;overflow-x:hidden}
 
 /* ── HEADER ── */
-header{background:var(--white);height:56px;display:flex;align-items:center;justify-content:space-between;padding:0 16px;box-shadow:0 2px 8px rgba(0,0,0,.08);position:sticky;top:0;z-index:100}
-.h-logo{display:flex;align-items:center;gap:8px;font-family:'Nunito',sans-serif;font-weight:900;font-size:16px}
+header{background:var(--white);height:56px;display:flex;align-items:center;justify-content:flex-start;gap:10px;padding:0 16px;box-shadow:0 2px 8px rgba(0,0,0,.08);position:sticky;top:0;z-index:100}
+.h-logo{display:flex;align-items:center;gap:8px;font-family:'Nunito',sans-serif;font-weight:900;font-size:16px;min-width:0}
 .h-logo-icon{width:34px;height:34px;background:linear-gradient(135deg,var(--mint),var(--sky));border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px}
-.h-back{background:var(--light);border:none;border-radius:10px;padding:6px 12px;font-family:'Nunito',sans-serif;font-weight:800;font-size:13px;cursor:pointer;color:var(--gray);text-decoration:none}
+.h-back{width:36px;height:36px;flex:0 0 36px;background:var(--white);border:2px solid var(--light);border-radius:10px;display:grid;place-items:center;font-family:'Nunito',sans-serif;font-weight:900;font-size:16px;cursor:pointer;color:var(--dark);text-decoration:none}
+.h-back:hover{border-color:var(--mint);color:var(--mint)}
 
 /* ── STAFF SELECTOR ── */
-#staffSelect{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:calc(100vh - 56px);padding:24px}
+#staffSelect{display:flex;flex-direction:column;align-items:center;justify-content:center;width:100%;min-height:calc(100vh - 56px);padding:24px}
 .sel-title{font-family:'Nunito',sans-serif;font-weight:900;font-size:20px;margin-bottom:24px;text-align:center}
 .role-section{width:100%;max-width:400px;margin-bottom:20px}
 .role-label-head{font-size:12px;font-weight:700;color:var(--gray);letter-spacing:.08em;margin-bottom:8px}
@@ -34,6 +35,12 @@ header{background:var(--white);height:56px;display:flex;align-items:center;justi
 .staff-btn.da .s-avatar{background:linear-gradient(135deg,var(--yellow),var(--coral))}
 .staff-btn .s-info .s-name{font-weight:700;font-size:14px}
 .staff-btn .s-info .s-role{font-size:11px;color:var(--gray)}
+
+@media (max-width:760px){
+  #staffSelect{padding:24px 16px}
+  .role-section{max-width:100%}
+  .staff-btn-grid{grid-template-columns:1fr}
+}
 
 /* ── SKILL SHEET ── */
 #skillSheet{display:none;padding:16px 16px 100px;max-width:540px;margin:0 auto}
@@ -108,11 +115,11 @@ body.is-admin .admin-only{display:block}
 <body>
 
 <header>
+  <a class="h-back" href="./index.html" title="ポータルに戻る" aria-label="ポータルに戻る">←</a>
   <div class="h-logo">
     <div class="h-logo-icon">🦷</div>
     スキルチェック
   </div>
-  <a class="h-back" href="https://kalmia-dc.github.io/portal/">← ポータル</a>
 </header>
 
 <!-- スタッフ選択画面 -->
@@ -595,7 +602,8 @@ window.resetSheet = function() {
 
 // ─── 戻るボタン ──────────────────────────────────────
 document.querySelector('.h-back').addEventListener('click', e => {
-  if (document.getElementById('skillSheet').style.display !== 'none') {
+  const sheetOpen = getComputedStyle(document.getElementById('skillSheet')).display !== 'none';
+  if (sheetOpen) {
     e.preventDefault();
     document.getElementById('skillSheet').style.display = 'none';
     document.getElementById('saveBar').classList.remove('visible');
@@ -604,11 +612,11 @@ document.querySelector('.h-back').addEventListener('click', e => {
       document.getElementById('staffSelect').style.display = 'flex';
     } else {
       // 一般：ポータルへ戻る
-      window.location.href = 'https://kalmia-dc.github.io/portal/';
+      window.location.href = './index.html';
     }
   } else {
     // 選択画面からポータルへ
-    window.location.href = 'https://kalmia-dc.github.io/portal/';
+    window.location.href = './index.html';
   }
 });
 </script>
