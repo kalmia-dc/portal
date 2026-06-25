@@ -1899,6 +1899,9 @@ async function updateTaskStatus(id, status, options = {}) {
   const item = state.tasks.find(task => task.id === id);
   if (!item) return;
   if (status === 'confirmed' && !isDirector()) return;
+  if (status === 'confirmed' && item.status !== 'review') {
+    return showToast('定着確認済みにできるのは確認依頼中のみです');
+  }
   if (status !== 'confirmed' && !(isLeader() || isDirector())) return;
   if (options.rejected && (!isDirector() || item.status !== 'review')) return;
   const payload = {
@@ -2129,7 +2132,7 @@ function taskActionsHtml(task) {
   return `
     <div class="item-actions">
       <button class="btn" type="button" data-action="edit-task" data-id="${escAttr(task.id)}">編集</button>
-      ${isDirector() && task.status !== 'confirmed' ? `<button class="btn primary" type="button" data-action="confirm-task" data-id="${escAttr(task.id)}">定着確認済みにする</button>` : ''}
+      ${isDirector() && task.status === 'review' ? `<button class="btn primary" type="button" data-action="confirm-task" data-id="${escAttr(task.id)}">定着確認済みにする</button>` : ''}
       ${isDirector() && task.status === 'review' ? `<button class="btn danger" type="button" data-action="reject-task" data-id="${escAttr(task.id)}">定着確認依頼を却下</button>` : ''}
       <button class="btn danger" type="button" data-action="delete-task" data-id="${escAttr(task.id)}">削除</button>
     </div>
