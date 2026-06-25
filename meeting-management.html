@@ -341,6 +341,7 @@ button{cursor:pointer}
   font-size:12px;
   font-weight:900;
 }
+.reject-status{border-color:#ffb3b3;background:#fff1f1;color:var(--bad)}
 .read-summary{
   margin-top:12px;
   padding:10px 12px;
@@ -1837,6 +1838,7 @@ async function handleActions(event) {
   if (action === 'edit-task') return fillTaskForm(id);
   if (action === 'delete-task') return deleteItem(PATHS.tasks, id, '取り組み', state.tasks.find(task => task.id === id));
   if (action === 'confirm-task') return updateTaskStatus(id, 'confirmed');
+  if (action === 'reject-task') return rejectTaskReview(id);
   if (action === 'task-status') return updateTaskStatus(id, btn.dataset.status);
   if (action === 'save-progress') return saveProgress(id);
   if (action === 'read-task') return markTaskRead(id);
@@ -1886,11 +1888,19 @@ async function deleteItem(path, id, label, item) {
   showToast(`${label}を削除しました`);
 }
 
-async function updateTaskStatus(id, status) {
+async function rejectTaskReview(id) {
+  const item = state.tasks.find(task => task.id === id);
+  if (!item || !isDirector() || item.status !== 'review') return;
+  if (!confirm('定着確認依頼を却下して、進行中に戻しますか？')) return;
+  return updateTaskStatus(id, 'in_progress', { rejected: true });
+}
+
+async function updateTaskStatus(id, status, options = {}) {
   const item = state.tasks.find(task => task.id === id);
   if (!item) return;
   if (status === 'confirmed' && !isDirector()) return;
   if (status !== 'confirmed' && !(isLeader() || isDirector())) return;
+  if (options.rejected && (!isDirector() || item.status !== 'review')) return;
   const payload = {
     status,
     updatedAt: Date.now(),
@@ -1899,6 +1909,16 @@ async function updateTaskStatus(id, status) {
   if (status === 'confirmed') {
     payload.confirmedAt = Date.now();
     payload.confirmedBy = currentUser.name;
+    payload.rejectedAt = null;
+    payload.rejectedBy = null;
+  }
+  if (status === 'review') {
+    payload.rejectedAt = null;
+    payload.rejectedBy = null;
+  }
+  if (options.rejected) {
+    payload.rejectedAt = Date.now();
+    payload.rejectedBy = currentUser.name;
   }
   await update(ref(db, `${PATHS.tasks}/${id}`), payload);
   showToast('ステータスを更新しました');
@@ -2081,6 +2101,7 @@ function renderTasks() {
       ${textBlock('完了条件', task.completion)}
       ${task.progress ? textBlock('進捗メモ', task.progress) : ''}
       ${imagesHtml(task.images)}
+      ${taskRejectionHtml(task)}
       ${taskReadButtonHtml(task)}
       ${taskReadSummaryHtml(task)}
       ${leaderProgressHtml(task)}
@@ -2109,9 +2130,16 @@ function taskActionsHtml(task) {
     <div class="item-actions">
       <button class="btn" type="button" data-action="edit-task" data-id="${escAttr(task.id)}">編集</button>
       ${isDirector() && task.status !== 'confirmed' ? `<button class="btn primary" type="button" data-action="confirm-task" data-id="${escAttr(task.id)}">定着確認済みにする</button>` : ''}
+      ${isDirector() && task.status === 'review' ? `<button class="btn danger" type="button" data-action="reject-task" data-id="${escAttr(task.id)}">定着確認依頼を却下</button>` : ''}
       <button class="btn danger" type="button" data-action="delete-task" data-id="${escAttr(task.id)}">削除</button>
     </div>
   `;
+}
+
+function taskRejectionHtml(task) {
+  if (!task.rejectedAt || task.status === 'review' || task.status === 'confirmed') return '';
+  const rejectedDate = formatDate(task.rejectedAt);
+  return `<div class="read-status reject-status">定着確認依頼却下：${esc(rejectedDate)} / ${esc(task.rejectedBy || '-')}</div>`;
 }
 
 function taskReadButtonHtml(task) {
