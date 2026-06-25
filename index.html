@@ -924,7 +924,7 @@ function goToSkillApp() {
 function goToTaskApp() {
   if (!currentUser) return;
   const params = new URLSearchParams({ sid: currentUser.staffId, name: currentUser.name });
-  window.open(`https://kalmia-dc.github.io/portal/task-manager.html?${params}`, '_blank');
+  window.location.href = `https://kalmia-dc.github.io/portal/task-manager.html?${params}`;
 }
 
 function goToGoalApp() {
