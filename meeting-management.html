@@ -332,6 +332,30 @@ button{cursor:pointer}
   font-size:12px;
   font-weight:900;
 }
+.progress-history{
+  margin:10px 0 0;
+  padding:10px 12px;
+  background:#f8fafb;
+  border:1px solid #edf1f3;
+  border-radius:8px;
+}
+.progress-log{
+  padding:9px 0;
+  border-top:1px solid #e5edf2;
+}
+.progress-log:first-of-type,
+.progress-history .text-label + .progress-log{border-top:0}
+.progress-log-meta{
+  margin-bottom:4px;
+  color:var(--muted);
+  font-size:12px;
+  font-weight:900;
+}
+.progress-log-text{
+  line-height:1.65;
+  white-space:pre-wrap;
+  word-break:break-word;
+}
 .image-grid{
   display:grid;
   grid-template-columns:repeat(auto-fill,minmax(92px,1fr));
@@ -1948,17 +1972,26 @@ async function updateTaskStatus(id, status, options = {}) {
     return showToast('確認依頼にできるのは取り組み中のみです');
   }
   if (options.rejected && (!isDirector() || currentStatus !== 'review')) return;
+  const now = Date.now();
+  const taskPath = `${PATHS.tasks}/${id}`;
   const payload = {
     status,
-    updatedAt: Date.now(),
+    updatedAt: now,
     updatedBy: currentUser.name
   };
+  const updates = {};
+  let progressInputToClear = null;
   if (status === 'in_progress') {
     const progressInput = document.querySelector(`[data-progress-id="${cssEscape(id)}"]`);
-    if (progressInput) payload.progress = progressInput.value.trim();
+    const progressText = progressInput?.value.trim() || '';
+    if (progressText) {
+      const logRef = push(ref(db, `${taskPath}/progressLogs`));
+      updates[`${taskPath}/progressLogs/${logRef.key}`] = progressLog(progressText, now);
+      progressInputToClear = progressInput;
+    }
   }
   if (status === 'confirmed') {
-    payload.confirmedAt = Date.now();
+    payload.confirmedAt = now;
     payload.confirmedBy = currentUser.name;
     payload.rejectedAt = null;
     payload.rejectedBy = null;
@@ -1968,10 +2001,14 @@ async function updateTaskStatus(id, status, options = {}) {
     payload.rejectedBy = null;
   }
   if (options.rejected) {
-    payload.rejectedAt = Date.now();
+    payload.rejectedAt = now;
     payload.rejectedBy = currentUser.name;
   }
-  await update(ref(db, `${PATHS.tasks}/${id}`), payload);
+  Object.entries(payload).forEach(([key, value]) => {
+    updates[`${taskPath}/${key}`] = value;
+  });
+  await update(ref(db), updates);
+  if (progressInputToClear) progressInputToClear.value = '';
   showToast('ステータスを更新しました');
 }
 
@@ -1980,14 +2017,28 @@ async function saveProgress(id) {
   const input = document.querySelector(`[data-progress-id="${cssEscape(id)}"]`);
   const item = state.tasks.find(task => task.id === id);
   if (!input || !item || taskStatus(item) === 'confirmed') return;
-  const payload = {
-    progress: input.value.trim(),
-    status: taskStatus(item),
-    updatedAt: Date.now(),
-    updatedBy: currentUser.name
+  const progressText = input.value.trim();
+  if (!progressText) return showToast('追加する進捗を入力してください');
+  const now = Date.now();
+  const taskPath = `${PATHS.tasks}/${id}`;
+  const logRef = push(ref(db, `${taskPath}/progressLogs`));
+  await update(ref(db), {
+    [`${taskPath}/progressLogs/${logRef.key}`]: progressLog(progressText, now),
+    [`${taskPath}/status`]: taskStatus(item),
+    [`${taskPath}/updatedAt`]: now,
+    [`${taskPath}/updatedBy`]: currentUser.name
+  });
+  input.value = '';
+  showToast('進捗を追加しました');
+}
+
+function progressLog(text, createdAt = Date.now()) {
+  return {
+    text,
+    createdAt,
+    createdBy: currentUser.name,
+    createdById: currentUser.staffId
   };
-  await update(ref(db, `${PATHS.tasks}/${id}`), payload);
-  showToast('取り組み内容を保存しました');
 }
 
 async function saveJudgment(id) {
@@ -2162,7 +2213,7 @@ function renderTasks() {
       </div>
       ${textBlock('詳細', task.detail)}
       ${textBlock('完了条件', task.completion)}
-      ${task.progress ? textBlock('取り組み内容・進捗メモ', task.progress) : ''}
+      ${progressLogsHtml(task)}
       ${imagesHtml(task.images)}
       ${taskRejectionHtml(task)}
       ${taskReadButtonHtml(task)}
@@ -2178,13 +2229,53 @@ function leaderProgressHtml(task) {
   if (!canCreateManagedItems() || status === 'confirmed') return '';
   return `
     <div class="progress-box">
-      <textarea data-progress-id="${escAttr(task.id)}" placeholder="取り組み中に行うこと・進捗メモ">${esc(task.progress || '')}</textarea>
+      <textarea data-progress-id="${escAttr(task.id)}" placeholder="今回追加する進捗・取り組み内容"></textarea>
       <div class="item-actions">
-        <button class="btn sky" type="button" data-action="save-progress" data-id="${escAttr(task.id)}">内容を保存</button>
+        <button class="btn sky" type="button" data-action="save-progress" data-id="${escAttr(task.id)}">進捗を追加</button>
         ${status === 'todo' ? '<button class="btn ghost" type="button" disabled>未確認スタッフあり</button>' : ''}
-        ${status === 'all_read' ? `<button class="btn" type="button" data-action="task-status" data-status="in_progress" data-id="${escAttr(task.id)}">内容保存して開始</button>` : ''}
+        ${status === 'all_read' ? `<button class="btn" type="button" data-action="task-status" data-status="in_progress" data-id="${escAttr(task.id)}">進捗を追加して開始</button>` : ''}
         ${status === 'in_progress' ? `<button class="btn warn" type="button" data-action="task-status" data-status="review" data-id="${escAttr(task.id)}">確認依頼</button>` : ''}
       </div>
+    </div>
+  `;
+}
+
+function progressLogsHtml(task) {
+  const logs = progressLogEntries(task);
+  const legacyProgress = String(task.progress || '').trim();
+  if (!logs.length && !legacyProgress) return '';
+  return `
+    <div class="progress-history">
+      <div class="text-label">取り組み内容・進捗メモ</div>
+      ${logs.map(progressLogHtml).join('')}
+      ${legacyProgress ? `
+        <div class="progress-log">
+          <div class="progress-log-meta">旧メモ / 記入日未記録</div>
+          <div class="progress-log-text">${esc(legacyProgress)}</div>
+        </div>
+      ` : ''}
+    </div>
+  `;
+}
+
+function progressLogEntries(task) {
+  const rawLogs = task?.progressLogs;
+  if (!rawLogs || typeof rawLogs !== 'object') return [];
+  const entries = Array.isArray(rawLogs)
+    ? rawLogs.map((log, index) => ({ id:String(index), ...log }))
+    : Object.entries(rawLogs).map(([id, log]) => ({ id, ...(log || {}) }));
+  return entries
+    .filter(log => String(log.text || '').trim())
+    .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+}
+
+function progressLogHtml(log) {
+  const dateText = log.createdAt ? formatDate(log.createdAt) : '記入日未記録';
+  const author = log.createdBy || '記入者未記録';
+  return `
+    <div class="progress-log">
+      <div class="progress-log-meta">${esc(dateText)} / ${esc(author)}</div>
+      <div class="progress-log-text">${esc(log.text)}</div>
     </div>
   `;
 }
