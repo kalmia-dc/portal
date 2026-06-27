@@ -315,6 +315,7 @@ button{cursor:pointer}
 .incident-status-in_progress{background:#fff7df;color:#9a6500;border-color:#f4d58a}
 .incident-status-followup_pending{background:#fff8e7;color:var(--warn);border-color:#f1c46d}
 .incident-status-confirmed{background:#e8f5e9;color:var(--ok);border-color:#a5d6a7}
+.incident-linked-task{background:#eef2ff;color:#3949ab;border-color:#c5cae9}
 .text-block{
   margin:10px 0 0;
   padding:10px 12px;
@@ -691,13 +692,13 @@ button{cursor:pointer}
 
   <main class="main">
     <nav class="tabs" aria-label="表示切替">
-      <button class="tab-btn active" type="button" data-tab="tasks">取り組み</button>
+      <button class="tab-btn" type="button" data-tab="tasks">取り組み</button>
       <button class="tab-btn" type="button" data-tab="notices">お知らせ</button>
       <button class="tab-btn" type="button" data-tab="opinions">スタッフ提言</button>
-      <button class="tab-btn" type="button" data-tab="incidents">ヒヤリハット・アクシデント報告</button>
+      <button class="tab-btn active" type="button" data-tab="incidents">ヒヤリハット・アクシデント報告</button>
     </nav>
 
-    <section id="tasksSection" class="section active">
+    <section id="tasksSection" class="section">
       <div class="section-head">
         <h2>取り組み</h2>
         <span class="count-badge" id="taskCount">0件</span>
@@ -798,7 +799,7 @@ button{cursor:pointer}
       <div class="list" id="opinionList"></div>
     </section>
 
-    <section id="incidentsSection" class="section">
+    <section id="incidentsSection" class="section active">
       <div class="section-head">
         <h2>ヒヤリハット・アクシデント報告</h2>
         <span class="count-badge" id="incidentCount">0件</span>
@@ -2342,6 +2343,7 @@ function renderIncidentReports() {
           <span class="badge incident-type-${escAttr(incidentTypeKey(report))}">${esc(INCIDENT_TYPE_LABELS[incidentTypeKey(report)] || '-')}</span>
           <span class="badge">${esc(INCIDENT_LEVEL_LABELS[report.level] || '-')}</span>
           <span class="badge incident-status-${escAttr(report.counterStatus || 'pending')}">${esc(INCIDENT_STATUS_LABELS[report.counterStatus || 'pending'])}</span>
+          ${incidentLinkedTaskBadgeHtml(report)}
         </div>
       </div>
       ${textBlock('概要', report.overview)}
@@ -2385,6 +2387,10 @@ function renderIncidentSummary(reports) {
 
 function incidentTypeKey(report) {
   return report?.type === 'accident' ? 'accident' : 'near_miss';
+}
+
+function incidentLinkedTaskBadgeHtml(report) {
+  return report?.linkedTaskId ? '<span class="badge incident-linked-task">報告済み</span>' : '';
 }
 
 function canManageIncidentReport() {
