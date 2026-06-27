@@ -1953,6 +1953,10 @@ async function updateTaskStatus(id, status, options = {}) {
     updatedAt: Date.now(),
     updatedBy: currentUser.name
   };
+  if (status === 'in_progress') {
+    const progressInput = document.querySelector(`[data-progress-id="${cssEscape(id)}"]`);
+    if (progressInput) payload.progress = progressInput.value.trim();
+  }
   if (status === 'confirmed') {
     payload.confirmedAt = Date.now();
     payload.confirmedBy = currentUser.name;
@@ -1972,7 +1976,7 @@ async function updateTaskStatus(id, status, options = {}) {
 }
 
 async function saveProgress(id) {
-  if (!isLeader()) return;
+  if (!canCreateManagedItems()) return;
   const input = document.querySelector(`[data-progress-id="${cssEscape(id)}"]`);
   const item = state.tasks.find(task => task.id === id);
   if (!input || !item || taskStatus(item) === 'confirmed') return;
@@ -1983,7 +1987,7 @@ async function saveProgress(id) {
     updatedBy: currentUser.name
   };
   await update(ref(db, `${PATHS.tasks}/${id}`), payload);
-  showToast('進捗を保存しました');
+  showToast('取り組み内容を保存しました');
 }
 
 async function saveJudgment(id) {
@@ -2158,7 +2162,7 @@ function renderTasks() {
       </div>
       ${textBlock('詳細', task.detail)}
       ${textBlock('完了条件', task.completion)}
-      ${task.progress ? textBlock('進捗メモ', task.progress) : ''}
+      ${task.progress ? textBlock('取り組み内容・進捗メモ', task.progress) : ''}
       ${imagesHtml(task.images)}
       ${taskRejectionHtml(task)}
       ${taskReadButtonHtml(task)}
@@ -2171,14 +2175,14 @@ function renderTasks() {
 
 function leaderProgressHtml(task) {
   const status = taskStatus(task);
-  if (!isLeader() || status === 'confirmed') return '';
+  if (!canCreateManagedItems() || status === 'confirmed') return '';
   return `
     <div class="progress-box">
-      <textarea data-progress-id="${escAttr(task.id)}" placeholder="進捗メモ">${esc(task.progress || '')}</textarea>
+      <textarea data-progress-id="${escAttr(task.id)}" placeholder="取り組み中に行うこと・進捗メモ">${esc(task.progress || '')}</textarea>
       <div class="item-actions">
-        <button class="btn sky" type="button" data-action="save-progress" data-id="${escAttr(task.id)}">進捗保存</button>
+        <button class="btn sky" type="button" data-action="save-progress" data-id="${escAttr(task.id)}">内容を保存</button>
         ${status === 'todo' ? '<button class="btn ghost" type="button" disabled>未確認スタッフあり</button>' : ''}
-        ${status === 'all_read' ? `<button class="btn" type="button" data-action="task-status" data-status="in_progress" data-id="${escAttr(task.id)}">取り組み開始</button>` : ''}
+        ${status === 'all_read' ? `<button class="btn" type="button" data-action="task-status" data-status="in_progress" data-id="${escAttr(task.id)}">内容保存して開始</button>` : ''}
         ${status === 'in_progress' ? `<button class="btn warn" type="button" data-action="task-status" data-status="review" data-id="${escAttr(task.id)}">確認依頼</button>` : ''}
       </div>
     </div>
