@@ -600,6 +600,7 @@ function updateProgress() {
 
 // ─── LINEワークス通知 ───────────────────────────────
 const NOTIFY_URL = 'https://kalmia-notify.chibakenmin-sugihey.workers.dev';
+const SKILL_NOTIFY_ENABLED = false;
 const NOTIFY_START_HOUR = 8;
 const NOTIFY_END_HOUR   = 19;
 const SKILL_NOTIFY_QUEUE_KEY = 'skill_notify_queue';
@@ -687,7 +688,7 @@ async function postNotify(text) {
 }
 
 async function flushSkillNotifyQueue() {
-  if (!isNotifyWindow()) return;
+  if (!SKILL_NOTIFY_ENABLED || !isNotifyWindow()) return;
 
   const token = acquireLocalStorageLock(SKILL_NOTIFY_FLUSH_LOCK_KEY);
   if (!token) return;
@@ -718,6 +719,7 @@ async function flushSkillNotifyQueue() {
 
 function scheduleSkillNotifyFlush(delayOverride = null) {
   if (skillNotifyFlushTimer) clearTimeout(skillNotifyFlushTimer);
+  if (!SKILL_NOTIFY_ENABLED) return;
 
   const now = new Date();
   const delay = Number.isFinite(delayOverride)
@@ -734,6 +736,8 @@ function scheduleSkillNotifyFlush(delayOverride = null) {
 }
 
 async function sendNotify(text) {
+  if (!SKILL_NOTIFY_ENABLED) return false;
+
   const notifyId = `text:${hashNotifyText(text)}`;
 
   if (!isNotifyWindow()) {
