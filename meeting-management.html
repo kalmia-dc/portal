@@ -145,6 +145,35 @@ button{cursor:pointer}
   font-size:12px;
   font-weight:900;
 }
+.incident-summary{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  margin:-4px 0 14px;
+}
+.summary-chip{
+  flex:1 1 160px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  border:1px solid var(--line);
+  border-radius:8px;
+  background:#fff;
+  padding:10px 12px;
+}
+.summary-chip span{
+  color:var(--muted);
+  font-size:12px;
+  font-weight:900;
+}
+.summary-chip strong{
+  font-size:18px;
+  line-height:1;
+  font-weight:900;
+}
+.summary-chip.near_miss strong{color:var(--ok)}
+.summary-chip.accident strong{color:var(--bad)}
 .form-panel{
   background:#fff;
   border:1px solid var(--line);
@@ -774,6 +803,7 @@ button{cursor:pointer}
         <h2>ヒヤリハット・アクシデント報告</h2>
         <span class="count-badge" id="incidentCount">0件</span>
       </div>
+      <div class="incident-summary" id="incidentSummary" aria-label="報告数集計"></div>
       <div class="form-panel">
         <form id="incidentForm" class="incident-wizard">
           <div class="wizard-progress">
@@ -901,6 +931,8 @@ const INCIDENT_STATUS_LABELS = {
   followup_pending:'定着確認待ち',
   confirmed:'定着確認済み'
 };
+const INCIDENT_TASK_READY_STATUSES = new Set(['decided', 'in_progress', 'followup_pending', 'confirmed']);
+const INCIDENT_TASK_COMPLETION = '実際に運用されている状態を1か月を目安に継続確認し、院長が定着を確認できたら完了';
 const INCIDENT_CATEGORIES = [
   { value:'A', label:'A. 確認不足', hint:'ダブルチェック未実施、声かけなしで処置開始' },
   { value:'B', label:'B. 連絡・引き継ぎ不足', hint:'申し送りミス、カルテ情報の共有漏れ' },
@@ -1853,6 +1885,7 @@ async function handleActions(event) {
   if (action === 'toggle-incident-edit') return toggleIncidentEdit(id);
   if (action === 'save-incident-report') return saveIncidentReportEdit(id);
   if (action === 'save-incident-followup') return saveIncidentFollowup(id);
+  if (action === 'create-incident-task') return createTaskFromIncident(id);
   if (action === 'delete-incident') return deleteIncidentReport(id);
 }
 
@@ -2288,6 +2321,7 @@ function readChip(id, isRead, read) {
 function renderIncidentReports() {
   const reports = visibleIncidentReports();
   document.getElementById('incidentCount').textContent = `${reports.length}件`;
+  renderIncidentSummary(reports);
   const list = document.getElementById('incidentList');
   if (!reports.length) {
     list.innerHTML = '<div class="empty">報告はありません</div>';
@@ -2305,7 +2339,7 @@ function renderIncidentReports() {
           </div>
         </div>
         <div class="item-badges">
-          <span class="badge incident-type-${escAttr(report.type || 'near_miss')}">${esc(INCIDENT_TYPE_LABELS[report.type] || '-')}</span>
+          <span class="badge incident-type-${escAttr(incidentTypeKey(report))}">${esc(INCIDENT_TYPE_LABELS[incidentTypeKey(report)] || '-')}</span>
           <span class="badge">${esc(INCIDENT_LEVEL_LABELS[report.level] || '-')}</span>
           <span class="badge incident-status-${escAttr(report.counterStatus || 'pending')}">${esc(INCIDENT_STATUS_LABELS[report.counterStatus || 'pending'])}</span>
         </div>
@@ -2335,6 +2369,22 @@ function renderIncidentReports() {
 
 function visibleIncidentReports() {
   return state.incidentReports;
+}
+
+function renderIncidentSummary(reports) {
+  const counts = reports.reduce((acc, report) => {
+    acc[incidentTypeKey(report)] += 1;
+    return acc;
+  }, { near_miss:0, accident:0 });
+  document.getElementById('incidentSummary').innerHTML = `
+    <div class="summary-chip total"><span>全体</span><strong>${reports.length}件</strong></div>
+    <div class="summary-chip near_miss"><span>${esc(INCIDENT_TYPE_LABELS.near_miss)}</span><strong>${counts.near_miss}件</strong></div>
+    <div class="summary-chip accident"><span>${esc(INCIDENT_TYPE_LABELS.accident)}</span><strong>${counts.accident}件</strong></div>
+  `;
+}
+
+function incidentTypeKey(report) {
+  return report?.type === 'accident' ? 'accident' : 'near_miss';
 }
 
 function canManageIncidentReport() {
@@ -2467,9 +2517,18 @@ function incidentFollowupHtml(report) {
       </div>
       <div class="item-actions">
         <button class="btn primary" type="button" data-action="save-incident-followup" data-id="${escAttr(report.id)}">ミーティング対応を保存</button>
+        ${incidentTaskMigrationButtonHtml(report)}
       </div>
     </div>
   `;
+}
+
+function incidentTaskMigrationButtonHtml(report) {
+  if (report.linkedTaskId) {
+    return '<button class="btn ghost" type="button" disabled>取り組み移行済み</button>';
+  }
+  const disabled = isIncidentTaskReady(report) ? '' : 'disabled';
+  return `<button class="btn sky" type="button" data-action="create-incident-task" data-id="${escAttr(report.id)}" ${disabled}>取り組みへ移行</button>`;
 }
 
 function incidentStatusOptionsHtml(currentStatus) {
@@ -2551,6 +2610,71 @@ async function saveIncidentFollowup(id) {
 
 function incidentFollowupField(id, field) {
   return document.querySelector(`[data-incident-followup="${cssEscape(id)}"][data-field="${field}"]`)?.value.trim() || '';
+}
+
+function isIncidentTaskReady(report) {
+  return Boolean(String(report?.countermeasure || '').trim())
+    && INCIDENT_TASK_READY_STATUSES.has(report?.counterStatus || 'pending');
+}
+
+async function createTaskFromIncident(id) {
+  if (!canManageIncidentReport()) return;
+  const report = state.incidentReports.find(item => item.id === id);
+  if (!report) return;
+  if (report.linkedTaskId) return showToast('すでに取り組みへ移行済みです');
+  if (!isIncidentTaskReady(report)) {
+    return showToast('対策内容を入力し、実施状況を対策決定以降にしてください');
+  }
+  const now = Date.now();
+  const taskRef = push(ref(db, PATHS.tasks));
+  const reportNumber = report.reportNumber || buildIncidentReportNumber(report);
+  await update(ref(db), {
+    [`${PATHS.tasks}/${taskRef.key}`]: {
+      title: buildIncidentTaskTitle(report),
+      detail: buildIncidentTaskDetail(report),
+      completion: INCIDENT_TASK_COMPLETION,
+      images: [],
+      progress:'',
+      status:'todo',
+      sourceIncidentId: id,
+      sourceIncidentNumber: reportNumber,
+      createdAt: now,
+      createdBy: currentUser.name,
+      createdById: currentUser.staffId,
+      updatedAt: now,
+      updatedBy: currentUser.name
+    },
+    [`${PATHS.incidentReports}/${id}/linkedTaskId`]: taskRef.key,
+    [`${PATHS.incidentReports}/${id}/linkedTaskCreatedAt`]: now,
+    [`${PATHS.incidentReports}/${id}/linkedTaskCreatedBy`]: currentUser.name,
+    [`${PATHS.incidentReports}/${id}/updatedAt`]: now,
+    [`${PATHS.incidentReports}/${id}/updatedBy`]: currentUser.name
+  });
+  showToast('取り組みへ移行しました');
+}
+
+function buildIncidentTaskTitle(report) {
+  const type = INCIDENT_TYPE_LABELS[incidentTypeKey(report)] || '報告';
+  const reportNumber = report.reportNumber || buildIncidentReportNumber(report);
+  const title = `【${type}対策】${reportNumber}`;
+  return title.length > 80 ? `${title.slice(0, 77)}...` : title;
+}
+
+function buildIncidentTaskDetail(report) {
+  const lines = [];
+  appendIncidentTaskDetail(lines, '報告番号', report.reportNumber || buildIncidentReportNumber(report));
+  appendIncidentTaskDetail(lines, '種別', INCIDENT_TYPE_LABELS[incidentTypeKey(report)]);
+  appendIncidentTaskDetail(lines, '発生日', formatIncidentOccurredAt(report));
+  appendIncidentTaskDetail(lines, '概要', report.overview);
+  appendIncidentTaskDetail(lines, '具体的な内容', report.details);
+  appendIncidentTaskDetail(lines, 'ミーティングへの申し送り', report.handoff);
+  appendIncidentTaskDetail(lines, '対策内容', report.countermeasure);
+  return lines.join('\n');
+}
+
+function appendIncidentTaskDetail(lines, label, value) {
+  const text = String(value || '').trim();
+  if (text) lines.push(`${label}: ${text}`);
 }
 
 async function deleteIncidentReport(id) {
