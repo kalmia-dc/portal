@@ -80,6 +80,7 @@ header{background:var(--white);height:56px;display:flex;align-items:center;justi
 .save-bar{position:fixed;bottom:0;left:0;right:0;background:var(--white);padding:12px 16px;border-top:1px solid var(--light);display:none;gap:10px}
 .save-bar.visible{display:flex}
 .btn-save{flex:1;padding:14px;background:linear-gradient(135deg,var(--mint),var(--sky));color:white;border:none;border-radius:14px;font-family:'Nunito',sans-serif;font-weight:800;font-size:16px;cursor:pointer}
+.btn-save:disabled{opacity:.7;cursor:wait}
 .btn-reset{padding:14px 18px;background:var(--light);color:var(--gray);border:none;border-radius:14px;font-family:'Nunito',sans-serif;font-weight:800;font-size:14px;cursor:pointer}
 .save-msg{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--dark);color:white;padding:8px 20px;border-radius:20px;font-size:13px;font-weight:700;opacity:0;transition:opacity .3s;pointer-events:none}
 
@@ -283,6 +284,62 @@ let currentData    = {}; // { skillKey: rank }
 let _canEdit       = true;
 let approvalData   = {}; // { skillKey: true } 承認済みフラグ
 
+const FIREBASE_KEY_UNSAFE_RE = /[.#$\[\]\/\x00-\x1F\x7F]/g;
+
+function firebaseSkillKey(key) {
+  return String(key).replace(FIREBASE_KEY_UNSAFE_RE, ch =>
+    `__u${ch.charCodeAt(0).toString(16).padStart(4, '0')}__`
+  );
+}
+
+function skillKeysForRole(roleKey) {
+  const keys = [];
+  const sheets = ROLE_SHEETS[roleKey] || [roleKey];
+  for (const sheetKey of sheets) {
+    const def = SKILLS[sheetKey];
+    if (!def) continue;
+    for (const [cat, items] of Object.entries(def.categories)) {
+      for (const item of items) keys.push(`${cat}__${item}`);
+    }
+  }
+  return keys;
+}
+
+function normalizeStoredSkillMap(stored = {}, roleKey = currentRoleKey) {
+  const result = {};
+  const consumed = new Set();
+  for (const key of skillKeysForRole(roleKey)) {
+    const safeKey = firebaseSkillKey(key);
+    if (Object.prototype.hasOwnProperty.call(stored, safeKey)) {
+      result[key] = stored[safeKey];
+      consumed.add(safeKey);
+    } else if (Object.prototype.hasOwnProperty.call(stored, key)) {
+      result[key] = stored[key];
+      consumed.add(key);
+    }
+  }
+  for (const [key, value] of Object.entries(stored)) {
+    if (!consumed.has(key)) result[key] = value;
+  }
+  return result;
+}
+
+function serializeSkillMap(data = {}) {
+  const stored = {};
+  for (const [key, value] of Object.entries(data)) {
+    stored[firebaseSkillKey(key)] = value;
+  }
+  return stored;
+}
+
+function showSaveMessage(text, ok = true) {
+  const msg = document.getElementById('saveMsg');
+  msg.textContent = text;
+  msg.style.background = ok ? 'var(--dark)' : 'var(--coral)';
+  msg.style.opacity = '1';
+  setTimeout(() => msg.style.opacity = '0', 2600);
+}
+
 // ─── 評価基準の展開/折りたたみ ──────────────────────────
 window.toggleCriteria = function(btn) {
   const box = btn.closest('.skill-card').querySelector('.criteria-box');
@@ -340,8 +397,8 @@ window.openSheet = async function(staffId, name, roleKey, avatarClass) {
   const snap = await get(ref(_db, `skills/${staffId}`));
   const raw = snap.exists() ? snap.val() : {};
   // approvalDataとcurrentDataを分離
-  approvalData = raw._approvals || {};
-  currentData  = Object.fromEntries(Object.entries(raw).filter(([k]) => k !== '_approvals'));
+  approvalData = normalizeStoredSkillMap(raw._approvals || {}, roleKey);
+  currentData  = normalizeStoredSkillMap(Object.fromEntries(Object.entries(raw).filter(([k]) => k !== '_approvals')), roleKey);
 
   // ヘッダー
   const av = document.getElementById('sheetAvatar');
@@ -710,7 +767,12 @@ window.toggleApproval = async function(key) {
   refreshApprovalBadge(key);
   updateProgress();
   // Firebaseに即時保存
-  await set(ref(_db, `skills/${currentStaffId}/_approvals`), approvalData);
+  try {
+    await set(ref(_db, `skills/${currentStaffId}/_approvals`), serializeSkillMap(approvalData));
+  } catch(error) {
+    console.error('承認保存失敗:', error);
+    showSaveMessage(`承認を保存できませんでした: ${error.message || error}`, false);
+  }
 };
 
 function refreshApprovalBadge(key) {
@@ -729,14 +791,29 @@ function refreshApprovalBadge(key) {
 }
 
 window.saveSheet = async function() {
-  await set(ref(_db, `skills/${currentStaffId}`), { ...currentData, _approvals: approvalData });
-  const msg = document.getElementById('saveMsg');
-  msg.style.opacity = '1';
-  setTimeout(() => msg.style.opacity = '0', 2000);
-  // LINEワークス通知
-  const staffName = document.getElementById('sheetName').textContent;
-  const updaterName = portalUser?.name || '';
-  await sendNotify(`📋 スキルチェックが更新されました\nスタッフ：${staffName}\n更新者：${updaterName}`);
+  const saveBtn = document.querySelector('.btn-save');
+  const originalText = saveBtn?.textContent || '💾 保存';
+  if (saveBtn) {
+    saveBtn.disabled = true;
+    saveBtn.textContent = '保存中...';
+  }
+
+  try {
+    await set(ref(_db, `skills/${currentStaffId}`), { ...serializeSkillMap(currentData), _approvals: serializeSkillMap(approvalData) });
+    showSaveMessage('保存しました ✅');
+    // LINEワークス通知
+    const staffName = document.getElementById('sheetName').textContent;
+    const updaterName = portalUser?.name || '';
+    await sendNotify(`📋 スキルチェックが更新されました\nスタッフ：${staffName}\n更新者：${updaterName}`);
+  } catch(error) {
+    console.error('スキルチェック保存失敗:', error);
+    showSaveMessage(`保存できませんでした: ${error.message || error}`, false);
+  } finally {
+    if (saveBtn) {
+      saveBtn.disabled = false;
+      saveBtn.textContent = originalText;
+    }
+  }
 };
 
 window.resetSheet = function() {
