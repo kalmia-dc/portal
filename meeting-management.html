@@ -2143,6 +2143,7 @@ function leaderProgressHtml(task) {
       <textarea data-progress-id="${escAttr(task.id)}" placeholder="進捗メモ">${esc(task.progress || '')}</textarea>
       <div class="item-actions">
         <button class="btn sky" type="button" data-action="save-progress" data-id="${escAttr(task.id)}">進捗保存</button>
+        ${status === 'todo' ? '<button class="btn ghost" type="button" disabled>未確認スタッフあり</button>' : ''}
         ${status === 'all_read' ? `<button class="btn" type="button" data-action="task-status" data-status="in_progress" data-id="${escAttr(task.id)}">取り組み開始</button>` : ''}
         ${status === 'in_progress' ? `<button class="btn warn" type="button" data-action="task-status" data-status="review" data-id="${escAttr(task.id)}">確認依頼</button>` : ''}
       </div>
