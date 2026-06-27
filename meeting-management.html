@@ -1160,7 +1160,7 @@ function toList(data) {
 }
 
 function sortTasks(a, b) {
-  const weight = { review:0, in_progress:1, all_read:2, todo:3, confirmed:4 };
+  const weight = { todo:0, review:1, in_progress:2, all_read:3, confirmed:4 };
   const aw = weight[taskStatus(a)] ?? 3;
   const bw = weight[taskStatus(b)] ?? 3;
   if (aw !== bw) return aw - bw;
