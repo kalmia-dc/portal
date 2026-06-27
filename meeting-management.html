@@ -271,6 +271,7 @@ button{cursor:pointer}
   white-space:nowrap;
 }
 .status-todo{background:#f3f6f8;color:#68737a}
+.status-all_read{background:#e6fffb;color:#0f766e;border-color:#8ee8dc}
 .status-in_progress{background:#e9f7ff;color:#1769aa;border-color:#b9def7}
 .status-review{background:#fff7df;color:#9a6500;border-color:#f4d58a}
 .status-confirmed{background:#e8f5e9;color:var(--ok);border-color:#a5d6a7}
@@ -873,6 +874,7 @@ const NOTICE_TARGETS = {
 const NOTICE_TARGET_IDS = Object.keys(NOTICE_TARGETS);
 const STATUS_LABELS = {
   todo:'ミーティング未共有',
+  all_read:'全員確認済み',
   in_progress:'取り組み中',
   review:'確認依頼',
   confirmed:'定着確認済み'
@@ -1158,9 +1160,9 @@ function toList(data) {
 }
 
 function sortTasks(a, b) {
-  const weight = { review:0, in_progress:1, todo:2, confirmed:3 };
-  const aw = weight[a.status || 'todo'] ?? 2;
-  const bw = weight[b.status || 'todo'] ?? 2;
+  const weight = { review:0, in_progress:1, all_read:2, todo:3, confirmed:4 };
+  const aw = weight[taskStatus(a)] ?? 3;
+  const bw = weight[taskStatus(b)] ?? 3;
   if (aw !== bw) return aw - bw;
   return (b.createdAt || 0) - (a.createdAt || 0);
 }
@@ -1899,12 +1901,19 @@ async function rejectTaskReview(id) {
 async function updateTaskStatus(id, status, options = {}) {
   const item = state.tasks.find(task => task.id === id);
   if (!item) return;
+  const currentStatus = taskStatus(item);
   if (status === 'confirmed' && !isDirector()) return;
-  if (status === 'confirmed' && item.status !== 'review') {
+  if (status === 'confirmed' && currentStatus !== 'review') {
     return showToast('定着確認済みにできるのは確認依頼中のみです');
   }
   if (status !== 'confirmed' && !(isLeader() || isDirector())) return;
-  if (options.rejected && (!isDirector() || item.status !== 'review')) return;
+  if (status === 'in_progress' && !options.rejected && currentStatus !== 'all_read') {
+    return showToast('取り組み中にできるのは全員確認済みのみです');
+  }
+  if (status === 'review' && currentStatus !== 'in_progress') {
+    return showToast('確認依頼にできるのは取り組み中のみです');
+  }
+  if (options.rejected && (!isDirector() || currentStatus !== 'review')) return;
   const payload = {
     status,
     updatedAt: Date.now(),
@@ -1932,10 +1941,10 @@ async function saveProgress(id) {
   if (!isLeader()) return;
   const input = document.querySelector(`[data-progress-id="${cssEscape(id)}"]`);
   const item = state.tasks.find(task => task.id === id);
-  if (!input || !item || item.status === 'confirmed') return;
+  if (!input || !item || taskStatus(item) === 'confirmed') return;
   const payload = {
     progress: input.value.trim(),
-    status: item.status === 'todo' ? 'in_progress' : item.status,
+    status: taskStatus(item),
     updatedAt: Date.now(),
     updatedBy: currentUser.name
   };
@@ -1997,13 +2006,25 @@ async function markTaskRead(id) {
   if (!task) return;
   const currentRead = readByMap(task)[currentUser.staffId];
   if (currentRead) return showToast('確認済みです');
-  await set(ref(db, `${PATHS.tasks}/${id}/readBy/${currentUser.staffId}`), {
+  const readAt = Date.now();
+  const readEntry = {
     staffId: currentUser.staffId,
     name: currentUser.name,
     role: NOTICE_TARGETS[currentUser.staffId]?.role || '',
-    readAt: Date.now()
-  });
-  showToast('確認済みにしました');
+    readAt
+  };
+  const fullyRead = taskStatus(task) === 'todo' && isNoticeFullyRead(task, { [currentUser.staffId]: readEntry });
+  const payload = {
+    [`readBy/${currentUser.staffId}`]: readEntry
+  };
+  if (fullyRead) {
+    payload.status = 'all_read';
+    payload.allReadAt = readAt;
+    payload.updatedAt = readAt;
+    payload.updatedBy = currentUser.name;
+  }
+  await update(ref(db, `${PATHS.tasks}/${id}`), payload);
+  showToast(fullyRead ? '全員確認済みになりました' : '確認済みにしました');
 }
 
 async function markNoticeRead(id) {
@@ -2098,7 +2119,7 @@ function renderTasks() {
         </div>
         <div class="item-badges">
           <span class="task-elapsed">${esc(formatElapsedSince(task.createdAt))}</span>
-          <span class="badge status-${escAttr(task.status || 'todo')}">${STATUS_LABELS[task.status || 'todo'] || STATUS_LABELS.todo}</span>
+          <span class="badge status-${escAttr(taskStatus(task))}">${STATUS_LABELS[taskStatus(task)] || STATUS_LABELS.todo}</span>
         </div>
       </div>
       ${textBlock('詳細', task.detail)}
@@ -2115,14 +2136,15 @@ function renderTasks() {
 }
 
 function leaderProgressHtml(task) {
-  if (!isLeader() || task.status === 'confirmed') return '';
+  const status = taskStatus(task);
+  if (!isLeader() || status === 'confirmed') return '';
   return `
     <div class="progress-box">
       <textarea data-progress-id="${escAttr(task.id)}" placeholder="進捗メモ">${esc(task.progress || '')}</textarea>
       <div class="item-actions">
         <button class="btn sky" type="button" data-action="save-progress" data-id="${escAttr(task.id)}">進捗保存</button>
-        ${task.status === 'todo' ? `<button class="btn" type="button" data-action="task-status" data-status="in_progress" data-id="${escAttr(task.id)}">ミーティングで共有した</button>` : ''}
-        ${task.status !== 'review' ? `<button class="btn warn" type="button" data-action="task-status" data-status="review" data-id="${escAttr(task.id)}">確認依頼</button>` : ''}
+        ${status === 'all_read' ? `<button class="btn" type="button" data-action="task-status" data-status="in_progress" data-id="${escAttr(task.id)}">取り組み開始</button>` : ''}
+        ${status === 'in_progress' ? `<button class="btn warn" type="button" data-action="task-status" data-status="review" data-id="${escAttr(task.id)}">確認依頼</button>` : ''}
       </div>
     </div>
   `;
@@ -2243,6 +2265,12 @@ function readSummaryHtml(item) {
 
 function readByMap(notice) {
   return notice?.readBy && typeof notice.readBy === 'object' ? notice.readBy : {};
+}
+
+function taskStatus(task) {
+  const status = task?.status || 'todo';
+  if (status === 'todo' && isNoticeFullyRead(task)) return 'all_read';
+  return status;
 }
 
 function isNoticeFullyRead(notice, extraReadBy = {}) {
