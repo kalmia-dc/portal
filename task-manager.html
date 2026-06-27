@@ -362,6 +362,17 @@
 
   .task-tags { margin-top: 5px; display: flex; flex-wrap: wrap; gap: 3px; }
   .tag { font-size: 10px; background: var(--bg); color: var(--text-muted); padding: 2px 6px; border-radius: 6px; border: 1px solid var(--border); }
+  .task-progress-preview {
+    margin-top: 7px;
+    padding: 7px 9px;
+    border-radius: 10px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    font-size: 11px;
+    line-height: 1.45;
+    word-break: break-word;
+  }
 
   /* ===== LIST VIEW ===== */
   .list-view { display: flex; flex-direction: column; gap: 6px; }
@@ -556,6 +567,47 @@
   .role-dh .assignee-checkbox:checked + .assignee-label { background: #ede7ff; border-color: #6c5ce7; color: #6c5ce7; }
   .role-da .assignee-checkbox:checked + .assignee-label { background: #fff4e0; border-color: #e67e22; color: #e67e22; }
 
+  .progress-log-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 9px;
+    max-height: 180px;
+    overflow-y: auto;
+  }
+
+  .progress-log {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 9px 10px;
+  }
+
+  .progress-log-meta {
+    color: var(--text-muted);
+    font-family: 'Nunito', sans-serif;
+    font-size: 10px;
+    font-weight: 800;
+    margin-bottom: 4px;
+  }
+
+  .progress-log-text {
+    font-size: 12px;
+    line-height: 1.55;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  .progress-empty {
+    color: var(--text-muted);
+    background: var(--surface2);
+    border: 1px dashed var(--border);
+    border-radius: 12px;
+    padding: 11px;
+    font-size: 12px;
+    text-align: center;
+  }
+
   .modal-footer {
     display: flex;
     gap: 8px;
@@ -738,6 +790,8 @@
   <button class="filter-chip" data-filter="mine" data-guest-hidden="true" onclick="setFilter('mine',this)">担当のみ</button>
   <button class="filter-chip" data-filter="everyone" onclick="setFilter('everyone',this)">👥 全員分</button>
   <button class="filter-chip" onclick="setFilter('未着手',this)">未着手</button>
+  <button class="filter-chip" onclick="setFilter('着手中',this)">着手中</button>
+  <button class="filter-chip" onclick="setFilter('保留',this)">保留</button>
   <button class="filter-chip" onclick="setFilter('完了',this)">完了</button>
   <button class="filter-chip" onclick="setFilter('overdue',this)">⚠ 期限切れ</button>
   <button class="filter-chip" onclick="setFilter('high',this)">🔴 高優先</button>
@@ -811,8 +865,11 @@
       <div class="status-group">
         <input type="radio" class="status-option" name="status" id="st-todo" value="未着手" checked>
         <label for="st-todo" class="status-label">未着手</label>
+        <input type="radio" class="status-option" name="status" id="st-doing" value="着手中">
+        <label for="st-doing" class="status-label">着手中</label>
+        <input type="radio" class="status-option" name="status" id="st-hold" value="保留">
+        <label for="st-hold" class="status-label">保留</label>
         <input type="radio" class="status-option" name="status" id="st-done" value="完了">
-        <label for="st-done" class="status-label">完了</label>
       </div>
     </div>
 
@@ -824,6 +881,12 @@
     <div class="form-group">
       <label>タグ（カンマ区切り）</label>
       <input type="text" id="fTags" placeholder="例: 要確認, 急ぎ">
+    </div>
+
+    <div class="form-group">
+      <label>進捗記録</label>
+      <div id="progressLogList" class="progress-log-list"></div>
+      <textarea id="fProgress" placeholder="今回の進捗を追記"></textarea>
     </div>
 
     <div class="modal-footer">
@@ -1218,6 +1281,57 @@ function daysLeft(d) {
   return Math.round((new Date(d+'T00:00:00') - new Date(todayStr()+'T00:00:00')) / 86400000);
 }
 
+const ACTIVE_STATUSES = ['未着手','着手中','保留'];
+const BOARD_STATUSES = [...ACTIVE_STATUSES, '完了'];
+
+function normalizeStatus(status) {
+  if (status === '進行中') return '着手中';
+  return status || '未着手';
+}
+
+function normalizeProgressLogs(logs) {
+  const list = Array.isArray(logs) ? logs : (logs ? Object.values(logs) : []);
+  return list
+    .filter(log => log && log.text)
+    .map(log => ({
+      text: String(log.text || ''),
+      by: log.by || '不明',
+      at: Number(log.at) || 0,
+    }))
+    .sort((a, b) => a.at - b.at);
+}
+
+function fmtDateTime(ts) {
+  const dt = new Date(Number(ts));
+  if (Number.isNaN(dt.getTime())) return '';
+  const mm = String(dt.getMinutes()).padStart(2, '0');
+  return `${dt.getMonth()+1}/${dt.getDate()} ${dt.getHours()}:${mm}`;
+}
+
+function renderProgressLogs(logs) {
+  const normalized = normalizeProgressLogs(logs).reverse();
+  if (!normalized.length) return '<div class="progress-empty">まだ記録はありません</div>';
+  return normalized.map(log => `
+    <div class="progress-log">
+      <div class="progress-log-meta">${fmtDateTime(log.at)}　${esc(log.by)}</div>
+      <div class="progress-log-text">${esc(log.text)}</div>
+    </div>`).join('');
+}
+
+function latestProgress(logs) {
+  const normalized = normalizeProgressLogs(logs);
+  return normalized[normalized.length - 1] || null;
+}
+
+async function appendProgressLog(taskId, text, at = Date.now()) {
+  if (!taskId || !tasks[taskId] || !text) return;
+  const progressLogs = [
+    ...normalizeProgressLogs(tasks[taskId].progressLogs),
+    { text, by: currentUser?.name || '不明', at },
+  ];
+  await set(ref(db, `tasks/${taskId}/progressLogs`), progressLogs);
+}
+
 // ===== FILTER =====
 function getFiltered() {
   return Object.entries(tasks).filter(([id, t]) => {
@@ -1240,7 +1354,7 @@ function getFiltered() {
     if (currentFilter === 'mine')    return (t.assignees||[]).includes(currentUser.name);
     if (currentFilter === 'overdue') return isOverdue(t.date) && t.status !== '完了';
     if (currentFilter === 'high')    return t.priority === 'high';
-    if (['未着手','進行中','完了','保留'].includes(currentFilter)) return t.status === currentFilter;
+    if (BOARD_STATUSES.includes(currentFilter)) return normalizeStatus(t.status) === currentFilter;
     if (['診療','経営','スタッフ','設備','その他'].includes(currentFilter)) return t.category === currentFilter;
     return true;
   }).map(([id, t]) => ({ id, ...t }))
@@ -1287,7 +1401,8 @@ function assigneeChips(assignees) {
 }
 
 function taskCardHtml(t) {
-  const od = isOverdue(t.date) && t.status!=='完了';
+  const status = normalizeStatus(t.status);
+  const od = isOverdue(t.date) && status!=='完了';
   const dl = daysLeft(t.date);
   let dateLabel = '';
   if (t.date) {
@@ -1301,8 +1416,10 @@ function taskCardHtml(t) {
   const priLbl={high:'高',med:'中',low:'低'};
   const tags  = (t.tags||[]).map(g=>`<span class="tag">${esc(g)}</span>`).join('');
   const chips = assigneeChips(t.assignees);
-  const isDone = t.status === '完了';
+  const isDone = status === '完了';
   const gIcon  = t.googleTaskId ? `<span style="font-size:10px;color:#4285f4;margin-left:2px;">G</span>` : '';
+  const latestLog = latestProgress(t.progressLogs);
+  const progressPreview = latestLog ? `<div class="task-progress-preview">${esc(latestLog.text)}</div>` : '';
 
   // タスク種別ラベル
   const myName = currentUser?.name || '';
@@ -1338,19 +1455,19 @@ function taskCardHtml(t) {
       </div>
       ${chips?`<div class="task-assignees">${chips}</div>`:''}
       ${tags ?`<div class="task-tags">${tags}</div>`:''}
+      ${progressPreview}
       ${isGuestUser() ? '' : `<button class="btn-done" onclick="window._toggleDone(event,'${t.id}')" title="${isDone?'未着手に戻す':'完了にする'}">✓</button>`}
     </div>`;
 }
 
 function renderBoard() {
   const filtered = getFiltered();
-  const cols = ['未着手','完了'];
-  const clsMap = {'未着手':'col-todo','完了':'col-done'};
-  let html = '<div class="board" style="grid-template-columns:1fr 1fr;">';
-  for (const status of cols) {
-    const items = filtered.filter(t => t.status===status);
-    html += `<div class="column">
-      <div class="column-header ${clsMap[status]}">
+  const clsMap = {'未着手':'col-todo','着手中':'col-doing','保留':'col-hold','完了':'col-done'};
+  let html = '<div class="board">';
+  for (const status of BOARD_STATUSES) {
+    const items = filtered.filter(t => normalizeStatus(t.status)===status);
+    html += `<div class="column ${clsMap[status]}">
+      <div class="column-header">
         <div class="column-title"><span class="col-dot"></span>${status}</div>
         <span class="column-count">${items.length}</span>
       </div>
@@ -1370,20 +1487,23 @@ function renderList() {
   const priCls={high:'badge-high',med:'badge-med',low:'badge-low'};
   const priLbl={high:'高優先',med:'中優先',low:'低優先'};
   const html = filtered.map(t => {
-    const od = isOverdue(t.date) && t.status!=='完了';
+    const status = normalizeStatus(t.status);
+    const od = isOverdue(t.date) && status!=='完了';
     const dl = daysLeft(t.date);
     let ds = '';
     if (t.date) ds = od?`⚠ ${fmtDate(t.date)} 期限切れ`:isToday(t.date)?'今日':dl!==null&&dl<=3?`あと${dl}日`:fmtDate(t.date)+'期限';
     const chips = assigneeChips(t.assignees);
+    const latestLog = latestProgress(t.progressLogs);
     return `<div class="list-item pri-${t.priority} ${od?'overdue':''}" onclick="window._openTask('${t.id}')">
       <div class="list-content">
-        <div class="list-title ${t.status==='完了'?'done-title':''}">${esc(t.title)}${t.googleTaskId?' <span style="font-size:10px;color:#4285f4;">G</span>':''}</div>
+        <div class="list-title ${status==='完了'?'done-title':''}">${esc(t.title)}${t.googleTaskId?' <span style="font-size:10px;color:#4285f4;">G</span>':''}</div>
         <div class="list-sub">
-          <span>${t.category||'その他'}</span><span>${t.status}</span>
+          <span>${t.category||'その他'}</span><span>${status}</span>
           ${ds?`<span>${ds}</span>`:''}
           ${t.createdBy?`<span>作成: ${t.createdBy}</span>`:''}
         </div>
         ${chips?`<div class="task-assignees" style="margin-top:5px">${chips}</div>`:''}
+        ${latestLog?`<div class="task-progress-preview">${esc(latestLog.text)}</div>`:''}
       </div>
       <div class="list-right"><span class="badge ${priCls[t.priority]}">${priLbl[t.priority]}</span></div>
     </div>`;
@@ -1422,8 +1542,12 @@ function openModal(id = null) {
     document.getElementById('fDate').value  = t.date||'';
     document.getElementById('fTags').value  = (t.tags||[]).join(', ');
     document.querySelector(`input[name="priority"][value="${t.priority||'med'}"]`).checked = true;
-    document.querySelector(`input[name="status"][value="${t.status||'未着手'}"]`).checked = true;
+    const normalizedStatus = normalizeStatus(t.status);
+    const formStatus = ACTIVE_STATUSES.includes(normalizedStatus) || normalizedStatus === '完了' ? normalizedStatus : '未着手';
+    document.querySelector(`input[name="status"][value="${formStatus}"]`).checked = true;
     document.querySelectorAll('.assignee-checkbox').forEach(cb => { cb.checked = (t.assignees||[]).includes(cb.value); });
+    document.getElementById('progressLogList').innerHTML = renderProgressLogs(t.progressLogs);
+    document.getElementById('fProgress').value = '';
     document.getElementById('btnDelete').style.display = '';
     // 完了ボタン：完了以外のタスク編集時のみ表示
     const doneBtn = document.getElementById('btnDoneModal');
@@ -1455,6 +1579,8 @@ function openModal(id = null) {
     document.getElementById('fCat').value   = 'その他';
     document.getElementById('fDate').value  = '';
     document.getElementById('fTags').value  = '';
+    document.getElementById('progressLogList').innerHTML = renderProgressLogs([]);
+    document.getElementById('fProgress').value = '';
     document.querySelector('#pri-med').checked = true;
     document.querySelector('#st-todo').checked  = true;
     document.querySelectorAll('.assignee-checkbox').forEach(cb => cb.checked = false);
@@ -1760,6 +1886,8 @@ async function saveTask() {
   if (!dateVal && !editingId) { showToast('期限を入力してください'); return; }
   const assignees = [...document.querySelectorAll('.assignee-checkbox:checked')].map(cb => cb.value);
   const newStatus = document.querySelector('input[name="status"]:checked').value;
+  const now = Date.now();
+  const progressText = document.getElementById('fProgress').value.trim();
   const data = {
     title,
     note:      document.getElementById('fNote').value.trim(),
@@ -1769,7 +1897,7 @@ async function saveTask() {
     status:    newStatus,
     assignees,
     tags:      document.getElementById('fTags').value.split(',').map(t=>t.trim()).filter(Boolean),
-    updatedAt: Date.now(),
+    updatedAt: now,
     updatedBy: currentUser?.name||'不明',
   };
   saving = true;
@@ -1777,6 +1905,19 @@ async function saveTask() {
   try {
     if (editingId) {
       const existing = tasks[editingId] || {};
+      const progressLogs = normalizeProgressLogs(existing.progressLogs);
+      const existingStatus = normalizeStatus(existing.status);
+      if (existingStatus !== newStatus) {
+        progressLogs.push({
+          text: `ステータスを「${existingStatus}」から「${newStatus}」に変更`,
+          by: currentUser?.name || '不明',
+          at: now,
+        });
+      }
+      if (progressText) {
+        progressLogs.push({ text: progressText, by: currentUser?.name || '不明', at: now });
+      }
+      if (progressLogs.length) data.progressLogs = progressLogs;
       const payload = { ...existing, ...data };
       if (newStatus === '完了') {
         payload.completedAt = existing.status === '完了' && existing.completedAt ? existing.completedAt : Date.now();
@@ -1796,9 +1937,10 @@ async function saveTask() {
       }
       showToast('更新しました');
     } else {
-      data.createdAt = Date.now();
+      data.createdAt = now;
       data.createdBy = currentUser?.name||'不明';
-      if (newStatus === '完了') data.completedAt = Date.now();
+      if (progressText) data.progressLogs = [{ text: progressText, by: data.createdBy, at: now }];
+      if (newStatus === '完了') data.completedAt = now;
       const createdRef = await push(ref(db, 'tasks'), data);
       showToast('追加しました');
       // LINEワークス通知
@@ -1862,6 +2004,7 @@ window.quickComplete = async function() {
     await set(ref(db, `tasks/${targetId}/updatedBy`), currentUser?.name || '不明');
     if (newStatus === '完了') await set(ref(db, `tasks/${targetId}/completedAt`), now);
     else await remove(ref(db, `tasks/${targetId}/completedAt`));
+    await appendProgressLog(targetId, newStatus === '完了' ? '完了にしました' : '未着手に戻しました', now);
     if (newStatus === '完了' && tasks[targetId].googleTaskId) {
       await completeGoogleTask(tasks[targetId].googleTaskId, tasks[targetId].googleListId);
     }
@@ -1896,6 +2039,7 @@ window._toggleDone = async function(e, id) {
     await set(ref(db, `tasks/${id}/updatedBy`), currentUser?.name||'不明');
     if (newStatus === '完了') await set(ref(db, `tasks/${id}/completedAt`), now);
     else await remove(ref(db, `tasks/${id}/completedAt`));
+    await appendProgressLog(id, newStatus === '完了' ? '完了にしました' : '未着手に戻しました', now);
     // Googleタスクと連携していれば完了を反映
     if (newStatus === '完了' && tasks[id].googleTaskId) {
       await completeGoogleTask(tasks[id].googleTaskId, tasks[id].googleListId);
