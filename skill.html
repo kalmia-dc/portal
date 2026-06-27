@@ -543,15 +543,161 @@ function updateProgress() {
 
 // ─── LINEワークス通知 ───────────────────────────────
 const NOTIFY_URL = 'https://kalmia-notify.chibakenmin-sugihey.workers.dev';
-async function sendNotify(text) {
-  try {
-    await fetch(NOTIFY_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text })
-    });
-  } catch(e) { console.warn('通知失敗:', e); }
+const NOTIFY_START_HOUR = 8;
+const NOTIFY_END_HOUR   = 19;
+const SKILL_NOTIFY_QUEUE_KEY = 'skill_notify_queue';
+const SKILL_NOTIFY_FLUSH_LOCK_KEY = 'skill_notify_flush_lock';
+const SKILL_NOTIFY_LOCK_TTL_MS = 60 * 1000;
+
+let skillNotifyFlushTimer = null;
+
+function isNotifyWindow(now = new Date()) {
+  const minutes = now.getHours() * 60 + now.getMinutes();
+  return minutes >= NOTIFY_START_HOUR * 60 && minutes <= NOTIFY_END_HOUR * 60;
 }
+
+function msUntilNextNotifyWindow(now = new Date(), forceTomorrow = false) {
+  const target = new Date(now);
+  target.setHours(NOTIFY_START_HOUR, 0, 0, 0);
+  if (forceTomorrow || now > target) target.setDate(target.getDate() + 1);
+  return Math.max(0, target.getTime() - now.getTime());
+}
+
+function getSkillNotifyQueue() {
+  try { return JSON.parse(localStorage.getItem(SKILL_NOTIFY_QUEUE_KEY) || '[]'); }
+  catch(e) { return []; }
+}
+
+function saveSkillNotifyQueue(queue) {
+  localStorage.setItem(SKILL_NOTIFY_QUEUE_KEY, JSON.stringify(queue));
+}
+
+function hashNotifyText(text) {
+  let hash = 0;
+  for (let i = 0; i < String(text || '').length; i++) {
+    hash = ((hash << 5) - hash + String(text).charCodeAt(i)) | 0;
+  }
+  return Math.abs(hash).toString(36);
+}
+
+function notifyItemId(item) {
+  if (!item) return '';
+  if (item.id) return String(item.id);
+  return `legacy:${hashNotifyText(item.text || '')}`;
+}
+
+function acquireLocalStorageLock(key) {
+  const now = Date.now();
+  try {
+    const current = JSON.parse(localStorage.getItem(key) || 'null');
+    if (current?.token && now - Number(current.lockedAt || 0) < SKILL_NOTIFY_LOCK_TTL_MS) return '';
+  } catch(e) {}
+
+  const token = `${now}-${Math.random().toString(36).slice(2)}`;
+  try {
+    localStorage.setItem(key, JSON.stringify({ token, lockedAt: now }));
+    const stored = JSON.parse(localStorage.getItem(key) || 'null');
+    return stored?.token === token ? token : '';
+  } catch(e) {
+    return token;
+  }
+}
+
+function releaseLocalStorageLock(key, token) {
+  if (!token) return;
+  try {
+    const current = JSON.parse(localStorage.getItem(key) || 'null');
+    if (current?.token === token) localStorage.removeItem(key);
+  } catch(e) {}
+}
+
+function queueSkillNotify(text, id = '') {
+  const notifyId = id || `text:${hashNotifyText(text)}`;
+  const queue = getSkillNotifyQueue();
+  if (queue.some(item => notifyItemId(item) === notifyId)) return false;
+  queue.push({ id: notifyId, text, queuedAt: Date.now() });
+  saveSkillNotifyQueue(queue);
+  return true;
+}
+
+async function postNotify(text) {
+  const res = await fetch(NOTIFY_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text })
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+}
+
+async function flushSkillNotifyQueue() {
+  if (!isNotifyWindow()) return;
+
+  const token = acquireLocalStorageLock(SKILL_NOTIFY_FLUSH_LOCK_KEY);
+  if (!token) return;
+
+  try {
+    const queue = getSkillNotifyQueue();
+    if (!queue.length) return;
+
+    const remaining = [];
+    const seen = new Set();
+    for (const item of queue) {
+      const notifyId = notifyItemId(item);
+      if (!item?.text || seen.has(notifyId)) continue;
+      seen.add(notifyId);
+
+      try {
+        await postNotify(item.text);
+      } catch(e) {
+        console.warn('保留通知の送信失敗:', e);
+        remaining.push(item);
+      }
+    }
+    saveSkillNotifyQueue(remaining);
+  } finally {
+    releaseLocalStorageLock(SKILL_NOTIFY_FLUSH_LOCK_KEY, token);
+  }
+}
+
+function scheduleSkillNotifyFlush(delayOverride = null) {
+  if (skillNotifyFlushTimer) clearTimeout(skillNotifyFlushTimer);
+
+  const now = new Date();
+  const delay = Number.isFinite(delayOverride)
+    ? delayOverride
+    : isNotifyWindow(now)
+      ? msUntilNextNotifyWindow(now, true)
+      : msUntilNextNotifyWindow(now);
+
+  skillNotifyFlushTimer = setTimeout(async () => {
+    await flushSkillNotifyQueue();
+    const hasRemaining = getSkillNotifyQueue().length > 0;
+    scheduleSkillNotifyFlush(hasRemaining && isNotifyWindow() ? 10 * 60 * 1000 : null);
+  }, delay);
+}
+
+async function sendNotify(text) {
+  const notifyId = `text:${hashNotifyText(text)}`;
+
+  if (!isNotifyWindow()) {
+    queueSkillNotify(text, notifyId);
+    scheduleSkillNotifyFlush();
+    return false;
+  }
+
+  try {
+    await flushSkillNotifyQueue();
+    await postNotify(text);
+    return true;
+  } catch(e) {
+    console.warn('通知失敗:', e);
+    queueSkillNotify(text, notifyId);
+    scheduleSkillNotifyFlush(10 * 60 * 1000);
+    return false;
+  }
+}
+
+scheduleSkillNotifyFlush(isNotifyWindow() ? 1500 : null);
 
 // ─── 承認処理 ──────────────────────────────────────
 window.toggleApproval = async function(key) {
