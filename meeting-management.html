@@ -120,6 +120,26 @@ button{cursor:pointer}
   border-color:var(--mint);
   box-shadow:0 0 0 3px rgba(78,205,196,.18);
 }
+.search-panel{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  margin:-4px 0 14px;
+}
+.search-panel input{
+  flex:1 1 auto;
+  min-width:0;
+  border:1px solid var(--line);
+  border-radius:8px;
+  background:#fff;
+  color:var(--ink);
+  padding:10px 11px;
+  outline:none;
+}
+.search-panel input:focus{
+  border-color:var(--mint);
+  box-shadow:0 0 0 3px rgba(78,205,196,.16);
+}
 .section{display:none}
 .section.active{display:block}
 .section-head{
@@ -700,6 +720,7 @@ button{cursor:pointer}
   .item-badges{justify-content:flex-start}
   .item-actions,.form-actions{justify-content:stretch}
   .btn{width:100%}
+  .search-panel .btn{width:auto;flex:0 0 auto}
 }
 </style>
 </head>
@@ -721,6 +742,10 @@ button{cursor:pointer}
       <button class="tab-btn" type="button" data-tab="opinions">スタッフ提言</button>
       <button class="tab-btn active" type="button" data-tab="incidents">ヒヤリハット・アクシデント報告</button>
     </nav>
+    <div class="search-panel" role="search">
+      <input id="listSearch" type="search" autocomplete="off" placeholder="ヒヤリハット・アクシデント報告を検索">
+      <button class="btn ghost" type="button" id="listSearchClear" hidden>クリア</button>
+    </div>
 
     <section id="tasksSection" class="section">
       <div class="section-head">
@@ -1058,7 +1083,7 @@ let dailyNoticeNotificationDoneFor = '';
 let incidentStepIndex = 0;
 let incidentDraft = {};
 let incidentImportCandidates = [];
-const state = { tasks:[], notices:[], opinions:[], incidentReports:[] };
+const state = { tasks:[], notices:[], opinions:[], incidentReports:[], searchQuery:'' };
 
 if (!currentUser?.staffId) {
   document.getElementById('guard').hidden = false;
@@ -1069,6 +1094,7 @@ if (!currentUser?.staffId) {
 function boot() {
   setupUser();
   setupTabs();
+  setupSearch();
   setupForms();
   setupViewer();
   attachDataListeners();
@@ -1162,6 +1188,50 @@ function activateTab(tab) {
   document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tab));
   document.querySelectorAll('.section').forEach(sec => sec.classList.remove('active'));
   document.getElementById(`${tab}Section`).classList.add('active');
+  updateSearchPlaceholder();
+  renderActiveTab();
+}
+
+function setupSearch() {
+  const input = document.getElementById('listSearch');
+  const clearBtn = document.getElementById('listSearchClear');
+  input.addEventListener('input', () => {
+    state.searchQuery = input.value.trim();
+    clearBtn.hidden = !state.searchQuery;
+    renderActiveTab();
+  });
+  clearBtn.addEventListener('click', () => {
+    input.value = '';
+    state.searchQuery = '';
+    clearBtn.hidden = true;
+    input.focus();
+    renderActiveTab();
+  });
+  updateSearchPlaceholder();
+}
+
+function updateSearchPlaceholder() {
+  const input = document.getElementById('listSearch');
+  if (!input) return;
+  const labels = {
+    tasks:'取り組み',
+    notices:'お知らせ',
+    opinions:'スタッフ提言',
+    incidents:'ヒヤリハット・アクシデント報告'
+  };
+  input.placeholder = `${labels[currentTab()] || '一覧'}を検索`;
+}
+
+function currentTab() {
+  return document.querySelector('.tab-btn.active')?.dataset.tab || 'incidents';
+}
+
+function renderActiveTab() {
+  const tab = currentTab();
+  if (tab === 'tasks') return renderTasks();
+  if (tab === 'notices' && canSeeNotices()) return renderNotices();
+  if (tab === 'opinions' && canSeeOpinions()) return renderOpinions();
+  return renderIncidentReports();
 }
 
 function setupForms() {
@@ -2191,14 +2261,123 @@ async function requestTaskUnreadCheck() {
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
 }
 
-function renderTasks() {
-  document.getElementById('taskCount').textContent = `${state.tasks.length}件`;
-  const list = document.getElementById('taskList');
-  if (!state.tasks.length) {
-    list.innerHTML = '<div class="empty">取り組みはありません</div>';
+function hasSearchQuery() {
+  return Boolean(normalizedSearchQuery());
+}
+
+function normalizedSearchQuery() {
+  return normalizeForSearch(state.searchQuery);
+}
+
+function normalizeForSearch(value) {
+  return String(value ?? '').normalize('NFKC').toLocaleLowerCase('ja-JP');
+}
+
+function filterBySearch(items, textFn) {
+  const query = normalizedSearchQuery();
+  if (!query) return items;
+  return items.filter(item => normalizeForSearch(textFn(item)).includes(query));
+}
+
+function countText(filteredCount, totalCount) {
+  return hasSearchQuery() ? `${filteredCount}/${totalCount}件` : `${totalCount}件`;
+}
+
+function emptyListHtml(label) {
+  const text = hasSearchQuery() ? `検索に一致する${label}はありません` : `${label}はありません`;
+  return `<div class="empty">${esc(text)}</div>`;
+}
+
+function combinedSearchText(parts) {
+  const values = [];
+  appendSearchParts(values, parts);
+  return values.join(' ');
+}
+
+function appendSearchParts(values, part) {
+  if (part == null) return;
+  if (Array.isArray(part)) {
+    part.forEach(value => appendSearchParts(values, value));
     return;
   }
-  list.innerHTML = state.tasks.map(task => `
+  if (typeof part === 'object') {
+    Object.values(part).forEach(value => appendSearchParts(values, value));
+    return;
+  }
+  values.push(part);
+}
+
+function taskSearchText(task) {
+  return combinedSearchText([
+    task.title,
+    task.detail,
+    task.completion,
+    task.progress,
+    task.sourceIncidentNumber,
+    displayCreatedBy(task),
+    task.updatedBy,
+    STATUS_LABELS[taskStatus(task)],
+    progressLogEntries(task).map(log => log.text)
+  ]);
+}
+
+function noticeSearchText(notice) {
+  return combinedSearchText([
+    notice.title,
+    notice.body,
+    notice.createdBy,
+    notice.updatedBy
+  ]);
+}
+
+function opinionSearchText(opinion) {
+  return combinedSearchText([
+    opinion.content,
+    opinion.reason,
+    opinion.createdBy,
+    opinion.updatedBy,
+    DECISION_LABELS[opinion.decision || 'pending'],
+    opinion.directorMemo,
+    decisionReasonsOf(opinion)
+  ]);
+}
+
+function incidentReportSearchText(report) {
+  return combinedSearchText([
+    report.reportNumber || buildIncidentReportNumber(report),
+    INCIDENT_TYPE_LABELS[incidentTypeKey(report)],
+    INCIDENT_LEVEL_LABELS[report.level],
+    INCIDENT_STATUS_LABELS[report.counterStatus || 'pending'],
+    report.linkedTaskId ? '報告済み 取り組み移行済み' : '',
+    formatIncidentOccurredAt(report),
+    report.reporterName,
+    report.discovererName,
+    report.createdBy,
+    report.updatedBy,
+    incidentCategoryText(report),
+    report.overview,
+    report.scene,
+    report.eventImpact,
+    report.details,
+    report.goodPoint,
+    report.causeHuman,
+    report.causeEnvironment,
+    report.handoff,
+    report.countermeasure,
+    report.meetingReportDate,
+    report.sourceIncidentNumber
+  ]);
+}
+
+function renderTasks() {
+  const tasks = filterBySearch(state.tasks, taskSearchText);
+  document.getElementById('taskCount').textContent = countText(tasks.length, state.tasks.length);
+  const list = document.getElementById('taskList');
+  if (!tasks.length) {
+    list.innerHTML = emptyListHtml('取り組み');
+    return;
+  }
+  list.innerHTML = tasks.map(task => `
     <article class="item">
       <div class="item-top">
         <div class="item-title">
@@ -2320,13 +2499,14 @@ function taskReadSummaryHtml(task) {
 }
 
 function renderNotices() {
-  document.getElementById('noticeCount').textContent = `${state.notices.length}件`;
+  const notices = filterBySearch(state.notices, noticeSearchText);
+  document.getElementById('noticeCount').textContent = countText(notices.length, state.notices.length);
   const list = document.getElementById('noticeList');
-  if (!state.notices.length) {
-    list.innerHTML = '<div class="empty">お知らせはありません</div>';
+  if (!notices.length) {
+    list.innerHTML = emptyListHtml('お知らせ');
     return;
   }
-  list.innerHTML = state.notices.map(notice => `
+  list.innerHTML = notices.map(notice => `
     <article class="item">
       <div class="item-top">
         <div class="item-title">
@@ -2418,12 +2598,13 @@ function readChip(id, isRead, read) {
 }
 
 function renderIncidentReports() {
-  const reports = visibleIncidentReports();
-  document.getElementById('incidentCount').textContent = `${reports.length}件`;
+  const allReports = visibleIncidentReports();
+  const reports = filterBySearch(allReports, incidentReportSearchText);
+  document.getElementById('incidentCount').textContent = countText(reports.length, allReports.length);
   renderIncidentSummary(reports);
   const list = document.getElementById('incidentList');
   if (!reports.length) {
-    list.innerHTML = '<div class="empty">報告はありません</div>';
+    list.innerHTML = emptyListHtml('報告');
     return;
   }
   list.innerHTML = reports.map(report => `
@@ -2789,13 +2970,14 @@ async function deleteIncidentReport(id) {
 }
 
 function renderOpinions() {
-  document.getElementById('opinionCount').textContent = `${state.opinions.length}件`;
+  const opinions = filterBySearch(state.opinions, opinionSearchText);
+  document.getElementById('opinionCount').textContent = countText(opinions.length, state.opinions.length);
   const list = document.getElementById('opinionList');
-  if (!state.opinions.length) {
-    list.innerHTML = '<div class="empty">スタッフ提言はありません</div>';
+  if (!opinions.length) {
+    list.innerHTML = emptyListHtml('スタッフ提言');
     return;
   }
-  list.innerHTML = state.opinions.map(opinion => `
+  list.innerHTML = opinions.map(opinion => `
     <article class="item">
       <div class="item-top">
         <div class="item-title">
