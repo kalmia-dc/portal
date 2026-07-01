@@ -932,7 +932,6 @@ const firebaseConfig = {
 const fbApp = initializeApp(firebaseConfig);
 const db = getDatabase(fbApp);
 
-const NOTIFY_URL = 'https://kalmia-notify.chibakenmin-sugihey.workers.dev';
 const DIRECTOR_ID = 'sugihira';
 const LEADER_IDS = ['momo', 'yamada'];
 const STAFF_NAMES = {
@@ -1076,10 +1075,6 @@ const PATHS = {
 let currentUser = readUser();
 let editingTaskId = null;
 let editingNoticeId = null;
-let dailyTaskNotificationInFlight = false;
-let dailyTaskNotificationDoneFor = '';
-let dailyNoticeNotificationInFlight = false;
-let dailyNoticeNotificationDoneFor = '';
 let incidentStepIndex = 0;
 let incidentDraft = {};
 let incidentImportCandidates = [];
@@ -1263,12 +1258,10 @@ function attachDataListeners() {
   onValue(ref(db, PATHS.tasks), snap => {
     state.tasks = toList(snap.val()).sort(sortTasks);
     renderTasks();
-    maybeSendDailyTaskReadNotification();
   });
   onValue(ref(db, PATHS.notices), snap => {
     state.notices = toList(snap.val()).sort((a,b) => (b.createdAt || 0) - (a.createdAt || 0));
     if (canSeeNotices()) renderNotices();
-    maybeSendDailyNoticeReadNotification();
   });
   if (canSeeOpinions()) {
     onValue(ref(db, PATHS.opinions), snap => {
@@ -2209,56 +2202,6 @@ async function markNoticeRead(id) {
     return showToast('全員確認済みのため、お知らせを削除しました');
   }
   showToast('確認済みにしました');
-}
-
-async function maybeSendDailyTaskReadNotification() {
-  const dateKey = todayKey();
-  if (dailyTaskNotificationInFlight || dailyTaskNotificationDoneFor === dateKey) return;
-
-  dailyTaskNotificationInFlight = true;
-
-  try {
-    await requestTaskUnreadCheck();
-    dailyTaskNotificationDoneFor = dateKey;
-  } catch (err) {
-    console.warn('取り組み未確認通知に失敗しました:', err);
-  } finally {
-    dailyTaskNotificationInFlight = false;
-  }
-}
-
-async function maybeSendDailyNoticeReadNotification() {
-  const dateKey = todayKey();
-  if (dailyNoticeNotificationInFlight || dailyNoticeNotificationDoneFor === dateKey) return;
-
-  dailyNoticeNotificationInFlight = true;
-
-  try {
-    await requestNoticeUnreadCheck();
-    dailyNoticeNotificationDoneFor = dateKey;
-  } catch (err) {
-    console.warn('お知らせ未確認通知に失敗しました:', err);
-  } finally {
-    dailyNoticeNotificationInFlight = false;
-  }
-}
-
-async function requestNoticeUnreadCheck() {
-  const res = await fetch(NOTIFY_URL, {
-    method:'POST',
-    headers:{ 'Content-Type':'application/json' },
-    body:JSON.stringify({ action:'noticeUnreadCheck' })
-  });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-}
-
-async function requestTaskUnreadCheck() {
-  const res = await fetch(NOTIFY_URL, {
-    method:'POST',
-    headers:{ 'Content-Type':'application/json' },
-    body:JSON.stringify({ action:'taskUnreadCheck' })
-  });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
 }
 
 function hasSearchQuery() {
