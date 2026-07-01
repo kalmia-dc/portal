@@ -1818,7 +1818,6 @@ function startTaskMaintenance() {
   if (taskMaintenanceStarted || !currentUser) return;
   taskMaintenanceStarted = true;
   setTimeout(async () => { await cleanupCompletedExpired(); }, 1500);
-  scheduleDeadlineCheck();
 }
 
 // タスク期限通知（8:00〜19:00内で1日1回。期限切れは完了まで毎日）
@@ -1885,6 +1884,7 @@ async function saveTask() {
   const dateVal = document.getElementById('fDate').value;
   if (!dateVal && !editingId) { showToast('期限を入力してください'); return; }
   const assignees = [...document.querySelectorAll('.assignee-checkbox:checked')].map(cb => cb.value);
+  if (!assignees.length) { showToast('担当者を1人以上選択してください'); return; }
   const newStatus = document.querySelector('input[name="status"]:checked').value;
   const now = Date.now();
   const progressText = document.getElementById('fProgress').value.trim();
@@ -1929,12 +1929,6 @@ async function saveTask() {
       if (newStatus === '完了' && existing.googleTaskId) {
         await completeGoogleTask(existing.googleTaskId, existing.googleListId);
       }
-      // 完了になった場合にLINEワークス通知
-      if (newStatus === '完了' && existing.status !== '完了') {
-        const assigneeStr = data.assignees?.length ? data.assignees.join('・') : 'なし';
-        const createdBy = existing.createdBy || '不明';
-        await sendNotify(`✅ タスクが完了しました\n${ { ...existing, ...data }.title || ''}\n担当者：${assigneeStr}\n作成者：${createdBy}`, `task-completed:${editingId}:${todayStr()}`);
-      }
       showToast('更新しました');
     } else {
       data.createdAt = now;
@@ -1943,10 +1937,6 @@ async function saveTask() {
       if (newStatus === '完了') data.completedAt = now;
       const createdRef = await push(ref(db, 'tasks'), data);
       showToast('追加しました');
-      // LINEワークス通知
-      const assigneeStr = data.assignees?.length ? data.assignees.join('・') : 'なし';
-      const dateStr = data.date ? `期限：${data.date}` : '期限なし';
-      await sendNotify(`📋 新しいタスクが作成されました\n${data.title}\n担当者：${assigneeStr}\n${dateStr}\n作成者：${data.createdBy}`, `task-created:${createdRef.key || data.createdAt}`);
     }
     closeModal();
   } catch(e) { showToast('保存に失敗しました'); }
@@ -2008,12 +1998,6 @@ window.quickComplete = async function() {
     if (newStatus === '完了' && tasks[targetId].googleTaskId) {
       await completeGoogleTask(tasks[targetId].googleTaskId, tasks[targetId].googleListId);
     }
-    if (newStatus === '完了') {
-      const t = tasks[targetId];
-      const assigneeStr = (t.assignees||[]).join('・') || 'なし';
-      const createdBy = t.createdBy || '不明';
-      await sendNotify(`✅ タスクが完了しました\n${t.title||''}\n担当者：${assigneeStr}\n作成者：${createdBy}`, `task-completed:${targetId}:${todayStr()}`);
-    }
     showToast(newStatus === '完了' ? '✅ 完了にしました' : '↩ 未着手に戻しました');
     closeModal();
   } catch(e) {
@@ -2043,12 +2027,6 @@ window._toggleDone = async function(e, id) {
     // Googleタスクと連携していれば完了を反映
     if (newStatus === '完了' && tasks[id].googleTaskId) {
       await completeGoogleTask(tasks[id].googleTaskId, tasks[id].googleListId);
-    }
-    if (newStatus === '完了') {
-      const t = tasks[id];
-      const assigneeStr = (t.assignees||[]).join('・') || 'なし';
-      const createdBy = t.createdBy || '不明';
-      await sendNotify(`✅ タスクが完了しました\n${t.title||''}\n担当者：${assigneeStr}\n作成者：${createdBy}`, `task-completed:${id}:${todayStr()}`);
     }
     showToast(newStatus === '完了' ? '✅ 完了にしました' : '↩ 未着手に戻しました');
   } catch(err) {
