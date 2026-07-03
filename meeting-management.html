@@ -194,6 +194,86 @@ button{cursor:pointer}
 }
 .summary-chip.near_miss strong{color:var(--ok)}
 .summary-chip.accident strong{color:var(--bad)}
+.incident-period{
+  display:flex;
+  flex-wrap:wrap;
+  align-items:flex-end;
+  gap:10px;
+  margin:-4px 0 14px;
+  padding:12px;
+  border:1px solid var(--line);
+  border-radius:8px;
+  background:#fff;
+}
+.incident-period .field{
+  min-width:150px;
+  flex:0 1 180px;
+}
+.incident-period .field.period-month{flex-basis:190px}
+.incident-period .field.period-year{flex-basis:130px}
+.incident-period [hidden]{display:none!important}
+.incident-period .period-caption{
+  flex:1 1 220px;
+  color:var(--muted);
+  font-size:12px;
+  font-weight:800;
+  line-height:1.5;
+}
+.reporter-stats{
+  flex:1 1 100%;
+  border:1px solid var(--line);
+  border-radius:8px;
+  background:#fff;
+  overflow:hidden;
+}
+.reporter-stats-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  padding:10px 12px;
+  border-bottom:1px solid var(--line);
+}
+.reporter-stats-head h3{
+  margin:0;
+  font-size:14px;
+  line-height:1.3;
+  font-weight:900;
+}
+.reporter-stats-head span{
+  color:var(--muted);
+  font-size:12px;
+  font-weight:900;
+  white-space:nowrap;
+}
+.reporter-table-wrap{overflow-x:auto}
+.reporter-table{
+  width:100%;
+  border-collapse:collapse;
+  min-width:420px;
+}
+.reporter-table th,
+.reporter-table td{
+  padding:9px 12px;
+  border-top:1px solid var(--line);
+  text-align:right;
+  font-size:13px;
+  white-space:nowrap;
+}
+.reporter-table tr:first-child th{border-top:0}
+.reporter-table th{
+  color:var(--muted);
+  font-size:12px;
+  font-weight:900;
+}
+.reporter-table th:first-child,
+.reporter-table td:first-child{
+  text-align:left;
+}
+.reporter-table td strong{
+  color:var(--ink);
+  font-size:14px;
+}
 .form-panel{
   background:#fff;
   border:1px solid var(--line);
@@ -853,6 +933,27 @@ button{cursor:pointer}
         <h2>ヒヤリハット・アクシデント報告</h2>
         <span class="count-badge" id="incidentCount">0件</span>
       </div>
+      <div class="incident-period" aria-label="報告統計の集計期間">
+        <div class="field">
+          <label for="incidentPeriodMode">集計期間</label>
+          <select id="incidentPeriodMode">
+            <option value="all">すべて</option>
+            <option value="current_month">今月</option>
+            <option value="current_year">今年</option>
+            <option value="month">月指定</option>
+            <option value="year">年指定</option>
+          </select>
+        </div>
+        <div class="field period-month" id="incidentPeriodMonthField" hidden>
+          <label for="incidentPeriodMonth">月</label>
+          <input id="incidentPeriodMonth" type="month">
+        </div>
+        <div class="field period-year" id="incidentPeriodYearField" hidden>
+          <label for="incidentPeriodYear">年</label>
+          <input id="incidentPeriodYear" type="number" inputmode="numeric" min="2000" max="2100" step="1">
+        </div>
+        <div class="period-caption" id="incidentPeriodCaption">全期間の報告を集計しています。</div>
+      </div>
       <div class="incident-summary" id="incidentSummary" aria-label="報告数集計"></div>
       <div class="form-panel">
         <form id="incidentForm" class="incident-wizard">
@@ -1078,7 +1179,16 @@ let editingNoticeId = null;
 let incidentStepIndex = 0;
 let incidentDraft = {};
 let incidentImportCandidates = [];
-const state = { tasks:[], notices:[], opinions:[], incidentReports:[], searchQuery:'' };
+const state = {
+  tasks:[],
+  notices:[],
+  opinions:[],
+  incidentReports:[],
+  searchQuery:'',
+  incidentPeriodMode:'all',
+  incidentPeriodMonth:todayKey().slice(0, 7),
+  incidentPeriodYear:todayKey().slice(0, 4)
+};
 
 if (!currentUser?.staffId) {
   document.getElementById('guard').hidden = false;
@@ -1090,6 +1200,7 @@ function boot() {
   setupUser();
   setupTabs();
   setupSearch();
+  setupIncidentPeriod();
   setupForms();
   setupViewer();
   attachDataListeners();
@@ -1203,6 +1314,40 @@ function setupSearch() {
     renderActiveTab();
   });
   updateSearchPlaceholder();
+}
+
+function setupIncidentPeriod() {
+  const mode = document.getElementById('incidentPeriodMode');
+  const month = document.getElementById('incidentPeriodMonth');
+  const year = document.getElementById('incidentPeriodYear');
+  mode.value = state.incidentPeriodMode;
+  month.value = state.incidentPeriodMonth;
+  year.value = state.incidentPeriodYear;
+  mode.addEventListener('change', () => {
+    state.incidentPeriodMode = mode.value;
+    updateIncidentPeriodControls();
+    renderIncidentReports();
+  });
+  month.addEventListener('change', () => {
+    state.incidentPeriodMonth = month.value || todayKey().slice(0, 7);
+    updateIncidentPeriodControls();
+    renderIncidentReports();
+  });
+  year.addEventListener('input', () => {
+    state.incidentPeriodYear = year.value || todayKey().slice(0, 4);
+    updateIncidentPeriodControls();
+    renderIncidentReports();
+  });
+  updateIncidentPeriodControls();
+}
+
+function updateIncidentPeriodControls() {
+  const monthField = document.getElementById('incidentPeriodMonthField');
+  const yearField = document.getElementById('incidentPeriodYearField');
+  const caption = document.getElementById('incidentPeriodCaption');
+  monthField.hidden = state.incidentPeriodMode !== 'month';
+  yearField.hidden = state.incidentPeriodMode !== 'year';
+  caption.textContent = `${incidentPeriodLabel()}の報告を集計しています。`;
 }
 
 function updateSearchPlaceholder() {
@@ -2542,8 +2687,9 @@ function readChip(id, isRead, read) {
 
 function renderIncidentReports() {
   const allReports = visibleIncidentReports();
-  const reports = filterBySearch(allReports, incidentReportSearchText);
-  document.getElementById('incidentCount').textContent = countText(reports.length, allReports.length);
+  const periodReports = filterIncidentReportsByPeriod(allReports);
+  const reports = filterBySearch(periodReports, incidentReportSearchText);
+  document.getElementById('incidentCount').textContent = countText(reports.length, periodReports.length);
   renderIncidentSummary(reports);
   const list = document.getElementById('incidentList');
   if (!reports.length) {
@@ -2600,11 +2746,113 @@ function renderIncidentSummary(reports) {
     acc[incidentTypeKey(report)] += 1;
     return acc;
   }, { near_miss:0, accident:0 });
+  const reporterStats = incidentReporterStats(reports);
   document.getElementById('incidentSummary').innerHTML = `
     <div class="summary-chip total"><span>全体</span><strong>${reports.length}件</strong></div>
     <div class="summary-chip near_miss"><span>${esc(INCIDENT_TYPE_LABELS.near_miss)}</span><strong>${counts.near_miss}件</strong></div>
     <div class="summary-chip accident"><span>${esc(INCIDENT_TYPE_LABELS.accident)}</span><strong>${counts.accident}件</strong></div>
+    <div class="reporter-stats">
+      <div class="reporter-stats-head">
+        <h3>記入者別報告数</h3>
+        <span>${esc(incidentPeriodLabel())} / ${reports.length}件</span>
+      </div>
+      <div class="reporter-table-wrap">
+        ${reporterStats.length ? `
+          <table class="reporter-table">
+            <thead>
+              <tr>
+                <th>記入者</th>
+                <th>合計</th>
+                <th>${esc(INCIDENT_TYPE_LABELS.near_miss)}</th>
+                <th>${esc(INCIDENT_TYPE_LABELS.accident)}</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${reporterStats.map(stat => `
+                <tr>
+                  <td>${esc(stat.name)}</td>
+                  <td><strong>${stat.total}件</strong></td>
+                  <td>${stat.near_miss}件</td>
+                  <td>${stat.accident}件</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        ` : `<div class="empty">集計対象の報告はありません</div>`}
+      </div>
+    </div>
   `;
+}
+
+function filterIncidentReportsByPeriod(reports) {
+  const mode = state.incidentPeriodMode;
+  if (mode === 'all') return reports;
+  const today = todayKey();
+  const month = mode === 'current_month' ? today.slice(0, 7) : state.incidentPeriodMonth;
+  const year = mode === 'current_year' ? today.slice(0, 4) : state.incidentPeriodYear;
+  return reports.filter(report => {
+    const dateKey = incidentReportDateKey(report);
+    if (!dateKey) return false;
+    if (mode === 'current_month' || mode === 'month') return dateKey.startsWith(month);
+    if (mode === 'current_year' || mode === 'year') return dateKey.startsWith(year);
+    return true;
+  });
+}
+
+function incidentReportDateKey(report) {
+  const explicitDate = [report?.occurredDate, report?.entryDate]
+    .map(value => String(value || '').trim())
+    .find(value => /^\d{4}-\d{2}-\d{2}$/.test(value));
+  if (explicitDate) return explicitDate;
+  const timestamp = Number(report?.createdAt || report?.importedAt || 0);
+  if (!Number.isFinite(timestamp) || timestamp <= 0) return '';
+  return todayKey(new Date(timestamp));
+}
+
+function incidentPeriodLabel() {
+  const mode = state.incidentPeriodMode;
+  const today = todayKey();
+  if (mode === 'current_month') return `${today.slice(0, 4)}年${today.slice(5, 7)}月`;
+  if (mode === 'current_year') return `${today.slice(0, 4)}年`;
+  if (mode === 'month') {
+    const match = String(state.incidentPeriodMonth || '').match(/^(\d{4})-(\d{2})$/);
+    return match ? `${match[1]}年${match[2]}月` : '月指定';
+  }
+  if (mode === 'year') {
+    const year = String(state.incidentPeriodYear || '').match(/^\d{4}$/)?.[0];
+    return year ? `${year}年` : '年指定';
+  }
+  return '全期間';
+}
+
+function incidentReporterStats(reports) {
+  const stats = new Map();
+  reports.forEach(report => {
+    const name = incidentReporterName(report);
+    const key = normalizeForSearch(name);
+    if (!stats.has(key)) {
+      stats.set(key, { name, total:0, near_miss:0, accident:0 });
+    }
+    const stat = stats.get(key);
+    const type = incidentTypeKey(report);
+    stat.total += 1;
+    stat[type] += 1;
+  });
+  return Array.from(stats.values()).sort((a, b) => {
+    if (b.total !== a.total) return b.total - a.total;
+    return a.name.localeCompare(b.name, 'ja-JP');
+  });
+}
+
+function incidentReporterName(report) {
+  const name = String(
+    report?.reporterName ||
+    report?.createdBy ||
+    STAFF_NAMES[report?.createdById] ||
+    report?.createdById ||
+    '未記録'
+  ).trim();
+  return name || '未記録';
 }
 
 function incidentTypeKey(report) {
