@@ -570,6 +570,10 @@ function canEditLoan(loan) {
   return isAdmin() && ['draft','pending_agreement'].includes(loan?.status);
 }
 
+function canAgreeLoan(loan, status = effectiveStatus(loan)) {
+  return loan?.staffId === currentUser?.staffId && status === 'pending_agreement';
+}
+
 function visibleLoans() {
   if (isAdmin()) return loans;
   return loans.filter(loan => loan.staffId === currentUser.staffId && loan.status !== 'draft');
@@ -643,8 +647,11 @@ function renderLoanCard(loan) {
 function renderActions(loan, status) {
   const detail = `<button class="btn ghost" type="button" onclick="openLoan('${escAttr(loan.id)}')">詳細</button>`;
   const actions = [detail];
+  if (canAgreeLoan(loan, status)) {
+    const label = isAdmin() ? '本人として同意' : '同意手続き';
+    actions.push(`<button class="btn primary" type="button" onclick="openLoan('${escAttr(loan.id)}')">${label}</button>`);
+  }
   if (!isAdmin()) {
-    if (status === 'pending_agreement') actions.push(`<button class="btn primary" type="button" onclick="openLoan('${escAttr(loan.id)}')">同意手続き</button>`);
     return actions.join('');
   }
   if (canEditLoan(loan)) actions.push(`<button class="btn secondary" type="button" onclick="editLoan('${escAttr(loan.id)}')">編集</button>`);
@@ -715,7 +722,7 @@ function openLoan(id) {
   document.getElementById('documentText').textContent = loan.loanDocumentText || buildLoanDocumentText(loan);
   document.getElementById('modalTimeline').innerHTML = renderTimeline(status);
   const agreementBox = document.getElementById('agreementBox');
-  const canAgree = !isAdmin() && loan.staffId === currentUser.staffId && status === 'pending_agreement';
+  const canAgree = canAgreeLoan(loan, status);
   agreementBox.classList.toggle('hidden', !canAgree);
   document.getElementById('agreeCheck').checked = false;
   document.getElementById('agreePass').value = '';
