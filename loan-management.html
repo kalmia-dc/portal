@@ -1,0 +1,905 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>貸付・借用管理 | カルミアデンタル スタッフポータル</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800;900&family=Zen+Maru+Gothic:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --mint:#4ecdc4;
+  --sky:#74b9ff;
+  --green:#25a67a;
+  --amber:#f2a93b;
+  --red:#d94b4b;
+  --bg:#f4f8fb;
+  --white:#fff;
+  --dark:#273238;
+  --gray:#64727a;
+  --light:#dfe8ed;
+  --line:#e8eef2;
+  --shadow:0 10px 28px rgba(39,50,56,.08);
+}
+*{box-sizing:border-box}
+html,body{max-width:100%;overflow-x:hidden}
+body{margin:0;font-family:'Zen Maru Gothic',sans-serif;background:var(--bg);color:var(--dark);min-height:100vh}
+button,input,select,textarea{font-family:inherit}
+header{height:58px;background:var(--white);display:flex;align-items:center;gap:10px;padding:0 16px;box-shadow:0 2px 10px rgba(0,0,0,.07);position:sticky;top:0;z-index:20}
+.back{width:36px;height:36px;flex:0 0 36px;border:2px solid var(--light);border-radius:10px;background:var(--white);color:var(--dark);font-weight:900;display:grid;place-items:center;text-decoration:none;font-size:16px}
+.back:hover{border-color:var(--mint);color:#18857e}
+.brand{display:flex;align-items:center;gap:10px;font-family:'Nunito',sans-serif;font-weight:900;font-size:16px;min-width:0}
+.brand-mark{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,var(--green),var(--sky));display:grid;place-items:center;color:white;font-weight:900}
+.app{width:100%;max-width:1180px;margin:0 auto;padding:20px 16px 54px;overflow:hidden}
+.guard{min-height:calc(100vh - 58px);display:grid;place-items:center;padding:24px;text-align:center;color:var(--gray)}
+.hero{background:linear-gradient(135deg,#248f87,#3d7ec8);color:white;border-radius:18px;padding:20px;box-shadow:var(--shadow);margin-bottom:16px}
+.eyebrow{font-family:'Nunito',sans-serif;font-weight:900;font-size:12px;letter-spacing:.08em;opacity:.84;margin-bottom:4px}
+h1{font-size:26px;line-height:1.25;margin:0 0 8px;font-weight:900}
+.lead{margin:0;font-size:13px;line-height:1.75;opacity:.93;max-width:760px}
+.notice{background:#fff8e8;border:1px solid #f5d48d;border-radius:12px;padding:12px 14px;color:#835b12;font-size:13px;line-height:1.7;margin-bottom:16px}
+.toolbar{background:var(--white);border-radius:16px;padding:14px;box-shadow:var(--shadow);display:grid;grid-template-columns:1fr 170px 170px auto;gap:10px;align-items:end;margin-bottom:14px}
+.admin-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.panel{background:var(--white);border-radius:16px;padding:16px;box-shadow:var(--shadow);margin-bottom:14px}
+.panel-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
+.panel-title{font-size:16px;font-weight:900}
+.form-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.field{display:flex;flex-direction:column;gap:6px}
+.field.full{grid-column:1/-1}
+label{font-size:12px;font-weight:900;color:var(--gray)}
+input,select,textarea{width:100%;min-width:0;max-width:100%;border:2px solid var(--line);border-radius:12px;background:white;color:var(--dark);padding:11px 12px;font-size:14px;outline:none}
+textarea{min-height:86px;resize:vertical;line-height:1.6}
+input:focus,select:focus,textarea:focus{border-color:var(--mint)}
+.readonly{background:#f7fafb;color:#43535a}
+.hint{font-size:12px;line-height:1.6;color:var(--gray);margin-top:6px}
+.hint.warn{color:#a06a12;font-weight:900}
+.btn{border:0;border-radius:12px;padding:11px 14px;font-weight:900;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:6px;font-size:13px;line-height:1.2;white-space:nowrap}
+.btn.primary{background:linear-gradient(135deg,var(--mint),var(--sky));color:white}
+.btn.secondary{background:var(--light);color:#43535a}
+.btn.ghost{background:#edf7f8;color:#247d85}
+.btn.warn{background:#fff1d5;color:#9a640c}
+.btn.danger{background:#ffe7e7;color:#b43232}
+.btn:disabled{opacity:.55;cursor:not-allowed}
+.status-line{font-size:12px;color:var(--gray);min-height:18px;line-height:1.5}
+.status-line.ok{color:#188060;font-weight:900}
+.status-line.err{color:#c0392b;font-weight:900}
+.summary-row{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:14px}
+.metric{background:white;border-radius:12px;padding:13px 14px;box-shadow:var(--shadow);min-width:0}
+.metric-label{font-size:11px;color:var(--gray);font-weight:900}
+.metric-value{font-size:22px;font-family:'Nunito',sans-serif;font-weight:900;margin-top:2px}
+.list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.card{background:white;border-radius:16px;padding:16px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:12px;min-height:254px}
+.card-head{display:flex;gap:12px;align-items:flex-start;justify-content:space-between}
+.card-title{font-size:17px;font-weight:900;line-height:1.35;margin:0}
+.card-sub{font-size:12px;color:var(--gray);font-weight:800;margin-top:3px}
+.pill-row{display:flex;gap:6px;flex-wrap:wrap}
+.badge{border-radius:999px;background:#eef4f7;padding:4px 8px;font-size:11px;font-weight:900;color:#4f6169}
+.badge.status{background:#eaf7f4;color:#1f7d64}
+.badge.warn{background:#fff2d9;color:#9a640c}
+.badge.danger{background:#ffe7e7;color:#ad3333}
+.badge.done{background:#edf7ff;color:#286da8}
+.money{font-family:'Nunito',sans-serif;font-weight:900;font-size:24px;letter-spacing:0}
+.info-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.info{background:#f8fbfc;border:1px solid var(--line);border-radius:10px;padding:9px 10px}
+.info-label{font-size:11px;color:var(--gray);font-weight:900;margin-bottom:2px}
+.info-value{font-size:13px;font-weight:900;overflow-wrap:anywhere}
+.card-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:auto}
+.empty{background:white;border-radius:16px;padding:28px 18px;text-align:center;color:var(--gray);box-shadow:var(--shadow);grid-column:1/-1}
+.hidden{display:none!important}
+.modal-backdrop{position:fixed;inset:0;background:rgba(26,38,45,.45);z-index:50;display:none;align-items:flex-start;justify-content:center;padding:72px 16px 24px;overflow:auto}
+.modal-backdrop.open{display:flex}
+.modal{width:min(900px,100%);background:white;border-radius:18px;box-shadow:0 18px 60px rgba(0,0,0,.22);padding:16px}
+.modal-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;border-bottom:1px solid var(--line);padding-bottom:12px;margin-bottom:12px}
+.modal-title{font-size:18px;font-weight:900;margin:0}
+.doc-box{background:#fbfcfd;border:1px solid var(--line);border-radius:12px;padding:14px;white-space:pre-wrap;line-height:1.85;font-size:13px;max-height:440px;overflow:auto}
+.agreement-box{border-top:1px solid var(--line);margin-top:12px;padding-top:12px}
+.check-row{display:flex;align-items:flex-start;gap:8px;background:#f8fbfc;border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:10px}
+.check-row input{width:auto;margin-top:4px}
+.agreement-grid{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:end}
+.timeline{display:flex;gap:6px;flex-wrap:wrap}
+.step{font-size:11px;font-weight:900;color:#64727a;background:#eef4f7;border-radius:999px;padding:5px 8px}
+.step.active{background:#eaf7f4;color:#1f7d64}
+.step.done{background:#edf7ff;color:#286da8}
+@media (max-width:900px){
+  .toolbar{grid-template-columns:1fr 1fr}
+  .admin-actions{justify-content:flex-start}
+  .summary-row{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .list{grid-template-columns:1fr}
+}
+@media (max-width:680px){
+  .app{padding:14px 12px 42px}
+  .hero{border-radius:14px;padding:17px}
+  h1{font-size:23px}
+  .toolbar,.form-grid,.agreement-grid{grid-template-columns:1fr}
+  .summary-row{grid-template-columns:1fr}
+  .info-grid{grid-template-columns:1fr}
+  .btn{width:100%}
+  .modal-backdrop{padding:64px 10px 18px}
+}
+@media print{
+  header,.toolbar,.notice,.summary-row,.panel,.card-actions,.modal-head,.agreement-box{display:none!important}
+  body{background:white}
+  .modal-backdrop{position:static;display:block!important;background:white;padding:0}
+  .modal{box-shadow:none;border-radius:0;width:100%;padding:0}
+  .doc-box{border:0;max-height:none;font-size:12pt;line-height:1.9}
+}
+</style>
+</head>
+<body>
+<header>
+  <a class="back" href="./index.html" title="ポータルに戻る" aria-label="ポータルに戻る">←</a>
+  <div class="brand"><div class="brand-mark">LOAN</div><span>Loan Management</span></div>
+</header>
+
+<main class="app hidden" id="app">
+  <section class="hero">
+    <div class="eyebrow">LOAN AGREEMENT</div>
+    <h1>貸付・借用管理</h1>
+    <p class="lead">貸付案件の作成、借用書の電子同意、貸付実行、2年経過後の免除判定、退職時の返済対象管理を行います。</p>
+  </section>
+
+  <div class="notice">
+    貸付金に関する確認同意書は紙で事前締結する前提です。個別の借用書は、このページで全文確認と4桁パスワード再入力により同意します。
+  </div>
+
+  <section class="toolbar" aria-label="検索と操作">
+    <input id="searchText" type="search" placeholder="スタッフ名・内容メモで検索" oninput="renderLoans()">
+    <select id="statusFilter" onchange="renderLoans()">
+      <option value="">すべての状態</option>
+    </select>
+    <select id="staffFilter" class="admin-only" onchange="renderLoans()">
+      <option value="">全スタッフ</option>
+    </select>
+    <div class="admin-actions admin-only">
+      <button class="btn primary" type="button" onclick="startNewLoan()">新規作成</button>
+    </div>
+  </section>
+
+  <section class="panel hidden" id="loanFormPanel" aria-label="貸付案件フォーム">
+    <div class="panel-head">
+      <div class="panel-title" id="formTitle">貸付案件を作成</div>
+      <button class="btn secondary" type="button" onclick="cancelEdit()">閉じる</button>
+    </div>
+    <form id="loanForm" onsubmit="saveLoan(event)">
+      <div class="form-grid">
+        <div class="field">
+          <label for="loanStaff">対象スタッフ</label>
+          <select id="loanStaff" required></select>
+        </div>
+        <div class="field">
+          <label for="loanCategory">対象区分</label>
+          <select id="loanCategory" required onchange="updateComputedFields()">
+            <option value="uniform">制服・名札</option>
+            <option value="equipment">使用器材等</option>
+            <option value="self_development">自己研鑽費用</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="loanAmount">金額</label>
+          <input id="loanAmount" type="number" min="1" step="1" required placeholder="例：12000">
+        </div>
+        <div class="field">
+          <label for="originDate" id="originDateLabel">購入日</label>
+          <input id="originDate" type="date" required onchange="updateComputedFields()">
+        </div>
+        <div class="field">
+          <label for="loanDate">貸付予定日</label>
+          <input id="loanDate" type="date" required>
+        </div>
+        <div class="field">
+          <label for="exemptionDate">免除判定日</label>
+          <input id="exemptionDate" class="readonly" type="date" readonly>
+        </div>
+        <div class="field">
+          <label for="initialStatus">保存時の状態</label>
+          <select id="initialStatus">
+            <option value="pending_agreement">同意待ち</option>
+            <option value="draft">作成中</option>
+          </select>
+        </div>
+        <div class="field full">
+          <label for="loanDescription">内容メモ</label>
+          <input id="loanDescription" type="text" maxlength="120" required placeholder="例：制服一式、ルーペ、セミナー受講費">
+          <div class="hint" id="categoryHint">制服・名札は金額条件なし。購入日から2年経過で免除判定します。</div>
+        </div>
+        <div class="field full">
+          <label for="loanNote">備考</label>
+          <textarea id="loanNote" maxlength="600" placeholder="管理メモ、確認事項など"></textarea>
+        </div>
+      </div>
+      <div class="form-actions" style="display:flex;gap:10px;align-items:center;justify-content:flex-end;margin-top:12px;flex-wrap:wrap">
+        <div class="status-line" id="formStatus"></div>
+        <button class="btn primary" id="saveBtn" type="submit">保存</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="summary-row" aria-label="集計">
+    <div class="metric"><div class="metric-label">表示中</div><div class="metric-value" id="metricShown">0</div></div>
+    <div class="metric"><div class="metric-label">同意待ち</div><div class="metric-value" id="metricPending">0</div></div>
+    <div class="metric"><div class="metric-label">免除対象</div><div class="metric-value" id="metricEligible">0</div></div>
+    <div class="metric"><div class="metric-label">返済対象額</div><div class="metric-value" id="metricRepayment">0</div></div>
+  </section>
+
+  <section class="list" id="loanList" aria-label="貸付案件一覧"></section>
+</main>
+
+<div class="guard" id="guard">
+  <div>
+    <p style="font-weight:900;margin:0 0 8px">ポータルからログインしてください。</p>
+    <a class="btn primary" href="./index.html">ポータルに戻る</a>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="loanModal" onclick="closeModalIfBg(event)">
+  <section class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="modal-head">
+      <div>
+        <h2 class="modal-title" id="modalTitle">借用書</h2>
+        <div class="status-line" id="modalMeta"></div>
+      </div>
+      <button class="btn secondary" type="button" onclick="closeModal()">閉じる</button>
+    </div>
+    <div class="timeline" id="modalTimeline"></div>
+    <div style="height:10px"></div>
+    <div class="doc-box" id="documentText"></div>
+    <div class="agreement-box hidden" id="agreementBox">
+      <label class="check-row">
+        <input id="agreeCheck" type="checkbox">
+        <span>上記の借用書全文を確認し、内容に同意します。</span>
+      </label>
+      <div class="agreement-grid">
+        <div class="field">
+          <label for="agreePass">4桁パスワード</label>
+          <input id="agreePass" type="password" inputmode="numeric" maxlength="4" autocomplete="current-password" placeholder="●●●●">
+        </div>
+        <button class="btn primary" id="agreeBtn" type="button" onclick="agreeLoan()">同意する</button>
+      </div>
+      <div class="status-line" id="agreeStatus"></div>
+    </div>
+  </section>
+</div>
+
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import { getDatabase, ref, push, set, update, onValue, get }
+  from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
+
+const firebaseConfig = {
+  apiKey:            'AIzaSyDdMe7feUF6CKPHH0YIx7Suk-WnXtOYUu8',
+  authDomain:        'kalmia-shift.firebaseapp.com',
+  databaseURL:       'https://kalmia-shift-default-rtdb.asia-southeast1.firebasedatabase.app',
+  projectId:         'kalmia-shift',
+  storageBucket:     'kalmia-shift.firebasestorage.app',
+  messagingSenderId: '714175473480',
+  appId:             '1:714175473480:web:7d6626a46e4a9dcb1fb57d'
+};
+
+const fbApp = initializeApp(firebaseConfig);
+const db = getDatabase(fbApp);
+const DB_PATH = 'loanAgreements';
+const PORTAL_USER_STORAGE_KEY = 'portalUser';
+const AGREEMENT_VERSION = 'loan-agreement-v1-2026-07-03';
+const ADMIN_STAFF = ['sugihira', 'momo'];
+const DEFAULT_PASSWORDS = {
+  sugihira:'1001', shimanaka:'1002', hokari:'1003', shinoda:'1004',
+  tsuruta:'2001', yoshida:'2002', takagi:'2003', matsumoto:'2004',
+  yamada:'2006', hanowa:'2007',
+  tamiya:'3001', tanaka:'3002', momo:'3003',
+  guest:'0000'
+};
+const STAFF_NAMES = {
+  sugihira:'院長', shimanaka:'島中', hokari:'保刈', shinoda:'篠田',
+  tsuruta:'鶴田', yoshida:'吉田', takagi:'高木', matsumoto:'松本',
+  yamada:'山田', hanowa:'ハノワ', tamiya:'田宮', tanaka:'田中', momo:'百々',
+  guest:'ゲスト'
+};
+const STAFF_ROLES = {
+  sugihira:'DR', shimanaka:'DR', hokari:'DR', shinoda:'DR',
+  tsuruta:'DH', yoshida:'DH', takagi:'DH', matsumoto:'DH', yamada:'DH', hanowa:'DH',
+  tamiya:'DA', tanaka:'DA', momo:'DA', guest:'ゲスト'
+};
+const CATEGORY_LABELS = {
+  uniform:'制服・名札',
+  equipment:'使用器材等',
+  self_development:'自己研鑽費用'
+};
+const STATUS_LABELS = {
+  draft:'作成中',
+  pending_agreement:'同意待ち',
+  agreed:'同意済み',
+  funded:'貸付実行済み',
+  eligible:'免除対象',
+  exempted:'免除済み',
+  repayment_due:'返済対象',
+  repaid:'返済済み',
+  cancelled:'取消'
+};
+const STATUS_ORDER = ['draft','pending_agreement','agreed','funded','eligible','exempted','repayment_due','repaid','cancelled'];
+
+let currentUser = readUser();
+let syncedPasswords = {};
+let passwordsReady = false;
+let loans = [];
+let editingId = '';
+let activeLoanId = '';
+let autoSyncDone = false;
+
+init();
+
+function init() {
+  if (!currentUser || currentUser.staffId === 'guest') {
+    document.getElementById('guard').classList.remove('hidden');
+    return;
+  }
+  document.getElementById('guard').classList.add('hidden');
+  document.getElementById('app').classList.remove('hidden');
+  renderAdminState();
+  renderStaffOptions();
+  renderStatusOptions();
+  updateComputedFields();
+  document.getElementById('loanAmount')?.addEventListener('input', updateComputedFields);
+  document.getElementById('agreePass')?.addEventListener('keydown', event => {
+    if (event.key === 'Enter') window.agreeLoan();
+  });
+  onValue(ref(db, DB_PATH), snap => {
+    const data = snap.val() || {};
+    loans = Object.entries(data).map(([id, item]) => ({ id, ...item }))
+      .sort((a, b) => (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0));
+    if (isAdmin() && !autoSyncDone) {
+      autoSyncDone = true;
+      syncEligibleStatuses();
+    }
+    renderLoans();
+  }, error => {
+    document.getElementById('loanList').innerHTML = `<div class="empty">貸付案件を読み込めませんでした: ${esc(error.message)}</div>`;
+  });
+}
+
+function readUser() {
+  const params = new URLSearchParams(location.search);
+  const sid = params.get('sid') || '';
+  if (sid) {
+    return savePortalUser(normalizePortalUser({
+      staffId: sid,
+      sid,
+      name: params.get('name'),
+      role: params.get('role'),
+      pass: params.get('p') || ''
+    }));
+  }
+  for (const storage of [sessionStorage, localStorage]) {
+    try {
+      const saved = storage.getItem(PORTAL_USER_STORAGE_KEY);
+      if (!saved) continue;
+      const user = normalizePortalUser(JSON.parse(saved));
+      if (user) return savePortalUser(user);
+    } catch(e) {}
+  }
+  return null;
+}
+
+function normalizePortalUser(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  const staffId = raw.staffId || raw.sid || '';
+  if (!staffId) return null;
+  const name = isInvalidUserText(raw.name) ? (STAFF_NAMES[staffId] || staffId) : String(raw.name).trim();
+  const role = isInvalidUserText(raw.role) ? (STAFF_ROLES[staffId] || '') : String(raw.role).trim();
+  const pass = isInvalidUserText(raw.pass) ? '' : String(raw.pass);
+  return { ...raw, staffId, sid: staffId, name, role, pass };
+}
+
+function savePortalUser(user) {
+  const normalized = normalizePortalUser(user);
+  if (!normalized) return null;
+  const serialized = JSON.stringify(normalized);
+  sessionStorage.setItem(PORTAL_USER_STORAGE_KEY, serialized);
+  localStorage.setItem(PORTAL_USER_STORAGE_KEY, serialized);
+  return normalized;
+}
+
+function isInvalidUserText(value) {
+  const text = String(value ?? '').trim();
+  return !text || text.toLowerCase() === 'undefined' || text.toLowerCase() === 'null';
+}
+
+function readLocalPasswords() {
+  try {
+    return JSON.parse(localStorage.getItem('carmia_passwords') || '{}') || {};
+  } catch(e) {
+    return {};
+  }
+}
+
+async function ensurePasswordsLoaded() {
+  if (passwordsReady) return;
+  try {
+    const snap = await get(ref(db, 'passwords'));
+    syncedPasswords = { ...readLocalPasswords(), ...(snap.val() || {}) };
+    localStorage.setItem('carmia_passwords', JSON.stringify(syncedPasswords));
+  } catch(e) {
+    syncedPasswords = readLocalPasswords();
+  }
+  passwordsReady = true;
+}
+
+function passwordForStaff(staffId) {
+  return syncedPasswords[staffId] || readLocalPasswords()[staffId] || DEFAULT_PASSWORDS[staffId] || '';
+}
+
+function isAdmin() {
+  return ADMIN_STAFF.includes(currentUser?.staffId);
+}
+
+function renderAdminState() {
+  document.querySelectorAll('.admin-only').forEach(el => {
+    el.classList.toggle('hidden', !isAdmin());
+  });
+}
+
+function renderStaffOptions() {
+  const loanStaff = document.getElementById('loanStaff');
+  const staffFilter = document.getElementById('staffFilter');
+  const staffEntries = Object.entries(STAFF_NAMES).filter(([id]) => id !== 'guest');
+  if (loanStaff) {
+    loanStaff.innerHTML = staffEntries.map(([id, name]) => `<option value="${escAttr(id)}">${esc(name)}（${esc(STAFF_ROLES[id] || '')}）</option>`).join('');
+  }
+  if (staffFilter) {
+    staffFilter.innerHTML = '<option value="">全スタッフ</option>' + staffEntries
+      .map(([id, name]) => `<option value="${escAttr(id)}">${esc(name)}</option>`)
+      .join('');
+  }
+}
+
+function renderStatusOptions() {
+  const filter = document.getElementById('statusFilter');
+  filter.innerHTML = '<option value="">すべての状態</option>' + STATUS_ORDER
+    .map(status => `<option value="${status}">${esc(STATUS_LABELS[status])}</option>`)
+    .join('');
+}
+
+window.updateComputedFields = function() {
+  const category = document.getElementById('loanCategory')?.value || 'uniform';
+  const originDate = document.getElementById('originDate')?.value || '';
+  const label = document.getElementById('originDateLabel');
+  const hint = document.getElementById('categoryHint');
+  if (label) label.textContent = category === 'self_development' ? '受講日' : '購入日';
+  if (hint) {
+    hint.textContent = category === 'equipment'
+      ? '使用器材等は税抜10,000円以上が対象です。購入日から2年経過で免除判定します。'
+      : category === 'self_development'
+        ? '自己研鑽費用は金額条件なし。受講日から2年経過で免除判定します。'
+        : '制服・名札は金額条件なし。購入日から2年経過で免除判定します。';
+  }
+  const exemptionDate = document.getElementById('exemptionDate');
+  if (exemptionDate) exemptionDate.value = originDate ? addYears(originDate, 2) : '';
+};
+
+window.startNewLoan = function() {
+  editingId = '';
+  document.getElementById('formTitle').textContent = '貸付案件を作成';
+  document.getElementById('loanForm').reset();
+  document.getElementById('initialStatus').value = 'pending_agreement';
+  document.getElementById('loanDate').value = todayYmd();
+  document.getElementById('originDate').value = todayYmd();
+  updateComputedFields();
+  setFormStatus('');
+  document.getElementById('loanFormPanel').classList.remove('hidden');
+  document.getElementById('loanFormPanel').scrollIntoView({ behavior:'smooth', block:'start' });
+};
+
+window.cancelEdit = function() {
+  editingId = '';
+  setFormStatus('');
+  document.getElementById('loanFormPanel').classList.add('hidden');
+};
+
+window.saveLoan = async function(event) {
+  event.preventDefault();
+  if (!isAdmin()) return setFormStatus('管理者のみ保存できます。', 'err');
+  const staffId = document.getElementById('loanStaff').value;
+  const category = document.getElementById('loanCategory').value;
+  const amount = Number(document.getElementById('loanAmount').value || 0);
+  const originDate = document.getElementById('originDate').value;
+  const loanDate = document.getElementById('loanDate').value;
+  const exemptionDate = document.getElementById('exemptionDate').value;
+  const description = document.getElementById('loanDescription').value.trim();
+  const note = document.getElementById('loanNote').value.trim();
+  const status = document.getElementById('initialStatus').value;
+  if (!staffId) return setFormStatus('対象スタッフを選択してください。', 'err');
+  if (!description) return setFormStatus('内容メモを入力してください。', 'err');
+  if (!Number.isInteger(amount) || amount <= 0) return setFormStatus('金額は1円以上の整数で入力してください。', 'err');
+  if (category === 'equipment' && amount < 10000) return setFormStatus('使用器材等は税抜10,000円以上が対象です。', 'err');
+  if (!originDate || !loanDate || !exemptionDate) return setFormStatus('日付を入力してください。', 'err');
+
+  const now = Date.now();
+  const payload = {
+    staffId,
+    staffName: STAFF_NAMES[staffId] || staffId,
+    category,
+    categoryLabel: CATEGORY_LABELS[category],
+    description,
+    amount,
+    originDate,
+    originDateLabel: category === 'self_development' ? '受講日' : '購入日',
+    loanDate,
+    exemptionDate,
+    note,
+    status,
+    updatedAt: now,
+    updatedById: currentUser.staffId,
+    updatedByName: currentUser.name || STAFF_NAMES[currentUser.staffId] || currentUser.staffId
+  };
+  const saveBtn = document.getElementById('saveBtn');
+  saveBtn.disabled = true;
+  setFormStatus('保存しています。');
+  try {
+    if (editingId) {
+      const current = loans.find(loan => loan.id === editingId);
+      if (!current || !canEditLoan(current)) throw new Error('この案件は編集できません。');
+      await update(ref(db, `${DB_PATH}/${editingId}`), payload);
+      setFormStatus('更新しました。', 'ok');
+    } else {
+      const itemRef = push(ref(db, DB_PATH));
+      await set(itemRef, {
+        ...payload,
+        status,
+        createdAt: now,
+        createdById: currentUser.staffId,
+        createdByName: currentUser.name || STAFF_NAMES[currentUser.staffId] || currentUser.staffId,
+        agreementVersion: AGREEMENT_VERSION
+      });
+      setFormStatus('保存しました。', 'ok');
+      document.getElementById('loanForm').reset();
+      updateComputedFields();
+    }
+    editingId = '';
+    setTimeout(() => document.getElementById('loanFormPanel').classList.add('hidden'), 700);
+  } catch(error) {
+    setFormStatus(`保存できませんでした: ${error.message}`, 'err');
+  } finally {
+    saveBtn.disabled = false;
+  }
+};
+
+function setFormStatus(text, type = '') {
+  const el = document.getElementById('formStatus');
+  el.textContent = text || '';
+  el.className = `status-line ${type}`.trim();
+}
+
+function canEditLoan(loan) {
+  return isAdmin() && ['draft','pending_agreement'].includes(loan?.status);
+}
+
+function visibleLoans() {
+  if (isAdmin()) return loans;
+  return loans.filter(loan => loan.staffId === currentUser.staffId && loan.status !== 'draft');
+}
+
+window.renderLoans = function() {
+  const q = document.getElementById('searchText').value.trim().toLocaleLowerCase('ja-JP');
+  const status = document.getElementById('statusFilter').value;
+  const staff = document.getElementById('staffFilter')?.value || '';
+  let filtered = visibleLoans().filter(loan => {
+    const effective = effectiveStatus(loan);
+    if (status && effective !== status) return false;
+    if (staff && loan.staffId !== staff) return false;
+    if (!q) return true;
+    return [loan.staffName, loan.description, loan.categoryLabel, loan.note]
+      .some(value => String(value || '').toLocaleLowerCase('ja-JP').includes(q));
+  });
+
+  renderMetrics(filtered);
+  const list = document.getElementById('loanList');
+  if (!filtered.length) {
+    list.innerHTML = '<div class="empty">条件に合う貸付案件はありません。</div>';
+    return;
+  }
+  list.innerHTML = filtered.map(renderLoanCard).join('');
+};
+
+function renderMetrics(filtered) {
+  const source = visibleLoans();
+  const pending = source.filter(loan => effectiveStatus(loan) === 'pending_agreement').length;
+  const eligible = source.filter(loan => effectiveStatus(loan) === 'eligible').length;
+  const repayment = source
+    .filter(loan => effectiveStatus(loan) === 'repayment_due')
+    .reduce((sum, loan) => sum + Number(loan.amount || 0), 0);
+  document.getElementById('metricShown').textContent = String(filtered.length);
+  document.getElementById('metricPending').textContent = String(pending);
+  document.getElementById('metricEligible').textContent = String(eligible);
+  document.getElementById('metricRepayment').textContent = yen(repayment);
+}
+
+function renderLoanCard(loan) {
+  const status = effectiveStatus(loan);
+  const statusBadge = badgeForStatus(status);
+  const originLabel = loan.originDateLabel || (loan.category === 'self_development' ? '受講日' : '購入日');
+  const actions = renderActions(loan, status);
+  return `
+    <article class="card">
+      <div class="card-head">
+        <div>
+          <h2 class="card-title">${esc(loan.description || '貸付案件')}</h2>
+          <div class="card-sub">${esc(loan.staffName || STAFF_NAMES[loan.staffId] || loan.staffId || '')}</div>
+        </div>
+        <div class="pill-row">${statusBadge}</div>
+      </div>
+      <div class="money">${yen(loan.amount)}</div>
+      <div class="pill-row">
+        <span class="badge">${esc(loan.categoryLabel || CATEGORY_LABELS[loan.category] || '')}</span>
+        <span class="badge">文面 ${esc(loan.agreementVersion || AGREEMENT_VERSION)}</span>
+      </div>
+      <div class="info-grid">
+        <div class="info"><div class="info-label">${esc(originLabel)}</div><div class="info-value">${esc(formatDate(loan.originDate))}</div></div>
+        <div class="info"><div class="info-label">貸付予定日</div><div class="info-value">${esc(formatDate(loan.loanDate))}</div></div>
+        <div class="info"><div class="info-label">免除判定日</div><div class="info-value">${esc(formatDate(loan.exemptionDate))}</div></div>
+        <div class="info"><div class="info-label">同意日時</div><div class="info-value">${esc(formatDateTime(loan.agreedAt) || '未同意')}</div></div>
+      </div>
+      ${loan.note ? `<div class="hint">${esc(loan.note)}</div>` : ''}
+      <div class="card-actions">${actions}</div>
+    </article>`;
+}
+
+function renderActions(loan, status) {
+  const detail = `<button class="btn ghost" type="button" onclick="openLoan('${escAttr(loan.id)}')">詳細</button>`;
+  const actions = [detail];
+  if (!isAdmin()) {
+    if (status === 'pending_agreement') actions.push(`<button class="btn primary" type="button" onclick="openLoan('${escAttr(loan.id)}')">同意手続き</button>`);
+    return actions.join('');
+  }
+  if (canEditLoan(loan)) actions.push(`<button class="btn secondary" type="button" onclick="editLoan('${escAttr(loan.id)}')">編集</button>`);
+  if (status === 'draft') actions.push(`<button class="btn primary" type="button" onclick="setLoanStatus('${escAttr(loan.id)}','pending_agreement')">同意待ちにする</button>`);
+  if (status === 'agreed') actions.push(`<button class="btn primary" type="button" onclick="setLoanStatus('${escAttr(loan.id)}','funded')">貸付実行済み</button>`);
+  if (status === 'funded' || status === 'eligible') actions.push(`<button class="btn primary" type="button" onclick="setLoanStatus('${escAttr(loan.id)}','exempted')">免除済みにする</button>`);
+  if (['funded','eligible'].includes(status)) actions.push(`<button class="btn warn" type="button" onclick="setLoanStatus('${escAttr(loan.id)}','repayment_due')">返済対象</button>`);
+  if (status === 'repayment_due') actions.push(`<button class="btn primary" type="button" onclick="setLoanStatus('${escAttr(loan.id)}','repaid')">返済済み</button>`);
+  if (!['exempted','repaid','cancelled'].includes(status)) actions.push(`<button class="btn danger" type="button" onclick="setLoanStatus('${escAttr(loan.id)}','cancelled')">取消</button>`);
+  return actions.join('');
+}
+
+function badgeForStatus(status) {
+  const label = STATUS_LABELS[status] || status;
+  const cls = status === 'repayment_due' || status === 'cancelled' ? 'danger'
+    : status === 'eligible' ? 'warn'
+      : status === 'exempted' || status === 'repaid' ? 'done'
+        : 'status';
+  return `<span class="badge ${cls}">${esc(label)}</span>`;
+}
+
+window.editLoan = function(id) {
+  const loan = loans.find(item => item.id === id);
+  if (!loan || !canEditLoan(loan)) return;
+  editingId = id;
+  document.getElementById('formTitle').textContent = '貸付案件を編集';
+  document.getElementById('loanStaff').value = loan.staffId || '';
+  document.getElementById('loanCategory').value = loan.category || 'uniform';
+  document.getElementById('loanAmount').value = loan.amount || '';
+  document.getElementById('originDate').value = loan.originDate || '';
+  document.getElementById('loanDate').value = loan.loanDate || '';
+  document.getElementById('loanDescription').value = loan.description || '';
+  document.getElementById('loanNote').value = loan.note || '';
+  document.getElementById('initialStatus').value = loan.status || 'pending_agreement';
+  updateComputedFields();
+  document.getElementById('loanFormPanel').classList.remove('hidden');
+  document.getElementById('loanFormPanel').scrollIntoView({ behavior:'smooth', block:'start' });
+};
+
+window.setLoanStatus = async function(id, status) {
+  if (!isAdmin()) return;
+  const loan = loans.find(item => item.id === id);
+  if (!loan) return;
+  const label = STATUS_LABELS[status] || status;
+  if (!confirm(`この案件を「${label}」に更新しますか？`)) return;
+  const now = Date.now();
+  const payload = {
+    status,
+    updatedAt: now,
+    updatedById: currentUser.staffId,
+    updatedByName: currentUser.name || STAFF_NAMES[currentUser.staffId] || currentUser.staffId
+  };
+  if (status === 'funded') payload.fundedAt = now;
+  if (status === 'exempted') payload.exemptedAt = now;
+  if (status === 'repayment_due') payload.repaymentMarkedAt = now;
+  if (status === 'repaid') payload.repaidAt = now;
+  if (status === 'cancelled') payload.cancelledAt = now;
+  await update(ref(db, `${DB_PATH}/${id}`), payload);
+};
+
+window.openLoan = function(id) {
+  const loan = loans.find(item => item.id === id);
+  if (!loan || (!isAdmin() && loan.staffId !== currentUser.staffId)) return;
+  activeLoanId = id;
+  const status = effectiveStatus(loan);
+  document.getElementById('modalTitle').textContent = `${loan.staffName || ''} 借用書`;
+  document.getElementById('modalMeta').textContent = `${STATUS_LABELS[status] || status} / ${yen(loan.amount)} / 免除判定日 ${formatDate(loan.exemptionDate)}`;
+  document.getElementById('documentText').textContent = loan.loanDocumentText || buildLoanDocumentText(loan);
+  document.getElementById('modalTimeline').innerHTML = renderTimeline(status);
+  const agreementBox = document.getElementById('agreementBox');
+  const canAgree = !isAdmin() && loan.staffId === currentUser.staffId && status === 'pending_agreement';
+  agreementBox.classList.toggle('hidden', !canAgree);
+  document.getElementById('agreeCheck').checked = false;
+  document.getElementById('agreePass').value = '';
+  setAgreeStatus('');
+  document.getElementById('loanModal').classList.add('open');
+};
+
+function renderTimeline(status) {
+  const flow = ['pending_agreement','agreed','funded','eligible','exempted'];
+  const activeIndex = flow.indexOf(status);
+  return flow.map((key, index) => {
+    const cls = key === status ? 'active' : (activeIndex >= 0 && index < activeIndex ? 'done' : '');
+    return `<span class="step ${cls}">${esc(STATUS_LABELS[key])}</span>`;
+  }).join('');
+}
+
+window.closeModal = function() {
+  document.getElementById('loanModal').classList.remove('open');
+  activeLoanId = '';
+};
+
+window.closeModalIfBg = function(event) {
+  if (event.target === document.getElementById('loanModal')) closeModal();
+};
+
+window.agreeLoan = async function() {
+  const loan = loans.find(item => item.id === activeLoanId);
+  if (!loan || loan.staffId !== currentUser.staffId) return setAgreeStatus('対象案件を確認できません。', 'err');
+  if (effectiveStatus(loan) !== 'pending_agreement') return setAgreeStatus('この案件は同意できる状態ではありません。', 'err');
+  if (!document.getElementById('agreeCheck').checked) return setAgreeStatus('確認チェックを入れてください。', 'err');
+  const pass = document.getElementById('agreePass').value;
+  if (!/^\d{4}$/.test(pass)) return setAgreeStatus('4桁パスワードを入力してください。', 'err');
+  await ensurePasswordsLoaded();
+  if (pass !== passwordForStaff(currentUser.staffId)) return setAgreeStatus('パスワードが違います。', 'err');
+  const documentText = buildLoanDocumentText(loan);
+  const now = Date.now();
+  const agreeBtn = document.getElementById('agreeBtn');
+  agreeBtn.disabled = true;
+  setAgreeStatus('同意を記録しています。');
+  try {
+    await update(ref(db, `${DB_PATH}/${loan.id}`), {
+      status: 'agreed',
+      agreedAt: now,
+      agreedById: currentUser.staffId,
+      agreedByName: currentUser.name || STAFF_NAMES[currentUser.staffId] || currentUser.staffId,
+      agreementVersion: AGREEMENT_VERSION,
+      loanDocumentText: documentText,
+      agreementSnapshot: {
+        staffId: loan.staffId,
+        staffName: loan.staffName,
+        category: loan.category,
+        categoryLabel: loan.categoryLabel,
+        description: loan.description,
+        amount: loan.amount,
+        originDate: loan.originDate,
+        loanDate: loan.loanDate,
+        exemptionDate: loan.exemptionDate,
+        version: AGREEMENT_VERSION
+      },
+      deviceInfo: navigator.userAgent || '',
+      updatedAt: now,
+      updatedById: currentUser.staffId,
+      updatedByName: currentUser.name || STAFF_NAMES[currentUser.staffId] || currentUser.staffId
+    });
+    setAgreeStatus('同意を記録しました。', 'ok');
+    setTimeout(closeModal, 900);
+  } catch(error) {
+    setAgreeStatus(`同意を記録できませんでした: ${error.message}`, 'err');
+  } finally {
+    agreeBtn.disabled = false;
+  }
+};
+
+function setAgreeStatus(text, type = '') {
+  const el = document.getElementById('agreeStatus');
+  el.textContent = text || '';
+  el.className = `status-line ${type}`.trim();
+}
+
+function buildLoanDocumentText(loan) {
+  const originLabel = loan.originDateLabel || (loan.category === 'self_development' ? '受講日' : '購入日');
+  const staffName = loan.staffName || STAFF_NAMES[loan.staffId] || loan.staffId || '';
+  return [
+    '借　用　書',
+    '',
+    'カルミアデンタルクリニック',
+    '院長　殿',
+    '',
+    `金　${yen(loan.amount)}　也`,
+    '',
+    `私は、貴院より下記の内容について貸付を受けることを確認し、借用します。`,
+    '',
+    `1. 対象費用：${loan.categoryLabel || CATEGORY_LABELS[loan.category] || ''}`,
+    `2. 内容：${loan.description || ''}`,
+    `3. ${originLabel}：${formatDate(loan.originDate)}`,
+    `4. 貸付日または貸付予定日：${formatDate(loan.loanDate)}`,
+    `5. 免除判定日：${formatDate(loan.exemptionDate)}`,
+    '',
+    '上記貸付金について、免除判定日前に退職する場合は、未免除の貸付金を退職時までに全額返済します。',
+    '退職時の返済について賃金から控除する場合は、賃金控除に関する労使協定および本借用書に基づき行うものとします。',
+    '退職時の賃金控除額が未返済額に満たない場合は、その差額をクリニックが指定する方法により支払います。',
+    '',
+    '本貸付について、利息および手数料は発生しません。',
+    '',
+    `文面バージョン：${AGREEMENT_VERSION}`,
+    '',
+    `借用者：${staffName}`,
+    `スタッフID：${loan.staffId || ''}`
+  ].join('\n');
+}
+
+function effectiveStatus(loan) {
+  if (!loan) return '';
+  if (loan.status === 'funded' && isDue(loan.exemptionDate)) return 'eligible';
+  return loan.status || 'draft';
+}
+
+async function syncEligibleStatuses() {
+  const targets = loans.filter(loan => loan.status === 'funded' && isDue(loan.exemptionDate));
+  for (const loan of targets) {
+    try {
+      await update(ref(db, `${DB_PATH}/${loan.id}`), {
+        status: 'eligible',
+        autoEligibleAt: Date.now(),
+        updatedAt: Date.now(),
+        updatedById: 'portal-auto',
+        updatedByName: 'ポータル自動判定'
+      });
+    } catch(e) {
+      console.warn('免除対象の自動更新に失敗しました:', loan.id, e);
+    }
+  }
+}
+
+function isDue(ymd) {
+  if (!ymd) return false;
+  return ymd <= todayYmd();
+}
+
+function addYears(ymd, years) {
+  const [y, m, d] = ymd.split('-').map(Number);
+  const date = new Date(y, m - 1, d);
+  date.setFullYear(date.getFullYear() + years);
+  return toYmd(date);
+}
+
+function todayYmd() {
+  return toYmd(new Date());
+}
+
+function toYmd(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+function formatDate(ymd) {
+  if (!ymd) return '';
+  const [y, m, d] = String(ymd).split('-');
+  return `${y}年${Number(m)}月${Number(d)}日`;
+}
+
+function formatDateTime(value) {
+  if (!value) return '';
+  const date = new Date(Number(value));
+  if (Number.isNaN(date.getTime())) return '';
+  return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日 ${String(date.getHours()).padStart(2,'0')}:${String(date.getMinutes()).padStart(2,'0')}`;
+}
+
+function yen(value) {
+  const num = Number(value || 0);
+  return `${num.toLocaleString('ja-JP')}円`;
+}
+
+function esc(value) {
+  return String(value ?? '').replace(/[&<>"']/g, ch => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[ch]));
+}
+
+function escAttr(value) {
+  return esc(value).replace(/`/g, '&#96;');
+}
+
+Object.assign(window, {
+  startNewLoan, cancelEdit, saveLoan, updateComputedFields, renderLoans,
+  editLoan, setLoanStatus, openLoan, closeModal, closeModalIfBg, agreeLoan
+});
+</script>
+</body>
+</html>

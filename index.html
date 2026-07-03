@@ -521,6 +521,9 @@
         <a class="tool-item shift-tool" data-guest-hidden="true" href="#" onclick="goToShiftApp();return false;">
           <span class="tool-linked-badge">連携中</span><span class="tool-icon">📅</span><span class="tool-name">シフト管理</span>
         </a>
+        <a class="tool-item" data-guest-hidden="true" href="#" onclick="goToLoanApp();return false;" style="background:linear-gradient(135deg,#f0fbf7,#e2f3ff);border:2px solid #9dd7d1;">
+          <span class="tool-icon">￥</span><span class="tool-name">貸付・借用</span>
+        </a>
         <a class="tool-item" href="#" onclick="goToGoalApp();return false;" style="background:linear-gradient(135deg,#eef5ff,#dbeafe);border:2px solid #9fc5f8;">
           <span class="tool-icon">◎</span><span class="tool-name">目標管理</span>
         </a>
@@ -931,6 +934,12 @@ function goToGoalApp() {
   if (!currentUser) return;
   const params = new URLSearchParams({ sid: currentUser.staffId, name: currentUser.name, p: currentUser.pass });
   window.location.href = `https://kalmia-dc.github.io/portal/goal-manager.html?${params}`;
+}
+
+function goToLoanApp() {
+  if (!currentUser) return;
+  const params = new URLSearchParams({ sid: currentUser.staffId, name: currentUser.name, p: currentUser.pass });
+  window.location.href = `https://kalmia-dc.github.io/portal/loan-management.html?${params}`;
 }
 
 function goToPrivateMetricsApp() {
@@ -1613,7 +1622,7 @@ async function loadScheduleEvents(staffId) {
 
 Object.assign(window, {
   doLogin, doLogout,
-  goToShiftApp, goToSkillApp, goToTaskApp, goToGoalApp, goToPrivateMetricsApp, goToScheduleApp, goToMeetingManagementApp, goToTrainingMaterialsApp,
+  goToShiftApp, goToSkillApp, goToTaskApp, goToGoalApp, goToLoanApp, goToPrivateMetricsApp, goToScheduleApp, goToMeetingManagementApp, goToTrainingMaterialsApp,
   togglePortalMenu, closePortalMenu, toggleMenuSection,
   openPwModal, closePwModal, closePwModalIfBg, submitPwChange,
   openNoticeModal, closeNoticeModal, closeNoticeModalIfBg, submitNotice, deleteNotice
