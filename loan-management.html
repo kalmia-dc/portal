@@ -456,7 +456,7 @@ function renderStatusOptions() {
     .join('');
 }
 
-window.updateComputedFields = function() {
+function updateComputedFields() {
   const category = document.getElementById('loanCategory')?.value || 'uniform';
   const originDate = document.getElementById('originDate')?.value || '';
   const label = document.getElementById('originDateLabel');
@@ -471,9 +471,9 @@ window.updateComputedFields = function() {
   }
   const exemptionDate = document.getElementById('exemptionDate');
   if (exemptionDate) exemptionDate.value = originDate ? addYears(originDate, 2) : '';
-};
+}
 
-window.startNewLoan = function() {
+function startNewLoan() {
   editingId = '';
   document.getElementById('formTitle').textContent = '貸付案件を作成';
   document.getElementById('loanForm').reset();
@@ -484,15 +484,15 @@ window.startNewLoan = function() {
   setFormStatus('');
   document.getElementById('loanFormPanel').classList.remove('hidden');
   document.getElementById('loanFormPanel').scrollIntoView({ behavior:'smooth', block:'start' });
-};
+}
 
-window.cancelEdit = function() {
+function cancelEdit() {
   editingId = '';
   setFormStatus('');
   document.getElementById('loanFormPanel').classList.add('hidden');
-};
+}
 
-window.saveLoan = async function(event) {
+async function saveLoan(event) {
   event.preventDefault();
   if (!isAdmin()) return setFormStatus('管理者のみ保存できます。', 'err');
   const staffId = document.getElementById('loanStaff').value;
@@ -558,7 +558,7 @@ window.saveLoan = async function(event) {
   } finally {
     saveBtn.disabled = false;
   }
-};
+}
 
 function setFormStatus(text, type = '') {
   const el = document.getElementById('formStatus');
@@ -575,7 +575,7 @@ function visibleLoans() {
   return loans.filter(loan => loan.staffId === currentUser.staffId && loan.status !== 'draft');
 }
 
-window.renderLoans = function() {
+function renderLoans() {
   const q = document.getElementById('searchText').value.trim().toLocaleLowerCase('ja-JP');
   const status = document.getElementById('statusFilter').value;
   const staff = document.getElementById('staffFilter')?.value || '';
@@ -595,7 +595,7 @@ window.renderLoans = function() {
     return;
   }
   list.innerHTML = filtered.map(renderLoanCard).join('');
-};
+}
 
 function renderMetrics(filtered) {
   const source = visibleLoans();
@@ -666,7 +666,7 @@ function badgeForStatus(status) {
   return `<span class="badge ${cls}">${esc(label)}</span>`;
 }
 
-window.editLoan = function(id) {
+function editLoan(id) {
   const loan = loans.find(item => item.id === id);
   if (!loan || !canEditLoan(loan)) return;
   editingId = id;
@@ -682,9 +682,9 @@ window.editLoan = function(id) {
   updateComputedFields();
   document.getElementById('loanFormPanel').classList.remove('hidden');
   document.getElementById('loanFormPanel').scrollIntoView({ behavior:'smooth', block:'start' });
-};
+}
 
-window.setLoanStatus = async function(id, status) {
+async function setLoanStatus(id, status) {
   if (!isAdmin()) return;
   const loan = loans.find(item => item.id === id);
   if (!loan) return;
@@ -703,9 +703,9 @@ window.setLoanStatus = async function(id, status) {
   if (status === 'repaid') payload.repaidAt = now;
   if (status === 'cancelled') payload.cancelledAt = now;
   await update(ref(db, `${DB_PATH}/${id}`), payload);
-};
+}
 
-window.openLoan = function(id) {
+function openLoan(id) {
   const loan = loans.find(item => item.id === id);
   if (!loan || (!isAdmin() && loan.staffId !== currentUser.staffId)) return;
   activeLoanId = id;
@@ -721,7 +721,7 @@ window.openLoan = function(id) {
   document.getElementById('agreePass').value = '';
   setAgreeStatus('');
   document.getElementById('loanModal').classList.add('open');
-};
+}
 
 function renderTimeline(status) {
   const flow = ['pending_agreement','agreed','funded','eligible','exempted'];
@@ -732,16 +732,16 @@ function renderTimeline(status) {
   }).join('');
 }
 
-window.closeModal = function() {
+function closeModal() {
   document.getElementById('loanModal').classList.remove('open');
   activeLoanId = '';
-};
+}
 
-window.closeModalIfBg = function(event) {
+function closeModalIfBg(event) {
   if (event.target === document.getElementById('loanModal')) closeModal();
-};
+}
 
-window.agreeLoan = async function() {
+async function agreeLoan() {
   const loan = loans.find(item => item.id === activeLoanId);
   if (!loan || loan.staffId !== currentUser.staffId) return setAgreeStatus('対象案件を確認できません。', 'err');
   if (effectiveStatus(loan) !== 'pending_agreement') return setAgreeStatus('この案件は同意できる状態ではありません。', 'err');
@@ -787,7 +787,7 @@ window.agreeLoan = async function() {
   } finally {
     agreeBtn.disabled = false;
   }
-};
+}
 
 function setAgreeStatus(text, type = '') {
   const el = document.getElementById('agreeStatus');
