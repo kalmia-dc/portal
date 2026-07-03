@@ -322,7 +322,11 @@
   .hero-notice-post-btn.visible { display:inline-block; }
   .hero-notice-item { display:flex; align-items:flex-start; gap:8px; padding:5px 0; border-bottom:1px solid rgba(255,255,255,.15); }
   .hero-notice-item:last-child { border-bottom:none; padding-bottom:0; }
+  .hero-notice-meta { display:flex; align-items:center; gap:6px; margin-bottom:4px; min-width:0; }
+  .hero-notice-type { font-size:10px; font-weight:800; padding:1px 6px; border-radius:999px; background:rgba(255,255,255,.24); color:white; white-space:nowrap; }
+  .hero-notice-date { font-size:10px; color:rgba(255,255,255,.82); white-space:nowrap; }
   .hero-notice-text { font-size:13px; flex:1; line-height:1.4; }
+  .hero-notice-link { display:inline-block; margin-top:4px; color:white; font-size:12px; font-weight:700; text-decoration:underline; text-underline-offset:2px; }
   .hero-notice-del {
     background:none; border:none; color:rgba(255,255,255,.6);
     font-size:14px; cursor:pointer; padding:0 2px; flex-shrink:0;
@@ -338,6 +342,16 @@
     transition:border-color .2s; resize:none; height:100px;
   }
   .notice-textarea:focus { border-color:var(--mint); }
+  .notice-select,
+  .notice-input {
+    width:100%; padding:12px 14px; border:2px solid var(--light-gray); border-radius:12px;
+    font-family:'Zen Maru Gothic',sans-serif; font-size:14px; outline:none;
+    transition:border-color .2s; background:white;
+  }
+  .notice-select:focus,
+  .notice-input:focus { border-color:var(--mint); }
+  .notice-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  @media(max-width:520px){ .notice-grid { grid-template-columns:1fr; } }
 
   /* ── ANIMATIONS ── */
   @keyframes fadeUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
@@ -649,15 +663,37 @@
 
 <!-- お知らせ投稿モーダル -->
 <div class="modal-overlay" id="noticeModal" onclick="closeNoticeModalIfBg(event)">
-  <div class="modal-sheet" id="noticeModal">
+  <div class="modal-sheet">
     <div class="modal-handle"></div>
     <div class="modal-title">📢 更新情報を投稿</div>
+    <div class="notice-grid">
+      <div class="pw-field">
+        <label>種別</label>
+        <select class="notice-select" id="noticeType">
+          <option value="new">新規追加</option>
+          <option value="change">使い方変更</option>
+          <option value="fix">不具合修正</option>
+          <option value="request">確認依頼</option>
+          <option value="deadline">締切</option>
+        </select>
+      </div>
+      <div class="pw-field">
+        <label>表示期限</label>
+        <input class="notice-input" type="date" id="noticeExpiresAt">
+      </div>
+    </div>
     <div class="pw-field">
       <label>内容</label>
       <textarea class="notice-textarea" id="noticeText" placeholder="更新情報を入力..."></textarea>
     </div>
+    <div class="pw-field">
+      <label>リンク先（任意）</label>
+      <input class="notice-input" type="url" id="noticeLinkUrl" placeholder="https://kalmia-dc.github.io/portal/...">
+    </div>
     <div class="pw-msg" id="noticeMsg"></div>
     <button class="pw-btn primary" onclick="submitNotice()">投稿する</button>
+  </div>
+</div>
 </div><!-- /#app -->
 
 <script type="module">
@@ -1270,6 +1306,22 @@ onValue(ref(_db, 'passwords'), snap => {
 // お知らせ（Firebase /notices）
 // ─────────────────────────────────────────
 let _noticesUnsub = null;
+const NOTICE_TYPES = {
+  new: '新規追加',
+  change: '使い方変更',
+  fix: '不具合修正',
+  request: '確認依頼',
+  deadline: '締切'
+};
+const NOTICE_TYPE_ALIASES = {
+  '新規追加': 'new',
+  '使い方変更': 'change',
+  '不具合修正': 'fix',
+  '確認依頼': 'request',
+  '締切': 'deadline'
+};
+const DEFAULT_NOTICE_TYPE = 'new';
+const NOTICE_DEFAULT_DAYS = 30;
 
 function startNoticeSync() {
   const noticesRef = ref(_db, 'notices');
@@ -1289,7 +1341,9 @@ function renderNotices(data) {
   if (isAdmin) postBtn.classList.add('visible');
   else         postBtn.classList.remove('visible');
 
-  const items = Object.entries(data).sort((a,b) => b[1].createdAt - a[1].createdAt);
+  const items = Object.entries(data)
+    .filter(([, n]) => isActiveNotice(n))
+    .sort((a,b) => (b[1]?.createdAt || 0) - (a[1]?.createdAt || 0));
 
   if (!items.length && !isAdmin) {
     card.classList.remove('has-items');
@@ -1299,26 +1353,129 @@ function renderNotices(data) {
   card.classList.add('has-items');
 
   if (!items.length) {
-    list.innerHTML = '<div style="font-size:12px;opacity:.7;">まだ更新情報はありません</div>';
+    list.innerHTML = '<div style="font-size:12px;opacity:.7;">現在表示中の更新情報はありません</div>';
     return;
   }
 
   list.innerHTML = items.map(([key, n]) => {
     const d = n.createdAt ? new Date(n.createdAt) : null;
     const dateStr = d ? `${d.getMonth()+1}/${d.getDate()}` : '';
+    const typeLabel = noticeTypeLabel(n.type);
+    const linkUrl = buildNoticeLinkHref(n.linkUrl);
     return `
     <div class="hero-notice-item">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
-        ${dateStr ? `<span style="font-size:10px;color:var(--gray);">${dateStr}</span>` : '<span></span>'}
-        <button class="hero-notice-del ${isAdmin?'visible':''}" onclick="deleteNotice('${key}')" title="削除">✕</button>
+      <div style="flex:1;min-width:0;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;gap:8px;">
+          <div class="hero-notice-meta">
+            ${dateStr ? `<span class="hero-notice-date">${dateStr}</span>` : ''}
+            <span class="hero-notice-type">${escHtml(typeLabel)}</span>
+          </div>
+          <button class="hero-notice-del ${isAdmin?'visible':''}" onclick="deleteNotice('${key}')" title="削除">✕</button>
+        </div>
+        <div class="hero-notice-text">${escHtml(n.text || '')}</div>
+        ${linkUrl ? `<a class="hero-notice-link" href="${escAttr(linkUrl)}">開く →</a>` : ''}
       </div>
-      <div class="hero-notice-text">${escHtml(n.text)}</div>
     </div>`;
   }).join('');
 }
 
+function isActiveNotice(n) {
+  if (!n || n.hidden === true) return false;
+  const expiresAt = n.expiresAt || defaultNoticeExpiryFromCreatedAt(n.createdAt);
+  const expiryTime = noticeExpiryEndTime(expiresAt);
+  return !expiryTime || expiryTime >= Date.now();
+}
+
+function noticeTypeLabel(type) {
+  return NOTICE_TYPES[resolveNoticeType(type)] || '更新';
+}
+
+function resolveNoticeType(type) {
+  const raw = String(type || '').trim();
+  return NOTICE_TYPES[raw] ? raw : (NOTICE_TYPE_ALIASES[raw] || DEFAULT_NOTICE_TYPE);
+}
+
+function defaultNoticeExpiryFromCreatedAt(createdAt) {
+  if (!createdAt) return '';
+  const d = new Date(createdAt);
+  if (Number.isNaN(d.getTime())) return '';
+  d.setDate(d.getDate() + NOTICE_DEFAULT_DAYS);
+  return toDateInputValue(d);
+}
+
+function defaultNoticeExpiryForType(type) {
+  const resolved = resolveNoticeType(type);
+  if (resolved === 'request' || resolved === 'deadline') return '';
+  const d = new Date();
+  d.setDate(d.getDate() + NOTICE_DEFAULT_DAYS);
+  return toDateInputValue(d);
+}
+
+function toDateInputValue(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+function normalizeNoticeExpiry(value) {
+  if (!value) return '';
+  if (typeof value === 'number') {
+    const d = new Date(value);
+    return Number.isNaN(d.getTime()) ? '' : toDateInputValue(d);
+  }
+  const text = String(value).trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return text;
+  const d = new Date(text);
+  return Number.isNaN(d.getTime()) ? '' : toDateInputValue(d);
+}
+
+function noticeExpiryEndTime(value) {
+  const dateValue = normalizeNoticeExpiry(value);
+  if (!dateValue) return null;
+  const [y, m, d] = dateValue.split('-').map(Number);
+  return new Date(y, m - 1, d, 23, 59, 59, 999).getTime();
+}
+
+function syncNoticeExpiryDefault(force = false) {
+  const typeEl = document.getElementById('noticeType');
+  const expiresEl = document.getElementById('noticeExpiresAt');
+  if (!typeEl || !expiresEl) return;
+  if (!force && expiresEl.value) return;
+  expiresEl.value = defaultNoticeExpiryForType(typeEl.value);
+}
+
+function normalizeNoticeLink(url) {
+  const value = String(url || '').trim();
+  if (!value) return '';
+  if (/^(https?:\/\/|\/|\.\/|\.\.\/|[a-z0-9-]+\.html(?:[?#].*)?$)/i.test(value)) return value;
+  return '';
+}
+
+function buildNoticeLinkHref(url) {
+  const value = normalizeNoticeLink(url);
+  if (!value) return '';
+  try {
+    const link = new URL(value, window.location.href);
+    const isLocalPortalPage = link.origin === window.location.origin && link.pathname.endsWith('.html');
+    const isPublicPortalPage = link.origin === 'https://kalmia-dc.github.io' && link.pathname.startsWith('/portal/') && link.pathname.endsWith('.html');
+    if (currentUser && (isLocalPortalPage || isPublicPortalPage)) {
+      link.searchParams.set('sid', currentUser.staffId);
+      link.searchParams.set('name', currentUser.name);
+      if (currentUser.pass) link.searchParams.set('p', currentUser.pass);
+    }
+    return link.href;
+  } catch(e) {
+    return value;
+  }
+}
+
 function escHtml(str) {
-  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+  return String(str ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+}
+
+function escAttr(str) {
+  return escHtml(str).replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
 
 async function deleteNotice(key) {
@@ -1326,9 +1483,17 @@ async function deleteNotice(key) {
   await remove(ref(_db, `notices/${key}`));
 }
 
-function openNoticeModal(prefillText = '') {
+function openNoticeModal(prefillText = '', options = {}) {
   const msg = document.getElementById('noticeMsg');
+  const typeEl = document.getElementById('noticeType');
+  const expiresEl = document.getElementById('noticeExpiresAt');
+  const linkEl = document.getElementById('noticeLinkUrl');
+  const type = resolveNoticeType(options.type);
+
   document.getElementById('noticeText').value = prefillText;
+  if (typeEl) typeEl.value = type;
+  if (expiresEl) expiresEl.value = normalizeNoticeExpiry(options.expiresAt) || defaultNoticeExpiryForType(type);
+  if (linkEl) linkEl.value = options.linkUrl || '';
   msg.textContent = prefillText ? '内容を確認してから投稿してください' : '';
   msg.className = prefillText ? 'pw-msg ok' : 'pw-msg';
   document.getElementById('noticeModal').classList.add('open');
@@ -1340,16 +1505,27 @@ function applyUpdateDraftFromUrl() {
   const hasNoticeDraft = params.has('noticeDraft');
   if (!hasUpdateDraft && !hasNoticeDraft) return;
   const draft = hasUpdateDraft ? params.get('updateDraft') : params.get('noticeDraft');
+  const options = {
+    type: params.get('noticeType') || params.get('type') || DEFAULT_NOTICE_TYPE,
+    linkUrl: params.get('noticeLink') || params.get('noticeLinkUrl') || '',
+    expiresAt: params.get('noticeExpiresAt') || params.get('expiresAt') || ''
+  };
 
   params.delete('updateDraft');
   params.delete('noticeDraft');
+  params.delete('noticeType');
+  params.delete('noticeLink');
+  params.delete('noticeLinkUrl');
+  params.delete('noticeExpiresAt');
+  params.delete('type');
+  params.delete('expiresAt');
   const nextQuery = params.toString();
   const nextUrl = `${window.location.pathname}${nextQuery ? `?${nextQuery}` : ''}${window.location.hash}`;
   window.history.replaceState({}, '', nextUrl);
 
   if (!ADMIN_STAFF.includes(currentUser?.staffId)) return;
   const trimmedDraft = draft.trim();
-  if (trimmedDraft) openNoticeModal(trimmedDraft);
+  if (trimmedDraft) openNoticeModal(trimmedDraft, options);
 }
 
 function closeNoticeModal() {
@@ -1363,10 +1539,29 @@ function closeNoticeModalIfBg(e) {
 async function submitNotice() {
   const text = document.getElementById('noticeText').value.trim();
   const msg  = document.getElementById('noticeMsg');
+  const type = resolveNoticeType(document.getElementById('noticeType')?.value);
+  const expiresAt = normalizeNoticeExpiry(document.getElementById('noticeExpiresAt')?.value) || defaultNoticeExpiryForType(type);
+  const rawLinkUrl = document.getElementById('noticeLinkUrl')?.value.trim() || '';
+  const linkUrl = normalizeNoticeLink(rawLinkUrl);
+
   if (!text) { msg.textContent='内容を入力してください'; msg.className='pw-msg err'; return; }
+  if ((type === 'request' || type === 'deadline') && !expiresAt) {
+    msg.textContent = '確認依頼・締切は表示期限を入力してください';
+    msg.className = 'pw-msg err';
+    return;
+  }
+  if (rawLinkUrl && !linkUrl) {
+    msg.textContent = 'リンク先は http(s) または portal 内URLを入力してください';
+    msg.className = 'pw-msg err';
+    return;
+  }
   try {
     await push(ref(_db, 'notices'), {
       text,
+      type,
+      expiresAt,
+      linkUrl,
+      hidden: false,
       author:    currentUser.name,
       createdAt: Date.now()
     });
@@ -1378,6 +1573,8 @@ async function submitNotice() {
     msg.className = 'pw-msg err';
   }
 }
+
+document.getElementById('noticeType')?.addEventListener('change', () => syncNoticeExpiryDefault(true));
 
 // ─────────────────────────────────────────
 // Googleカレンダー（院長の予定）読み込み
