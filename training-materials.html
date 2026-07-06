@@ -190,7 +190,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--mint)}
           <div class="field full">
             <label for="materialFile">ファイル</label>
             <div class="file-box">
-              <input id="materialFile" type="file" accept=".pdf,.ppt,.pptx,.doc,.docx,.xls,.xlsx,image/*,video/*">
+              <input id="materialFile" type="file" accept=".pdf,.ppt,.pptx,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif,.webp,.heic,.heif,image/*,video/*">
             </div>
             <div class="hint" id="fileHint">動画はYouTubeの限定公開リンク保存も使えます。</div>
           </div>
@@ -657,7 +657,7 @@ window.saveMaterial = async function(event) {
     }
     resetForm();
   } catch(error) {
-    setStatus(`保存できませんでした: ${error.message}`, 'err');
+    setStatus(`保存できませんでした: ${uploadErrorMessage(error)}`, 'err');
   } finally {
     saveBtn.disabled = false;
     setProgress(0, false);
@@ -668,7 +668,8 @@ function uploadFile(file) {
   return new Promise((resolve, reject) => {
     const path = `training-materials/${Date.now()}_${safeStorageName(file.name)}`;
     const target = storageRef(storage, path);
-    const task = uploadBytesResumable(target, file, { contentType: file.type || undefined });
+    const contentType = fileContentType(file);
+    const task = uploadBytesResumable(target, file, contentType ? { contentType } : {});
     setProgress(1, true);
     task.on('state_changed',
       snapshot => {
@@ -684,7 +685,7 @@ function uploadFile(file) {
             sourceType: 'file',
             linkUrl: null,
             fileName: file.name,
-            fileType: file.type || '',
+            fileType: contentType,
             fileSize: file.size,
             storagePath: path,
             url
@@ -936,18 +937,66 @@ function safeStorageName(name) {
   return `${base || 'file'}${ext}`;
 }
 
+function fileContentType(file) {
+  const explicit = String(file?.type || '').trim().toLowerCase();
+  if (explicit) return explicit;
+  return mimeTypeFromName(file?.name || '');
+}
+
+function mimeTypeFromName(name) {
+  const ext = String(name || '').split('.').pop()?.toLowerCase() || '';
+  const types = {
+    jpg: 'image/jpeg',
+    jpeg: 'image/jpeg',
+    png: 'image/png',
+    gif: 'image/gif',
+    webp: 'image/webp',
+    heic: 'image/heic',
+    heif: 'image/heif',
+    pdf: 'application/pdf',
+    ppt: 'application/vnd.ms-powerpoint',
+    pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    doc: 'application/msword',
+    docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    xls: 'application/vnd.ms-excel',
+    xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    mp4: 'video/mp4',
+    mov: 'video/quicktime',
+    m4v: 'video/x-m4v'
+  };
+  return types[ext] || '';
+}
+
+function uploadErrorMessage(error) {
+  const code = error?.code || '';
+  if (code === 'storage/unauthorized') {
+    return 'Storageルールで拒否されています（storage/unauthorized）。Firebase Storageの書き込み権限を確認してください。';
+  }
+  if (code === 'storage/quota-exceeded') {
+    return 'Storageの容量制限に達しています（storage/quota-exceeded）。';
+  }
+  if (code === 'storage/retry-limit-exceeded') {
+    return '通信が不安定でアップロードが完了しませんでした（storage/retry-limit-exceeded）。';
+  }
+  if (code === 'storage/canceled') {
+    return 'アップロードがキャンセルされました（storage/canceled）。';
+  }
+  return [error?.message || '原因不明のエラー', code ? `(${code})` : ''].filter(Boolean).join(' ');
+}
+
 function fileLabel(type = '', name = '', url = '', isLink = false) {
   if (isLink) {
     if (isYouTubeUrl(url)) return { short:'YT', label:'YouTube' };
     return { short:'URL', label:'リンク' };
   }
   const lowerName = String(name).toLowerCase();
-  if (type.includes('pdf') || lowerName.endsWith('.pdf')) return { short:'PDF', label:'PDF' };
+  const normalizedType = type || mimeTypeFromName(lowerName);
+  if (normalizedType.includes('pdf') || lowerName.endsWith('.pdf')) return { short:'PDF', label:'PDF' };
   if (lowerName.endsWith('.ppt') || lowerName.endsWith('.pptx')) return { short:'PPT', label:'PowerPoint' };
   if (lowerName.endsWith('.doc') || lowerName.endsWith('.docx')) return { short:'DOC', label:'Word' };
   if (lowerName.endsWith('.xls') || lowerName.endsWith('.xlsx')) return { short:'XLS', label:'Excel' };
-  if (type.startsWith('image/')) return { short:'IMG', label:'画像' };
-  if (type.startsWith('video/')) return { short:'MOV', label:'動画' };
+  if (normalizedType.startsWith('image/')) return { short:'IMG', label:'画像' };
+  if (normalizedType.startsWith('video/')) return { short:'MOV', label:'動画' };
   return { short:'FILE', label:'ファイル' };
 }
 
