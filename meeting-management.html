@@ -1151,7 +1151,7 @@ const INCIDENT_QUESTIONS = [
     options:() => Object.entries(INCIDENT_LEVEL_LABELS).map(([value, label]) => ({ value, label })),
     support:data => `候補は「${INCIDENT_LEVEL_LABELS[inferIncidentLevel(data)]}」です。必要に応じて変更してください。`
   },
-  { key:'details', step:'STEP 4', title:'状況の深掘り', prompt:'具体的な内容を5W1Hで入力してください。', type:'textarea', required:true },
+  { key:'details', step:'STEP 4', title:'状況の深掘り', prompt:'いつ・どこで・誰が・何を・なぜ・どのように起きたかがわかるように、具体的な内容を入力してください。', type:'textarea', required:true },
   { key:'goodPoint', step:'STEP 5', title:'なぜ防げたか', prompt:'どんな行動・気づきが防止につながりましたか？', type:'textarea', required:true, onlyWhen:data => data.type === 'near_miss' },
   {
     key:'causeHuman',
