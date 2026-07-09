@@ -194,6 +194,7 @@ button{cursor:pointer}
 }
 .summary-chip.near_miss strong{color:var(--ok)}
 .summary-chip.accident strong{color:var(--bad)}
+.summary-chip.review_required strong{color:var(--warn)}
 .incident-period{
   display:flex;
   flex-wrap:wrap;
@@ -410,6 +411,7 @@ button{cursor:pointer}
 .decision-hold{background:#fff7df;color:var(--warn);border-color:#f4d58a}
 .incident-type-near_miss{background:#e8f5e9;color:var(--ok);border-color:#a5d6a7}
 .incident-type-accident{background:#fff1f1;color:var(--bad);border-color:#ffb3b3}
+.incident-type-review_required{background:#fff7df;color:#9a6500;border-color:#f4d58a}
 .incident-status-pending{background:#f3f6f8;color:#68737a}
 .incident-status-decided{background:#e9f7ff;color:#1769aa;border-color:#b9def7}
 .incident-status-in_progress{background:#fff7df;color:#9a6500;border-color:#f4d58a}
@@ -1068,8 +1070,27 @@ const DECISION_LABELS = {
 const DECISION_REASON_KEYS = ['approved', 'rejected', 'hold'];
 const INCIDENT_TYPE_LABELS = {
   near_miss:'ヒヤリハット',
-  accident:'アクシデント'
+  accident:'アクシデント',
+  review_required:'判定要確認'
 };
+const INCIDENT_REVIEW_REQUIRED_TYPE = 'review_required';
+const INCIDENT_TYPE_OPTIONS = [
+  {
+    value:'near_miss',
+    label:'出ていない（ヒヤリハット）',
+    hint:'実害はなく、事故につながりそうだった・未然に防げた場合'
+  },
+  {
+    value:'accident',
+    label:'出た（アクシデント）',
+    hint:'けが・破損・診療対応変更・謝罪やクレーム対応など、実際の影響が出た場合'
+  },
+  {
+    value:INCIDENT_REVIEW_REQUIRED_TYPE,
+    label:'わからない（判定要確認）',
+    hint:'判断に迷う場合。院長またはリーダーが後で正式判定します'
+  }
+];
 const INCIDENT_LEVEL_LABELS = {
   A:'レベルA：ゾッとした',
   B:'レベルB：ハッとした'
@@ -1106,12 +1127,18 @@ const INCIDENT_QUESTIONS = [
   {
     key:'type',
     step:'STEP 2',
-    title:'判定',
-    prompt:'事象の種別を確認してください。',
+    title:'実害の有無で判定',
+    prompt:'実害は出ましたか？',
     type:'choice',
     required:true,
-    options:() => Object.entries(INCIDENT_TYPE_LABELS).map(([value, label]) => ({ value, label })),
-    support:data => `気づいて報告してくださってありがとうございます。一緒に整理していきましょう。候補は「${INCIDENT_TYPE_LABELS[inferIncidentType(data)]}」です。`
+    options:() => INCIDENT_TYPE_OPTIONS,
+    support:data => {
+      const candidate = suggestIncidentType(data);
+      const base = '実害が出ていなければヒヤリハット、身体・物品・診療対応・対外対応に影響が出ていればアクシデントです。';
+      return candidate
+        ? `${base} 入力内容からの候補は「${INCIDENT_TYPE_LABELS[candidate]}」です。`
+        : `${base} 判断に迷う場合は「判定要確認」を選んでください。`;
+    }
   },
   { key:'occurredDate', step:'STEP 3', title:'基本情報', prompt:'発生日を入力してください。', type:'date', required:true },
   { key:'occurredTime', step:'STEP 3', title:'基本情報', prompt:'発生時刻を入力してください。時刻不明の場合は「午前」「午後」「不明」でも構いません。', type:'text', required:true, placeholder:'例：16:00ごろ / 午後 / 不明' },
@@ -1599,7 +1626,7 @@ async function handleIncidentNext(event) {
   if (!question) return;
   if (question.type === 'review') return saveIncidentReport();
   if (!storeCurrentIncidentAnswer()) return;
-  if (question.key === 'type' && incidentDraft.type === 'accident') delete incidentDraft.goodPoint;
+  if (question.key === 'type' && incidentDraft.type !== 'near_miss') delete incidentDraft.goodPoint;
   incidentStepIndex = Math.min(incidentStepIndex + 1, activeIncidentQuestions().length - 1);
   renderIncidentQuestion();
 }
@@ -1634,7 +1661,10 @@ function renderIncidentQuestion() {
 
 function applyIncidentDefault(question) {
   if (!question || incidentDraft[question.key] !== undefined) return;
-  if (question.key === 'type') incidentDraft.type = inferIncidentType(incidentDraft);
+  if (question.key === 'type') {
+    const candidate = suggestIncidentType(incidentDraft);
+    if (candidate) incidentDraft.type = candidate;
+  }
   else if (question.key === 'category') incidentDraft.category = inferIncidentCategory(incidentDraft);
   else if (question.key === 'level') incidentDraft.level = inferIncidentLevel(incidentDraft);
   else if (question.defaultValue) incidentDraft[question.key] = question.defaultValue();
@@ -2037,7 +2067,7 @@ function parseIncidentHtmlReport(html, sourceFileName) {
     source:'html',
     sourceFileName,
     reportNumber,
-    type: /アクシデント/.test(typeText) ? 'accident' : 'near_miss',
+    type: explicitIncidentType(typeText) || inferIncidentType({ rawText:bodyText }),
     occurredDate: occurred.date,
     occurredTime: occurred.time,
     entryDate: parseLooseDate(info['記入日']),
@@ -2068,7 +2098,7 @@ function parseIncidentOcrText(text, sourceFileName) {
     sourceFileName,
     rawText,
     reportNumber,
-    type: /アクシデント/.test(rawText) ? 'accident' : 'near_miss',
+    type: explicitIncidentType(rawText) || inferIncidentType({ rawText }),
     occurredDate: occurred.date,
     occurredTime: occurred.time,
     entryDate: parseLooseDate(extractLabeledText(rawText, ['記入日'], ['記入者名', '記入者'])) || todayKey(),
@@ -2719,7 +2749,7 @@ function renderIncidentReports() {
       ${textBlock('場面', report.scene)}
       ${textBlock('どうなりそうだった？ / 発生した実害', report.eventImpact)}
       ${textBlock('具体的な内容', report.details)}
-      ${report.type === 'near_miss' ? textBlock('なぜ防げたか（Good Point）', report.goodPoint) : ''}
+      ${incidentTypeKey(report) === 'near_miss' ? textBlock('なぜ防げたか（Good Point）', report.goodPoint) : ''}
       ${textBlock('原因【人・行動】', report.causeHuman)}
       ${textBlock('原因【環境・連携】', report.causeEnvironment)}
       ${textBlock('ミーティングへの申し送り', report.handoff)}
@@ -2745,12 +2775,13 @@ function renderIncidentSummary(reports) {
   const counts = reports.reduce((acc, report) => {
     acc[incidentTypeKey(report)] += 1;
     return acc;
-  }, { near_miss:0, accident:0 });
+  }, { near_miss:0, accident:0, review_required:0 });
   const reporterStats = incidentReporterStats(reports);
   document.getElementById('incidentSummary').innerHTML = `
     <div class="summary-chip total"><span>全体</span><strong>${reports.length}件</strong></div>
     <div class="summary-chip near_miss"><span>${esc(INCIDENT_TYPE_LABELS.near_miss)}</span><strong>${counts.near_miss}件</strong></div>
     <div class="summary-chip accident"><span>${esc(INCIDENT_TYPE_LABELS.accident)}</span><strong>${counts.accident}件</strong></div>
+    <div class="summary-chip review_required"><span>${esc(INCIDENT_TYPE_LABELS.review_required)}</span><strong>${counts.review_required}件</strong></div>
     <div class="reporter-stats">
       <div class="reporter-stats-head">
         <h3>記入者別報告数</h3>
@@ -2765,6 +2796,7 @@ function renderIncidentSummary(reports) {
                 <th>合計</th>
                 <th>${esc(INCIDENT_TYPE_LABELS.near_miss)}</th>
                 <th>${esc(INCIDENT_TYPE_LABELS.accident)}</th>
+                <th>${esc(INCIDENT_TYPE_LABELS.review_required)}</th>
               </tr>
             </thead>
             <tbody>
@@ -2774,6 +2806,7 @@ function renderIncidentSummary(reports) {
                   <td><strong>${stat.total}件</strong></td>
                   <td>${stat.near_miss}件</td>
                   <td>${stat.accident}件</td>
+                  <td>${stat.review_required}件</td>
                 </tr>
               `).join('')}
             </tbody>
@@ -2831,7 +2864,7 @@ function incidentReporterStats(reports) {
     const name = incidentReporterName(report);
     const key = normalizeForSearch(name);
     if (!stats.has(key)) {
-      stats.set(key, { name, total:0, near_miss:0, accident:0 });
+      stats.set(key, { name, total:0, near_miss:0, accident:0, review_required:0 });
     }
     const stat = stats.get(key);
     const type = incidentTypeKey(report);
@@ -2856,7 +2889,9 @@ function incidentReporterName(report) {
 }
 
 function incidentTypeKey(report) {
-  return report?.type === 'accident' ? 'accident' : 'near_miss';
+  if (report?.type === 'accident') return 'accident';
+  if (report?.type === INCIDENT_REVIEW_REQUIRED_TYPE) return INCIDENT_REVIEW_REQUIRED_TYPE;
+  return 'near_miss';
 }
 
 function incidentLinkedTaskBadgeHtml(report) {
@@ -2871,6 +2906,10 @@ function canEditIncidentReport(report) {
   return isDirector() || isLeader() || report?.createdById === currentUser.staffId;
 }
 
+function canChangeIncidentType(report) {
+  return canManageIncidentReport() || incidentTypeKey(report) !== INCIDENT_REVIEW_REQUIRED_TYPE;
+}
+
 function incidentConfirmationHtml(report) {
   if (report.counterStatus !== 'confirmed') return '';
   const confirmedDate = report.confirmedAt ? formatDate(report.confirmedAt) : '-';
@@ -2880,6 +2919,8 @@ function incidentConfirmationHtml(report) {
 function incidentEditHtml(report) {
   if (!canEditIncidentReport(report)) return '';
   const categoryText = report.categoryText || incidentCategoryText(report);
+  const typeKey = incidentTypeKey(report);
+  const typeDisabled = canChangeIncidentType(report) ? '' : 'disabled';
   return `
     <div class="incident-edit-panel" data-incident-edit-panel="${escAttr(report.id)}" hidden>
       <div class="form-grid">
@@ -2889,8 +2930,8 @@ function incidentEditHtml(report) {
         </div>
         <div class="field">
           <label>種別</label>
-          <select data-incident-edit="${escAttr(report.id)}" data-field="type">
-            ${Object.entries(INCIDENT_TYPE_LABELS).map(([value, label]) => `<option value="${escAttr(value)}" ${value === (report.type || 'near_miss') ? 'selected' : ''}>${esc(label)}</option>`).join('')}
+          <select data-incident-edit="${escAttr(report.id)}" data-field="type" ${typeDisabled}>
+            ${Object.entries(INCIDENT_TYPE_LABELS).map(([value, label]) => `<option value="${escAttr(value)}" ${value === typeKey ? 'selected' : ''}>${esc(label)}</option>`).join('')}
           </select>
         </div>
         <div class="field">
@@ -3022,7 +3063,7 @@ async function saveIncidentReportEdit(id) {
   const duplicate = state.incidentReports.find(item => item.id !== id && item.reportNumber === reportNumber);
   if (duplicate) return showToast('同じ報告番号の報告が既にあります');
   const occurredDate = value('occurredDate');
-  const type = value('type');
+  const type = canChangeIncidentType(report) ? value('type') : incidentTypeKey(report);
   const details = value('details');
   if (!reportNumber || !type || !occurredDate || !details) {
     return showToast('報告番号・種別・発生日・具体的な内容は必須です');
@@ -3089,6 +3130,7 @@ function incidentFollowupField(id, field) {
 }
 
 function isIncidentTaskReady(report) {
+  if (incidentTypeKey(report) === INCIDENT_REVIEW_REQUIRED_TYPE) return false;
   return Boolean(String(report?.countermeasure || '').trim())
     && INCIDENT_TASK_READY_STATUSES.has(report?.counterStatus || 'pending');
 }
@@ -3349,16 +3391,37 @@ function parseCategoryCodes(text) {
   return [...new Set(codes)];
 }
 
+function explicitIncidentType(text) {
+  const source = String(text || '').normalize('NFKC');
+  if (/判定要確認|要確認/.test(source)) return INCIDENT_REVIEW_REQUIRED_TYPE;
+  if (/アクシデント/.test(source)) return 'accident';
+  if (/ヒヤリハット/.test(source)) return 'near_miss';
+  return '';
+}
+
+function suggestIncidentType(data) {
+  return suggestIncidentTypeFromText(incidentSearchText(data));
+}
+
+function suggestIncidentTypeFromText(text) {
+  const source = String(text || '').normalize('NFKC');
+  if (!source) return '';
+  if (/しそう|しそうだった|そうになった|そうだった|させそう|しかけ|かけた|寸前|未然|防げた|防止できた|起きそう|なりそう|渡し間違えそう|ヒヤリ|ハッと|ゾッと/.test(source)) {
+    return 'near_miss';
+  }
+  if (/けが|ケガ|怪我|負傷|傷|創傷|誤飲|誤嚥|状態悪化|クレーム|苦情|実害|出血|痛み|疼痛|事故|転倒|転落|破損|紛失|謝罪|対応変更|処置変更|中断|再処置|再説明/.test(source)) {
+    return 'accident';
+  }
+  return '';
+}
+
 function inferIncidentType(data) {
-  const text = incidentSearchText(data);
-  return /怪我|誤飲|誤嚥|状態悪化|クレーム|実害|出血|痛み|事故|転倒|破損|謝罪/.test(text)
-    ? 'accident'
-    : 'near_miss';
+  return suggestIncidentType(data) || INCIDENT_REVIEW_REQUIRED_TYPE;
 }
 
 function inferIncidentLevel(data) {
   const text = incidentSearchText(data);
-  return /怪我|誤飲|誤嚥|状態悪化|クレーム|実害|出血|転倒|重大|ゾッ|事故/.test(text) ? 'A' : 'B';
+  return /けが|ケガ|怪我|負傷|誤飲|誤嚥|状態悪化|クレーム|苦情|実害|出血|転倒|転落|重大|ゾッ|事故/.test(text) ? 'A' : 'B';
 }
 
 function inferIncidentCategory(data) {
@@ -3379,7 +3442,8 @@ function incidentSearchText(data) {
     data?.eventImpact,
     data?.details,
     data?.causeHuman,
-    data?.causeEnvironment
+    data?.causeEnvironment,
+    data?.rawText
   ].filter(Boolean).join(' ');
 }
 
