@@ -1696,6 +1696,8 @@ const HISTORY_MONTH_COUNT = 6;
 const BREAK_EVEN_SALES = 11_000_000;
 const PDFJS_URL = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
 const PDFJS_WORKER_URL = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+const PDFJS_CMAP_URL = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/cmaps/';
+const PDFJS_STANDARD_FONT_DATA_URL = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/standard_fonts/';
 const TESSERACT_URL = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
 const EXCLUDED_GOAL_ITEMS = new Set(['物販売上']);
 const STAFF_NAMES = {
@@ -2916,15 +2918,51 @@ function extractedImportTextLooksUsable(text) {
   return false;
 }
 
+function pdfTextContentToLines(content) {
+  const rows = [];
+  (content?.items || []).forEach(item => {
+    const str = String(item.str || '').trim();
+    if (!str) return;
+    const transform = item.transform || [];
+    const x = Number(transform[4] || 0);
+    const y = Number(transform[5] || 0);
+    const height = Math.abs(Number(item.height || transform[3] || 0));
+    const tolerance = Math.max(2, Math.min(6, height * 0.45 || 3));
+    let row = rows.find(entry => Math.abs(entry.y - y) <= tolerance);
+    if (!row) {
+      row = { y, items: [] };
+      rows.push(row);
+    } else {
+      row.y = ((row.y * row.items.length) + y) / (row.items.length + 1);
+    }
+    row.items.push({ x, str });
+  });
+  return rows
+    .sort((a, b) => b.y - a.y)
+    .map(row => row.items
+      .sort((a, b) => a.x - b.x)
+      .map(item => item.str)
+      .join(' ')
+      .replace(/\s+/g, ' ')
+      .trim())
+    .filter(Boolean)
+    .join('\n');
+}
+
 async function readPdfText(file) {
   const pdfjs = await loadPdfJs();
-  const pdf = await pdfjs.getDocument({ data: new Uint8Array(await file.arrayBuffer()) }).promise;
+  const pdf = await pdfjs.getDocument({
+    data: new Uint8Array(await file.arrayBuffer()),
+    cMapUrl: PDFJS_CMAP_URL,
+    cMapPacked: true,
+    standardFontDataUrl: PDFJS_STANDARD_FONT_DATA_URL
+  }).promise;
   const pages = [];
   for (let pageNo = 1; pageNo <= pdf.numPages; pageNo++) {
     setImportStatus(`PDF読み取り中 ${pageNo}/${pdf.numPages}`);
     const page = await pdf.getPage(pageNo);
-    const content = await page.getTextContent();
-    pages.push(content.items.map(item => item.str).join('\n'));
+    const content = await page.getTextContent({ normalizeWhitespace: true });
+    pages.push(pdfTextContentToLines(content));
   }
   const text = repairLegacyPdfText(pages.join('\n\n').trim());
   if (extractedImportTextLooksUsable(text)) return text;
