@@ -1303,9 +1303,13 @@ onValue(ref(_db, 'passwords'), snap => {
 });
 
 // ─────────────────────────────────────────
-// お知らせ（Firebase /notices）
+// お知らせ（Firebase /notices + portal-updates.json）
 // ─────────────────────────────────────────
 let _noticesUnsub = null;
+let _firebaseNotices = {};
+let _portalUpdateNotices = {};
+let _portalUpdateNoticeLoadStarted = false;
+const PORTAL_UPDATES_FILE = 'portal-updates.json';
 const NOTICE_TYPES = {
   new: '新規追加',
   change: '使い方変更',
@@ -1324,14 +1328,15 @@ const DEFAULT_NOTICE_TYPE = 'new';
 const NOTICE_DEFAULT_DAYS = 30;
 
 function startNoticeSync() {
+  loadPortalUpdateNotices();
   const noticesRef = ref(_db, 'notices');
   onValue(noticesRef, snap => {
-    const data = snap.val() || {};
-    renderNotices(data);
+    _firebaseNotices = snap.val() || {};
+    renderNotices();
   });
 }
 
-function renderNotices(data) {
+function renderNotices() {
   const card    = document.getElementById('heroNoticeCard');
   const list    = document.getElementById('heroNoticeList');
   const postBtn = document.getElementById('noticePostBtn');
@@ -1341,9 +1346,10 @@ function renderNotices(data) {
   if (isAdmin) postBtn.classList.add('visible');
   else         postBtn.classList.remove('visible');
 
+  const data = { ..._portalUpdateNotices, ..._firebaseNotices };
   const items = Object.entries(data)
     .filter(([, n]) => isActiveNotice(n))
-    .sort((a,b) => (b[1]?.createdAt || 0) - (a[1]?.createdAt || 0));
+    .sort((a,b) => noticeCreatedAtTime(b[1]?.createdAt) - noticeCreatedAtTime(a[1]?.createdAt));
 
   if (!items.length && !isAdmin) {
     card.classList.remove('has-items');
@@ -1358,10 +1364,12 @@ function renderNotices(data) {
   }
 
   list.innerHTML = items.map(([key, n]) => {
-    const d = n.createdAt ? new Date(n.createdAt) : null;
+    const createdAt = noticeCreatedAtTime(n.createdAt);
+    const d = createdAt ? new Date(createdAt) : null;
     const dateStr = d ? `${d.getMonth()+1}/${d.getDate()}` : '';
     const typeLabel = noticeTypeLabel(n.type);
     const linkUrl = buildNoticeLinkHref(n.linkUrl);
+    const canDelete = isAdmin && n.portalUpdate !== true;
     return `
     <div class="hero-notice-item">
       <div style="flex:1;min-width:0;">
@@ -1370,13 +1378,61 @@ function renderNotices(data) {
             ${dateStr ? `<span class="hero-notice-date">${dateStr}</span>` : ''}
             <span class="hero-notice-type">${escHtml(typeLabel)}</span>
           </div>
-          <button class="hero-notice-del ${isAdmin?'visible':''}" onclick="deleteNotice('${key}')" title="削除">✕</button>
+          ${canDelete ? `<button class="hero-notice-del visible" onclick="deleteNotice('${key}')" title="削除">✕</button>` : ''}
         </div>
         <div class="hero-notice-text">${escHtml(n.text || '')}</div>
         ${linkUrl ? `<a class="hero-notice-link" href="${escAttr(linkUrl)}">開く →</a>` : ''}
       </div>
     </div>`;
   }).join('');
+}
+
+async function loadPortalUpdateNotices() {
+  if (_portalUpdateNoticeLoadStarted) return;
+  _portalUpdateNoticeLoadStarted = true;
+  try {
+    const res = await fetch(`${PORTAL_UPDATES_FILE}?v=${Date.now()}`, { cache: 'no-store' });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    _portalUpdateNotices = normalizePortalUpdateNotices(await res.json());
+  } catch (e) {
+    console.warn('portal-updates.jsonを読み込めませんでした', e);
+    _portalUpdateNotices = {};
+  } finally {
+    renderNotices();
+  }
+}
+
+function normalizePortalUpdateNotices(raw) {
+  const rows = Array.isArray(raw)
+    ? raw
+    : Object.entries(raw || {}).map(([id, item]) => ({ id, ...(item || {}) }));
+
+  return Object.fromEntries(rows.map((item, index) => {
+    if (!item || typeof item !== 'object') return null;
+    const text = String(item.text || '').trim();
+    const createdAt = noticeCreatedAtTime(item.createdAt);
+    if (!text || !createdAt) return null;
+    const rawId = String(item.id || `item-${createdAt}-${index}`).trim();
+    const key = rawId.replace(/[^a-z0-9_-]+/gi, '-') || `item-${index}`;
+    const expiresAt = normalizeNoticeExpiry(item.expiresAt) || defaultNoticeExpiryFromCreatedAt(createdAt);
+    return [`portal-update-${key}`, {
+      text,
+      type: resolveNoticeType(item.type),
+      expiresAt,
+      linkUrl: normalizeNoticeLink(item.linkUrl),
+      hidden: item.hidden === true,
+      author: item.author || 'portal',
+      createdAt,
+      portalUpdate: true
+    }];
+  }).filter(Boolean));
+}
+
+function noticeCreatedAtTime(value) {
+  if (!value) return 0;
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? 0 : d.getTime();
 }
 
 function isActiveNotice(n) {
