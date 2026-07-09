@@ -2876,6 +2876,46 @@ function repairLegacyPdfText(text) {
   }
 }
 
+function importItemHitCount(text) {
+  const normalized = compactForMatch(text);
+  if (!normalized) return 0;
+  const items = new Set();
+  for (const config of IMPORT_ITEM_ALIASES) {
+    for (const alias of config.aliases) {
+      const key = compactForMatch(alias);
+      if (key && normalized.includes(key)) {
+        items.add(canonicalGoalItem(config.item));
+        break;
+      }
+    }
+  }
+  return items.size;
+}
+
+function importKeywordHitCount(text) {
+  const source = normalizeImportText(text);
+  const keywords = [
+    '月計表', '合計', '患者数', '再初診', '新患', '診療報酬',
+    '自費', '保険種別', 'レセプト', '目標', '実績', '結果', '3ヶ月平均'
+  ];
+  return keywords.reduce((count, keyword) => count + (source.includes(keyword) ? 1 : 0), 0);
+}
+
+function extractedImportTextLooksUsable(text) {
+  const source = normalizeImportText(repairLegacyPdfText(text)).trim();
+  if (source.length < 20) return false;
+  const numberCount = (source.match(/-?\d[\d,]*(?:\.\d+)?/g) || []).length;
+  const keywordHits = importKeywordHitCount(source);
+  const itemHits = importItemHitCount(source);
+  const readableChars = (source.match(/[ぁ-んァ-ン一-龥A-Za-z0-9]/g) || []).length;
+  const noiseChars = (source.match(/[\u0080-\u009f�_|－—―]/g) || []).length;
+  if (parseMonthlyReport(source)) return true;
+  if (keywordHits >= 2 && numberCount >= 3) return true;
+  if (itemHits >= 1 && numberCount >= 1) return true;
+  if (noiseChars >= readableChars) return false;
+  return false;
+}
+
 async function readPdfText(file) {
   const pdfjs = await loadPdfJs();
   const pdf = await pdfjs.getDocument({ data: new Uint8Array(await file.arrayBuffer()) }).promise;
@@ -2887,8 +2927,8 @@ async function readPdfText(file) {
     pages.push(content.items.map(item => item.str).join('\n'));
   }
   const text = repairLegacyPdfText(pages.join('\n\n').trim());
-  if (text.length >= 20) return text;
-  setImportStatus('PDFに文字データが少ないためOCRに切り替えます');
+  if (extractedImportTextLooksUsable(text)) return text;
+  setImportStatus('PDFの文字データから候補を作れないためOCRに切り替えます');
   return readPdfByOcr(pdf);
 }
 
@@ -3111,6 +3151,30 @@ function numbersFromImportLine(line) {
     .filter(Number.isFinite);
 }
 
+function isMonthlyReportTotalLine(line) {
+  return /^合\s*計(?=\s|$|[:：]|\d)/u.test(normalizeImportText(line).trim());
+}
+
+function isMonthlyReportText(text, lines) {
+  if (text.includes('月計表')) return true;
+  const headerHits = ['患者数', '再初診', '新患', '診療報酬', '自費', '物販', '保険種別', 'レセプト']
+    .reduce((count, keyword) => count + (text.includes(keyword) ? 1 : 0), 0);
+  if (headerHits >= 2) return true;
+  return lines.some(line => isMonthlyReportTotalLine(line) && numbersFromImportLine(line).length >= 12);
+}
+
+function monthlyReportTreatmentDays(lines) {
+  const days = new Set();
+  lines.forEach(line => {
+    const text = normalizeImportText(line).trim();
+    const match = text.match(/^([1-9]|[12]\d|3[01])(?:\s*[\(（][^)）]+[\)）])?\s+(.+)$/);
+    if (!match) return;
+    const nums = numbersFromImportLine(match[2]);
+    if (nums.length >= 2) days.add(Number(match[1]));
+  });
+  return days.size;
+}
+
 function inferImportMonthFromText(rawText) {
   const text = normalizeImportText(repairLegacyPdfText(rawText));
   let match = text.match(/令和\s*(\d{1,2})\s*年\s*(\d{1,2})\s*月/);
@@ -3127,16 +3191,16 @@ function inferImportMonthFromText(rawText) {
 
 function parseMonthlyReport(rawText) {
   const text = normalizeImportText(repairLegacyPdfText(rawText));
-  if (!text.includes('月計表')) return null;
   const lines = text.split(/\n+/).map(line => line.trim()).filter(Boolean);
+  if (!isMonthlyReportText(text, lines)) return null;
   const totalLines = lines
-    .filter(line => /^合計\s/.test(line))
+    .filter(isMonthlyReportTotalLine)
     .map(line => ({ line, nums: numbersFromImportLine(line) }));
   const dailyTotal = totalLines.find(entry => entry.nums.length >= 15);
   if (!dailyTotal) return null;
   const insuranceTotal = totalLines.find(entry => /\([^)]*\)/.test(entry.line) && entry.nums.length >= 7)
     || totalLines.find(entry => entry !== dailyTotal && entry.nums.length >= 7);
-  const treatmentDays = lines.filter(line => /^\d{1,2}\([^)]+\)\s+\d/.test(line)).length;
+  const treatmentDays = monthlyReportTreatmentDays(lines);
   const daily = dailyTotal.nums;
   const insurance = insuranceTotal?.nums || [];
   const insurancePoints = insurance[2] ?? daily[4] ?? null;
