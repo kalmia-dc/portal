@@ -226,7 +226,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--mint)}
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import { getDatabase, ref, push, set, update, remove, onValue, get }
   from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
-import { getStorage, ref as storageRef, uploadBytesResumable, getDownloadURL, deleteObject }
+import { getStorage, ref as storageRef, uploadBytes, uploadBytesResumable, getDownloadURL, deleteObject }
   from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js';
 
 const firebaseConfig = {
@@ -244,6 +244,7 @@ const db = getDatabase(fbApp);
 const storage = getStorage(fbApp);
 const DB_PATH = 'trainingMaterials';
 const CATEGORY_DB_PATH = 'trainingMaterialCategories';
+const DIRECT_UPLOAD_MAX_BYTES = 20 * 1024 * 1024;
 const ADMIN_STAFF = ['sugihira', 'momo'];
 const DEFAULT_ADMIN_PASSWORDS = { sugihira:'1001', momo:'3003' };
 const DEFAULT_MATERIAL_CATEGORIES = ['歯周治療', 'インプラント'];
@@ -664,12 +665,25 @@ window.saveMaterial = async function(event) {
   }
 };
 
-function uploadFile(file) {
+async function uploadFile(file) {
+  const path = `training-materials/${Date.now()}_${safeStorageName(file.name)}`;
+  const target = storageRef(storage, path);
+  const contentType = fileContentType(file);
+  const metadata = contentType ? { contentType } : {};
+  if (!shouldUseResumableUpload(file, contentType)) {
+    setProgress(1, true);
+    setStatus('アップロードしています。');
+    const snapshot = await uploadBytes(target, file, metadata);
+    setProgress(100, true);
+    const url = await getDownloadURL(snapshot.ref);
+    return filePayload(file, path, contentType, url);
+  }
+  return uploadResumableFile(file, target, path, contentType, metadata);
+}
+
+function uploadResumableFile(file, target, path, contentType, metadata) {
   return new Promise((resolve, reject) => {
-    const path = `training-materials/${Date.now()}_${safeStorageName(file.name)}`;
-    const target = storageRef(storage, path);
-    const contentType = fileContentType(file);
-    const task = uploadBytesResumable(target, file, contentType ? { contentType } : {});
+    const task = uploadBytesResumable(target, file, metadata);
     setProgress(1, true);
     task.on('state_changed',
       snapshot => {
@@ -681,21 +695,29 @@ function uploadFile(file) {
       async () => {
         try {
           const url = await getDownloadURL(task.snapshot.ref);
-          resolve({
-            sourceType: 'file',
-            linkUrl: null,
-            fileName: file.name,
-            fileType: contentType,
-            fileSize: file.size,
-            storagePath: path,
-            url
-          });
+          resolve(filePayload(file, path, contentType, url));
         } catch(error) {
           reject(error);
         }
       }
     );
   });
+}
+
+function shouldUseResumableUpload(file, contentType) {
+  return contentType.startsWith('video/') || Number(file?.size || 0) > DIRECT_UPLOAD_MAX_BYTES;
+}
+
+function filePayload(file, path, contentType, url) {
+  return {
+    sourceType: 'file',
+    linkUrl: null,
+    fileName: file.name,
+    fileType: contentType,
+    fileSize: file.size,
+    storagePath: path,
+    url
+  };
 }
 
 window.startEdit = function(id) {
@@ -976,7 +998,7 @@ function uploadErrorMessage(error) {
     return 'Storageの容量制限に達しています（storage/quota-exceeded）。';
   }
   if (code === 'storage/retry-limit-exceeded') {
-    return '通信が不安定でアップロードが完了しませんでした（storage/retry-limit-exceeded）。';
+    return 'アップロード通信が時間切れになりました（storage/retry-limit-exceeded）。再度保存しても失敗する場合は、別のネットワークで試してください。';
   }
   if (code === 'storage/canceled') {
     return 'アップロードがキャンセルされました（storage/canceled）。';
