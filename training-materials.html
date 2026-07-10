@@ -84,6 +84,11 @@ input:focus,select:focus,textarea:focus{border-color:var(--mint)}
 .meta{display:flex;gap:6px;flex-wrap:wrap;font-size:11px;color:var(--gray)}
 .badge{border-radius:999px;background:#eef4f7;padding:4px 8px;font-weight:800}
 .summary{font-size:13px;line-height:1.65;color:#405057;white-space:pre-wrap;overflow-wrap:anywhere;margin:0;flex:1}
+.material-preview{position:relative;display:block;width:100%;aspect-ratio:16/9;border:0;border-radius:12px;overflow:hidden;background:#eef4f7;padding:0;cursor:pointer}
+.material-preview img{width:100%;height:100%;object-fit:cover;display:block}
+.material-preview:focus-visible{outline:3px solid var(--mint);outline-offset:2px}
+.youtube-play{position:absolute;inset:0;margin:auto;width:54px;height:38px;border-radius:12px;background:rgba(23,37,48,.78)}
+.youtube-play::before{content:'';position:absolute;left:22px;top:10px;border-left:15px solid white;border-top:9px solid transparent;border-bottom:9px solid transparent}
 .card-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:auto}
 .empty{background:white;border-radius:16px;padding:28px 18px;text-align:center;color:var(--gray);box-shadow:var(--shadow)}
 .admin-actions{display:flex;gap:8px;flex-wrap:wrap}
@@ -100,6 +105,13 @@ input:focus,select:focus,textarea:focus{border-color:var(--mint)}
 .comment-status{font-size:12px;color:var(--gray);line-height:1.5}
 .comment-status.ok{color:#188060;font-weight:800}
 .comment-status.err{color:#c0392b;font-weight:800}
+.viewer{position:fixed;inset:0;background:rgba(15,28,38,.72);display:none;align-items:center;justify-content:center;padding:18px;z-index:50}
+.viewer.open{display:flex}
+.viewer-panel{position:relative;width:min(960px,100%);max-height:92vh;background:white;border-radius:16px;padding:14px;box-shadow:0 24px 60px rgba(15,28,38,.32);display:flex;flex-direction:column;gap:10px}
+.viewer-panel img{width:100%;max-height:76vh;object-fit:contain;border-radius:10px;background:#f4f8f9}
+.viewer-close{align-self:flex-end;border:0;border-radius:10px;background:#edf7f8;color:#247d85;font-weight:900;padding:9px 12px;cursor:pointer}
+.viewer-caption{font-size:13px;color:var(--gray);font-weight:800;line-height:1.5}
+body.viewer-open{overflow:hidden}
 .hidden{display:none!important}
 @media (min-width:820px){
   .top{grid-template-columns:1fr 1.2fr;align-items:start}
@@ -222,6 +234,14 @@ input:focus,select:focus,textarea:focus{border-color:var(--mint)}
   <section class="list" id="materialList"></section>
 </main>
 
+<div class="viewer" id="materialViewer" aria-hidden="true" onclick="closeMaterialViewer(event)">
+  <div class="viewer-panel" role="dialog" aria-modal="true" aria-label="画像プレビュー">
+    <button class="viewer-close" type="button" onclick="closeMaterialViewer()">閉じる</button>
+    <img id="materialViewerImage" src="" alt="">
+    <div class="viewer-caption" id="materialViewerCaption"></div>
+  </div>
+</div>
+
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import { getDatabase, ref, push, set, update, remove, onValue, get }
@@ -282,6 +302,9 @@ document.querySelectorAll('input[name="materialMode"]').forEach(input => {
   input.addEventListener('change', updateMaterialMode);
 });
 document.getElementById('materialFile')?.addEventListener('change', updateFileHint);
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape') window.closeMaterialViewer();
+});
 document.getElementById('newMaterialCategory')?.addEventListener('keydown', event => {
   if (event.key !== 'Enter') return;
   event.preventDefault();
@@ -561,7 +584,9 @@ function renderMaterials() {
     const date = formatDate(item.updatedAt || item.createdAt);
     const size = formatSize(item.fileSize || 0);
     const openUrl = escAttr(item.url || item.linkUrl || '#');
-    const downloadButton = isLink ? '' : `<a class="btn ghost" href="${openUrl}" target="_blank" rel="noopener" download>ダウンロード</a>`;
+    const preview = renderMaterialPreview(item);
+    const openControl = materialOpenControl(item, openUrl);
+    const downloadButton = (isLink || item.inlineImage) ? '' : `<a class="btn ghost" href="${openUrl}" target="_blank" rel="noopener" download>ダウンロード</a>`;
     const manageActions = canManageMaterial(item)
       ? `<div class="admin-actions">
           <button class="btn secondary" type="button" onclick="startEdit('${escAttr(item.id)}')">編集</button>
@@ -582,10 +607,11 @@ function renderMaterials() {
             </div>
           </div>
         </div>
+        ${preview}
         ${summary ? `<p class="summary">${summary}</p>` : '<p class="summary">メモはありません。</p>'}
         <div class="meta">${fileName}</div>
         <div class="card-actions">
-          <a class="btn primary" href="${openUrl}" target="_blank" rel="noopener">開く</a>
+          ${openControl}
           ${downloadButton}
           ${manageActions}
         </div>
@@ -594,6 +620,55 @@ function renderMaterials() {
     `;
   }).join('');
 }
+
+function renderMaterialPreview(item) {
+  if (item.inlineImage && item.url) {
+    return `
+      <button class="material-preview" type="button" onclick="openMaterialImage('${escAttr(item.id)}')" aria-label="${escAttr(item.title || item.fileName || '画像')}を表示">
+        <img src="${escAttr(item.url)}" alt="">
+      </button>
+    `;
+  }
+  const youtubeId = youtubeVideoId(item.url || item.linkUrl || '');
+  if (youtubeId) {
+    const url = escAttr(item.url || item.linkUrl || '#');
+    return `
+      <a class="material-preview" href="${url}" target="_blank" rel="noopener" aria-label="${escAttr(item.title || 'YouTube')}を開く">
+        <img src="${escAttr(youtubeThumbnailUrl(youtubeId))}" alt="">
+        <span class="youtube-play" aria-hidden="true"></span>
+      </a>
+    `;
+  }
+  return '';
+}
+
+function materialOpenControl(item, openUrl) {
+  if (item.inlineImage && item.url) {
+    return `<button class="btn primary" type="button" onclick="openMaterialImage('${escAttr(item.id)}')">開く</button>`;
+  }
+  return `<a class="btn primary" href="${openUrl}" target="_blank" rel="noopener">開く</a>`;
+}
+
+window.openMaterialImage = function(id) {
+  const item = materials.find(material => material.id === id);
+  if (!item?.url) return;
+  document.getElementById('materialViewerImage').src = item.url;
+  document.getElementById('materialViewerCaption').textContent = item.title || item.fileName || '画像';
+  const viewer = document.getElementById('materialViewer');
+  viewer.classList.add('open');
+  viewer.setAttribute('aria-hidden', 'false');
+  document.body.classList.add('viewer-open');
+};
+
+window.closeMaterialViewer = function(event) {
+  if (event && event.target !== event.currentTarget) return;
+  const viewer = document.getElementById('materialViewer');
+  const image = document.getElementById('materialViewerImage');
+  viewer.classList.remove('open');
+  viewer.setAttribute('aria-hidden', 'true');
+  image.src = '';
+  document.body.classList.remove('viewer-open');
+};
 
 window.saveMaterial = async function(event) {
   event.preventDefault();
@@ -996,6 +1071,36 @@ function isYouTubeUrl(value) {
   } catch(e) {
     return false;
   }
+}
+
+function youtubeVideoId(value) {
+  try {
+    const url = new URL(value);
+    const host = url.hostname.replace(/^www\./, '').toLowerCase();
+    if (host === 'youtu.be') {
+      return cleanYouTubeId(url.pathname.split('/').filter(Boolean)[0]);
+    }
+    if (host === 'youtube.com' || host.endsWith('.youtube.com')) {
+      const fromQuery = cleanYouTubeId(url.searchParams.get('v'));
+      if (fromQuery) return fromQuery;
+      const parts = url.pathname.split('/').filter(Boolean);
+      if (['embed', 'shorts', 'live', 'v'].includes(parts[0])) {
+        return cleanYouTubeId(parts[1]);
+      }
+    }
+  } catch(e) {
+    return '';
+  }
+  return '';
+}
+
+function cleanYouTubeId(value) {
+  const id = String(value || '').trim();
+  return /^[a-zA-Z0-9_-]{6,20}$/.test(id) ? id : '';
+}
+
+function youtubeThumbnailUrl(id) {
+  return `https://i.ytimg.com/vi/${id}/hqdefault.jpg`;
 }
 
 function setProgress(value, show) {
