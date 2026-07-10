@@ -245,6 +245,9 @@ const storage = getStorage(fbApp);
 const DB_PATH = 'trainingMaterials';
 const CATEGORY_DB_PATH = 'trainingMaterialCategories';
 const DIRECT_UPLOAD_MAX_BYTES = 20 * 1024 * 1024;
+const INLINE_IMAGE_MAX_DIMENSION = 1200;
+const INLINE_IMAGE_QUALITY = 0.72;
+const INLINE_IMAGE_MAX_DATA_URL_LENGTH = 9.5 * 1024 * 1024;
 const ADMIN_STAFF = ['sugihira', 'momo'];
 const DEFAULT_ADMIN_PASSWORDS = { sugihira:'1001', momo:'3003' };
 const DEFAULT_MATERIAL_CATEGORIES = ['歯周治療', 'インプラント'];
@@ -666,9 +669,12 @@ window.saveMaterial = async function(event) {
 };
 
 async function uploadFile(file) {
+  const contentType = fileContentType(file);
+  if (isImageFile(file, contentType)) {
+    return inlineImagePayload(file, contentType);
+  }
   const path = `training-materials/${Date.now()}_${safeStorageName(file.name)}`;
   const target = storageRef(storage, path);
-  const contentType = fileContentType(file);
   const metadata = contentType ? { contentType } : {};
   if (!shouldUseResumableUpload(file, contentType)) {
     setProgress(1, true);
@@ -718,6 +724,63 @@ function filePayload(file, path, contentType, url) {
     storagePath: path,
     url
   };
+}
+
+async function inlineImagePayload(file, contentType) {
+  setProgress(1, true);
+  setStatus('画像を縮小しています。');
+  const image = await resizeInlineImage(file);
+  if (image.data.length > INLINE_IMAGE_MAX_DATA_URL_LENGTH) {
+    throw new Error('画像のサイズが大きすぎます。画像を小さくしてから保存してください。');
+  }
+  setProgress(100, true);
+  return {
+    sourceType: 'file',
+    linkUrl: null,
+    fileName: file.name,
+    fileType: image.type || contentType || 'image/jpeg',
+    fileSize: file.size,
+    storagePath: '',
+    inlineImage: true,
+    url: image.data
+  };
+}
+
+function resizeInlineImage(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('画像を読み込めませんでした。'));
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error('画像を読み込めませんでした。PNG/JPEG/WebP形式の画像で再度お試しください。'));
+      img.onload = () => {
+        let width = img.width;
+        let height = img.height;
+        if (width > INLINE_IMAGE_MAX_DIMENSION || height > INLINE_IMAGE_MAX_DIMENSION) {
+          const ratio = Math.min(INLINE_IMAGE_MAX_DIMENSION / width, INLINE_IMAGE_MAX_DIMENSION / height);
+          width = Math.round(width * ratio);
+          height = Math.round(height * ratio);
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(0, 0, width, height);
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve({
+          type: 'image/jpeg',
+          data: canvas.toDataURL('image/jpeg', INLINE_IMAGE_QUALITY)
+        });
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function isImageFile(file, contentType) {
+  return contentType.startsWith('image/') || /\.(jpe?g|png|gif|webp|heic|heif)$/i.test(file?.name || '');
 }
 
 window.startEdit = function(id) {
