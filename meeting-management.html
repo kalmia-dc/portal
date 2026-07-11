@@ -1116,10 +1116,10 @@ const INCIDENT_CATEGORIES = [
 const TESSERACT_CDN = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
 const INCIDENT_QUESTIONS = [
   {
-    key:'overview',
+    key:'eventImpact',
     step:'STEP 1',
-    title:'概要把握',
-    prompt:'まず、何が起きたか（または起きそうになったか）を自由に教えてください。',
+    title:'影響把握',
+    prompt:'どうなりそうだったか、または発生した実害を入力してください。',
     type:'textarea',
     required:true,
     support:'全部で8つのステップで進めます。途中で戻りながら内容を確認できます。'
@@ -1167,7 +1167,6 @@ const INCIDENT_QUESTIONS = [
   },
   { key:'categoryOther', step:'STEP 4', title:'状況の深掘り', prompt:'その他の内容を入力してください。', type:'text', required:true, onlyWhen:data => Array.isArray(data.category) && data.category.includes('G') },
   { key:'scene', step:'STEP 4', title:'状況の深掘り', prompt:'どんな場面で起きましたか？', type:'text', required:true, placeholder:'例：診察中、処置中、受付対応中、院内移動中' },
-  { key:'eventImpact', step:'STEP 4', title:'状況の深掘り', prompt:'どうなりそうだったか、または発生した実害を入力してください。', type:'textarea', required:true },
   {
     key:'level',
     step:'STEP 4',
@@ -1747,7 +1746,6 @@ function incidentReviewHtml() {
           <div class="review-value">${esc(value)}</div>
         `).join('')}
       </div>
-      ${textBlock('概要', incidentDraft.overview)}
       ${textBlock('どうなりそうだった？ / 発生した実害', incidentDraft.eventImpact)}
       ${textBlock('具体的な内容', incidentDraft.details)}
       ${incidentDraft.type === 'near_miss' ? textBlock('なぜ防げたか', incidentDraft.goodPoint) : ''}
@@ -1864,7 +1862,6 @@ function renderIncidentImportPreview() {
           ${importInputHtml(index, 'categoryText', '事象の種類', candidate.categoryText || incidentCategoryText(candidate))}
           ${importInputHtml(index, 'scene', '場面', candidate.scene)}
           ${importSelectHtml(index, 'level', '危険度', candidate.level, INCIDENT_LEVEL_LABELS)}
-          ${importTextareaHtml(index, 'overview', '概要', candidate.overview)}
           ${importTextareaHtml(index, 'eventImpact', 'どうなりそうだった？ / 発生した実害', candidate.eventImpact)}
           ${importTextareaHtml(index, 'details', '具体的な内容', candidate.details)}
           ${importTextareaHtml(index, 'goodPoint', 'なぜ防げたか', candidate.goodPoint)}
@@ -1959,7 +1956,6 @@ function readIncidentImportCandidate(base, index) {
     category: parseCategoryCodes(categoryText),
     scene: value('scene'),
     level: value('level'),
-    overview: value('overview'),
     eventImpact: value('eventImpact'),
     details: value('details'),
     goodPoint: value('goodPoint'),
@@ -1987,7 +1983,6 @@ function normalizeIncidentImport(raw) {
     categoryText: raw.categoryText || incidentCategoryText({ category }) || '',
     scene: raw.scene || '',
     level: raw.level || inferIncidentLevel(raw),
-    overview: raw.overview || shortTitle(raw.details || raw.rawText || ''),
     eventImpact: raw.eventImpact || '',
     details: raw.details || raw.rawText || '',
     goodPoint: raw.goodPoint || '',
@@ -2473,7 +2468,6 @@ function incidentReportSearchText(report) {
     report.createdBy,
     report.updatedBy,
     incidentCategoryText(report),
-    report.overview,
     report.scene,
     report.eventImpact,
     report.details,
@@ -2744,11 +2738,10 @@ function renderIncidentReports() {
           ${incidentLinkedTaskBadgeHtml(report)}
         </div>
       </div>
-      ${textBlock('概要', report.overview)}
-      ${textBlock('事象の種類', incidentCategoryText(report))}
-      ${textBlock('場面', report.scene)}
       ${textBlock('どうなりそうだった？ / 発生した実害', report.eventImpact)}
       ${textBlock('具体的な内容', report.details)}
+      ${textBlock('事象の種類', incidentCategoryText(report))}
+      ${textBlock('場面', report.scene)}
       ${incidentTypeKey(report) === 'near_miss' ? textBlock('なぜ防げたか（Good Point）', report.goodPoint) : ''}
       ${textBlock('原因【人・行動】', report.causeHuman)}
       ${textBlock('原因【環境・連携】', report.causeEnvironment)}
@@ -2964,10 +2957,6 @@ function incidentEditHtml(report) {
           <label>事象の種類</label>
           <input data-incident-edit="${escAttr(report.id)}" data-field="categoryText" value="${escAttr(categoryText === '-' ? '' : categoryText)}">
         </div>
-        <div class="field full">
-          <label>概要</label>
-          <textarea data-incident-edit="${escAttr(report.id)}" data-field="overview">${esc(report.overview || '')}</textarea>
-        </div>
         <div class="field">
           <label>場面</label>
           <input data-incident-edit="${escAttr(report.id)}" data-field="scene" value="${escAttr(report.scene || '')}">
@@ -3081,7 +3070,7 @@ async function saveIncidentReportEdit(id) {
     categoryText,
     category: parseCategoryCodes(categoryText),
     level: value('level'),
-    overview: value('overview'),
+    overview: null,
     scene: value('scene'),
     eventImpact: value('eventImpact'),
     details,
@@ -3183,7 +3172,7 @@ function buildIncidentTaskDetail(report) {
   appendIncidentTaskDetail(lines, '報告番号', report.reportNumber || buildIncidentReportNumber(report));
   appendIncidentTaskDetail(lines, '種別', INCIDENT_TYPE_LABELS[incidentTypeKey(report)]);
   appendIncidentTaskDetail(lines, '発生日', formatIncidentOccurredAt(report));
-  appendIncidentTaskDetail(lines, '概要', report.overview);
+  appendIncidentTaskDetail(lines, 'どうなりそうだった？ / 発生した実害', report.eventImpact);
   appendIncidentTaskDetail(lines, '具体的な内容', report.details);
   appendIncidentTaskDetail(lines, 'ミーティングへの申し送り', report.handoff);
   appendIncidentTaskDetail(lines, '対策内容', report.countermeasure);
@@ -3438,7 +3427,6 @@ function inferIncidentCategory(data) {
 
 function incidentSearchText(data) {
   return [
-    data?.overview,
     data?.eventImpact,
     data?.details,
     data?.causeHuman,
