@@ -2727,8 +2727,8 @@ function renderIncidentReports() {
           <h3>${esc(report.reportNumber || buildIncidentReportNumber(report))}</h3>
           <div class="meta">
             <span>${esc(formatIncidentOccurredAt(report))}</span>
-            <span>記入者: ${esc(report.reporterName || report.createdBy || '-')}</span>
-            <span>登録: ${esc(report.createdBy || '-')}</span>
+            <span>記入者（報告者）: ${esc(report.reporterName || report.createdBy || '-')}</span>
+            <span>発見者: ${esc(report.discovererName || '-')}</span>
           </div>
         </div>
         <div class="item-badges">
