@@ -1452,12 +1452,12 @@ function toList(data) {
 
 function sortTasks(a, b) {
   const weight = { todo:0, review:1, in_progress:2, all_read:3, confirmed:4 };
-  const aw = weight[taskStatus(a)] ?? 3;
-  const bw = weight[taskStatus(b)] ?? 3;
-  if (aw !== bw) return aw - bw;
   const aUpdated = Number(a.updatedAt || a.createdAt || 0);
   const bUpdated = Number(b.updatedAt || b.createdAt || 0);
   if (aUpdated !== bUpdated) return bUpdated - aUpdated;
+  const aw = weight[taskStatus(a)] ?? 3;
+  const bw = weight[taskStatus(b)] ?? 3;
+  if (aw !== bw) return aw - bw;
   return (b.createdAt || 0) - (a.createdAt || 0);
 }
 
