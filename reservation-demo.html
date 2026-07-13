@@ -661,6 +661,194 @@
         width: 100%;
       }
     }
+
+    @media print {
+      @page {
+        size: A4 landscape;
+        margin: 8mm;
+      }
+
+      :root {
+        --bg: #ffffff;
+        --surface: #ffffff;
+        --slot-height: 30px;
+        --time-col: 58px;
+        --chair-col: minmax(118px, 1fr);
+      }
+
+      * {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+
+      body {
+        background: #ffffff;
+        color: #000000;
+        font-size: 10px;
+      }
+
+      .app-shell {
+        min-height: 0;
+      }
+
+      .topbar {
+        position: static;
+        padding: 0 0 6px;
+        border-bottom: 1px solid #9aa8af;
+      }
+
+      .topbar-row {
+        max-width: none;
+        display: grid;
+        grid-template-columns: 1fr auto;
+        align-items: end;
+        gap: 8px;
+      }
+
+      .title-block {
+        min-width: 0;
+      }
+
+      h1 {
+        font-size: 16px;
+      }
+
+      .subtitle {
+        font-size: 10px;
+      }
+
+      .date-controls {
+        justify-content: end;
+      }
+
+      .date-controls .icon-button,
+      .date-controls .button,
+      .toolbar,
+      .notice,
+      dialog,
+      .toast {
+        display: none !important;
+      }
+
+      input[type="date"] {
+        border: 0;
+        padding: 0;
+        min-height: 0;
+        width: auto;
+        font-weight: 700;
+      }
+
+      .main {
+        max-width: none;
+        padding: 7px 0 0;
+        gap: 6px;
+      }
+
+      .summary-band {
+        grid-template-columns: repeat(4, 1fr);
+        gap: 5px;
+      }
+
+      .summary-item {
+        min-height: 0;
+        padding: 5px 6px;
+        border-radius: 0;
+      }
+
+      .summary-label {
+        font-size: 8px;
+      }
+
+      .summary-value {
+        margin-top: 0;
+        font-size: 12px;
+      }
+
+      .legend-row {
+        padding: 5px 6px;
+        border-radius: 0;
+        gap: 6px;
+      }
+
+      .legend-items {
+        gap: 4px;
+      }
+
+      .legend-title,
+      .type-pill,
+      .card-type,
+      .card-number,
+      .card-note {
+        font-size: 8px;
+      }
+
+      .type-pill {
+        min-height: 0;
+        padding: 1px 5px;
+      }
+
+      .type-dot {
+        width: 7px;
+        height: 7px;
+      }
+
+      .schedule-wrap {
+        max-height: none;
+        min-height: 0;
+        overflow: visible;
+        border-radius: 0;
+      }
+
+      .schedule-grid {
+        min-width: 0;
+        grid-template-columns: var(--time-col) repeat(4, var(--chair-col));
+      }
+
+      .schedule-corner,
+      .chair-header {
+        position: static;
+        min-height: 28px;
+        background: #eef3f4;
+      }
+
+      .time-cell {
+        position: static;
+        min-height: var(--slot-height);
+        padding: 4px 5px;
+        color: #263238;
+        font-size: 8px;
+      }
+
+      .slot-cell {
+        min-height: var(--slot-height);
+        padding: 3px;
+      }
+
+      .slot-cell.break::after {
+        font-size: 8px;
+      }
+
+      .appointment-card {
+        border-radius: 0;
+        border-left-width: 4px;
+        padding: 2px 4px;
+        gap: 0;
+        box-shadow: none;
+        overflow: hidden;
+      }
+
+      .card-name {
+        font-size: 9px;
+      }
+
+      .card-note {
+        display: none;
+      }
+
+      .empty-hint {
+        display: none;
+      }
+    }
   </style>
 </head>
 <body>
@@ -680,6 +868,7 @@
         </div>
 
         <div class="toolbar">
+          <button class="button primary" type="button" id="printButton">印刷</button>
           <button class="button" type="button" id="typeSettingsButton">予約内容を編集</button>
           <button class="button" type="button" id="resetDemoButton">初期データに戻す</button>
         </div>
@@ -840,6 +1029,7 @@
         els.prevDateButton = document.getElementById("prevDateButton");
         els.nextDateButton = document.getElementById("nextDateButton");
         els.todayButton = document.getElementById("todayButton");
+        els.printButton = document.getElementById("printButton");
         els.typeSettingsButton = document.getElementById("typeSettingsButton");
         els.resetDemoButton = document.getElementById("resetDemoButton");
         els.storageNotice = document.getElementById("storageNotice");
@@ -886,6 +1076,7 @@
             renderAll();
           }
         });
+        els.printButton.addEventListener("click", () => window.print());
         els.typeSettingsButton.addEventListener("click", openTypeEditor);
         els.resetDemoButton.addEventListener("click", resetDemoData);
 
