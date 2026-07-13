@@ -1,0 +1,1610 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>歯科予約表デモ</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f5f7f8;
+      --surface: #ffffff;
+      --surface-alt: #f8fafb;
+      --line: #d9e1e6;
+      --line-strong: #bccbd3;
+      --text: #172126;
+      --muted: #65757e;
+      --accent: #0f766e;
+      --accent-dark: #0b5f59;
+      --danger: #b42318;
+      --warning-bg: #fff7e6;
+      --warning-line: #ffd38a;
+      --shadow: 0 14px 32px rgba(23, 33, 38, 0.12);
+      --radius: 8px;
+      --slot-height: 76px;
+      --time-col: 96px;
+      --chair-col: minmax(190px, 1fr);
+      font-family: "Segoe UI", "Yu Gothic UI", "Hiragino Sans", Meiryo, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-size: 15px;
+      line-height: 1.5;
+    }
+
+    button,
+    input,
+    select,
+    textarea {
+      font: inherit;
+    }
+
+    button {
+      cursor: pointer;
+    }
+
+    button:disabled {
+      cursor: not-allowed;
+      opacity: 0.58;
+    }
+
+    .app-shell {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .topbar {
+      background: var(--surface);
+      border-bottom: 1px solid var(--line);
+      padding: 14px 20px;
+      position: sticky;
+      top: 0;
+      z-index: 30;
+    }
+
+    .topbar-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      max-width: 1480px;
+      margin: 0 auto;
+    }
+
+    .title-block {
+      min-width: 230px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 22px;
+      font-weight: 700;
+    }
+
+    .subtitle {
+      margin: 2px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .date-controls {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .button,
+    .icon-button {
+      border: 1px solid var(--line-strong);
+      background: var(--surface);
+      color: var(--text);
+      border-radius: 6px;
+      min-height: 38px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.15s ease;
+    }
+
+    .button {
+      padding: 0 13px;
+      font-weight: 600;
+    }
+
+    .icon-button {
+      width: 38px;
+      padding: 0;
+      font-size: 20px;
+      line-height: 1;
+    }
+
+    .button:hover,
+    .icon-button:hover {
+      border-color: #91a6af;
+      background: #f3f7f7;
+    }
+
+    .button:active,
+    .icon-button:active {
+      transform: translateY(1px);
+    }
+
+    .button.primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #ffffff;
+    }
+
+    .button.primary:hover {
+      background: var(--accent-dark);
+      border-color: var(--accent-dark);
+    }
+
+    .button.danger {
+      border-color: #f1b6af;
+      color: var(--danger);
+      background: #fff8f7;
+    }
+
+    .button.danger:hover {
+      border-color: #e68177;
+      background: #fff1ef;
+    }
+
+    input[type="date"],
+    input[type="text"],
+    input[type="color"],
+    select,
+    textarea {
+      border: 1px solid var(--line-strong);
+      border-radius: 6px;
+      background: #ffffff;
+      color: var(--text);
+      min-height: 38px;
+      padding: 8px 10px;
+      width: 100%;
+    }
+
+    input[type="color"] {
+      padding: 3px;
+      width: 54px;
+      min-width: 54px;
+    }
+
+    textarea {
+      resize: vertical;
+      min-height: 92px;
+    }
+
+    .main {
+      width: 100%;
+      max-width: 1480px;
+      margin: 0 auto;
+      padding: 18px 20px 28px;
+      display: grid;
+      gap: 14px;
+    }
+
+    .notice {
+      border: 1px solid var(--warning-line);
+      background: var(--warning-bg);
+      color: #604000;
+      border-radius: var(--radius);
+      padding: 10px 12px;
+      font-size: 13px;
+    }
+
+    .summary-band {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(130px, 1fr));
+      gap: 10px;
+    }
+
+    .summary-item {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 12px 14px;
+      min-height: 72px;
+    }
+
+    .summary-label {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .summary-value {
+      margin-top: 3px;
+      font-size: 22px;
+      font-weight: 750;
+    }
+
+    .legend-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 12px 14px;
+    }
+
+    .legend-items {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .legend-title {
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 700;
+      margin-right: 2px;
+    }
+
+    .type-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      min-height: 28px;
+      padding: 4px 9px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: #ffffff;
+      color: var(--text);
+      font-size: 13px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .type-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      background: var(--type-color);
+      flex: 0 0 auto;
+    }
+
+    .schedule-wrap {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      overflow: auto;
+      max-height: calc(100vh - 270px);
+      min-height: 540px;
+    }
+
+    .schedule-grid {
+      min-width: 860px;
+      display: grid;
+      grid-template-columns: var(--time-col) repeat(4, var(--chair-col));
+      align-items: stretch;
+    }
+
+    .schedule-corner,
+    .chair-header,
+    .time-cell,
+    .slot-cell {
+      border-right: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .schedule-corner {
+      position: sticky;
+      top: 0;
+      left: 0;
+      z-index: 12;
+      background: #edf3f4;
+      min-height: 48px;
+    }
+
+    .chair-header {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: #edf3f4;
+      min-height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 750;
+    }
+
+    .time-cell {
+      position: sticky;
+      left: 0;
+      z-index: 5;
+      background: #f8fafb;
+      min-height: var(--slot-height);
+      padding: 10px 11px;
+      color: var(--muted);
+      font-weight: 700;
+      display: flex;
+      align-items: flex-start;
+      justify-content: flex-end;
+    }
+
+    .time-cell.break {
+      background: #f1f4f5;
+      color: #81909a;
+    }
+
+    .slot-cell {
+      min-height: var(--slot-height);
+      padding: 7px;
+      background: #ffffff;
+      position: relative;
+      outline: none;
+    }
+
+    .slot-cell:not(.break):not(.occupied):hover,
+    .slot-cell.drop-ready {
+      background: #effaf8;
+      box-shadow: inset 0 0 0 2px rgba(15, 118, 110, 0.22);
+    }
+
+    .slot-cell.break {
+      background:
+        repeating-linear-gradient(
+          -45deg,
+          #f1f4f5,
+          #f1f4f5 10px,
+          #e7ecef 10px,
+          #e7ecef 20px
+        );
+      color: #75848c;
+    }
+
+    .slot-cell.break::after {
+      content: "休憩";
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #75848c;
+      font-size: 12px;
+      font-weight: 750;
+      pointer-events: none;
+    }
+
+    .slot-cell.occupied {
+      background: #fbfcfd;
+    }
+
+    .appointment-card {
+      height: 100%;
+      width: 100%;
+      border: 1px solid color-mix(in srgb, var(--type-color) 58%, #ffffff);
+      border-left: 5px solid var(--type-color);
+      border-radius: 7px;
+      background: #ffffff;
+      padding: 8px 9px;
+      display: grid;
+      align-content: start;
+      gap: 3px;
+      box-shadow: 0 5px 12px rgba(23, 33, 38, 0.08);
+      outline: none;
+      user-select: none;
+    }
+
+    .appointment-card:hover,
+    .appointment-card:focus-visible {
+      box-shadow: 0 7px 18px rgba(23, 33, 38, 0.14);
+      border-color: var(--type-color);
+    }
+
+    .appointment-card.dragging {
+      opacity: 0.48;
+    }
+
+    .card-topline {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+      min-width: 0;
+    }
+
+    .card-type {
+      color: var(--type-color);
+      font-size: 12px;
+      font-weight: 800;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .card-number {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .card-name {
+      color: var(--text);
+      font-weight: 800;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .card-note {
+      color: var(--muted);
+      font-size: 12px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .empty-hint {
+      color: #91a0a8;
+      font-size: 12px;
+      font-weight: 700;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      transition: opacity 0.15s ease;
+    }
+
+    .slot-cell:not(.break):not(.occupied):hover .empty-hint,
+    .slot-cell:not(.break):not(.occupied):focus-visible .empty-hint {
+      opacity: 1;
+    }
+
+    dialog {
+      border: 0;
+      padding: 0;
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      width: min(94vw, 560px);
+      background: var(--surface);
+      color: var(--text);
+    }
+
+    dialog::backdrop {
+      background: rgba(14, 25, 30, 0.42);
+    }
+
+    .modal-header,
+    .modal-footer {
+      padding: 15px 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .modal-header {
+      border-bottom: 1px solid var(--line);
+    }
+
+    .modal-footer {
+      border-top: 1px solid var(--line);
+      background: var(--surface-alt);
+      flex-wrap: wrap;
+    }
+
+    .modal-title {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 750;
+    }
+
+    .modal-body {
+      padding: 18px;
+      display: grid;
+      gap: 13px;
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 13px;
+    }
+
+    .form-field {
+      display: grid;
+      gap: 5px;
+    }
+
+    .form-field.full {
+      grid-column: 1 / -1;
+    }
+
+    .field-label {
+      font-size: 13px;
+      color: var(--muted);
+      font-weight: 750;
+    }
+
+    .slot-label {
+      background: #eef6f5;
+      color: #0d5f59;
+      border: 1px solid #c8e2de;
+      border-radius: 6px;
+      padding: 9px 10px;
+      font-weight: 750;
+    }
+
+    .error-message {
+      min-height: 20px;
+      color: var(--danger);
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .footer-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .type-editor-list {
+      display: grid;
+      gap: 8px;
+    }
+
+    .type-editor-row {
+      display: grid;
+      grid-template-columns: 1fr 62px auto;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .type-add-row {
+      display: grid;
+      grid-template-columns: 1fr 62px auto;
+      align-items: center;
+      gap: 8px;
+      padding-top: 10px;
+      border-top: 1px solid var(--line);
+    }
+
+    .toast {
+      position: fixed;
+      right: 18px;
+      bottom: 18px;
+      z-index: 60;
+      background: #142226;
+      color: #ffffff;
+      border-radius: 7px;
+      padding: 11px 13px;
+      min-width: 220px;
+      max-width: min(420px, calc(100vw - 36px));
+      box-shadow: var(--shadow);
+      opacity: 0;
+      transform: translateY(8px);
+      pointer-events: none;
+      transition: opacity 0.18s ease, transform 0.18s ease;
+      font-weight: 700;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    [hidden] {
+      display: none !important;
+    }
+
+    @media (max-width: 980px) {
+      .topbar-row {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .date-controls,
+      .toolbar {
+        justify-content: flex-start;
+      }
+
+      .summary-band {
+        grid-template-columns: repeat(2, minmax(140px, 1fr));
+      }
+
+      .schedule-wrap {
+        max-height: none;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .topbar,
+      .main {
+        padding-left: 12px;
+        padding-right: 12px;
+      }
+
+      .summary-band {
+        grid-template-columns: 1fr;
+      }
+
+      .legend-row {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .form-grid,
+      .type-editor-row,
+      .type-add-row {
+        grid-template-columns: 1fr;
+      }
+
+      input[type="color"] {
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="topbar-row">
+        <div class="title-block">
+          <h1>歯科予約表デモ</h1>
+          <p class="subtitle">1日表示・チェア別・30分刻み</p>
+        </div>
+
+        <div class="date-controls" aria-label="日付操作">
+          <button class="icon-button" type="button" id="prevDateButton" title="前日">‹</button>
+          <input type="date" id="dateInput" aria-label="表示日">
+          <button class="icon-button" type="button" id="nextDateButton" title="翌日">›</button>
+          <button class="button" type="button" id="todayButton">今日</button>
+        </div>
+
+        <div class="toolbar">
+          <button class="button" type="button" id="typeSettingsButton">予約内容を編集</button>
+          <button class="button" type="button" id="resetDemoButton">初期データに戻す</button>
+        </div>
+      </div>
+    </header>
+
+    <main class="main">
+      <div class="notice" id="storageNotice" hidden>
+        このブラウザでは保存機能が利用できません。画面を閉じると変更内容は保持されません。
+      </div>
+
+      <section class="summary-band" aria-label="予約状況">
+        <div class="summary-item">
+          <div class="summary-label">表示日</div>
+          <div class="summary-value" id="summaryDate">-</div>
+        </div>
+        <div class="summary-item">
+          <div class="summary-label">予約数</div>
+          <div class="summary-value" id="summaryBooked">0</div>
+        </div>
+        <div class="summary-item">
+          <div class="summary-label">空き枠</div>
+          <div class="summary-value" id="summaryOpen">0</div>
+        </div>
+        <div class="summary-item">
+          <div class="summary-label">診療時間</div>
+          <div class="summary-value">9:30-20:00</div>
+        </div>
+      </section>
+
+      <section class="legend-row" aria-label="予約内容の凡例">
+        <div class="legend-items" id="legendItems">
+          <span class="legend-title">予約内容</span>
+        </div>
+        <div class="subtitle">休憩 12:00-15:00 / 18:00-19:00</div>
+      </section>
+
+      <section class="schedule-wrap" aria-label="予約表">
+        <div class="schedule-grid" id="scheduleGrid"></div>
+      </section>
+    </main>
+  </div>
+
+  <dialog id="appointmentDialog">
+    <form method="dialog" id="appointmentForm">
+      <div class="modal-header">
+        <h2 class="modal-title" id="appointmentDialogTitle">予約追加</h2>
+        <button class="icon-button" type="button" id="closeAppointmentButton" title="閉じる">×</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="slot-label" id="appointmentSlotLabel">-</div>
+        <div class="form-grid">
+          <label class="form-field">
+            <span class="field-label">カルテ番号</span>
+            <input type="text" id="chartNumberInput" autocomplete="off" required>
+          </label>
+          <label class="form-field">
+            <span class="field-label">患者名</span>
+            <input type="text" id="patientNameInput" autocomplete="off" required>
+          </label>
+          <label class="form-field full">
+            <span class="field-label">予約内容</span>
+            <select id="appointmentTypeInput" required></select>
+          </label>
+          <label class="form-field full">
+            <span class="field-label">メモ</span>
+            <textarea id="memoInput" placeholder="連絡事項や注意点"></textarea>
+          </label>
+        </div>
+        <div class="error-message" id="appointmentError" aria-live="polite"></div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="button danger" type="button" id="deleteAppointmentButton" hidden>予約キャンセル</button>
+        <div class="footer-actions">
+          <button class="button" type="button" id="cancelAppointmentButton">閉じる</button>
+          <button class="button primary" type="submit">保存</button>
+        </div>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="typeEditorDialog">
+    <div class="modal-header">
+      <h2 class="modal-title">予約内容を編集</h2>
+      <button class="icon-button" type="button" id="closeTypeEditorButton" title="閉じる">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="type-editor-list" id="typeEditorList"></div>
+      <div class="type-add-row">
+        <input type="text" id="newTypeNameInput" placeholder="新しい予約内容">
+        <input type="color" id="newTypeColorInput" value="#0f766e" aria-label="新しい予約内容の色">
+        <button class="button" type="button" id="addTypeButton">追加</button>
+      </div>
+      <div class="error-message" id="typeEditorError" aria-live="polite"></div>
+    </div>
+    <div class="modal-footer">
+      <div></div>
+      <div class="footer-actions">
+        <button class="button" type="button" id="cancelTypeEditorButton">閉じる</button>
+        <button class="button primary" type="button" id="saveTypesButton">保存</button>
+      </div>
+    </div>
+  </dialog>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script>
+    (() => {
+      "use strict";
+
+      const STORAGE_KEY = "dentalReservationDemo.v1";
+      const TEST_STORAGE_KEY = "dentalReservationDemo.storageTest";
+      const chairs = [
+        { id: "chair-1", name: "チェア1" },
+        { id: "chair-2", name: "チェア2" },
+        { id: "chair-3", name: "チェア3" },
+        { id: "chair-4", name: "チェア4" }
+      ];
+      const startMinutes = 9 * 60 + 30;
+      const endMinutes = 20 * 60;
+      const slotMinutes = 30;
+      const breakRanges = [
+        { start: 12 * 60, end: 15 * 60 },
+        { start: 18 * 60, end: 19 * 60 }
+      ];
+      const defaultTypes = [
+        { id: "type-first", name: "初診", color: "#2563eb" },
+        { id: "type-revisit", name: "再診", color: "#0f766e" },
+        { id: "type-emergency", name: "急患", color: "#dc2626" },
+        { id: "type-maintenance", name: "メンテナンス", color: "#7c3aed" },
+        { id: "type-treatment", name: "治療", color: "#d97706" }
+      ];
+
+      const els = {};
+      const storageAvailable = canUseLocalStorage();
+      let currentDate = todayIso();
+      let state = loadState();
+      let editingAppointmentId = null;
+      let pendingSlot = null;
+      let draggedAppointmentId = null;
+      let typeDraft = [];
+      let toastTimer = null;
+
+      document.addEventListener("DOMContentLoaded", init);
+
+      function init() {
+        cacheElements();
+        bindEvents();
+        els.storageNotice.hidden = storageAvailable;
+        els.dateInput.value = currentDate;
+        renderAll();
+      }
+
+      function cacheElements() {
+        els.dateInput = document.getElementById("dateInput");
+        els.prevDateButton = document.getElementById("prevDateButton");
+        els.nextDateButton = document.getElementById("nextDateButton");
+        els.todayButton = document.getElementById("todayButton");
+        els.typeSettingsButton = document.getElementById("typeSettingsButton");
+        els.resetDemoButton = document.getElementById("resetDemoButton");
+        els.storageNotice = document.getElementById("storageNotice");
+        els.summaryDate = document.getElementById("summaryDate");
+        els.summaryBooked = document.getElementById("summaryBooked");
+        els.summaryOpen = document.getElementById("summaryOpen");
+        els.legendItems = document.getElementById("legendItems");
+        els.scheduleGrid = document.getElementById("scheduleGrid");
+        els.appointmentDialog = document.getElementById("appointmentDialog");
+        els.appointmentForm = document.getElementById("appointmentForm");
+        els.appointmentDialogTitle = document.getElementById("appointmentDialogTitle");
+        els.appointmentSlotLabel = document.getElementById("appointmentSlotLabel");
+        els.chartNumberInput = document.getElementById("chartNumberInput");
+        els.patientNameInput = document.getElementById("patientNameInput");
+        els.appointmentTypeInput = document.getElementById("appointmentTypeInput");
+        els.memoInput = document.getElementById("memoInput");
+        els.appointmentError = document.getElementById("appointmentError");
+        els.deleteAppointmentButton = document.getElementById("deleteAppointmentButton");
+        els.closeAppointmentButton = document.getElementById("closeAppointmentButton");
+        els.cancelAppointmentButton = document.getElementById("cancelAppointmentButton");
+        els.typeEditorDialog = document.getElementById("typeEditorDialog");
+        els.typeEditorList = document.getElementById("typeEditorList");
+        els.newTypeNameInput = document.getElementById("newTypeNameInput");
+        els.newTypeColorInput = document.getElementById("newTypeColorInput");
+        els.addTypeButton = document.getElementById("addTypeButton");
+        els.typeEditorError = document.getElementById("typeEditorError");
+        els.closeTypeEditorButton = document.getElementById("closeTypeEditorButton");
+        els.cancelTypeEditorButton = document.getElementById("cancelTypeEditorButton");
+        els.saveTypesButton = document.getElementById("saveTypesButton");
+        els.toast = document.getElementById("toast");
+      }
+
+      function bindEvents() {
+        els.prevDateButton.addEventListener("click", () => changeDateBy(-1));
+        els.nextDateButton.addEventListener("click", () => changeDateBy(1));
+        els.todayButton.addEventListener("click", () => {
+          currentDate = todayIso();
+          els.dateInput.value = currentDate;
+          renderAll();
+        });
+        els.dateInput.addEventListener("change", () => {
+          if (els.dateInput.value) {
+            currentDate = els.dateInput.value;
+            renderAll();
+          }
+        });
+        els.typeSettingsButton.addEventListener("click", openTypeEditor);
+        els.resetDemoButton.addEventListener("click", resetDemoData);
+
+        els.appointmentForm.addEventListener("submit", saveAppointmentFromForm);
+        els.deleteAppointmentButton.addEventListener("click", deleteCurrentAppointment);
+        els.closeAppointmentButton.addEventListener("click", () => closeDialog(els.appointmentDialog));
+        els.cancelAppointmentButton.addEventListener("click", () => closeDialog(els.appointmentDialog));
+
+        els.closeTypeEditorButton.addEventListener("click", () => closeDialog(els.typeEditorDialog));
+        els.cancelTypeEditorButton.addEventListener("click", () => closeDialog(els.typeEditorDialog));
+        els.addTypeButton.addEventListener("click", addTypeDraft);
+        els.saveTypesButton.addEventListener("click", saveTypeDraft);
+      }
+
+      function renderAll() {
+        renderSummary();
+        renderLegend();
+        renderTypeOptions();
+        renderSchedule();
+      }
+
+      function renderSummary() {
+        const active = getAppointmentsForCurrentDate();
+        const usableSlots = getSlots().filter((slot) => !isBreakSlot(slot.minutes)).length * chairs.length;
+        els.summaryDate.textContent = formatDateLabel(currentDate);
+        els.summaryBooked.textContent = String(active.length);
+        els.summaryOpen.textContent = String(Math.max(usableSlots - active.length, 0));
+      }
+
+      function renderLegend() {
+        els.legendItems.innerHTML = "";
+        const title = document.createElement("span");
+        title.className = "legend-title";
+        title.textContent = "予約内容";
+        els.legendItems.append(title);
+
+        state.types.forEach((type) => {
+          const pill = document.createElement("span");
+          pill.className = "type-pill";
+          pill.style.setProperty("--type-color", type.color);
+
+          const dot = document.createElement("span");
+          dot.className = "type-dot";
+          const label = document.createElement("span");
+          label.textContent = type.name;
+
+          pill.append(dot, label);
+          els.legendItems.append(pill);
+        });
+      }
+
+      function renderTypeOptions(selectedTypeId = "") {
+        els.appointmentTypeInput.innerHTML = "";
+        state.types.forEach((type) => {
+          const option = document.createElement("option");
+          option.value = type.id;
+          option.textContent = type.name;
+          els.appointmentTypeInput.append(option);
+        });
+
+        if (selectedTypeId && state.types.some((type) => type.id === selectedTypeId)) {
+          els.appointmentTypeInput.value = selectedTypeId;
+        }
+      }
+
+      function renderSchedule() {
+        els.scheduleGrid.innerHTML = "";
+
+        const corner = document.createElement("div");
+        corner.className = "schedule-corner";
+        corner.setAttribute("aria-hidden", "true");
+        els.scheduleGrid.append(corner);
+
+        chairs.forEach((chair) => {
+          const header = document.createElement("div");
+          header.className = "chair-header";
+          header.textContent = chair.name;
+          els.scheduleGrid.append(header);
+        });
+
+        getSlots().forEach((slot) => {
+          const timeCell = document.createElement("div");
+          timeCell.className = `time-cell${isBreakSlot(slot.minutes) ? " break" : ""}`;
+          timeCell.textContent = slot.label;
+          els.scheduleGrid.append(timeCell);
+
+          chairs.forEach((chair) => {
+            els.scheduleGrid.append(createSlotCell(slot, chair));
+          });
+        });
+      }
+
+      function createSlotCell(slot, chair) {
+        const breakSlot = isBreakSlot(slot.minutes);
+        const appointment = findAppointment(currentDate, chair.id, slot.label);
+        const cell = document.createElement("div");
+        cell.className = `slot-cell${breakSlot ? " break" : ""}${appointment ? " occupied" : ""}`;
+        cell.dataset.date = currentDate;
+        cell.dataset.time = slot.label;
+        cell.dataset.chair = chair.id;
+
+        if (!breakSlot) {
+          cell.tabIndex = appointment ? -1 : 0;
+          cell.setAttribute("role", "button");
+          cell.setAttribute("aria-label", `${formatDateLabel(currentDate)} ${chair.name} ${slot.label} 予約追加`);
+          cell.addEventListener("click", () => {
+            if (!appointment) {
+              openAppointmentDialog({ chairId: chair.id, time: slot.label });
+            }
+          });
+          cell.addEventListener("keydown", (event) => {
+            if (!appointment && (event.key === "Enter" || event.key === " ")) {
+              event.preventDefault();
+              openAppointmentDialog({ chairId: chair.id, time: slot.label });
+            }
+          });
+          bindDropTarget(cell, slot, chair);
+        }
+
+        if (appointment) {
+          cell.append(createAppointmentCard(appointment));
+        } else if (!breakSlot) {
+          const hint = document.createElement("div");
+          hint.className = "empty-hint";
+          hint.textContent = "クリックして追加";
+          cell.append(hint);
+        }
+
+        return cell;
+      }
+
+      function createAppointmentCard(appointment) {
+        const type = findType(appointment.typeId);
+        const card = document.createElement("div");
+        card.className = "appointment-card";
+        card.draggable = true;
+        card.tabIndex = 0;
+        card.setAttribute("role", "button");
+        card.setAttribute("aria-label", `${appointment.patientName} ${type.name}の予約を編集`);
+        card.dataset.appointmentId = appointment.id;
+        card.style.setProperty("--type-color", type.color);
+
+        const topline = document.createElement("div");
+        topline.className = "card-topline";
+        const typeLabel = document.createElement("span");
+        typeLabel.className = "card-type";
+        typeLabel.textContent = type.name;
+        const numberLabel = document.createElement("span");
+        numberLabel.className = "card-number";
+        numberLabel.textContent = appointment.chartNumber;
+        topline.append(typeLabel, numberLabel);
+
+        const name = document.createElement("div");
+        name.className = "card-name";
+        name.textContent = appointment.patientName;
+
+        const note = document.createElement("div");
+        note.className = "card-note";
+        note.textContent = appointment.memo || "メモなし";
+
+        card.append(topline, name, note);
+
+        card.addEventListener("click", (event) => {
+          event.stopPropagation();
+          openAppointmentDialog({ appointmentId: appointment.id });
+        });
+        card.addEventListener("keydown", (event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            openAppointmentDialog({ appointmentId: appointment.id });
+          }
+        });
+        card.addEventListener("dragstart", (event) => {
+          draggedAppointmentId = appointment.id;
+          card.classList.add("dragging");
+          event.dataTransfer.effectAllowed = "move";
+          event.dataTransfer.setData("text/plain", appointment.id);
+        });
+        card.addEventListener("dragend", () => {
+          draggedAppointmentId = null;
+          card.classList.remove("dragging");
+          clearDropStyles();
+        });
+
+        return card;
+      }
+
+      function bindDropTarget(cell, slot, chair) {
+        cell.addEventListener("dragover", (event) => {
+          if (draggedAppointmentId) {
+            event.preventDefault();
+            event.dataTransfer.dropEffect = "move";
+          }
+        });
+        cell.addEventListener("dragenter", () => {
+          if (draggedAppointmentId && canPlaceAppointment(currentDate, chair.id, slot.label, draggedAppointmentId).ok) {
+            cell.classList.add("drop-ready");
+          }
+        });
+        cell.addEventListener("dragleave", () => {
+          cell.classList.remove("drop-ready");
+        });
+        cell.addEventListener("drop", (event) => {
+          event.preventDefault();
+          const appointmentId = event.dataTransfer.getData("text/plain") || draggedAppointmentId;
+          moveAppointment(appointmentId, chair.id, slot.label);
+        });
+      }
+
+      function openAppointmentDialog({ appointmentId = null, chairId = null, time = null }) {
+        els.appointmentError.textContent = "";
+        editingAppointmentId = appointmentId;
+
+        if (appointmentId) {
+          const appointment = state.reservations.find((item) => item.id === appointmentId);
+          if (!appointment) {
+            showToast("予約が見つかりません。");
+            return;
+          }
+          pendingSlot = {
+            date: appointment.date,
+            chairId: appointment.chairId,
+            time: appointment.time
+          };
+          els.appointmentDialogTitle.textContent = "予約編集";
+          els.deleteAppointmentButton.hidden = false;
+          els.chartNumberInput.value = appointment.chartNumber;
+          els.patientNameInput.value = appointment.patientName;
+          renderTypeOptions(appointment.typeId);
+          els.memoInput.value = appointment.memo || "";
+        } else {
+          pendingSlot = {
+            date: currentDate,
+            chairId,
+            time
+          };
+          els.appointmentDialogTitle.textContent = "予約追加";
+          els.deleteAppointmentButton.hidden = true;
+          els.appointmentForm.reset();
+          renderTypeOptions(state.types[0]?.id || "");
+        }
+
+        els.appointmentSlotLabel.textContent = buildSlotLabel(pendingSlot);
+        openDialog(els.appointmentDialog);
+        window.setTimeout(() => els.chartNumberInput.focus(), 0);
+      }
+
+      function saveAppointmentFromForm(event) {
+        event.preventDefault();
+        els.appointmentError.textContent = "";
+
+        if (!pendingSlot) {
+          els.appointmentError.textContent = "予約枠を確認できません。";
+          return;
+        }
+
+        const chartNumber = els.chartNumberInput.value.trim();
+        const patientName = els.patientNameInput.value.trim();
+        const typeId = els.appointmentTypeInput.value;
+        const memo = els.memoInput.value.trim();
+
+        if (!chartNumber || !patientName || !typeId) {
+          els.appointmentError.textContent = "カルテ番号、患者名、予約内容を入力してください。";
+          return;
+        }
+
+        const placement = canPlaceAppointment(
+          pendingSlot.date,
+          pendingSlot.chairId,
+          pendingSlot.time,
+          editingAppointmentId
+        );
+        if (!placement.ok) {
+          els.appointmentError.textContent = placement.message;
+          return;
+        }
+
+        if (editingAppointmentId) {
+          const appointment = state.reservations.find((item) => item.id === editingAppointmentId);
+          if (!appointment) {
+            els.appointmentError.textContent = "予約が見つかりません。";
+            return;
+          }
+          appointment.chartNumber = chartNumber;
+          appointment.patientName = patientName;
+          appointment.typeId = typeId;
+          appointment.memo = memo;
+          appointment.updatedAt = new Date().toISOString();
+        } else {
+          state.reservations.push({
+            id: createId("appt"),
+            date: pendingSlot.date,
+            chairId: pendingSlot.chairId,
+            time: pendingSlot.time,
+            chartNumber,
+            patientName,
+            typeId,
+            memo,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          });
+        }
+
+        persistState();
+        closeDialog(els.appointmentDialog);
+        renderAll();
+        showToast(editingAppointmentId ? "予約を更新しました。" : "予約を追加しました。");
+      }
+
+      function deleteCurrentAppointment() {
+        if (!editingAppointmentId) {
+          return;
+        }
+
+        const appointment = state.reservations.find((item) => item.id === editingAppointmentId);
+        if (!appointment) {
+          showToast("予約が見つかりません。");
+          return;
+        }
+
+        if (!window.confirm("この予約をキャンセルして削除しますか？")) {
+          return;
+        }
+
+        state.reservations = state.reservations.filter((item) => item.id !== editingAppointmentId);
+        persistState();
+        closeDialog(els.appointmentDialog);
+        renderAll();
+        showToast("予約をキャンセルしました。");
+      }
+
+      function moveAppointment(appointmentId, chairId, time) {
+        clearDropStyles();
+        const appointment = state.reservations.find((item) => item.id === appointmentId);
+        if (!appointment) {
+          showToast("移動する予約が見つかりません。");
+          return;
+        }
+
+        const placement = canPlaceAppointment(currentDate, chairId, time, appointment.id);
+        if (!placement.ok) {
+          showToast(placement.message);
+          return;
+        }
+
+        appointment.date = currentDate;
+        appointment.chairId = chairId;
+        appointment.time = time;
+        appointment.updatedAt = new Date().toISOString();
+        persistState();
+        renderAll();
+        showToast("予約を移動しました。");
+      }
+
+      function canPlaceAppointment(date, chairId, time, ignoreId = null) {
+        if (!date || !chairId || !time) {
+          return { ok: false, message: "予約枠が正しくありません。" };
+        }
+
+        if (isBreakSlot(timeToMinutes(time))) {
+          return { ok: false, message: "休憩時間には予約できません。" };
+        }
+
+        const conflict = state.reservations.find((item) => {
+          return item.date === date &&
+            item.chairId === chairId &&
+            item.time === time &&
+            item.id !== ignoreId;
+        });
+
+        if (conflict) {
+          return { ok: false, message: "同じチェアと時間に既に予約があります。" };
+        }
+
+        return { ok: true, message: "" };
+      }
+
+      function openTypeEditor() {
+        typeDraft = state.types.map((type) => ({ ...type }));
+        els.typeEditorError.textContent = "";
+        els.newTypeNameInput.value = "";
+        els.newTypeColorInput.value = "#0f766e";
+        renderTypeDraft();
+        openDialog(els.typeEditorDialog);
+      }
+
+      function renderTypeDraft() {
+        els.typeEditorList.innerHTML = "";
+
+        typeDraft.forEach((type, index) => {
+          const row = document.createElement("div");
+          row.className = "type-editor-row";
+
+          const nameInput = document.createElement("input");
+          nameInput.type = "text";
+          nameInput.value = type.name;
+          nameInput.setAttribute("aria-label", "予約内容名");
+          nameInput.addEventListener("input", () => {
+            typeDraft[index].name = nameInput.value;
+          });
+
+          const colorInput = document.createElement("input");
+          colorInput.type = "color";
+          colorInput.value = type.color;
+          colorInput.setAttribute("aria-label", `${type.name}の色`);
+          colorInput.addEventListener("input", () => {
+            typeDraft[index].color = colorInput.value;
+          });
+
+          const deleteButton = document.createElement("button");
+          deleteButton.className = "button danger";
+          deleteButton.type = "button";
+          deleteButton.textContent = "削除";
+          deleteButton.addEventListener("click", () => {
+            removeTypeDraft(type.id);
+          });
+
+          row.append(nameInput, colorInput, deleteButton);
+          els.typeEditorList.append(row);
+        });
+      }
+
+      function addTypeDraft() {
+        const name = els.newTypeNameInput.value.trim();
+        const color = els.newTypeColorInput.value;
+        els.typeEditorError.textContent = "";
+
+        if (!name) {
+          els.typeEditorError.textContent = "追加する予約内容名を入力してください。";
+          return;
+        }
+
+        if (typeDraft.some((type) => type.name === name)) {
+          els.typeEditorError.textContent = "同じ予約内容名が既にあります。";
+          return;
+        }
+
+        typeDraft.push({
+          id: createId("type"),
+          name,
+          color
+        });
+        els.newTypeNameInput.value = "";
+        renderTypeDraft();
+      }
+
+      function removeTypeDraft(typeId) {
+        els.typeEditorError.textContent = "";
+        if (typeDraft.length <= 1) {
+          els.typeEditorError.textContent = "予約内容は1件以上必要です。";
+          return;
+        }
+
+        const isUsed = state.reservations.some((appointment) => appointment.typeId === typeId);
+        if (isUsed) {
+          els.typeEditorError.textContent = "予約で使用中の内容は削除できません。";
+          return;
+        }
+
+        typeDraft = typeDraft.filter((type) => type.id !== typeId);
+        renderTypeDraft();
+      }
+
+      function saveTypeDraft() {
+        els.typeEditorError.textContent = "";
+        const normalized = typeDraft.map((type) => ({
+          ...type,
+          name: type.name.trim()
+        }));
+
+        if (!normalized.length || normalized.some((type) => !type.name)) {
+          els.typeEditorError.textContent = "予約内容名を入力してください。";
+          return;
+        }
+
+        const names = normalized.map((type) => type.name);
+        if (new Set(names).size !== names.length) {
+          els.typeEditorError.textContent = "予約内容名が重複しています。";
+          return;
+        }
+
+        state.types = normalized;
+        persistState();
+        closeDialog(els.typeEditorDialog);
+        renderAll();
+        showToast("予約内容を更新しました。");
+      }
+
+      function resetDemoData() {
+        if (!window.confirm("予約内容と予約データを初期状態に戻しますか？")) {
+          return;
+        }
+
+        state = createDefaultState(currentDate);
+        persistState();
+        renderAll();
+        showToast("初期データに戻しました。");
+      }
+
+      function changeDateBy(dayDelta) {
+        const date = parseIsoDate(currentDate);
+        date.setDate(date.getDate() + dayDelta);
+        currentDate = toIsoDate(date);
+        els.dateInput.value = currentDate;
+        renderAll();
+      }
+
+      function getAppointmentsForCurrentDate() {
+        return state.reservations.filter((appointment) => appointment.date === currentDate);
+      }
+
+      function findAppointment(date, chairId, time) {
+        return state.reservations.find((appointment) => {
+          return appointment.date === date && appointment.chairId === chairId && appointment.time === time;
+        }) || null;
+      }
+
+      function findType(typeId) {
+        return state.types.find((type) => type.id === typeId) || {
+          id: "missing",
+          name: "未分類",
+          color: "#64748b"
+        };
+      }
+
+      function buildSlotLabel(slot) {
+        const chair = chairs.find((item) => item.id === slot.chairId);
+        return `${formatDateLabel(slot.date)} ${slot.time} ${chair ? chair.name : ""}`;
+      }
+
+      function getSlots() {
+        const slots = [];
+        for (let minutes = startMinutes; minutes < endMinutes; minutes += slotMinutes) {
+          slots.push({
+            minutes,
+            label: minutesToTime(minutes)
+          });
+        }
+        return slots;
+      }
+
+      function isBreakSlot(minutes) {
+        return breakRanges.some((range) => minutes >= range.start && minutes < range.end);
+      }
+
+      function minutesToTime(minutes) {
+        const hours = Math.floor(minutes / 60);
+        const mins = minutes % 60;
+        return `${hours}:${String(mins).padStart(2, "0")}`;
+      }
+
+      function timeToMinutes(time) {
+        const [hours, minutes] = time.split(":").map(Number);
+        return hours * 60 + minutes;
+      }
+
+      function parseIsoDate(value) {
+        const [year, month, date] = value.split("-").map(Number);
+        return new Date(year, month - 1, date);
+      }
+
+      function toIsoDate(date) {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, "0");
+        const day = String(date.getDate()).padStart(2, "0");
+        return `${year}-${month}-${day}`;
+      }
+
+      function todayIso() {
+        return toIsoDate(new Date());
+      }
+
+      function formatDateLabel(value) {
+        const date = parseIsoDate(value);
+        const weekdays = ["日", "月", "火", "水", "木", "金", "土"];
+        return `${date.getMonth() + 1}/${date.getDate()}(${weekdays[date.getDay()]})`;
+      }
+
+      function canUseLocalStorage() {
+        try {
+          window.localStorage.setItem(TEST_STORAGE_KEY, "1");
+          window.localStorage.removeItem(TEST_STORAGE_KEY);
+          return true;
+        } catch (error) {
+          return false;
+        }
+      }
+
+      function loadState() {
+        if (!storageAvailable) {
+          return createDefaultState(currentDate);
+        }
+
+        try {
+          const raw = window.localStorage.getItem(STORAGE_KEY);
+          if (!raw) {
+            const initialState = createDefaultState(currentDate);
+            window.localStorage.setItem(STORAGE_KEY, JSON.stringify(initialState));
+            return initialState;
+          }
+
+          const parsed = JSON.parse(raw);
+          if (!parsed || !Array.isArray(parsed.types) || !Array.isArray(parsed.reservations)) {
+            throw new Error("Invalid saved data");
+          }
+
+          return parsed;
+        } catch (error) {
+          return createDefaultState(currentDate);
+        }
+      }
+
+      function persistState() {
+        if (!storageAvailable) {
+          return;
+        }
+
+        try {
+          window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        } catch (error) {
+          els.storageNotice.hidden = false;
+          showToast("保存できませんでした。ブラウザ設定を確認してください。");
+        }
+      }
+
+      function createDefaultState(seedDate) {
+        return {
+          types: defaultTypes.map((type) => ({ ...type })),
+          reservations: [
+            {
+              id: createId("appt"),
+              date: seedDate,
+              chairId: "chair-1",
+              time: "9:30",
+              chartNumber: "10021",
+              patientName: "サンプル 佐藤",
+              typeId: "type-first",
+              memo: "問診票確認",
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString()
+            },
+            {
+              id: createId("appt"),
+              date: seedDate,
+              chairId: "chair-2",
+              time: "10:00",
+              chartNumber: "10012",
+              patientName: "サンプル 鈴木",
+              typeId: "type-maintenance",
+              memo: "定期メンテナンス",
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString()
+            },
+            {
+              id: createId("appt"),
+              date: seedDate,
+              chairId: "chair-3",
+              time: "15:00",
+              chartNumber: "10008",
+              patientName: "サンプル 高橋",
+              typeId: "type-treatment",
+              memo: "右上治療予定",
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString()
+            },
+            {
+              id: createId("appt"),
+              date: seedDate,
+              chairId: "chair-4",
+              time: "19:00",
+              chartNumber: "10033",
+              patientName: "サンプル 田中",
+              typeId: "type-emergency",
+              memo: "痛みあり",
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString()
+            }
+          ]
+        };
+      }
+
+      function createId(prefix) {
+        if (window.crypto && typeof window.crypto.randomUUID === "function") {
+          return `${prefix}-${window.crypto.randomUUID()}`;
+        }
+        return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+      }
+
+      function openDialog(dialog) {
+        if (typeof dialog.showModal === "function") {
+          dialog.showModal();
+        } else {
+          dialog.setAttribute("open", "");
+        }
+      }
+
+      function closeDialog(dialog) {
+        if (typeof dialog.close === "function") {
+          dialog.close();
+        } else {
+          dialog.removeAttribute("open");
+        }
+      }
+
+      function clearDropStyles() {
+        document.querySelectorAll(".drop-ready").forEach((cell) => {
+          cell.classList.remove("drop-ready");
+        });
+      }
+
+      function showToast(message) {
+        window.clearTimeout(toastTimer);
+        els.toast.textContent = message;
+        els.toast.classList.add("show");
+        toastTimer = window.setTimeout(() => {
+          els.toast.classList.remove("show");
+        }, 2200);
+      }
+    })();
+  </script>
+</body>
+</html>
