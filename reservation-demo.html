@@ -21,9 +21,9 @@
       --warning-line: #ffd38a;
       --shadow: 0 14px 32px rgba(23, 33, 38, 0.12);
       --radius: 8px;
-      --slot-height: 76px;
+      --slot-height: 54px;
       --time-col: 96px;
-      --chair-col: minmax(190px, 1fr);
+      --chair-col: minmax(240px, 1fr);
       font-family: "Segoe UI", "Yu Gothic UI", "Hiragino Sans", Meiryo, sans-serif;
     }
 
@@ -297,9 +297,9 @@
     }
 
     .schedule-grid {
-      min-width: 860px;
+      min-width: 580px;
       display: grid;
-      grid-template-columns: var(--time-col) repeat(4, var(--chair-col));
+      grid-template-columns: var(--time-col) repeat(2, var(--chair-col));
       align-items: stretch;
     }
 
@@ -671,9 +671,9 @@
       :root {
         --bg: #ffffff;
         --surface: #ffffff;
-        --slot-height: 30px;
+        --slot-height: 14px;
         --time-col: 58px;
-        --chair-col: minmax(118px, 1fr);
+        --chair-col: minmax(220px, 1fr);
       }
 
       * {
@@ -801,27 +801,28 @@
 
       .schedule-grid {
         min-width: 0;
-        grid-template-columns: var(--time-col) repeat(4, var(--chair-col));
+        grid-template-columns: var(--time-col) repeat(2, var(--chair-col));
       }
 
       .schedule-corner,
       .chair-header {
         position: static;
-        min-height: 28px;
+        min-height: 18px;
         background: #eef3f4;
+        font-size: 9px;
       }
 
       .time-cell {
         position: static;
         min-height: var(--slot-height);
-        padding: 4px 5px;
+        padding: 1px 4px;
         color: #263238;
         font-size: 8px;
       }
 
       .slot-cell {
         min-height: var(--slot-height);
-        padding: 3px;
+        padding: 1px 2px;
       }
 
       .slot-cell.break::after {
@@ -830,15 +831,15 @@
 
       .appointment-card {
         border-radius: 0;
-        border-left-width: 4px;
-        padding: 2px 4px;
+        border-left-width: 3px;
+        padding: 0 3px;
         gap: 0;
         box-shadow: none;
         overflow: hidden;
       }
 
       .card-name {
-        font-size: 9px;
+        font-size: 8px;
       }
 
       .card-note {
@@ -857,7 +858,7 @@
       <div class="topbar-row">
         <div class="title-block">
           <h1>歯科予約表デモ</h1>
-          <p class="subtitle">1日表示・チェア別・30分刻み</p>
+          <p class="subtitle">1日表示・チェア別・15分刻み</p>
         </div>
 
         <div class="date-controls" aria-label="日付操作">
@@ -985,13 +986,11 @@
       const TEST_STORAGE_KEY = "dentalReservationDemo.storageTest";
       const chairs = [
         { id: "chair-1", name: "チェア1" },
-        { id: "chair-2", name: "チェア2" },
-        { id: "chair-3", name: "チェア3" },
-        { id: "chair-4", name: "チェア4" }
+        { id: "chair-2", name: "チェア2" }
       ];
       const startMinutes = 9 * 60 + 30;
       const endMinutes = 20 * 60;
-      const slotMinutes = 30;
+      const slotMinutes = 15;
       const breakRanges = [
         { start: 12 * 60, end: 15 * 60 },
         { start: 18 * 60, end: 19 * 60 }
@@ -1683,10 +1682,30 @@
             throw new Error("Invalid saved data");
           }
 
-          return parsed;
+          const normalized = normalizeState(parsed);
+          if (normalized.changed) {
+            window.localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized.state));
+          }
+          return normalized.state;
         } catch (error) {
           return createDefaultState(currentDate);
         }
+      }
+
+      function normalizeState(savedState) {
+        const validChairIds = new Set(chairs.map((chair) => chair.id));
+        const validTimes = new Set(getSlots().map((slot) => slot.label));
+        const reservations = savedState.reservations.filter((appointment) => {
+          return validChairIds.has(appointment.chairId) && validTimes.has(appointment.time);
+        });
+
+        return {
+          state: {
+            types: savedState.types.length ? savedState.types : defaultTypes.map((type) => ({ ...type })),
+            reservations
+          },
+          changed: reservations.length !== savedState.reservations.length || !savedState.types.length
+        };
       }
 
       function persistState() {
@@ -1733,7 +1752,7 @@
             {
               id: createId("appt"),
               date: seedDate,
-              chairId: "chair-3",
+              chairId: "chair-1",
               time: "15:00",
               chartNumber: "10008",
               patientName: "サンプル 高橋",
@@ -1745,7 +1764,7 @@
             {
               id: createId("appt"),
               date: seedDate,
-              chairId: "chair-4",
+              chairId: "chair-2",
               time: "19:00",
               chartNumber: "10033",
               patientName: "サンプル 田中",
