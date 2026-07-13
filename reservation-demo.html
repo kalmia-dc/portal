@@ -12,6 +12,8 @@
       --surface-alt: #f8fafb;
       --line: #d9e1e6;
       --line-strong: #bccbd3;
+      --grid-line: #a7b6be;
+      --grid-line-strong: #7c8d96;
       --text: #172126;
       --muted: #65757e;
       --accent: #0f766e;
@@ -289,7 +291,7 @@
 
     .schedule-wrap {
       background: var(--surface);
-      border: 1px solid var(--line);
+      border: 1px solid var(--grid-line-strong);
       border-radius: var(--radius);
       overflow: auto;
       max-height: calc(100vh - 270px);
@@ -307,8 +309,8 @@
     .chair-header,
     .time-cell,
     .slot-cell {
-      border-right: 1px solid var(--line);
-      border-bottom: 1px solid var(--line);
+      border-right: 1px solid var(--grid-line);
+      border-bottom: 1px solid var(--grid-line);
     }
 
     .schedule-corner {
@@ -316,7 +318,7 @@
       top: 0;
       left: 0;
       z-index: 12;
-      background: #edf3f4;
+      background: #e8eff1;
       min-height: 48px;
     }
 
@@ -324,7 +326,7 @@
       position: sticky;
       top: 0;
       z-index: 10;
-      background: #edf3f4;
+      background: #e8eff1;
       min-height: 48px;
       display: flex;
       align-items: center;
@@ -369,10 +371,10 @@
       background:
         repeating-linear-gradient(
           -45deg,
-          #f1f4f5,
-          #f1f4f5 10px,
-          #e7ecef 10px,
-          #e7ecef 20px
+          #eef2f4,
+          #eef2f4 10px,
+          #d9e2e6 10px,
+          #d9e2e6 20px
         );
       color: #75848c;
     }
@@ -671,6 +673,8 @@
       :root {
         --bg: #ffffff;
         --surface: #ffffff;
+        --grid-line: #596970;
+        --grid-line-strong: #323c42;
         --slot-height: 16px;
         --time-col: 46px;
         --chair-col: minmax(150px, 1fr);
@@ -796,6 +800,7 @@
         max-height: none;
         min-height: 0;
         overflow: visible;
+        border: 1px solid var(--grid-line-strong);
         border-radius: 0;
       }
 
@@ -808,7 +813,7 @@
       .chair-header {
         position: static;
         min-height: 18px;
-        background: #eef3f4;
+        background: #e4ebee;
         font-size: 9px;
       }
 
@@ -823,6 +828,17 @@
       .slot-cell {
         min-height: var(--slot-height);
         padding: 1px 2px;
+      }
+
+      .slot-cell.break {
+        background:
+          repeating-linear-gradient(
+            -45deg,
+            #eef2f4,
+            #eef2f4 7px,
+            #ccd8dd 7px,
+            #ccd8dd 14px
+          );
       }
 
       .slot-cell.break::after {
