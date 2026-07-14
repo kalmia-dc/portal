@@ -1808,9 +1808,7 @@ async function prepareIncidentImports() {
 
     if (imageFiles.length) {
       const ocrResults = await recognizeIncidentImageFiles(imageFiles, status);
-      ocrResults.forEach(result => {
-        incidentImportCandidates.push(normalizeIncidentImport(parseIncidentOcrText(result.text, result.file.name)));
-      });
+      incidentImportCandidates.push(...buildIncidentImageImportCandidates(ocrResults));
     }
 
     status.textContent = `${incidentImportCandidates.length}件の候補を作成しました。内容を確認してから取り込んでください。`;
@@ -1849,7 +1847,7 @@ function renderIncidentImportPreview() {
           <div>
             <h4>${esc(candidate.sourceFileName || `取り込み候補 ${index + 1}`)}</h4>
             <div class="meta">
-              <span>${candidate.source === 'image' ? '写真OCR' : 'HTML'}</span>
+              <span>${candidate.source === 'legacy_image' ? '旧様式（表裏統合）' : candidate.source === 'image' ? '写真OCR' : 'HTML'}</span>
               ${duplicate ? '<span class="badge incident-status-confirmed">同じ報告番号あり</span>' : ''}
             </div>
           </div>
@@ -1862,6 +1860,9 @@ function renderIncidentImportPreview() {
           ${importInputHtml(index, 'entryDate', '記入日', candidate.entryDate, 'date')}
           ${importInputHtml(index, 'reporterName', '記入者名', candidate.reporterName)}
           ${importInputHtml(index, 'discovererName', '発見者名', candidate.discovererName)}
+          ${importInputHtml(index, 'verifierName', '確認者', candidate.verifierName)}
+          ${importInputHtml(index, 'occurredPlace', '発生場所', candidate.occurredPlace)}
+          ${importInputHtml(index, 'workContent', '作業内容', candidate.workContent)}
           ${importInputHtml(index, 'categoryText', '事象の種類', candidate.categoryText || incidentCategoryText(candidate))}
           ${importInputHtml(index, 'scene', '場面', candidate.scene)}
           ${importSelectHtml(index, 'level', '危険度', candidate.level, INCIDENT_LEVEL_LABELS)}
@@ -1955,6 +1956,9 @@ function readIncidentImportCandidate(base, index) {
     entryDate: value('entryDate'),
     reporterName: value('reporterName'),
     discovererName: value('discovererName'),
+    verifierName: value('verifierName'),
+    occurredPlace: value('occurredPlace'),
+    workContent: value('workContent'),
     categoryText,
     category: parseCategoryCodes(categoryText),
     scene: value('scene'),
@@ -1979,9 +1983,12 @@ function normalizeIncidentImport(raw) {
     type: raw.type || inferIncidentType(raw),
     occurredDate: raw.occurredDate || '',
     occurredTime: raw.occurredTime || '',
-    entryDate: raw.entryDate || todayKey(),
+    entryDate: raw.entryDate || (raw.source === 'legacy_image' ? '' : todayKey()),
     reporterName: raw.reporterName || '',
     discovererName: raw.discovererName || raw.reporterName || '',
+    verifierName: raw.verifierName || '',
+    occurredPlace: raw.occurredPlace || '',
+    workContent: raw.workContent || '',
     category,
     categoryText: raw.categoryText || incidentCategoryText({ category }) || '',
     scene: raw.scene || '',
@@ -2019,18 +2026,78 @@ async function recognizeIncidentImageFiles(files, statusEl) {
       statusEl.textContent = `写真OCR: ${message.status}${progress}`;
     }
   });
+  await worker.setParameters({
+    tessedit_pageseg_mode: '6',
+    preserve_interword_spaces: '1'
+  });
   const results = [];
   try {
     for (let i = 0; i < files.length; i += 1) {
       const file = files[i];
+      statusEl.textContent = `写真を補正中 ${i + 1}/${files.length}: ${file.name}`;
+      const canvas = await incidentImageToOcrCanvas(file);
       statusEl.textContent = `写真OCR中 ${i + 1}/${files.length}: ${file.name}`;
-      const result = await worker.recognize(file);
+      const result = await worker.recognize(canvas);
       results.push({ file, text: result?.data?.text || '' });
+    }
+    const frontIndex = results.findIndex(result => legacyIncidentPageKind(result.text) === 'front');
+    if (results.length === 2 && frontIndex >= 0) {
+      const backIndex = frontIndex === 0 ? 1 : 0;
+      if (legacyIncidentPageKind(results[backIndex].text) !== 'back') {
+        const file = results[backIndex].file;
+        statusEl.textContent = `裏面の記入欄を拡大して再読み取り中: ${file.name}`;
+        const croppedCanvas = await incidentImageToOcrCanvas(file, { topRatio:.42, sideTrimRatio:.08 });
+        await worker.setParameters({ tessedit_pageseg_mode:'11', preserve_interword_spaces:'1' });
+        const retry = await worker.recognize(croppedCanvas);
+        await worker.setParameters({ tessedit_pageseg_mode:'6', preserve_interword_spaces:'1' });
+        const retryText = retry?.data?.text || '';
+        if (legacyBackTextScore(retryText) >= legacyBackTextScore(results[backIndex].text)) {
+          results[backIndex].text = retryText;
+        }
+      }
     }
   } finally {
     await worker.terminate();
   }
   return results;
+}
+
+function incidentImageToOcrCanvas(file, options = {}) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const image = new Image();
+    image.onload = () => {
+      URL.revokeObjectURL(url);
+      const width = image.naturalWidth || image.width;
+      const height = image.naturalHeight || image.height;
+      const sideTrim = Math.round(width * Math.max(0, Math.min(.25, Number(options.sideTrimRatio || 0))));
+      const sourceWidth = Math.max(1, width - sideTrim * 2);
+      const sourceHeight = Math.max(1, Math.round(height * Math.max(.2, Math.min(1, Number(options.topRatio || 1)))));
+      const scale = Math.min(2.5, Math.max(1, 3200 / Math.max(sourceWidth, sourceHeight, 1)));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(sourceWidth * scale);
+      canvas.height = Math.round(sourceHeight * scale);
+      const ctx = canvas.getContext('2d', { willReadFrequently:true });
+      if (!ctx) return reject(new Error('画像処理を開始できませんでした'));
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(image, sideTrim, 0, sourceWidth, sourceHeight, 0, 0, canvas.width, canvas.height);
+      const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      for (let i = 0; i < pixels.data.length; i += 4) {
+        const gray = pixels.data[i] * .299 + pixels.data[i + 1] * .587 + pixels.data[i + 2] * .114;
+        const value = Math.max(0, Math.min(255, (gray - 128) * 1.6 + 150));
+        pixels.data[i] = pixels.data[i + 1] = pixels.data[i + 2] = value;
+        pixels.data[i + 3] = 255;
+      }
+      ctx.putImageData(pixels, 0, 0);
+      resolve(canvas);
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error(`${file.name} の画像を読み込めませんでした`));
+    };
+    image.src = url;
+  });
 }
 
 function ensureTesseract() {
@@ -2084,6 +2151,162 @@ function parseIncidentHtmlReport(html, sourceFileName) {
     countermeasure: fieldValue(meeting, '対策'),
     meetingReportDate: parseLooseDate(fieldValue(meeting, '報告日'))
   };
+}
+
+function buildIncidentImageImportCandidates(ocrResults) {
+  const detectedLegacyPages = ocrResults.filter(result => isLegacyIncidentOcrText(result.text));
+  const hasLegacyFront = detectedLegacyPages.some(result => legacyIncidentPageKind(result.text) === 'front');
+  const legacyPages = hasLegacyFront && ocrResults.length === 2 ? ocrResults : detectedLegacyPages;
+  const candidates = [];
+  if (legacyPages.length) {
+    candidates.push(normalizeIncidentImport(parseLegacyIncidentOcrPages(legacyPages)));
+  }
+  ocrResults
+    .filter(result => !legacyPages.includes(result))
+    .forEach(result => candidates.push(normalizeIncidentImport(parseIncidentOcrText(result.text, result.file.name))));
+  return candidates;
+}
+
+function normalizeLegacyIncidentOcrText(text) {
+  let source = String(text || '').normalize('NFKC');
+  const labels = [
+    'ヒヤリハット報告書', '発生日時', '発生場所', '作業内容', '発生状況',
+    '原因', '再発防止対策', '報告者', '確認者', '報告日'
+  ];
+  labels.forEach(label => {
+    const spaced = label.split('').map(escapeRegExp).join('\\s*');
+    source = source.replace(new RegExp(spaced, 'g'), label);
+  });
+  return normalizeImportedText(source)
+    .replace(/再発[防訪坊][止上正]{1,3}\s*対策/g, '再発防止対策')
+    .replace(/確[認要]\s*者/g, '確認者')
+    .replace(/報[告吉]\s*者/g, '報告者')
+    .replace(/報[告吉]\s*日/g, '報告日')
+    .replace(/再発防止\s*対策/g, '再発防止対策')
+    .replace(/作業\s*内容/g, '作業内容');
+}
+
+function legacyIncidentPageKind(text) {
+  const source = normalizeLegacyIncidentOcrText(text);
+  const frontScore = ['ヒヤリハット報告書', '発生日時', '発生場所', '作業内容', '発生状況', '原因', '再発防止対策']
+    .reduce((score, label) => score + (source.includes(label) ? 1 : 0), 0);
+  const backScore = ['報告者', '確認者', '報告日']
+    .reduce((score, label) => score + (source.includes(label) ? 1 : 0), 0);
+  if (frontScore >= 2 && frontScore >= backScore) return 'front';
+  if (backScore >= 2) return 'back';
+  return '';
+}
+
+function legacyBackTextScore(text) {
+  const source = normalizeLegacyIncidentOcrText(text);
+  return ['報告者', '確認者', '報告日']
+    .reduce((score, label) => score + (source.includes(label) ? 2 : 0), 0)
+    + Math.min(3, (source.match(/[令和年月日]/g) || []).length / 3);
+}
+
+function isLegacyIncidentOcrText(text) {
+  return Boolean(legacyIncidentPageKind(text));
+}
+
+function legacyIncidentSection(text, labels, nextLabels) {
+  const source = normalizeLegacyIncidentOcrText(text);
+  const value = extractLabeledText(source, labels, nextLabels);
+  return normalizeImportedText(value)
+    .replace(/^[\s:：|｜_＿\-ー―・]+/, '')
+    .replace(/[\s_＿\-ー―]+$/, '')
+    .trim();
+}
+
+function legacyIncidentShortValue(text, labels, nextLabels) {
+  const value = legacyIncidentSection(text, labels, nextLabels);
+  const line = value.split(/\n+/).map(item => item.trim()).find(Boolean) || '';
+  return line
+    .replace(/^[\s.:：|｜_＿\-ー―・]+|[\s_＿\-ー―]+$/g, '')
+    .replace(/\s+[一-鿿A-Za-z]{1,2}$/, '')
+    .trim();
+}
+
+function cleanLegacyNarrative(value, preferBullets = false) {
+  const lines = normalizeImportedText(value).split(/\n+/).map(line => {
+    return line.trim()
+      .replace(/^[】\]]+\s*(?=[・•●])/, '')
+      .replace(/\s+[ぁ-ゖァ-ヶ一-鿿A-Za-z]{1,2}$/, '')
+      .trim();
+  });
+  while (lines.length) {
+    const readable = (lines[0].match(/[ぁ-ゖァ-ヶ一-鿿A-Za-z0-9]/g) || []).length;
+    if (readable >= 6 || /^[・•●]/.test(lines[0])) break;
+    lines.shift();
+  }
+  let usableLines = lines.filter(Boolean);
+  if (preferBullets && usableLines.some(line => /^[・•●]/.test(line))) {
+    const kept = [];
+    let inBullet = false;
+    for (const line of usableLines) {
+      const isBullet = /^[・•●]/.test(line);
+      if (!isBullet && inBullet && /[。！？]$/.test(kept[kept.length - 1] || '')) break;
+      kept.push(line);
+      if (isBullet) inBullet = true;
+    }
+    usableLines = kept;
+  }
+  let result = usableLines.join('\n').trim();
+  const lastSentenceEnd = Math.max(result.lastIndexOf('。'), result.lastIndexOf('！'), result.lastIndexOf('？'));
+  if (lastSentenceEnd >= 0) result = result.slice(0, lastSentenceEnd + 1);
+  return result;
+}
+
+function legacyIncidentPersonName(text, labels, nextLabels) {
+  const value = legacyIncidentShortValue(text, labels, nextLabels);
+  return /[ぁ-ゖァ-ヶ一-鿿]/.test(value) ? value : '';
+}
+
+function parseLegacyIncidentOcrPages(pages) {
+  const normalizedPages = pages.map(page => ({
+    ...page,
+    kind: legacyIncidentPageKind(page.text),
+    normalizedText: normalizeLegacyIncidentOcrText(page.text)
+  }));
+  const front = normalizedPages.find(page => page.kind === 'front') || normalizedPages[0];
+  const back = normalizedPages.find(page => page.kind === 'back') || normalizedPages.find(page => page !== front);
+  const frontText = front?.normalizedText || '';
+  const backText = back?.normalizedText || '';
+  const occurredText = legacyIncidentSection(frontText, ['発生日時', '発生日'], ['発生場所', '作業内容', '発生状況']);
+  const occurred = parseIncidentDateTime(occurredText || frontText);
+  const occurredPlace = legacyIncidentShortValue(frontText, ['発生場所'], ['作業内容', '発生状況']);
+  const workContent = legacyIncidentShortValue(frontText, ['作業内容'], ['発生状況', '原因']);
+  const details = cleanLegacyNarrative(legacyIncidentSection(frontText, ['発生状況'], ['原因', '再発防止対策']));
+  const causeHuman = cleanLegacyNarrative(legacyIncidentSection(frontText, ['原因'], ['再発防止対策', '報告者']), true);
+  const countermeasure = cleanLegacyNarrative(legacyIncidentSection(frontText, ['再発防止対策', '再発防止'], ['報告者', '確認者', '報告日']), true);
+  const reporterName = legacyIncidentPersonName(backText, ['報告者'], ['確認者', '報告日']);
+  const verifierName = legacyIncidentPersonName(backText, ['確認者'], ['報告日']);
+  const reportDateText = legacyIncidentSection(backText, ['報告日'], []);
+  const rawText = normalizedPages
+    .map(page => `【${page.kind === 'front' ? '表面' : page.kind === 'back' ? '裏面' : '画像'}: ${page.file.name}】\n${normalizeImportedText(page.text)}`)
+    .join('\n\n');
+  const base = {
+    source:'legacy_image',
+    sourceFileName: normalizedPages.map(page => page.file.name).join(' / '),
+    rawText,
+    type:'near_miss',
+    occurredDate: occurred.date,
+    occurredTime: occurred.time,
+    entryDate: parseLooseDate(reportDateText),
+    reporterName,
+    discovererName: reporterName,
+    verifierName,
+    occurredPlace,
+    workContent,
+    scene: [occurredPlace, workContent].filter(Boolean).join(' / '),
+    details,
+    causeHuman,
+    causeEnvironment:'',
+    countermeasure
+  };
+  base.category = inferIncidentCategory(base);
+  base.categoryText = incidentCategoryText(base);
+  base.level = inferIncidentLevel(base);
+  return base;
 }
 
 function parseIncidentOcrText(text, sourceFileName) {
@@ -2468,6 +2691,9 @@ function incidentReportSearchText(report) {
     formatIncidentOccurredAt(report),
     report.reporterName,
     report.discovererName,
+    report.verifierName,
+    report.occurredPlace,
+    report.workContent,
     report.createdBy,
     report.updatedBy,
     incidentCategoryText(report),
@@ -2732,6 +2958,7 @@ function renderIncidentReports() {
             <span>${esc(formatIncidentOccurredAt(report))}</span>
             <span>記入者（報告者）: ${esc(report.reporterName || report.createdBy || '-')}</span>
             <span>発見者: ${esc(report.discovererName || '-')}</span>
+            ${report.verifierName ? `<span>確認者: ${esc(report.verifierName)}</span>` : ''}
           </div>
         </div>
         <div class="item-badges">
@@ -2742,6 +2969,8 @@ function renderIncidentReports() {
         </div>
       </div>
       ${textBlock('どうなりそうだった？ / 発生した実害', report.eventImpact)}
+      ${textBlock('発生場所', report.occurredPlace)}
+      ${textBlock('作業内容', report.workContent)}
       ${textBlock('具体的な内容', report.details)}
       ${textBlock('事象の種類', incidentCategoryText(report))}
       ${textBlock('場面', report.scene)}
@@ -2951,6 +3180,18 @@ function incidentEditHtml(report) {
           <input data-incident-edit="${escAttr(report.id)}" data-field="discovererName" value="${escAttr(report.discovererName || '')}">
         </div>
         <div class="field">
+          <label>確認者</label>
+          <input data-incident-edit="${escAttr(report.id)}" data-field="verifierName" value="${escAttr(report.verifierName || '')}">
+        </div>
+        <div class="field">
+          <label>発生場所</label>
+          <input data-incident-edit="${escAttr(report.id)}" data-field="occurredPlace" value="${escAttr(report.occurredPlace || '')}">
+        </div>
+        <div class="field full">
+          <label>作業内容</label>
+          <input data-incident-edit="${escAttr(report.id)}" data-field="workContent" value="${escAttr(report.workContent || '')}">
+        </div>
+        <div class="field">
           <label>危険度</label>
           <select data-incident-edit="${escAttr(report.id)}" data-field="level">
             ${Object.entries(INCIDENT_LEVEL_LABELS).map(([value, label]) => `<option value="${escAttr(value)}" ${value === (report.level || 'B') ? 'selected' : ''}>${esc(label)}</option>`).join('')}
@@ -3070,6 +3311,9 @@ async function saveIncidentReportEdit(id) {
     entryDate: value('entryDate'),
     reporterName: value('reporterName'),
     discovererName: value('discovererName'),
+    verifierName: value('verifierName'),
+    occurredPlace: value('occurredPlace'),
+    workContent: value('workContent'),
     categoryText,
     category: parseCategoryCodes(categoryText),
     level: value('level'),
@@ -3175,6 +3419,8 @@ function buildIncidentTaskDetail(report) {
   appendIncidentTaskDetail(lines, '報告番号', report.reportNumber || buildIncidentReportNumber(report));
   appendIncidentTaskDetail(lines, '種別', INCIDENT_TYPE_LABELS[incidentTypeKey(report)]);
   appendIncidentTaskDetail(lines, '発生日', formatIncidentOccurredAt(report));
+  appendIncidentTaskDetail(lines, '発生場所', report.occurredPlace);
+  appendIncidentTaskDetail(lines, '作業内容', report.workContent);
   appendIncidentTaskDetail(lines, 'どうなりそうだった？ / 発生した実害', report.eventImpact);
   appendIncidentTaskDetail(lines, '具体的な内容', report.details);
   appendIncidentTaskDetail(lines, 'ミーティングへの申し送り', report.handoff);
@@ -3364,7 +3610,15 @@ function parseIncidentDateTime(text) {
 }
 
 function parseLooseDate(text) {
-  const match = String(text || '').match(/(20\d{2})[年\/\-. ]\s*(\d{1,2})[月\/\-. ]\s*(\d{1,2})/);
+  const source = String(text || '').normalize('NFKC');
+  const reiwa = source.match(/令和\s*(\d{1,2})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日?/);
+  if (reiwa) {
+    const year = String(2018 + Number(reiwa[1]));
+    const month = String(Number(reiwa[2])).padStart(2, '0');
+    const day = String(Number(reiwa[3])).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+  const match = source.match(/(20\d{2})[年\/\-. ]\s*(\d{1,2})[月\/\-. ]\s*(\d{1,2})/);
   if (!match) return '';
   const year = match[1];
   const month = String(Number(match[2])).padStart(2, '0');
