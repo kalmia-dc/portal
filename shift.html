@@ -1225,7 +1225,7 @@
         <div class="rule-item"><span class="rule-dot"></span>人数不足日 → ハノワ(午後)自動生成</div>
         <div class="rule-item"><span class="rule-dot"></span>DA不足 → 百々を現場アサイン</div>
         <div class="rule-item"><span class="rule-dot"></span>固定休は自動生成でも解除しない</div>
-        <div class="rule-item"><span class="rule-dot"></span>希望休は月1日まで、人数エラーが出ない日を優先</div>
+        <div class="rule-item"><span class="rule-dot"></span>希望休は複数日申請可。人数条件を満たす日は自動承認し、月1日以上は必ず承認</div>
         <div class="rule-item"><span class="rule-dot"></span>有給は絶対優先・却下不可</div>
       </div>
     </div>
@@ -5370,9 +5370,11 @@ function submitRequest(){
     result.textContent='有給休暇はコメント（理由）が必須です'; result.style.color='var(--red)'; return;
   }
 
-  // 希望休の場合、土曜日を除外し、月1日まで安全な日を優先して自動承認
+  // 希望休は複数日すべて受け付け、申請時に自動判定する（承認待ちにはしない）。
+  // 人数条件を満たす日はすべて承認し、同月に承認済みがなければ最も条件のよい1日は必ず承認する。
   let targetDates = [...reqDateList];
-  let wishSelectionMessage = '';
+  const wishStatusByDate = {};
+  const wishApprovalMessages = [];
   if(selectedReqType==='wish'){
     const satDates = reqDateList.filter(d=>new Date(d).getDay()===6);
     targetDates = reqDateList.filter(d=>new Date(d).getDay()!==6);
@@ -5392,47 +5394,36 @@ function submitRequest(){
       grouped[ym].push(date);
     });
 
-    const selectedDates=[];
-    const skippedMessages=[];
-    const unsafeMessages=[];
     Object.entries(grouped).forEach(([ym, dates])=>{
-      if(approvedWishCountForMonth(currentUser.staffId, ym)>=1){
-        skippedMessages.push(`${ym}は既に希望休が1日承認済み`);
-        return;
+      const evaluations=dates.map(date=>evaluateWishCandidate(currentUser.staffId, date));
+      evaluations.forEach(candidate=>{
+        wishStatusByDate[candidate.ds]=candidate.ok ? 'approved' : 'rejected';
+      });
+
+      const hasApprovedDate=approvedWishCountForMonth(currentUser.staffId, ym)>=1 ||
+        evaluations.some(candidate=>candidate.ok);
+      if(!hasApprovedDate){
+        const best=selectBestWishDate(currentUser.staffId, dates);
+        if(best) wishStatusByDate[best.ds]='approved';
       }
 
-      const best=selectBestWishDate(currentUser.staffId, dates);
-      if(!best || !best.ok){
-        const label=best?.ds ? best.ds.slice(5).replace('-','/') : ym;
-        const issues=best?.issues?.length ? `（${best.issues.join('・')}）` : '';
-        unsafeMessages.push(`${label}${issues}`);
-        return;
-      }
-
-      selectedDates.push(best.ds);
-      dates
-        .filter(date=>date!==best.ds)
-        .forEach(date=>skippedMessages.push(`${date.slice(5).replace('-','/')}は月1日制限のため未受付`));
+      const approvedDates=dates
+        .filter(date=>wishStatusByDate[date]==='approved')
+        .map(date=>date.slice(5).replace('-','/'));
+      const rejectedDates=dates
+        .filter(date=>wishStatusByDate[date]==='rejected')
+        .map(date=>date.slice(5).replace('-','/'));
+      if(approvedDates.length) wishApprovalMessages.push(`${approvedDates.join('・')}は自動承認`);
+      if(rejectedDates.length) wishApprovalMessages.push(`${rejectedDates.join('・')}は人数条件のため却下`);
     });
-
-    if(selectedDates.length===0){
-      const reason = unsafeMessages.length
-        ? `承認しても人員エラーが増えるため、希望休は自動承認できませんでした: ${unsafeMessages.join('、')}`
-        : `希望休は月1日までです。${skippedMessages.join('、')}`;
-      result.textContent=reason;
-      result.style.color='var(--red)';
-      return;
-    }
-
-    targetDates=selectedDates;
-    const notes=[...skippedMessages, ...unsafeMessages.map(x=>`${x}は人員エラー増加のため未受付`)];
-    if(notes.length) wishSelectionMessage = `（${notes.join('、')}）`;
   }
 
   let count=0;
   let shiftChanged = false;
   for(const date of targetDates){
-    const status = selectedReqType==='work' ? 'pending' : 'approved';
+    const status = selectedReqType==='wish'
+      ? (wishStatusByDate[date] || 'rejected')
+      : selectedReqType==='work' ? 'pending' : 'approved';
     const req = {
       id: Date.now()+count,
       staffId: currentUser.staffId,
@@ -5470,7 +5461,7 @@ function submitRequest(){
     ? `✅ ${targetDates.length}日分の有給申請を受け付けました（自動承認）`
     : selectedReqType==='work'
     ? `✅ ${targetDates.length}日分の出勤希望を受け付けました（承認待ち）`
-    : `✅ ${targetDates.map(d=>d.slice(5).replace('-','/')).join('、')} の希望休を受け付けました（月1日・安全日優先）${wishSelectionMessage}`;
+    : `✅ ${targetDates.length}日分の希望休を自動判定しました（${wishApprovalMessages.join('、')}）`;
   result.style.color='var(--teal)';
 
   reqDateList=[];
