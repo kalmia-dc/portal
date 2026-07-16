@@ -933,7 +933,10 @@ button{cursor:pointer}
     <section id="incidentsSection" class="section active">
       <div class="section-head">
         <h2>ヒヤリハット・アクシデント報告</h2>
-        <span class="count-badge" id="incidentCount">0件</span>
+        <div class="form-actions">
+          <button class="btn ghost" type="button" id="incidentArchiveToggle">アーカイブを表示</button>
+          <span class="count-badge" id="incidentCount">0件</span>
+        </div>
       </div>
       <div class="incident-period" aria-label="報告統計の集計期間">
         <div class="field">
@@ -1211,6 +1214,7 @@ const state = {
   opinions:[],
   incidentReports:[],
   searchQuery:'',
+  showArchivedIncidents:false,
   incidentPeriodMode:'all',
   incidentPeriodMonth:todayKey().slice(0, 7),
   incidentPeriodYear:todayKey().slice(0, 4)
@@ -1227,6 +1231,7 @@ function boot() {
   setupTabs();
   setupSearch();
   setupIncidentPeriod();
+  setupIncidentArchiveToggle();
   setupForms();
   setupViewer();
   attachDataListeners();
@@ -1365,6 +1370,16 @@ function setupIncidentPeriod() {
     renderIncidentReports();
   });
   updateIncidentPeriodControls();
+}
+
+function setupIncidentArchiveToggle() {
+  const button = document.getElementById('incidentArchiveToggle');
+  button.addEventListener('click', () => {
+    state.showArchivedIncidents = !state.showArchivedIncidents;
+    button.textContent = state.showArchivedIncidents ? '通常の報告を表示' : 'アーカイブを表示';
+    button.classList.toggle('primary', state.showArchivedIncidents);
+    renderIncidentReports();
+  });
 }
 
 function updateIncidentPeriodControls() {
@@ -2993,7 +3008,7 @@ function renderIncidentReports() {
 }
 
 function visibleIncidentReports() {
-  return state.incidentReports;
+  return state.incidentReports.filter(report => Boolean(report.linkedTaskId) === state.showArchivedIncidents);
 }
 
 function renderIncidentSummary(reports) {
