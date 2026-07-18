@@ -1854,8 +1854,10 @@ function renderIncidentImportPreview() {
     return;
   }
   const existingNumbers = new Set(state.incidentReports.map(report => report.reportNumber).filter(Boolean));
+  const existingImportKeys = new Set(state.incidentReports.map(incidentImportDuplicateKey));
   preview.innerHTML = incidentImportCandidates.map((candidate, index) => {
-    const duplicate = candidate.reportNumber && existingNumbers.has(candidate.reportNumber);
+    const duplicate = existingImportKeys.has(incidentImportDuplicateKey(candidate));
+    const numberCollision = !duplicate && candidate.reportNumber && existingNumbers.has(candidate.reportNumber);
     return `
       <div class="import-card" data-import-index="${index}">
         <div class="import-card-head">
@@ -1863,7 +1865,7 @@ function renderIncidentImportPreview() {
             <h4>${esc(candidate.sourceFileName || `取り込み候補 ${index + 1}`)}</h4>
             <div class="meta">
               <span>${candidate.source === 'current_image' ? '現行様式（2枚統合）' : candidate.source === 'legacy_image' ? '旧様式（表裏統合）' : candidate.source === 'image' ? '写真OCR' : 'HTML'}</span>
-              ${duplicate ? '<span class="badge incident-status-confirmed">同じ報告番号あり</span>' : ''}
+              ${duplicate ? '<span class="badge incident-status-confirmed">同じ内容の報告あり</span>' : numberCollision ? '<span class="badge incident-status-progress">報告番号を自動調整</span>' : ''}
             </div>
           </div>
         </div>
@@ -1931,13 +1933,16 @@ async function saveIncidentImports() {
   if (missing) return showToast('報告番号・種別・発生日・具体的な内容は必須です');
 
   const existingNumbers = new Set(state.incidentReports.map(report => report.reportNumber).filter(Boolean));
+  const existingImportKeys = new Set(state.incidentReports.map(incidentImportDuplicateKey));
   let saved = 0;
   let skipped = 0;
   for (const candidate of candidates) {
-    if (existingNumbers.has(candidate.reportNumber)) {
+    const duplicateKey = incidentImportDuplicateKey(candidate);
+    if (existingImportKeys.has(duplicateKey)) {
       skipped += 1;
       continue;
     }
+    candidate.reportNumber = allocateIncidentReportNumber(candidate.reportNumber, existingNumbers);
     const now = Date.now();
     await set(push(ref(db, PATHS.incidentReports)), {
       ...candidate,
@@ -1952,6 +1957,7 @@ async function saveIncidentImports() {
       updatedBy: currentUser.name
     });
     existingNumbers.add(candidate.reportNumber);
+    existingImportKeys.add(duplicateKey);
     saved += 1;
   }
   clearIncidentImports();
@@ -2187,6 +2193,29 @@ function buildIncidentImageImportCandidates(ocrResults) {
     .filter(result => !currentPages.includes(result) && !legacyPages.includes(result))
     .forEach(result => candidates.push(normalizeIncidentImport(parseIncidentOcrText(result.text, result.file.name))));
   return candidates;
+}
+
+function incidentImportDuplicateKey(item) {
+  const fields = [
+    item?.type,
+    item?.occurredDate,
+    item?.occurredTime,
+    item?.reporterName,
+    item?.discovererName,
+    item?.occurredPlace,
+    item?.workContent,
+    item?.eventImpact,
+    item?.details
+  ];
+  return fields.map(value => cleanImportedText(value || '').toLowerCase()).join('\u001f');
+}
+
+function allocateIncidentReportNumber(baseNumber, usedNumbers) {
+  if (!usedNumbers.has(baseNumber)) return baseNumber;
+  const stem = String(baseNumber).replace(/-\d{2}$/, '');
+  let sequence = 2;
+  while (usedNumbers.has(`${stem}-${String(sequence).padStart(2, '0')}`)) sequence += 1;
+  return `${stem}-${String(sequence).padStart(2, '0')}`;
 }
 
 function normalizeCurrentIncidentOcrText(text) {
@@ -3661,7 +3690,7 @@ function cleanImportedText(text) {
 }
 
 function extractReportNumber(text) {
-  return cleanImportedText(text).match(/KD-\d{4}-\d{4}-(?:\d{4}|AM|PM|UNK)/i)?.[0] || '';
+  return cleanImportedText(text).match(/KD-\d{4}-\d{4}-(?:\d{4}|AM|PM|UNK)(?:-\d{2})?/i)?.[0] || '';
 }
 
 function extractIncidentInfoGrid(doc) {
