@@ -1438,19 +1438,33 @@ let extraStaff = [];
 // 実際に使うSTAFF配列（DEFAULT + extra）
 let STAFF = [...DEFAULT_STAFF];
 
-// 祝日 (2025年 & 2026年 主要祝日)
-const HOLIDAYS = {
-  '2025-01-01':1,'2025-01-13':1,'2025-02-11':1,'2025-02-23':1,
-  '2025-03-20':1,'2025-04-29':1,'2025-05-03':1,'2025-05-04':1,
-  '2025-05-05':1,'2025-05-06':1,'2025-07-21':1,'2025-08-11':1,
-  '2025-09-15':1,'2025-09-22':1,'2025-09-23':1,'2025-10-13':1,
-  '2025-11-03':1,'2025-11-24':1,'2025-12-23':1,
-  '2026-01-01':1,'2026-01-12':1,'2026-02-11':1,'2026-02-23':1,
-  '2026-03-20':1,'2026-04-29':1,'2026-05-03':1,'2026-05-04':1,
-  '2026-05-05':1,'2026-05-06':1,'2026-07-20':1,'2026-08-11':1,
-  '2026-09-21':1,'2026-09-22':1,'2026-10-12':1,'2026-11-03':1,
-  '2026-11-23':1,
-};
+// 内閣府公表の祝日・休日（portal-holidays.jsonをシフト管理と通知Workerで共通利用）
+let HOLIDAYS = {};
+let holidayDataError = '';
+
+async function loadSharedHolidayData(){
+  try {
+    const res = await fetch(`./portal-holidays.json?v=${Date.now()}`, {
+      cache: 'no-store',
+    });
+    if(!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    if(!data || typeof data.holidays !== 'object' || Array.isArray(data.holidays)){
+      throw new Error('祝日データの形式が正しくありません');
+    }
+    HOLIDAYS = data.holidays;
+    holidayDataError = '';
+    if(currentUser?.role==='admin') render();
+    else if(currentUser?.role==='staff') renderStaffMonthGrid(currentUser.staffId);
+    return data;
+  } catch(e) {
+    holidayDataError = `祝日データを読み込めませんでした: ${e.message}`;
+    console.error(holidayDataError);
+    return null;
+  }
+}
+
+window.__holidayDataReady = loadSharedHolidayData();
 
 // ──────────────────────────────────────────────
 //  STATE
