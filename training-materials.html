@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>院内研修資料 | カルミアデンタル スタッフポータル</title>
+<title>マニュアル | カルミアデンタル スタッフポータル</title>
 <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800;900&family=Zen+Maru+Gothic:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -55,7 +55,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--mint)}
 .inline-form{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:start}
 .file-box{border:2px dashed #b9dce2;border-radius:14px;padding:14px;background:#f8fdff}
 .file-box input{border:0;padding:0;border-radius:0;background:transparent}
-.mode-toggle{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.mode-toggle{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
 .mode-toggle label{border:2px solid var(--line);border-radius:12px;padding:10px 12px;cursor:pointer;background:white;color:var(--dark);text-align:center}
 .mode-toggle input{position:absolute;opacity:0;pointer-events:none}
 .mode-toggle label:has(input:checked){border-color:var(--mint);background:#effbfa;color:#19766f}
@@ -84,6 +84,16 @@ input:focus,select:focus,textarea:focus{border-color:var(--mint)}
 .meta{display:flex;gap:6px;flex-wrap:wrap;font-size:11px;color:var(--gray)}
 .badge{border-radius:999px;background:#eef4f7;padding:4px 8px;font-weight:800}
 .summary{font-size:13px;line-height:1.65;color:#405057;white-space:pre-wrap;overflow-wrap:anywhere;margin:0;flex:1}
+.manual-body{font-size:14px;line-height:1.8;color:#33444c;white-space:pre-wrap;overflow-wrap:anywhere;margin:0;padding:14px;background:#f8fdff;border:1px solid var(--line);border-radius:12px}
+.skill-picker{border:1px solid var(--line);border-radius:12px;background:#f8fdff;padding:12px;max-height:300px;overflow:auto;display:flex;flex-direction:column;gap:10px}
+.skill-group{border-bottom:1px solid var(--line);padding-bottom:10px}
+.skill-group:last-child{border-bottom:0;padding-bottom:0}
+.skill-group-title{font-size:13px;font-weight:900;color:#247d85;margin-bottom:8px}
+.skill-category-title{font-size:12px;font-weight:900;color:var(--gray);margin:8px 0 5px}
+.skill-options{display:flex;flex-wrap:wrap;gap:6px}
+.skill-option{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--line);border-radius:999px;padding:6px 9px;background:white;color:var(--dark);cursor:pointer;font-size:12px}
+.skill-option input{width:auto;margin:0}
+.skill-tags{display:flex;gap:6px;flex-wrap:wrap}
 .material-preview{position:relative;display:block;width:100%;aspect-ratio:16/9;border:0;border-radius:12px;overflow:hidden;background:#eef4f7;padding:0;cursor:pointer}
 .material-preview img{width:100%;height:100%;object-fit:cover;display:block}
 .material-preview:focus-visible{outline:3px solid var(--mint);outline-offset:2px}
@@ -130,15 +140,15 @@ body.viewer-open{overflow:hidden}
 <body>
 <header>
   <a class="back" href="./index.html" title="ポータルに戻る" aria-label="ポータルに戻る">←</a>
-  <div class="brand"><div class="brand-mark">LIB</div><span>Training Materials</span></div>
+  <div class="brand"><div class="brand-mark">MAN</div><span>Manuals</span></div>
 </header>
 
 <main class="app" id="app">
   <section class="top">
     <div class="title-block">
-      <div class="eyebrow">IN-HOUSE TRAINING</div>
-      <h1>院内研修資料</h1>
-      <p class="lead">研修スライド、PDF、画像、動画などをまとめて保管し、必要なときにすぐ開けます。</p>
+      <div class="eyebrow">CLINIC MANUALS</div>
+      <h1>マニュアル</h1>
+      <p class="lead">文章、PDF、画像、動画、リンクをまとめて保管し、必要な手順をすぐ確認できます。</p>
     </div>
 
     <section class="auth-panel" id="authPanel" aria-label="管理者ログイン">
@@ -162,9 +172,9 @@ body.viewer-open{overflow:hidden}
       <div class="status" id="authStatus"></div>
     </section>
 
-    <section class="admin-panel" aria-label="資料追加">
+    <section class="admin-panel" aria-label="マニュアル追加">
       <div class="panel-head">
-        <div class="panel-title" id="formTitle">資料を追加</div>
+        <div class="panel-title" id="formTitle">マニュアルを追加</div>
         <button class="btn secondary hidden" type="button" id="cancelEditBtn" onclick="cancelEdit()">編集をやめる</button>
       </div>
       <form id="materialForm" onsubmit="saveMaterial(event)">
@@ -174,6 +184,7 @@ body.viewer-open{overflow:hidden}
             <div class="mode-toggle" role="radiogroup" aria-label="保存方法">
               <label><input type="radio" name="materialMode" value="file" checked>ファイルを保存</label>
               <label><input type="radio" name="materialMode" value="link">URLを保存</label>
+              <label><input type="radio" name="materialMode" value="text">文章を作成</label>
             </div>
           </div>
           <div class="field">
@@ -197,7 +208,11 @@ body.viewer-open{overflow:hidden}
           </div>
           <div class="field full">
             <label for="materialSummary">メモ</label>
-            <textarea id="materialSummary" maxlength="500" placeholder="対象スタッフ、研修日、補足メモなど"></textarea>
+            <textarea id="materialSummary" maxlength="500" placeholder="対象スタッフ、更新内容、補足メモなど"></textarea>
+          </div>
+          <div class="field full hidden" id="bodyField">
+            <label for="materialBody">本文</label>
+            <textarea id="materialBody" maxlength="20000" placeholder="手順、注意事項、確認ポイントなどを入力してください。"></textarea>
           </div>
           <div class="field full">
             <label for="materialFile">ファイル</label>
@@ -211,6 +226,10 @@ body.viewer-open{overflow:hidden}
             <input id="materialUrl" type="url" maxlength="500" placeholder="https://www.youtube.com/watch?v=...">
             <div class="hint">YouTubeは限定公開でアップロードし、共有URLを貼り付けてください。</div>
           </div>
+          <div class="field full">
+            <label>関連するスキル項目（複数選択可・未選択でも保存できます）</label>
+            <div class="skill-picker" id="skillPicker"><div class="hint">スキル項目を読み込んでいます。</div></div>
+          </div>
         </div>
         <div class="progress" id="uploadProgress"><div class="progress-bar" id="uploadProgressBar"></div></div>
         <div class="form-actions">
@@ -222,7 +241,7 @@ body.viewer-open{overflow:hidden}
   </section>
 
   <section class="toolbar" aria-label="検索">
-    <input id="searchText" type="search" placeholder="タイトル・メモ・ファイル名で検索" oninput="renderMaterials()">
+    <input id="searchText" type="search" placeholder="タイトル・本文・メモ・ファイル名で検索" oninput="renderMaterials()">
     <select id="categoryFilter" onchange="renderMaterials()">
       <option value="">すべてのカテゴリ</option>
       <option>歯周治療</option>
@@ -264,6 +283,7 @@ const db = getDatabase(fbApp);
 const storage = getStorage(fbApp);
 const DB_PATH = 'trainingMaterials';
 const CATEGORY_DB_PATH = 'trainingMaterialCategories';
+const MEETING_SOURCE_PATHS = { task:'meetingManagement/tasks', notice:'meetingManagement/notices' };
 const DIRECT_UPLOAD_MAX_BYTES = 20 * 1024 * 1024;
 const INLINE_IMAGE_MAX_DIMENSION = 1200;
 const INLINE_IMAGE_QUALITY = 0.72;
@@ -291,6 +311,7 @@ let materials = [];
 let materialCategories = [...DEFAULT_MATERIAL_CATEGORIES];
 let editingId = '';
 let editingMaterial = null;
+let skillCatalog = {};
 let syncedPasswords = {};
 let passwordsReady = false;
 
@@ -312,6 +333,7 @@ document.getElementById('newMaterialCategory')?.addEventListener('keydown', even
 });
 renderCategoryControls();
 updateMaterialMode();
+loadSkillCatalog();
 
 onValue(ref(db, CATEGORY_DB_PATH), snap => {
   materialCategories = normalizeMaterialCategories(snap.val());
@@ -328,8 +350,8 @@ onValue(ref(db, DB_PATH), snap => {
     .sort((a, b) => (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0));
   renderMaterials();
 }, error => {
-  showListError(`資料一覧を読み込めませんでした: ${error.message}`);
-  setStatus(`資料一覧を読み込めませんでした: ${error.message}`, 'err');
+  showListError(`マニュアル一覧を読み込めませんでした: ${error.message}`);
+  setStatus(`マニュアル一覧を読み込めませんでした: ${error.message}`, 'err');
 });
 
 function readUser() {
@@ -344,7 +366,11 @@ function readUser() {
       pass: params.get('p') || ''
     });
     savePortalUser(user);
-    history.replaceState({}, '', location.pathname);
+    const retained = new URLSearchParams();
+    for (const key of ['manualSource', 'sourceId']) {
+      if (params.get(key)) retained.set(key, params.get(key));
+    }
+    history.replaceState({}, '', retained.size ? `${location.pathname}?${retained.toString()}` : location.pathname);
     return user;
   }
   return readStoredPortalUser();
@@ -563,11 +589,11 @@ function renderMaterials() {
     const itemCategory = materialCategoryValue(item.category);
     if (category && itemCategory !== category) return false;
     if (!q) return true;
-    return [item.title, item.summary, item.fileName, itemCategory]
+    return [item.title, item.body, item.summary, item.fileName, itemCategory]
       .some(value => String(value || '').toLowerCase().includes(q));
   });
 
-  document.getElementById('materialCount').textContent = `${filtered.length}件の資料`;
+  document.getElementById('materialCount').textContent = `${filtered.length}件のマニュアル`;
 
   if (!filtered.length) {
     list.innerHTML = '<div class="empty">条件に合う資料はありません。</div>';
@@ -575,18 +601,23 @@ function renderMaterials() {
   }
 
   list.innerHTML = filtered.map(item => {
-    const title = esc(item.title || item.fileName || '無題の資料');
+    const title = esc(item.title || item.fileName || '無題のマニュアル');
     const summary = esc(item.summary || '');
+    const bodyText = esc(item.body || '');
     const category = materialCategoryValue(item.category);
+    const isText = item.sourceType === 'text';
     const isLink = item.sourceType === 'link' || Boolean(item.linkUrl);
     const fileName = esc(isLink ? (item.linkUrl || item.url || '') : (item.fileName || ''));
-    const type = fileLabel(item.fileType, item.fileName, item.url || item.linkUrl, isLink);
+    const type = isText
+      ? { short:'TXT', label:'文章' }
+      : fileLabel(item.fileType, item.fileName, item.url || item.linkUrl, isLink);
     const date = formatDate(item.updatedAt || item.createdAt);
     const size = formatSize(item.fileSize || 0);
     const openUrl = escAttr(item.url || item.linkUrl || '#');
     const preview = renderMaterialPreview(item);
     const openControl = materialOpenControl(item, openUrl);
-    const downloadButton = (isLink || item.inlineImage) ? '' : `<a class="btn ghost" href="${openUrl}" target="_blank" rel="noopener" download>ダウンロード</a>`;
+    const downloadButton = (isText || isLink || item.inlineImage) ? '' : `<a class="btn ghost" href="${openUrl}" target="_blank" rel="noopener" download>ダウンロード</a>`;
+    const skillTags = relatedSkillLabels(item.relatedSkillKeys);
     const manageActions = canManageMaterial(item)
       ? `<div class="admin-actions">
           <button class="btn secondary" type="button" onclick="startEdit('${escAttr(item.id)}')">編集</button>
@@ -608,8 +639,10 @@ function renderMaterials() {
           </div>
         </div>
         ${preview}
+        ${bodyText ? `<p class="manual-body">${bodyText}</p>` : ''}
         ${summary ? `<p class="summary">${summary}</p>` : '<p class="summary">メモはありません。</p>'}
-        <div class="meta">${fileName}</div>
+        ${skillTags ? `<div class="skill-tags">${skillTags}</div>` : ''}
+        ${fileName ? `<div class="meta">${fileName}</div>` : ''}
         <div class="card-actions">
           ${openControl}
           ${downloadButton}
@@ -643,6 +676,7 @@ function renderMaterialPreview(item) {
 }
 
 function materialOpenControl(item, openUrl) {
+  if (item.sourceType === 'text') return '';
   if (item.inlineImage && item.url) {
     return `<button class="btn primary" type="button" onclick="openMaterialImage('${escAttr(item.id)}')">開く</button>`;
   }
@@ -674,22 +708,25 @@ window.saveMaterial = async function(event) {
   event.preventDefault();
   const existingMaterial = editingId ? (editingMaterial || materials.find(material => material.id === editingId)) : null;
   if (editingId) {
-    if (!canManageMaterial(existingMaterial)) return setStatus('この資料を編集できません。', 'err');
+    if (!canManageMaterial(existingMaterial)) return setStatus('このマニュアルを編集できません。', 'err');
   } else if (!isAdmin()) {
-    return setStatus('資料の追加は管理者のみ可能です。', 'err');
+    return setStatus('マニュアルの追加は管理者のみ可能です。', 'err');
   }
 
   const title = document.getElementById('materialTitle').value.trim();
   const category = materialCategoryValue(document.getElementById('materialCategory').value);
   const summary = document.getElementById('materialSummary').value.trim();
+  const body = document.getElementById('materialBody').value.trim();
+  const relatedSkillKeys = selectedSkillKeys();
   const mode = getMaterialMode();
   const linkUrl = document.getElementById('materialUrl').value.trim();
   const file = document.getElementById('materialFile').files[0] || null;
   if (!title) return setStatus('タイトルを入力してください。', 'err');
   if (mode === 'link' && !linkUrl) return setStatus('保存するURLを入力してください。', 'err');
   if (mode === 'link' && !normalizeUrl(linkUrl)) return setStatus('URLは http:// または https:// で入力してください。', 'err');
+  if (mode === 'text' && !body) return setStatus('本文を入力してください。', 'err');
   if (!editingId && mode === 'file' && !file) return setStatus('保存するファイルを選択してください。', 'err');
-  if (editingId && mode === 'file' && !file && (editingMaterial?.sourceType === 'link' || editingMaterial?.linkUrl)) {
+  if (editingId && mode === 'file' && !file && (editingMaterial?.sourceType === 'link' || editingMaterial?.sourceType === 'text' || editingMaterial?.linkUrl)) {
     return setStatus('ファイル資料に変更する場合はファイルを選択してください。', 'err');
   }
 
@@ -698,7 +735,7 @@ window.saveMaterial = async function(event) {
   setStatus(mode === 'file' && file ? 'アップロードを開始します。' : '資料情報を保存しています。');
 
   try {
-    let filePayload = mode === 'link' ? linkPayload(linkUrl) : {};
+    let filePayload = mode === 'link' ? linkPayload(linkUrl) : mode === 'text' ? textPayload() : {};
     if (mode === 'file' && file) {
       filePayload = await uploadFile(file);
     }
@@ -709,12 +746,14 @@ window.saveMaterial = async function(event) {
         title,
         category,
         summary,
+        body: mode === 'text' ? body : '',
+        relatedSkillKeys,
         ...filePayload,
         updatedAt: now,
         updatedBy: currentUser?.name || '不明',
         updatedById: currentStaffId()
       });
-      if ((mode === 'link' || file) && editingMaterial?.storagePath && editingMaterial.storagePath !== filePayload.storagePath) {
+      if ((mode === 'link' || mode === 'text' || file) && editingMaterial?.storagePath && editingMaterial.storagePath !== filePayload.storagePath) {
         await deleteStorageFile(editingMaterial.storagePath, true);
       }
       setStatus('更新しました。', 'ok');
@@ -724,7 +763,10 @@ window.saveMaterial = async function(event) {
         title,
         category,
         summary,
+        body: mode === 'text' ? body : '',
+        relatedSkillKeys,
         ...filePayload,
+        ...meetingSourcePayload(),
         createdAt: now,
         createdBy: currentUser?.name || '不明',
         createdById: currentStaffId(),
@@ -861,16 +903,18 @@ function isImageFile(file, contentType) {
 window.startEdit = function(id) {
   const item = materials.find(material => material.id === id);
   if (!item) return;
-  if (!canManageMaterial(item)) return setStatus('この資料を編集できません。', 'err');
+  if (!canManageMaterial(item)) return setStatus('このマニュアルを編集できません。', 'err');
   editingId = id;
   editingMaterial = item;
   document.body.classList.add('is-editing-material');
-  document.getElementById('formTitle').textContent = '資料を編集';
+  document.getElementById('formTitle').textContent = 'マニュアルを編集';
   document.getElementById('materialTitle').value = item.title || '';
   document.getElementById('materialCategory').value = materialCategoryValue(item.category);
   document.getElementById('materialSummary').value = item.summary || '';
-  setMaterialMode(item.sourceType === 'link' || item.linkUrl ? 'link' : 'file');
+  document.getElementById('materialBody').value = item.body || '';
+  setMaterialMode(item.sourceType === 'text' ? 'text' : item.sourceType === 'link' || item.linkUrl ? 'link' : 'file');
   document.getElementById('materialUrl').value = item.linkUrl || (item.sourceType === 'link' ? item.url : '') || '';
+  setSelectedSkillKeys(item.relatedSkillKeys);
   document.getElementById('materialFile').value = '';
   document.getElementById('cancelEditBtn').classList.remove('hidden');
   document.getElementById('saveBtn').textContent = '更新';
@@ -886,8 +930,8 @@ window.cancelEdit = function() {
 window.deleteMaterial = async function(id) {
   const item = materials.find(material => material.id === id);
   if (!item) return;
-  if (!canManageMaterial(item)) return setStatus('この資料を削除できません。', 'err');
-  if (!confirm(`「${item.title || item.fileName || '資料'}」を削除しますか？`)) return;
+  if (!canManageMaterial(item)) return setStatus('このマニュアルを削除できません。', 'err');
+  if (!confirm(`「${item.title || item.fileName || 'マニュアル'}」を削除しますか？`)) return;
   try {
     if (item.storagePath) await deleteStorageFile(item.storagePath, false);
     await remove(ref(db, `${DB_PATH}/${id}`));
@@ -1000,7 +1044,9 @@ function resetForm() {
   renderCategoryControls();
   setMaterialMode('file');
   document.getElementById('materialUrl').value = '';
-  document.getElementById('formTitle').textContent = '資料を追加';
+  document.getElementById('materialBody').value = '';
+  setSelectedSkillKeys([]);
+  document.getElementById('formTitle').textContent = 'マニュアルを追加';
   document.getElementById('cancelEditBtn').classList.add('hidden');
   document.getElementById('saveBtn').textContent = '保存';
   document.body.classList.remove('is-editing-material');
@@ -1021,9 +1067,11 @@ function updateMaterialMode() {
   const mode = getMaterialMode();
   const fileField = document.getElementById('materialFile')?.closest('.field');
   const linkField = document.getElementById('linkField');
-  fileField?.classList.toggle('hidden', mode === 'link');
+  const bodyField = document.getElementById('bodyField');
+  fileField?.classList.toggle('hidden', mode !== 'file');
   linkField?.classList.toggle('hidden', mode !== 'link');
-  if (mode === 'link') {
+  bodyField?.classList.toggle('hidden', mode !== 'text');
+  if (mode !== 'file') {
     document.getElementById('materialFile').value = '';
     updateFileHint();
   }
@@ -1062,6 +1110,128 @@ function linkPayload(value) {
     fileSize: 0,
     storagePath: ''
   };
+}
+
+function textPayload() {
+  return {
+    sourceType: 'text',
+    linkUrl: '',
+    url: '',
+    fileName: '',
+    fileType: 'text/plain',
+    fileSize: 0,
+    storagePath: '',
+    inlineImage: false
+  };
+}
+
+async function loadSkillCatalog() {
+  const picker = document.getElementById('skillPicker');
+  try {
+    const response = await fetch('./skill-catalog.json', { cache:'no-store' });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    skillCatalog = await response.json();
+    renderSkillPicker();
+    await prefillMeetingSource();
+  } catch(error) {
+    if (picker) picker.innerHTML = `<div class="status err">スキル項目を読み込めませんでした: ${esc(error.message)}</div>`;
+  }
+}
+
+function manualSkillKey(sheet, category, item) {
+  return `${sheet}::${category}__${item}`;
+}
+
+function renderSkillPicker(selectedKeys = selectedSkillKeys()) {
+  const picker = document.getElementById('skillPicker');
+  if (!picker) return;
+  const selected = new Set(Array.isArray(selectedKeys) ? selectedKeys : Object.values(selectedKeys || {}));
+  picker.innerHTML = Object.entries(skillCatalog).map(([sheet, categories]) => `
+    <section class="skill-group">
+      <div class="skill-group-title">${esc(sheet)}</div>
+      ${Object.entries(categories).map(([category, items]) => `
+        <div class="skill-category-title">${esc(category)}</div>
+        <div class="skill-options">
+          ${items.map(item => {
+            const key = manualSkillKey(sheet, category, item);
+            return `<label class="skill-option"><input type="checkbox" name="relatedSkill" value="${escAttr(key)}" ${selected.has(key) ? 'checked' : ''}>${esc(item)}</label>`;
+          }).join('')}
+        </div>
+      `).join('')}
+    </section>
+  `).join('');
+}
+
+function selectedSkillKeys() {
+  return [...document.querySelectorAll('input[name="relatedSkill"]:checked')].map(input => input.value);
+}
+
+function setSelectedSkillKeys(keys) {
+  const selected = new Set(Array.isArray(keys) ? keys : Object.values(keys || {}));
+  document.querySelectorAll('input[name="relatedSkill"]').forEach(input => {
+    input.checked = selected.has(input.value);
+  });
+}
+
+function relatedSkillLabels(keys) {
+  const values = Array.isArray(keys) ? keys : Object.values(keys || {});
+  return values.map(key => {
+    const [sheet, skill = ''] = String(key).split('::');
+    const [category, item = ''] = skill.split('__');
+    return `<span class="badge">${esc(`${sheet} / ${category} / ${item}`)}</span>`;
+  }).join('');
+}
+
+function meetingSourceParams() {
+  const params = new URLSearchParams(location.search);
+  const sourceType = params.get('manualSource') || '';
+  const sourceId = params.get('sourceId') || '';
+  return MEETING_SOURCE_PATHS[sourceType] && sourceId ? { sourceType, sourceId } : null;
+}
+
+function meetingSourcePayload() {
+  const source = meetingSourceParams();
+  return source ? { sourceTypeOrigin:source.sourceType, sourceId:source.sourceId } : {};
+}
+
+async function prefillMeetingSource() {
+  const source = meetingSourceParams();
+  if (!source) return;
+  if (!isAdmin()) {
+    setStatus('ミーティング内容からマニュアルを作成できるのは管理者のみです。', 'err');
+    return;
+  }
+  try {
+    const snapshot = await get(ref(db, `${MEETING_SOURCE_PATHS[source.sourceType]}/${source.sourceId}`));
+    const item = snapshot.val();
+    if (!item) throw new Error('反映元が見つかりません');
+    const body = source.sourceType === 'task'
+      ? [`詳細\n${item.detail || ''}`, `完了条件\n${item.completion || ''}`, meetingProgressText(item)].filter(Boolean).join('\n\n')
+      : item.body || '';
+    document.getElementById('materialTitle').value = item.title || '';
+    document.getElementById('materialBody').value = body;
+    setMaterialMode('text');
+    document.getElementById('formTitle').textContent = source.sourceType === 'task'
+      ? '取り組みからマニュアルを作成'
+      : 'お知らせからマニュアルを作成';
+    setStatus('内容を確認・編集し、関連するスキル項目を選んで保存してください。', 'ok');
+    document.querySelector('.admin-panel')?.scrollIntoView({ block:'start' });
+  } catch(error) {
+    setStatus(`反映元を読み込めませんでした: ${error.message}`, 'err');
+  }
+}
+
+function meetingProgressText(item) {
+  const lines = [];
+  const rawLogs = item?.progressLogs;
+  if (rawLogs && typeof rawLogs === 'object') {
+    const logs = Array.isArray(rawLogs) ? rawLogs : Object.values(rawLogs);
+    for (const log of logs) {
+      if (String(log?.text || '').trim()) lines.push(String(log.text).trim());
+    }
+  }
+  if (String(item?.progress || '').trim()) lines.push(String(item.progress).trim());
+  return lines.length ? `取り組み内容・対策\n${lines.join('\n')}` : '';
 }
 
 function isYouTubeUrl(value) {

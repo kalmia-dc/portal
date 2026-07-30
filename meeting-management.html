@@ -1040,6 +1040,7 @@ const db = getDatabase(fbApp);
 
 const DIRECTOR_ID = 'sugihira';
 const LEADER_IDS = ['momo', 'yamada'];
+const MANUAL_ADMIN_IDS = [DIRECTOR_ID, 'momo'];
 const STAFF_NAMES = {
   sugihira:'杉平', shimanaka:'嶋中', hokari:'保刈', shinoda:'篠田',
   tsuruta:'鶴田', yoshida:'吉田', takagi:'高木', matsumoto:'松本',
@@ -1286,6 +1287,7 @@ function isNoticeTarget() { return Boolean(NOTICE_TARGETS[currentUser.staffId]);
 function canSeeNotices() { return isDirector() || isLeader() || isNoticeTarget(); }
 function canSeeOpinions() { return isDirector() || isLeader(); }
 function canCreateManagedItems() { return isDirector() || isLeader(); }
+function canCreateManuals() { return MANUAL_ADMIN_IDS.includes(currentUser.staffId); }
 function canManageOwnItem(item) {
   return isDirector() || (isLeader() && item?.createdById === currentUser.staffId);
 }
@@ -2519,9 +2521,11 @@ async function handleActions(event) {
   if (action === 'task-status') return updateTaskStatus(id, btn.dataset.status);
   if (action === 'save-progress') return saveProgress(id);
   if (action === 'read-task') return markTaskRead(id);
+  if (action === 'create-task-manual') return openManualDraft('task', id);
   if (action === 'edit-notice') return fillNoticeForm(id);
   if (action === 'delete-notice') return deleteItem(PATHS.notices, id, 'お知らせ', state.notices.find(notice => notice.id === id));
   if (action === 'read-notice') return markNoticeRead(id);
+  if (action === 'create-notice-manual') return openManualDraft('notice', id);
   if (action === 'delete-opinion') return deleteItem(PATHS.opinions, id, '意見・提案');
   if (action === 'save-judgment') return saveJudgment(id);
   if (action === 'toggle-incident-edit') return toggleIncidentEdit(id);
@@ -2529,6 +2533,18 @@ async function handleActions(event) {
   if (action === 'save-incident-followup') return saveIncidentFollowup(id);
   if (action === 'create-incident-task') return createTaskFromIncident(id);
   if (action === 'delete-incident') return deleteIncidentReport(id);
+}
+
+function openManualDraft(sourceType, sourceId) {
+  if (!canCreateManuals()) return showToast('マニュアルへ反映できるのは管理者のみです');
+  if (!['task', 'notice'].includes(sourceType) || !sourceId) return;
+  const params = new URLSearchParams({
+    sid: currentUser.staffId,
+    name: currentUser.name || '',
+    manualSource: sourceType,
+    sourceId
+  });
+  location.href = `./training-materials.html?${params.toString()}`;
 }
 
 function fillTaskForm(id) {
@@ -2962,13 +2978,20 @@ function progressLogHtml(log) {
 }
 
 function taskActionsHtml(task) {
-  if (!canManageOwnItem(task)) return '';
+  const manageActions = canManageOwnItem(task) ? `
+    <button class="btn" type="button" data-action="edit-task" data-id="${escAttr(task.id)}">編集</button>
+    ${isDirector() && task.status === 'review' ? `<button class="btn primary" type="button" data-action="confirm-task" data-id="${escAttr(task.id)}">定着確認済みにする</button>` : ''}
+    ${isDirector() && task.status === 'review' ? `<button class="btn danger" type="button" data-action="reject-task" data-id="${escAttr(task.id)}">定着確認依頼を却下</button>` : ''}
+    <button class="btn danger" type="button" data-action="delete-task" data-id="${escAttr(task.id)}">削除</button>
+  ` : '';
+  const manualAction = canCreateManuals()
+    ? `<button class="btn sky" type="button" data-action="create-task-manual" data-id="${escAttr(task.id)}">マニュアルに反映</button>`
+    : '';
+  if (!manageActions && !manualAction) return '';
   return `
     <div class="item-actions">
-      <button class="btn" type="button" data-action="edit-task" data-id="${escAttr(task.id)}">編集</button>
-      ${isDirector() && task.status === 'review' ? `<button class="btn primary" type="button" data-action="confirm-task" data-id="${escAttr(task.id)}">定着確認済みにする</button>` : ''}
-      ${isDirector() && task.status === 'review' ? `<button class="btn danger" type="button" data-action="reject-task" data-id="${escAttr(task.id)}">定着確認依頼を却下</button>` : ''}
-      <button class="btn danger" type="button" data-action="delete-task" data-id="${escAttr(task.id)}">削除</button>
+      ${manualAction}
+      ${manageActions}
     </div>
   `;
 }
@@ -3022,8 +3045,13 @@ function renderNotices() {
       ${noticeReadSummaryHtml(notice)}
       ${canManageOwnItem(notice) ? `
         <div class="item-actions">
+          ${canCreateManuals() ? `<button class="btn sky" type="button" data-action="create-notice-manual" data-id="${escAttr(notice.id)}">マニュアルに反映</button>` : ''}
           <button class="btn" type="button" data-action="edit-notice" data-id="${escAttr(notice.id)}">編集</button>
           <button class="btn danger" type="button" data-action="delete-notice" data-id="${escAttr(notice.id)}">削除</button>
+        </div>
+      ` : canCreateManuals() ? `
+        <div class="item-actions">
+          <button class="btn sky" type="button" data-action="create-notice-manual" data-id="${escAttr(notice.id)}">マニュアルに反映</button>
         </div>
       ` : ''}
     </article>

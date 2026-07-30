@@ -101,6 +101,20 @@ header{background:var(--white);height:56px;display:flex;align-items:center;justi
 .btn-approve.approved{background:#2e7d32;color:white;border-color:#2e7d32;}
 .criteria-detail{font-size:12px;font-weight:700;color:var(--dark);margin-bottom:6px;padding-bottom:6px;border-bottom:1px solid rgba(162,155,254,.2);}
 .criteria-text{font-size:12px;line-height:1.5;color:var(--dark)}
+.manual-link-row{margin:0 0 10px}
+.btn-manual{border:1.5px solid var(--mint);background:#effbfa;color:#19766f;border-radius:999px;padding:7px 12px;font-size:12px;font-weight:800;cursor:pointer}
+.manual-modal{position:fixed;inset:0;background:rgba(39,50,56,.68);display:none;align-items:center;justify-content:center;padding:18px;z-index:250}
+.manual-modal.open{display:flex}
+.manual-panel{width:min(620px,100%);max-height:88vh;overflow:auto;background:white;border-radius:18px;padding:16px;box-shadow:0 20px 60px rgba(0,0,0,.22)}
+.manual-panel-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}
+.manual-panel-title{font-size:18px;font-weight:900}
+.manual-close{border:0;border-radius:10px;background:var(--light);padding:8px 11px;font-weight:900;cursor:pointer}
+.manual-list{display:flex;flex-direction:column;gap:10px}
+.manual-item{border:1px solid var(--light);border-radius:14px;padding:13px;background:#fbfefe}
+.manual-item-title{font-size:15px;font-weight:900;margin-bottom:6px}
+.manual-item-meta{font-size:11px;color:var(--gray);font-weight:700;margin-bottom:7px}
+.manual-item-body{white-space:pre-wrap;overflow-wrap:anywhere;font-size:13px;line-height:1.7;margin:0 0 9px}
+.manual-open{display:inline-flex;text-decoration:none;border-radius:10px;padding:8px 11px;background:linear-gradient(135deg,var(--mint),var(--sky));color:white;font-size:12px;font-weight:900}
 .rank-color-1{background:#e8f4fd;color:#1a73c1}
 .rank-color-2{background:#e8fdf8;color:#0f7a5a}
 .rank-color-3{background:#f3f0ff;color:#5f49c7}
@@ -215,10 +229,19 @@ body.is-admin .admin-only{display:block}
   <button class="btn-save" onclick="saveSheet()">💾 保存</button>
 </div>
 <div class="save-msg" id="saveMsg">保存しました ✅</div>
+<div class="manual-modal" id="manualModal" aria-hidden="true" onclick="window.closeSkillManuals(event)">
+  <section class="manual-panel" role="dialog" aria-modal="true" aria-labelledby="manualModalTitle" onclick="event.stopPropagation()">
+    <div class="manual-panel-head">
+      <div class="manual-panel-title" id="manualModalTitle">マニュアル</div>
+      <button class="manual-close" type="button" onclick="window.closeSkillManuals()">閉じる</button>
+    </div>
+    <div class="manual-list" id="manualModalList"></div>
+  </section>
+</div>
 
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getDatabase, ref, set, get } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
+import { getDatabase, ref, set, get, onValue } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 
 const firebaseConfig = {
   apiKey:'AIzaSyDdMe7feUF6CKPHH0YIx7Suk-WnXtOYUu8',
@@ -283,6 +306,12 @@ let currentRoleKey = '';
 let currentData    = {}; // { skillKey: rank }
 let _canEdit       = true;
 let approvalData   = {}; // { skillKey: true } 承認済みフラグ
+let skillManuals   = [];
+
+onValue(ref(_db, 'trainingMaterials'), snap => {
+  skillManuals = Object.entries(snap.val() || {}).map(([id, item]) => ({ id, ...item }));
+  if (currentStaffId) renderSkills();
+});
 
 const FIREBASE_KEY_UNSAFE_RE = /[.#$\[\]\/\x00-\x1F\x7F]/g;
 
@@ -476,6 +505,8 @@ function renderSkills() {
 
       const isApproved = !!approvalData[key];
       const showApproveBtn = portalUser?.isAdmin && (currentData[key] || 0) > 0;
+      const manualKey = `${sheetKey}::${key}`;
+      const relatedManuals = manualsForSkill(manualKey);
       card.innerHTML = `
         <div class="skill-name-row" style="margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;">
           <div class="skill-name">${item}</div>
@@ -494,6 +525,10 @@ function renderSkills() {
             ? criteriaList.map(c => `<div class="criteria-row"><span class="criteria-bullet">・</span><span class="criteria-text">${c}</span></div>`).join('')
             : `${criteriaList.detail ? `<div class="criteria-detail">${criteriaList.detail}</div>` : ''}`
           }
+        </div>` : ''}
+        ${relatedManuals.length ? `
+        <div class="manual-link-row">
+          <button class="btn-manual" type="button" onclick="window.openSkillManuals('${encodeURIComponent(manualKey)}')">📘 マニュアル ${relatedManuals.length}件</button>
         </div>` : ''}
       `;
 
@@ -825,6 +860,64 @@ window.resetSheet = function() {
   currentData = {};
   renderSkills();
   updateProgress();
+};
+
+function manualRelatedKeys(manual) {
+  const keys = manual?.relatedSkillKeys;
+  return Array.isArray(keys) ? keys : Object.values(keys || {});
+}
+
+function manualsForSkill(manualKey) {
+  return skillManuals
+    .filter(manual => manualRelatedKeys(manual).includes(manualKey))
+    .sort((a, b) => Number(b.updatedAt || b.createdAt || 0) - Number(a.updatedAt || a.createdAt || 0));
+}
+
+function manualEsc(value) {
+  return String(value ?? '').replace(/[&<>"']/g, char => ({
+    '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'
+  }[char]));
+}
+
+function manualTypeLabel(manual) {
+  if (manual.sourceType === 'text') return '文章';
+  if (manual.sourceType === 'link' || manual.linkUrl) return 'リンク';
+  if (String(manual.fileType || '').includes('pdf')) return 'PDF';
+  if (String(manual.fileType || '').startsWith('video/')) return '動画';
+  if (String(manual.fileType || '').startsWith('image/')) return '画像';
+  return 'ファイル';
+}
+
+window.openSkillManuals = function(encodedKey) {
+  const manualKey = decodeURIComponent(encodedKey);
+  const manuals = manualsForSkill(manualKey);
+  const [, skillName = manualKey] = manualKey.split('::');
+  document.getElementById('manualModalTitle').textContent = `${skillName.replace('__', ' / ')}のマニュアル`;
+  document.getElementById('manualModalList').innerHTML = manuals.length
+    ? manuals.map(manual => {
+        const url = manual.url || manual.linkUrl || '';
+        const body = manual.body || '';
+        const summary = manual.summary || '';
+        return `
+          <article class="manual-item">
+            <div class="manual-item-title">${manualEsc(manual.title || manual.fileName || '無題のマニュアル')}</div>
+            <div class="manual-item-meta">${manualEsc(manual.category || '一般')} / ${manualEsc(manualTypeLabel(manual))}</div>
+            ${body ? `<p class="manual-item-body">${manualEsc(body)}</p>` : ''}
+            ${summary ? `<p class="manual-item-body">${manualEsc(summary)}</p>` : ''}
+            ${url ? `<a class="manual-open" href="${manualEsc(url)}" target="_blank" rel="noopener">開く</a>` : ''}
+          </article>
+        `;
+      }).join('')
+    : '<div class="manual-item">関連するマニュアルはありません。</div>';
+  const modal = document.getElementById('manualModal');
+  modal.classList.add('open');
+  modal.setAttribute('aria-hidden', 'false');
+};
+
+window.closeSkillManuals = function() {
+  const modal = document.getElementById('manualModal');
+  modal.classList.remove('open');
+  modal.setAttribute('aria-hidden', 'true');
 };
 
 // ─── 戻るボタン ──────────────────────────────────────
