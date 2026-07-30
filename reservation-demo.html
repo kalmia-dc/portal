@@ -941,11 +941,13 @@
         <div class="form-grid">
           <label class="form-field">
             <span class="field-label">カルテ番号</span>
-            <input type="text" id="chartNumberInput" autocomplete="off" required>
+            <input type="text" id="chartNumberInput" autocomplete="off" list="chartNumberSuggestions" required>
+            <datalist id="chartNumberSuggestions"></datalist>
           </label>
           <label class="form-field">
             <span class="field-label">患者名</span>
-            <input type="text" id="patientNameInput" autocomplete="off" required>
+            <input type="text" id="patientNameInput" autocomplete="off" list="patientNameSuggestions" required>
+            <datalist id="patientNameSuggestions"></datalist>
           </label>
           <label class="form-field full">
             <span class="field-label">予約内容</span>
@@ -1058,7 +1060,9 @@
         els.appointmentDialogTitle = document.getElementById("appointmentDialogTitle");
         els.appointmentSlotLabel = document.getElementById("appointmentSlotLabel");
         els.chartNumberInput = document.getElementById("chartNumberInput");
+        els.chartNumberSuggestions = document.getElementById("chartNumberSuggestions");
         els.patientNameInput = document.getElementById("patientNameInput");
+        els.patientNameSuggestions = document.getElementById("patientNameSuggestions");
         els.appointmentTypeInput = document.getElementById("appointmentTypeInput");
         els.memoInput = document.getElementById("memoInput");
         els.appointmentError = document.getElementById("appointmentError");
@@ -1096,6 +1100,9 @@
         els.resetDemoButton.addEventListener("click", resetDemoData);
 
         els.appointmentForm.addEventListener("submit", saveAppointmentFromForm);
+        els.chartNumberInput.addEventListener("input", fillPatientNameFromChartNumber);
+        els.chartNumberInput.addEventListener("change", fillPatientNameFromChartNumber);
+        els.patientNameInput.addEventListener("change", fillChartNumberFromPatientName);
         els.deleteAppointmentButton.addEventListener("click", deleteCurrentAppointment);
         els.closeAppointmentButton.addEventListener("click", () => closeDialog(els.appointmentDialog));
         els.cancelAppointmentButton.addEventListener("click", () => closeDialog(els.appointmentDialog));
@@ -1110,6 +1117,7 @@
         renderSummary();
         renderLegend();
         renderTypeOptions();
+        renderPatientSuggestions();
         renderSchedule();
       }
 
@@ -1155,6 +1163,23 @@
         if (selectedTypeId && state.types.some((type) => type.id === selectedTypeId)) {
           els.appointmentTypeInput.value = selectedTypeId;
         }
+      }
+
+      function renderPatientSuggestions() {
+        els.chartNumberSuggestions.innerHTML = "";
+        els.patientNameSuggestions.innerHTML = "";
+
+        getSortedPatients().forEach((patient) => {
+          const chartOption = document.createElement("option");
+          chartOption.value = patient.chartNumber;
+          chartOption.label = patient.patientName;
+          els.chartNumberSuggestions.append(chartOption);
+
+          const nameOption = document.createElement("option");
+          nameOption.value = patient.patientName;
+          nameOption.label = patient.chartNumber;
+          els.patientNameSuggestions.append(nameOption);
+        });
       }
 
       function renderSchedule() {
@@ -1383,6 +1408,7 @@
           });
         }
 
+        upsertPatientInfo(chartNumber, patientName);
         persistState();
         closeDialog(els.appointmentDialog);
         renderAll();
@@ -1701,14 +1727,139 @@
         const reservations = savedState.reservations.filter((appointment) => {
           return validChairIds.has(appointment.chairId) && validTimes.has(appointment.time);
         });
+        const types = savedState.types.length ? savedState.types : defaultTypes.map((type) => ({ ...type }));
+        const normalizedPatients = normalizePatients(savedState.patients, reservations);
 
         return {
           state: {
-            types: savedState.types.length ? savedState.types : defaultTypes.map((type) => ({ ...type })),
-            reservations
+            types,
+            reservations,
+            patients: normalizedPatients.patients
           },
-          changed: reservations.length !== savedState.reservations.length || !savedState.types.length
+          changed: reservations.length !== savedState.reservations.length || !savedState.types.length || normalizedPatients.changed
         };
+      }
+
+      function normalizePatients(savedPatients, reservations) {
+        const sourcePatients = Array.isArray(savedPatients) ? savedPatients : [];
+        const patientMap = new Map();
+
+        sourcePatients.forEach((patient) => {
+          addPatientToMap(
+            patientMap,
+            patient.chartNumber,
+            patient.patientName,
+            patient.createdAt,
+            patient.updatedAt
+          );
+        });
+
+        reservations.forEach((appointment) => {
+          addPatientToMap(
+            patientMap,
+            appointment.chartNumber,
+            appointment.patientName,
+            appointment.createdAt,
+            appointment.updatedAt
+          );
+        });
+
+        const patients = Array.from(patientMap.values()).sort(sortPatientsByUpdatedAt).slice(0, 200);
+        return {
+          patients,
+          changed: !Array.isArray(savedPatients) || JSON.stringify(sourcePatients) !== JSON.stringify(patients)
+        };
+      }
+
+      function addPatientToMap(patientMap, chartNumber, patientName, createdAt = "", updatedAt = "") {
+        const normalizedChartNumber = String(chartNumber || "").trim();
+        const normalizedPatientName = String(patientName || "").trim();
+        if (!normalizedChartNumber || !normalizedPatientName) {
+          return;
+        }
+
+        const existing = patientMap.get(normalizedChartNumber);
+        const patient = {
+          chartNumber: normalizedChartNumber,
+          patientName: normalizedPatientName,
+          createdAt: createdAt || updatedAt || new Date().toISOString(),
+          updatedAt: updatedAt || createdAt || new Date().toISOString()
+        };
+
+        if (!existing || sortPatientsByUpdatedAt(patient, existing) < 0) {
+          patientMap.set(normalizedChartNumber, {
+            ...existing,
+            ...patient,
+            createdAt: existing?.createdAt || patient.createdAt
+          });
+        }
+      }
+
+      function upsertPatientInfo(chartNumber, patientName) {
+        const normalizedChartNumber = chartNumber.trim();
+        const normalizedPatientName = patientName.trim();
+        if (!normalizedChartNumber || !normalizedPatientName) {
+          return;
+        }
+
+        if (!Array.isArray(state.patients)) {
+          state.patients = [];
+        }
+
+        const now = new Date().toISOString();
+        const existing = state.patients.find((patient) => patient.chartNumber === normalizedChartNumber);
+        if (existing) {
+          existing.patientName = normalizedPatientName;
+          existing.updatedAt = now;
+        } else {
+          state.patients.push({
+            chartNumber: normalizedChartNumber,
+            patientName: normalizedPatientName,
+            createdAt: now,
+            updatedAt: now
+          });
+        }
+
+        state.patients = normalizePatients(state.patients, []).patients;
+      }
+
+      function fillPatientNameFromChartNumber() {
+        const patient = findPatientByChartNumber(els.chartNumberInput.value);
+        if (patient) {
+          els.patientNameInput.value = patient.patientName;
+        }
+      }
+
+      function fillChartNumberFromPatientName() {
+        const patient = findPatientByName(els.patientNameInput.value);
+        if (patient) {
+          els.chartNumberInput.value = patient.chartNumber;
+          els.patientNameInput.value = patient.patientName;
+        }
+      }
+
+      function findPatientByChartNumber(value) {
+        const chartNumber = value.trim();
+        if (!chartNumber) {
+          return null;
+        }
+        return getSortedPatients().find((patient) => patient.chartNumber === chartNumber) || null;
+      }
+
+      function findPatientByName(value) {
+        const patientName = value.trim();
+        if (!patientName) {
+          return null;
+        }
+        return getSortedPatients().find((patient) => patient.patientName === patientName) || null;
+      }
+
+      function getSortedPatients() {
+        return Array.isArray(state.patients) ? [...state.patients].sort(sortPatientsByUpdatedAt) : [];
+      }
+
+      function sortPatientsByUpdatedAt(a, b) {
+        return (b.updatedAt || "").localeCompare(a.updatedAt || "") || a.chartNumber.localeCompare(b.chartNumber);
       }
 
       function persistState() {
@@ -1725,7 +1876,7 @@
       }
 
       function createDefaultState(seedDate) {
-        return {
+        const initialState = {
           types: defaultTypes.map((type) => ({ ...type })),
           reservations: [
             {
@@ -1778,6 +1929,12 @@
             }
           ]
         };
+        initialState.patients = buildPatientsFromReservations(initialState.reservations);
+        return initialState;
+      }
+
+      function buildPatientsFromReservations(reservations) {
+        return normalizePatients([], reservations).patients;
       }
 
       function createId(prefix) {
