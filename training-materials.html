@@ -57,7 +57,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--mint)}
 .file-box input{border:0;padding:0;border-radius:0;background:transparent}
 .mode-toggle{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
 .mode-toggle label{border:2px solid var(--line);border-radius:12px;padding:10px 12px;cursor:pointer;background:white;color:var(--dark);text-align:center}
-.mode-toggle input{position:absolute;opacity:0;pointer-events:none}
+.mode-toggle input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
 .mode-toggle label:has(input:checked){border-color:var(--mint);background:#effbfa;color:#19766f}
 .hint{font-size:12px;line-height:1.6;color:var(--gray);margin-top:6px}
 .hint.warn{color:#b96818;font-weight:800}
@@ -83,6 +83,8 @@ input:focus,select:focus,textarea:focus{border-color:var(--mint)}
 .card-title{font-size:16px;font-weight:900;line-height:1.35;margin:0}
 .meta{display:flex;gap:6px;flex-wrap:wrap;font-size:11px;color:var(--gray)}
 .badge{border-radius:999px;background:#eef4f7;padding:4px 8px;font-weight:800}
+.badge.draft{background:#fff1cc;color:#8a5a00}
+.badge.published{background:#e7f7ee;color:#176b43}
 .summary{font-size:13px;line-height:1.65;color:#405057;white-space:pre-wrap;overflow-wrap:anywhere;margin:0;flex:1}
 .manual-body{font-size:14px;line-height:1.8;color:#33444c;white-space:pre-wrap;overflow-wrap:anywhere;margin:0;padding:14px;background:#f8fdff;border:1px solid var(--line);border-radius:12px}
 .skill-picker{border:1px solid var(--line);border-radius:12px;background:#f8fdff;padding:12px;max-height:300px;overflow:auto;display:flex;flex-direction:column;gap:10px}
@@ -234,7 +236,8 @@ body.viewer-open{overflow:hidden}
         <div class="progress" id="uploadProgress"><div class="progress-bar" id="uploadProgressBar"></div></div>
         <div class="form-actions">
           <div class="status" id="formStatus"></div>
-          <button class="btn primary" id="saveBtn" type="submit">保存</button>
+          <button class="btn secondary" id="draftSaveBtn" type="submit" name="saveAction" value="draft">下書き保存</button>
+          <button class="btn primary" id="saveBtn" type="submit" name="saveAction" value="publish">公開する</button>
         </div>
       </form>
     </section>
@@ -449,6 +452,7 @@ function renderAuthState() {
     const staffSelect = document.getElementById('adminStaff');
     if (staffSelect) staffSelect.value = currentUser.staffId;
   }
+  if (materials.length) renderMaterials();
 }
 
 function setAuthStatus(text, type = '') {
@@ -492,12 +496,7 @@ function currentStaffId() {
 }
 
 function canManageMaterial(item) {
-  if (isAdmin()) return true;
-  const staffId = currentStaffId();
-  if (!staffId || !item) return false;
-  if (item.createdById && item.createdById === staffId) return true;
-  const userName = currentUser?.name || STAFF_NAMES[staffId] || '';
-  return !item.createdById && userName && item.createdBy === userName;
+  return Boolean(item) && isAdmin();
 }
 
 function cleanMaterialCategoryName(category) {
@@ -586,10 +585,12 @@ function renderMaterials() {
   const q = document.getElementById('searchText').value.trim().toLowerCase();
   const category = document.getElementById('categoryFilter').value;
   const filtered = materials.filter(item => {
+    if (item.status === 'draft' && !isAdmin()) return false;
     const itemCategory = materialCategoryValue(item.category);
     if (category && itemCategory !== category) return false;
     if (!q) return true;
-    return [item.title, item.body, item.summary, item.fileName, itemCategory]
+    return [item.title, item.body, item.summary, item.fileName, itemCategory,
+      item.draft?.title, item.draft?.body, item.draft?.summary, item.draft?.fileName]
       .some(value => String(value || '').toLowerCase().includes(q));
   });
 
@@ -618,9 +619,17 @@ function renderMaterials() {
     const openControl = materialOpenControl(item, openUrl);
     const downloadButton = (isText || isLink || item.inlineImage) ? '' : `<a class="btn ghost" href="${openUrl}" target="_blank" rel="noopener" download>ダウンロード</a>`;
     const skillTags = relatedSkillLabels(item.relatedSkillKeys);
+    const statusBadge = isAdmin()
+      ? item.status === 'draft'
+        ? '<span class="badge draft">下書き</span>'
+        : item.draft
+          ? '<span class="badge draft">公開中・下書きあり</span>'
+          : '<span class="badge published">公開中</span>'
+      : '';
     const manageActions = canManageMaterial(item)
       ? `<div class="admin-actions">
           <button class="btn secondary" type="button" onclick="startEdit('${escAttr(item.id)}')">編集</button>
+          ${(item.status === 'draft' || item.draft) ? `<button class="btn danger" type="button" onclick="deleteDraft('${escAttr(item.id)}')">下書きを削除</button>` : ''}
           <button class="btn danger" type="button" onclick="deleteMaterial('${escAttr(item.id)}')">削除</button>
         </div>`
       : '';
@@ -633,6 +642,7 @@ function renderMaterials() {
             <div class="meta">
               <span class="badge">${esc(category)}</span>
               <span class="badge">${esc(type.label)}</span>
+              ${statusBadge}
               ${size ? `<span class="badge">${size}</span>` : ''}
               ${date ? `<span class="badge">${date}</span>` : ''}
             </div>
@@ -648,7 +658,7 @@ function renderMaterials() {
           ${downloadButton}
           ${manageActions}
         </div>
-        ${renderCommentSection(item)}
+        ${item.status === 'draft' ? '' : renderCommentSection(item)}
       </article>
     `;
   }).join('');
@@ -706,6 +716,7 @@ window.closeMaterialViewer = function(event) {
 
 window.saveMaterial = async function(event) {
   event.preventDefault();
+  const saveAction = event.submitter?.value === 'draft' ? 'draft' : 'publish';
   const existingMaterial = editingId ? (editingMaterial || materials.find(material => material.id === editingId)) : null;
   if (editingId) {
     if (!canManageMaterial(existingMaterial)) return setStatus('このマニュアルを編集できません。', 'err');
@@ -722,65 +733,99 @@ window.saveMaterial = async function(event) {
   const linkUrl = document.getElementById('materialUrl').value.trim();
   const file = document.getElementById('materialFile').files[0] || null;
   if (!title) return setStatus('タイトルを入力してください。', 'err');
-  if (mode === 'link' && !linkUrl) return setStatus('保存するURLを入力してください。', 'err');
-  if (mode === 'link' && !normalizeUrl(linkUrl)) return setStatus('URLは http:// または https:// で入力してください。', 'err');
-  if (mode === 'text' && !body) return setStatus('本文を入力してください。', 'err');
-  if (!editingId && mode === 'file' && !file) return setStatus('保存するファイルを選択してください。', 'err');
-  if (editingId && mode === 'file' && !file && (editingMaterial?.sourceType === 'link' || editingMaterial?.sourceType === 'text' || editingMaterial?.linkUrl)) {
+  if (saveAction === 'publish' && mode === 'link' && !linkUrl) return setStatus('公開するURLを入力してください。', 'err');
+  if (mode === 'link' && linkUrl && !normalizeUrl(linkUrl)) return setStatus('URLは http:// または https:// で入力してください。', 'err');
+  if (saveAction === 'publish' && mode === 'text' && !body) return setStatus('本文を入力してください。', 'err');
+  const editingSource = existingMaterial?.draft || existingMaterial;
+  if (saveAction === 'publish' && mode === 'file' && !file && editingSource?.sourceType !== 'file') {
+    return setStatus('公開するファイルを選択してください。', 'err');
+  }
+  if (saveAction === 'publish' && !editingId && mode === 'file' && !file) return setStatus('公開するファイルを選択してください。', 'err');
+  if (saveAction === 'publish' && editingId && mode === 'file' && !file && (editingSource?.sourceType === 'link' || editingSource?.sourceType === 'text' || editingSource?.linkUrl)) {
     return setStatus('ファイル資料に変更する場合はファイルを選択してください。', 'err');
   }
 
   const saveBtn = document.getElementById('saveBtn');
+  const draftSaveBtn = document.getElementById('draftSaveBtn');
   saveBtn.disabled = true;
+  draftSaveBtn.disabled = true;
   setStatus(mode === 'file' && file ? 'アップロードを開始します。' : '資料情報を保存しています。');
 
   try {
-    let filePayload = mode === 'link' ? linkPayload(linkUrl) : mode === 'text' ? textPayload() : {};
+    let filePayload = mode === 'link'
+      ? (linkUrl ? linkPayload(linkUrl) : emptySourcePayload('link'))
+      : mode === 'text'
+        ? textPayload()
+        : sourcePayload(editingSource, 'file');
     if (mode === 'file' && file) {
       filePayload = await uploadFile(file);
     }
 
     const now = Date.now();
-    if (editingId) {
-      await update(ref(db, `${DB_PATH}/${editingId}`), {
-        title,
-        category,
-        summary,
-        body: mode === 'text' ? body : '',
-        relatedSkillKeys,
-        ...filePayload,
-        updatedAt: now,
-        updatedBy: currentUser?.name || '不明',
-        updatedById: currentStaffId()
-      });
-      if ((mode === 'link' || mode === 'text' || file) && editingMaterial?.storagePath && editingMaterial.storagePath !== filePayload.storagePath) {
-        await deleteStorageFile(editingMaterial.storagePath, true);
+    const content = {
+      title,
+      category,
+      summary,
+      body: mode === 'text' ? body : '',
+      relatedSkillKeys,
+      ...filePayload,
+      updatedAt: now,
+      updatedBy: currentUser?.name || '不明',
+      updatedById: currentStaffId()
+    };
+    if (saveAction === 'draft') {
+      if (editingId && existingMaterial?.status !== 'draft') {
+        await update(ref(db, `${DB_PATH}/${editingId}`), { draft: content });
+      } else if (editingId) {
+        await update(ref(db, `${DB_PATH}/${editingId}`), { ...content, status:'draft' });
+      } else {
+        const itemRef = push(ref(db, DB_PATH));
+        await set(itemRef, {
+          ...content,
+          ...meetingSourcePayload(),
+          status:'draft',
+          createdAt: now,
+          createdBy: currentUser?.name || '不明',
+          createdById: currentStaffId()
+        });
       }
-      setStatus('更新しました。', 'ok');
+      const oldDraftPath = existingMaterial?.status === 'draft'
+        ? existingMaterial.storagePath
+        : existingMaterial?.draft?.storagePath;
+      if ((mode !== 'file' || file) && oldDraftPath && oldDraftPath !== filePayload.storagePath && oldDraftPath !== existingMaterial?.storagePath) {
+        await deleteStorageFile(oldDraftPath, true);
+      }
+      setStatus('下書きを保存しました。', 'ok');
+    } else if (editingId) {
+      await update(ref(db, `${DB_PATH}/${editingId}`), {
+        ...content,
+        status:'published',
+        draft:null
+      });
+      const oldPublishedPath = existingMaterial?.status === 'draft' ? '' : existingMaterial?.storagePath;
+      const oldDraftPath = existingMaterial?.status === 'draft' ? existingMaterial?.storagePath : existingMaterial?.draft?.storagePath;
+      for (const oldPath of [oldPublishedPath, oldDraftPath]) {
+        if (oldPath && oldPath !== filePayload.storagePath) await deleteStorageFile(oldPath, true);
+      }
+      setStatus('公開しました。', 'ok');
     } else {
       const itemRef = push(ref(db, DB_PATH));
       await set(itemRef, {
-        title,
-        category,
-        summary,
-        body: mode === 'text' ? body : '',
-        relatedSkillKeys,
-        ...filePayload,
+        ...content,
         ...meetingSourcePayload(),
+        status:'published',
         createdAt: now,
         createdBy: currentUser?.name || '不明',
-        createdById: currentStaffId(),
-        updatedAt: now,
-        updatedBy: currentUser?.name || '不明',
-        updatedById: currentStaffId()
+        createdById: currentStaffId()
       });
-      setStatus('保存しました。', 'ok');
+      setStatus('公開しました。', 'ok');
     }
     resetForm();
   } catch(error) {
     setStatus(`保存できませんでした: ${uploadErrorMessage(error)}`, 'err');
   } finally {
     saveBtn.disabled = false;
+    draftSaveBtn.disabled = false;
     setProgress(0, false);
   }
 };
@@ -906,20 +951,42 @@ window.startEdit = function(id) {
   if (!canManageMaterial(item)) return setStatus('このマニュアルを編集できません。', 'err');
   editingId = id;
   editingMaterial = item;
+  const editItem = item.draft || item;
   document.body.classList.add('is-editing-material');
-  document.getElementById('formTitle').textContent = 'マニュアルを編集';
-  document.getElementById('materialTitle').value = item.title || '';
-  document.getElementById('materialCategory').value = materialCategoryValue(item.category);
-  document.getElementById('materialSummary').value = item.summary || '';
-  document.getElementById('materialBody').value = item.body || '';
-  setMaterialMode(item.sourceType === 'text' ? 'text' : item.sourceType === 'link' || item.linkUrl ? 'link' : 'file');
-  document.getElementById('materialUrl').value = item.linkUrl || (item.sourceType === 'link' ? item.url : '') || '';
-  setSelectedSkillKeys(item.relatedSkillKeys);
+  document.getElementById('formTitle').textContent = item.status === 'draft' ? '下書きを編集' : item.draft ? '編集下書きを編集' : 'マニュアルを編集';
+  document.getElementById('materialTitle').value = editItem.title || '';
+  document.getElementById('materialCategory').value = materialCategoryValue(editItem.category);
+  document.getElementById('materialSummary').value = editItem.summary || '';
+  document.getElementById('materialBody').value = editItem.body || '';
+  setMaterialMode(editItem.sourceType === 'text' ? 'text' : editItem.sourceType === 'link' || editItem.linkUrl ? 'link' : 'file');
+  document.getElementById('materialUrl').value = editItem.linkUrl || (editItem.sourceType === 'link' ? editItem.url : '') || '';
+  setSelectedSkillKeys(editItem.relatedSkillKeys);
   document.getElementById('materialFile').value = '';
   document.getElementById('cancelEditBtn').classList.remove('hidden');
-  document.getElementById('saveBtn').textContent = '更新';
+  document.getElementById('saveBtn').textContent = '公開する';
   setStatus(getMaterialMode() === 'link' ? 'URLを変更できます。' : 'ファイルを選び直さない場合は、現在のファイルをそのまま使います。');
   window.scrollTo({ top: 0, behavior: 'smooth' });
+};
+
+window.deleteDraft = async function(id) {
+  const item = materials.find(material => material.id === id);
+  if (!item || !canManageMaterial(item)) return setStatus('この下書きを削除できません。', 'err');
+  if (!confirm('保存中の下書きを削除しますか？')) return;
+  try {
+    const draftPath = item.status === 'draft' ? item.storagePath : item.draft?.storagePath;
+    if (item.status === 'draft') {
+      await remove(ref(db, `${DB_PATH}/${id}`));
+    } else {
+      await update(ref(db, `${DB_PATH}/${id}`), { draft:null });
+    }
+    if (draftPath && (item.status === 'draft' || draftPath !== item.storagePath)) {
+      await deleteStorageFile(draftPath, true);
+    }
+    if (editingId === id) resetForm();
+    setStatus('下書きを削除しました。', 'ok');
+  } catch(error) {
+    setStatus(`下書きを削除できませんでした: ${error.message}`, 'err');
+  }
 };
 
 window.cancelEdit = function() {
@@ -934,6 +1001,9 @@ window.deleteMaterial = async function(id) {
   if (!confirm(`「${item.title || item.fileName || 'マニュアル'}」を削除しますか？`)) return;
   try {
     if (item.storagePath) await deleteStorageFile(item.storagePath, false);
+    if (item.draft?.storagePath && item.draft.storagePath !== item.storagePath) {
+      await deleteStorageFile(item.draft.storagePath, true);
+    }
     await remove(ref(db, `${DB_PATH}/${id}`));
     setStatus('削除しました。', 'ok');
   } catch(error) {
@@ -1048,7 +1118,7 @@ function resetForm() {
   setSelectedSkillKeys([]);
   document.getElementById('formTitle').textContent = 'マニュアルを追加';
   document.getElementById('cancelEditBtn').classList.add('hidden');
-  document.getElementById('saveBtn').textContent = '保存';
+  document.getElementById('saveBtn').textContent = '公開する';
   document.body.classList.remove('is-editing-material');
   updateFileHint();
 }
@@ -1122,6 +1192,33 @@ function textPayload() {
     fileSize: 0,
     storagePath: '',
     inlineImage: false
+  };
+}
+
+function emptySourcePayload(sourceType) {
+  return {
+    sourceType,
+    linkUrl: '',
+    url: '',
+    fileName: '',
+    fileType: sourceType === 'text' ? 'text/plain' : '',
+    fileSize: 0,
+    storagePath: '',
+    inlineImage: false
+  };
+}
+
+function sourcePayload(item, sourceType) {
+  if (!item || item.sourceType !== sourceType) return emptySourcePayload(sourceType);
+  return {
+    sourceType,
+    linkUrl: item.linkUrl || '',
+    url: item.url || '',
+    fileName: item.fileName || '',
+    fileType: item.fileType || '',
+    fileSize: Number(item.fileSize || 0),
+    storagePath: item.storagePath || '',
+    inlineImage: Boolean(item.inlineImage)
   };
 }
 
