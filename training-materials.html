@@ -196,6 +196,7 @@ body.viewer-open{overflow:hidden}
           <div class="field">
             <label for="materialCategory">カテゴリ</label>
             <select id="materialCategory">
+              <option value="">未設定（下書きのみ）</option>
               <option>歯周治療</option>
               <option>インプラント</option>
             </select>
@@ -508,6 +509,11 @@ function materialCategoryValue(category) {
   return cleanMaterialCategoryName(category) || DEFAULT_MATERIAL_CATEGORIES[1];
 }
 
+function materialCategoryLabel(category, allowEmpty = false) {
+  const value = cleanMaterialCategoryName(category);
+  return value || (allowEmpty ? '未設定' : DEFAULT_MATERIAL_CATEGORIES[1]);
+}
+
 function normalizeMaterialCategories(raw) {
   const names = [...DEFAULT_MATERIAL_CATEGORIES];
   if (raw && typeof raw === 'object') {
@@ -525,11 +531,11 @@ function renderCategoryControls(selectedMaterialCategory, selectedFilterCategory
   const filterSelect = document.getElementById('categoryFilter');
 
   if (materialSelect) {
-    const selected = materialCategoryValue(selectedMaterialCategory ?? materialSelect.value);
-    materialSelect.innerHTML = categories
+    const selected = cleanMaterialCategoryName(selectedMaterialCategory ?? materialSelect.value);
+    materialSelect.innerHTML = '<option value="">未設定（下書きのみ）</option>' + categories
       .map(category => `<option value="${escAttr(category)}">${esc(category)}</option>`)
       .join('');
-    materialSelect.value = categories.includes(selected) ? selected : categories[0];
+    materialSelect.value = categories.includes(selected) ? selected : '';
   }
 
   if (filterSelect) {
@@ -586,7 +592,9 @@ function renderMaterials() {
   const category = document.getElementById('categoryFilter').value;
   const filtered = materials.filter(item => {
     if (item.status === 'draft' && !isAdmin()) return false;
-    const itemCategory = materialCategoryValue(item.category);
+    const itemCategory = item.status === 'draft'
+      ? cleanMaterialCategoryName(item.category)
+      : materialCategoryValue(item.category);
     if (category && itemCategory !== category) return false;
     if (!q) return true;
     return [item.title, item.body, item.summary, item.fileName, itemCategory,
@@ -605,7 +613,7 @@ function renderMaterials() {
     const title = esc(item.title || item.fileName || '無題のマニュアル');
     const summary = esc(item.summary || '');
     const bodyText = esc(item.body || '');
-    const category = materialCategoryValue(item.category);
+    const category = materialCategoryLabel(item.category, item.status === 'draft');
     const isText = item.sourceType === 'text';
     const isLink = item.sourceType === 'link' || Boolean(item.linkUrl);
     const fileName = esc(isLink ? (item.linkUrl || item.url || '') : (item.fileName || ''));
@@ -725,7 +733,7 @@ window.saveMaterial = async function(event) {
   }
 
   const title = document.getElementById('materialTitle').value.trim();
-  const category = materialCategoryValue(document.getElementById('materialCategory').value);
+  const category = cleanMaterialCategoryName(document.getElementById('materialCategory').value);
   const summary = document.getElementById('materialSummary').value.trim();
   const body = document.getElementById('materialBody').value.trim();
   const relatedSkillKeys = selectedSkillKeys();
@@ -733,6 +741,7 @@ window.saveMaterial = async function(event) {
   const linkUrl = document.getElementById('materialUrl').value.trim();
   const file = document.getElementById('materialFile').files[0] || null;
   if (!title) return setStatus('タイトルを入力してください。', 'err');
+  if (saveAction === 'publish' && !category) return setStatus('公開するカテゴリを選択してください。', 'err');
   if (saveAction === 'publish' && mode === 'link' && !linkUrl) return setStatus('公開するURLを入力してください。', 'err');
   if (mode === 'link' && linkUrl && !normalizeUrl(linkUrl)) return setStatus('URLは http:// または https:// で入力してください。', 'err');
   if (saveAction === 'publish' && mode === 'text' && !body) return setStatus('本文を入力してください。', 'err');
@@ -955,7 +964,7 @@ window.startEdit = function(id) {
   document.body.classList.add('is-editing-material');
   document.getElementById('formTitle').textContent = item.status === 'draft' ? '下書きを編集' : item.draft ? '編集下書きを編集' : 'マニュアルを編集';
   document.getElementById('materialTitle').value = editItem.title || '';
-  document.getElementById('materialCategory').value = materialCategoryValue(editItem.category);
+  document.getElementById('materialCategory').value = cleanMaterialCategoryName(editItem.category);
   document.getElementById('materialSummary').value = editItem.summary || '';
   document.getElementById('materialBody').value = editItem.body || '';
   setMaterialMode(editItem.sourceType === 'text' ? 'text' : editItem.sourceType === 'link' || editItem.linkUrl ? 'link' : 'file');
