@@ -548,6 +548,13 @@
     box-shadow: 0 2px 8px rgba(78,205,196,0.3);
   }
 
+  .recurrence-note {
+    margin-top: 6px;
+    color: var(--text-muted);
+    font-size: 11px;
+    line-height: 1.5;
+  }
+
   .assignee-grid { display: flex; flex-wrap: wrap; gap: 6px; }
   .assignee-checkbox { display: none; }
   .assignee-label {
@@ -858,6 +865,18 @@
         <input type="radio" class="radio-option" name="priority" id="pri-low" value="low">
         <label for="pri-low" class="radio-label">🔵 低</label>
       </div>
+    </div>
+
+    <div class="form-group">
+      <label>繰り返し</label>
+      <select id="fRecurrence">
+        <option value="none">繰り返しなし</option>
+        <option value="daily">毎日</option>
+        <option value="weekly">毎週</option>
+        <option value="monthly">毎月</option>
+        <option value="yearly">毎年</option>
+      </select>
+      <div class="recurrence-note">完了すると、期限日を基準に次回分を1件だけ作成します。</div>
     </div>
 
     <div class="form-group">
@@ -1283,10 +1302,79 @@ function daysLeft(d) {
 
 const ACTIVE_STATUSES = ['未着手','着手中','保留'];
 const BOARD_STATUSES = [...ACTIVE_STATUSES, '完了'];
+const RECURRENCE_LABELS = {
+  none: '',
+  daily: '毎日',
+  weekly: '毎週',
+  monthly: '毎月',
+  yearly: '毎年',
+};
 
 function normalizeStatus(status) {
   if (status === '進行中') return '着手中';
   return status || '未着手';
+}
+
+function normalizeRecurrence(recurrence) {
+  return Object.prototype.hasOwnProperty.call(RECURRENCE_LABELS, recurrence) ? recurrence : 'none';
+}
+
+function recurrenceBadge(recurrence) {
+  const label = RECURRENCE_LABELS[normalizeRecurrence(recurrence)];
+  return label ? `<span class="badge badge-cat">↻ ${label}</span>` : '';
+}
+
+function parseDateParts(dateText) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateText || '');
+  if (!match) return null;
+  return { year: Number(match[1]), month: Number(match[2]), day: Number(match[3]) };
+}
+
+function formatDateParts(year, month, day) {
+  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+function daysInMonth(year, month) {
+  return new Date(Date.UTC(year, month, 0)).getUTCDate();
+}
+
+function addCalendarDays(dateText, amount) {
+  const parts = parseDateParts(dateText);
+  if (!parts) return '';
+  const date = new Date(Date.UTC(parts.year, parts.month - 1, parts.day + amount));
+  return formatDateParts(date.getUTCFullYear(), date.getUTCMonth() + 1, date.getUTCDate());
+}
+
+function nextRecurringDate(task, minimumDate = todayStr()) {
+  const recurrence = normalizeRecurrence(task.recurrence);
+  const start = parseDateParts(task.date);
+  if (recurrence === 'none' || !start) return '';
+
+  const anchorDay = Number(task.recurrenceAnchorDay) || start.day;
+  const anchorMonth = Number(task.recurrenceAnchorMonth) || start.month;
+  let cursor = task.date;
+
+  for (let step = 0; step < 10000; step++) {
+    const current = parseDateParts(cursor);
+    if (!current) return '';
+
+    if (recurrence === 'daily') {
+      cursor = addCalendarDays(cursor, 1);
+    } else if (recurrence === 'weekly') {
+      cursor = addCalendarDays(cursor, 7);
+    } else if (recurrence === 'monthly') {
+      const monthIndex = current.year * 12 + (current.month - 1) + 1;
+      const year = Math.floor(monthIndex / 12);
+      const month = (monthIndex % 12) + 1;
+      cursor = formatDateParts(year, month, Math.min(anchorDay, daysInMonth(year, month)));
+    } else if (recurrence === 'yearly') {
+      const year = current.year + 1;
+      cursor = formatDateParts(year, anchorMonth, Math.min(anchorDay, daysInMonth(year, anchorMonth)));
+    }
+
+    if (cursor >= minimumDate) return cursor;
+  }
+  return '';
 }
 
 function normalizeProgressLogs(logs) {
@@ -1420,6 +1508,7 @@ function taskCardHtml(t) {
   const gIcon  = t.googleTaskId ? `<span style="font-size:10px;color:#4285f4;margin-left:2px;">G</span>` : '';
   const latestLog = latestProgress(t.progressLogs);
   const progressPreview = latestLog ? `<div class="task-progress-preview">${esc(latestLog.text)}</div>` : '';
+  const repeatBadge = recurrenceBadge(t.recurrence);
 
   // タスク種別ラベル
   const myName = currentUser?.name || '';
@@ -1452,6 +1541,7 @@ function taskCardHtml(t) {
         <span class="badge badge-cat">${t.category||'その他'}</span>
         <span class="badge ${priCls[t.priority]}">${priLbl[t.priority]}</span>
         ${dateLabel}
+        ${repeatBadge}
       </div>
       ${chips?`<div class="task-assignees">${chips}</div>`:''}
       ${tags ?`<div class="task-tags">${tags}</div>`:''}
@@ -1494,12 +1584,14 @@ function renderList() {
     if (t.date) ds = od?`⚠ ${fmtDate(t.date)} 期限切れ`:isToday(t.date)?'今日':dl!==null&&dl<=3?`あと${dl}日`:fmtDate(t.date)+'期限';
     const chips = assigneeChips(t.assignees);
     const latestLog = latestProgress(t.progressLogs);
+    const repeatBadge = recurrenceBadge(t.recurrence);
     return `<div class="list-item pri-${t.priority} ${od?'overdue':''}" onclick="window._openTask('${t.id}')">
       <div class="list-content">
         <div class="list-title ${status==='完了'?'done-title':''}">${esc(t.title)}${t.googleTaskId?' <span style="font-size:10px;color:#4285f4;">G</span>':''}</div>
         <div class="list-sub">
           <span>${t.category||'その他'}</span><span>${status}</span>
           ${ds?`<span>${ds}</span>`:''}
+          ${repeatBadge}
           ${t.createdBy?`<span>作成: ${t.createdBy}</span>`:''}
         </div>
         ${chips?`<div class="task-assignees" style="margin-top:5px">${chips}</div>`:''}
@@ -1540,6 +1632,7 @@ function openModal(id = null) {
     document.getElementById('fNote').value  = t.note||'';
     document.getElementById('fCat').value   = t.category||'その他';
     document.getElementById('fDate').value  = t.date||'';
+    document.getElementById('fRecurrence').value = normalizeRecurrence(t.recurrence);
     document.getElementById('fTags').value  = (t.tags||[]).join(', ');
     document.querySelector(`input[name="priority"][value="${t.priority||'med'}"]`).checked = true;
     const normalizedStatus = normalizeStatus(t.status);
@@ -1578,6 +1671,7 @@ function openModal(id = null) {
     document.getElementById('fNote').value  = '';
     document.getElementById('fCat').value   = 'その他';
     document.getElementById('fDate').value  = '';
+    document.getElementById('fRecurrence').value = 'none';
     document.getElementById('fTags').value  = '';
     document.getElementById('progressLogList').innerHTML = renderProgressLogs([]);
     document.getElementById('fProgress').value = '';
@@ -1883,6 +1977,8 @@ async function saveTask() {
   if (!title) { showToast('タイトルを入力してください'); return; }
   const dateVal = document.getElementById('fDate').value;
   if (!dateVal && !editingId) { showToast('期限を入力してください'); return; }
+  const recurrence = normalizeRecurrence(document.getElementById('fRecurrence').value);
+  if (recurrence !== 'none' && !dateVal) { showToast('繰り返しタスクには期限が必要です'); return; }
   const assignees = [...document.querySelectorAll('.assignee-checkbox:checked')].map(cb => cb.value);
   if (!assignees.length) { showToast('担当者を1人以上選択してください'); return; }
   const newStatus = document.querySelector('input[name="status"]:checked').value;
@@ -1893,6 +1989,7 @@ async function saveTask() {
     note:      document.getElementById('fNote').value.trim(),
     category:  document.getElementById('fCat').value,
     date:      document.getElementById('fDate').value,
+    recurrence,
     priority:  document.querySelector('input[name="priority"]:checked').value,
     status:    newStatus,
     assignees,
@@ -1905,6 +2002,16 @@ async function saveTask() {
   try {
     if (editingId) {
       const existing = tasks[editingId] || {};
+      const existingRecurrence = normalizeRecurrence(existing.recurrence);
+      if (recurrence !== 'none') {
+        const dateParts = parseDateParts(dateVal);
+        const keepAnchor = existingRecurrence === recurrence && existing.date === dateVal;
+        data.recurrenceAnchorDay = keepAnchor && existing.recurrenceAnchorDay
+          ? existing.recurrenceAnchorDay : dateParts.day;
+        data.recurrenceAnchorMonth = keepAnchor && existing.recurrenceAnchorMonth
+          ? existing.recurrenceAnchorMonth : dateParts.month;
+        data.recurrenceSeriesId = existing.recurrenceSeriesId || editingId;
+      }
       const progressLogs = normalizeProgressLogs(existing.progressLogs);
       const existingStatus = normalizeStatus(existing.status);
       if (existingStatus !== newStatus) {
@@ -1919,12 +2026,20 @@ async function saveTask() {
       }
       if (progressLogs.length) data.progressLogs = progressLogs;
       const payload = { ...existing, ...data };
+      if (recurrence === 'none') {
+        delete payload.recurrenceAnchorDay;
+        delete payload.recurrenceAnchorMonth;
+        delete payload.recurrenceSeriesId;
+      }
       if (newStatus === '完了') {
         payload.completedAt = existing.status === '完了' && existing.completedAt ? existing.completedAt : Date.now();
       } else {
         delete payload.completedAt;
       }
       await set(ref(db, `tasks/${editingId}`), payload);
+      if (newStatus === '完了' && normalizeStatus(existing.status) !== '完了') {
+        await createNextRecurringTask(editingId, payload, now);
+      }
       // Googleタスクが紐づいていて完了になった場合
       if (newStatus === '完了' && existing.googleTaskId) {
         await completeGoogleTask(existing.googleTaskId, existing.googleListId);
@@ -1933,9 +2048,17 @@ async function saveTask() {
     } else {
       data.createdAt = now;
       data.createdBy = currentUser?.name||'不明';
+      if (recurrence !== 'none') {
+        const dateParts = parseDateParts(dateVal);
+        data.recurrenceAnchorDay = dateParts.day;
+        data.recurrenceAnchorMonth = dateParts.month;
+      }
       if (progressText) data.progressLogs = [{ text: progressText, by: data.createdBy, at: now }];
       if (newStatus === '完了') data.completedAt = now;
       const createdRef = await push(ref(db, 'tasks'), data);
+      if (recurrence !== 'none') {
+        await set(ref(db, `tasks/${createdRef.key}/recurrenceSeriesId`), createdRef.key);
+      }
       showToast('追加しました');
     }
     closeModal();
@@ -1978,62 +2101,87 @@ window.handleOverlayClick = handleOverlayClick;
 window.saveTask = saveTask; window.deleteTask = deleteTask;
 window._openTask = (id) => openModal(id);
 
-// 編集モーダルの完了ボタン
-window.quickComplete = async function() {
+async function createNextRecurringTask(taskId, task, now = Date.now()) {
+  const recurrence = normalizeRecurrence(task.recurrence);
+  if (recurrence === 'none' || !task.date) return '';
+
+  const freshSnapshot = await get(ref(db, `tasks/${taskId}`));
+  const freshTask = freshSnapshot.val() || task;
+  if (freshTask.recurrenceNextTaskId) return freshTask.recurrenceNextDate || '';
+
+  const nextDate = nextRecurringDate(freshTask);
+  if (!nextDate) return '';
+
+  const seriesId = freshTask.recurrenceSeriesId || taskId;
+  const nextTaskId = `repeat_${seriesId}_${nextDate.replace(/-/g, '')}`;
+  const actor = currentUser?.name || '不明';
+  const nextTask = {
+    title: freshTask.title || '',
+    note: freshTask.note || '',
+    category: freshTask.category || 'その他',
+    date: nextDate,
+    priority: freshTask.priority || 'med',
+    status: '未着手',
+    assignees: Array.isArray(freshTask.assignees) ? freshTask.assignees : [],
+    tags: Array.isArray(freshTask.tags) ? freshTask.tags : [],
+    recurrence,
+    recurrenceAnchorDay: Number(freshTask.recurrenceAnchorDay) || parseDateParts(freshTask.date).day,
+    recurrenceAnchorMonth: Number(freshTask.recurrenceAnchorMonth) || parseDateParts(freshTask.date).month,
+    recurrenceSeriesId: seriesId,
+    recurrenceSourceTaskId: taskId,
+    recurrenceScheduledDate: nextDate,
+    createdAt: now,
+    createdBy: actor,
+    updatedAt: now,
+    updatedBy: actor,
+  };
+
+  await set(ref(db, `tasks/${nextTaskId}`), nextTask);
+  await set(ref(db, `tasks/${taskId}/recurrenceNextTaskId`), nextTaskId);
+  await set(ref(db, `tasks/${taskId}/recurrenceNextDate`), nextDate);
+  return nextDate;
+}
+
+async function toggleTaskCompletion(taskId) {
   if (isGuestUser()) { showToast('ゲストは閲覧専用です'); return; }
-  if (!editingId || !tasks[editingId]) return;
-  const targetId = editingId;
-  if (taskStatusUpdateInFlight.has(targetId)) return;
-  taskStatusUpdateInFlight.add(targetId);
-  const current = tasks[targetId].status;
-  const newStatus = current === '完了' ? '未着手' : '完了';
+  if (!taskId || !tasks[taskId] || taskStatusUpdateInFlight.has(taskId)) return;
+  taskStatusUpdateInFlight.add(taskId);
+  const task = tasks[taskId];
+  const newStatus = normalizeStatus(task.status) === '完了' ? '未着手' : '完了';
   try {
     const now = Date.now();
-    await set(ref(db, `tasks/${targetId}/status`), newStatus);
-    await set(ref(db, `tasks/${targetId}/updatedAt`), now);
-    await set(ref(db, `tasks/${targetId}/updatedBy`), currentUser?.name || '不明');
-    if (newStatus === '完了') await set(ref(db, `tasks/${targetId}/completedAt`), now);
-    else await remove(ref(db, `tasks/${targetId}/completedAt`));
-    await appendProgressLog(targetId, newStatus === '完了' ? '完了にしました' : '未着手に戻しました', now);
-    if (newStatus === '完了' && tasks[targetId].googleTaskId) {
-      await completeGoogleTask(tasks[targetId].googleTaskId, tasks[targetId].googleListId);
+    await set(ref(db, `tasks/${taskId}/status`), newStatus);
+    await set(ref(db, `tasks/${taskId}/updatedAt`), now);
+    await set(ref(db, `tasks/${taskId}/updatedBy`), currentUser?.name || '不明');
+    if (newStatus === '完了') await set(ref(db, `tasks/${taskId}/completedAt`), now);
+    else await remove(ref(db, `tasks/${taskId}/completedAt`));
+    await appendProgressLog(taskId, newStatus === '完了' ? '完了にしました' : '未着手に戻しました', now);
+    const nextDate = newStatus === '完了' ? await createNextRecurringTask(taskId, task, now) : '';
+    if (newStatus === '完了' && task.googleTaskId) {
+      await completeGoogleTask(task.googleTaskId, task.googleListId);
     }
-    showToast(newStatus === '完了' ? '✅ 完了にしました' : '↩ 未着手に戻しました');
-    closeModal();
+    showToast(newStatus === '完了'
+      ? nextDate ? `✅ 完了。次回分（${fmtDate(nextDate)}）を作成しました` : '✅ 完了にしました'
+      : '↩ 未着手に戻しました');
   } catch(e) {
     showToast('更新に失敗しました');
   } finally {
-    taskStatusUpdateInFlight.delete(targetId);
+    taskStatusUpdateInFlight.delete(taskId);
   }
+}
+
+// 編集モーダルの完了ボタン
+window.quickComplete = async function() {
+  if (!editingId) return;
+  const targetId = editingId;
+  await toggleTaskCompletion(targetId);
+  closeModal();
 };
 
 // カードの完了ボタン
 window._toggleDone = async function(e, id) {
   e.stopPropagation(); // カードのクリックイベントを止める
-  if (isGuestUser()) { showToast('ゲストは閲覧専用です'); return; }
-  if (!tasks[id]) return;
-  if (taskStatusUpdateInFlight.has(id)) return;
-  taskStatusUpdateInFlight.add(id);
-  const current = tasks[id].status;
-  const newStatus = current === '完了' ? '未着手' : '完了';
-  try {
-    const now = Date.now();
-    await set(ref(db, `tasks/${id}/status`), newStatus);
-    await set(ref(db, `tasks/${id}/updatedAt`), now);
-    await set(ref(db, `tasks/${id}/updatedBy`), currentUser?.name||'不明');
-    if (newStatus === '完了') await set(ref(db, `tasks/${id}/completedAt`), now);
-    else await remove(ref(db, `tasks/${id}/completedAt`));
-    await appendProgressLog(id, newStatus === '完了' ? '完了にしました' : '未着手に戻しました', now);
-    // Googleタスクと連携していれば完了を反映
-    if (newStatus === '完了' && tasks[id].googleTaskId) {
-      await completeGoogleTask(tasks[id].googleTaskId, tasks[id].googleListId);
-    }
-    showToast(newStatus === '完了' ? '✅ 完了にしました' : '↩ 未着手に戻しました');
-  } catch(err) {
-    showToast('更新に失敗しました');
-  } finally {
-    taskStatusUpdateInFlight.delete(id);
-  }
+  await toggleTaskCompletion(id);
 };
 
 document.addEventListener('keydown', e => {
