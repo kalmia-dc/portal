@@ -586,6 +586,19 @@ function setCategoryStatus(text, type = '') {
   el.className = `status ${type}`.trim();
 }
 
+function materialSortTime(item) {
+  if (item.status === 'draft') return item.updatedAt || item.createdAt || 0;
+  if (item.draft) return item.draft.updatedAt || item.updatedAt || item.createdAt || 0;
+  return item.updatedAt || item.createdAt || 0;
+}
+
+function sortMaterialsForDisplay(a, b) {
+  const aHasDraft = a.status === 'draft' || Boolean(a.draft);
+  const bHasDraft = b.status === 'draft' || Boolean(b.draft);
+  if (aHasDraft !== bHasDraft) return aHasDraft ? -1 : 1;
+  return materialSortTime(b) - materialSortTime(a);
+}
+
 function renderMaterials() {
   const list = document.getElementById('materialList');
   const q = document.getElementById('searchText').value.trim().toLowerCase();
@@ -600,7 +613,7 @@ function renderMaterials() {
     return [item.title, item.body, item.summary, item.fileName, itemCategory,
       item.draft?.title, item.draft?.body, item.draft?.summary, item.draft?.fileName]
       .some(value => String(value || '').toLowerCase().includes(q));
-  });
+  }).sort(sortMaterialsForDisplay);
 
   document.getElementById('materialCount').textContent = `${filtered.length}件のマニュアル`;
 
