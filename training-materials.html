@@ -95,7 +95,6 @@ input:focus,select:focus,textarea:focus{border-color:var(--mint)}
 .skill-options{display:flex;flex-wrap:wrap;gap:6px}
 .skill-option{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--line);border-radius:999px;padding:6px 9px;background:white;color:var(--dark);cursor:pointer;font-size:12px}
 .skill-option input{width:auto;margin:0}
-.skill-tags{display:flex;gap:6px;flex-wrap:wrap}
 .material-preview{position:relative;display:block;width:100%;aspect-ratio:16/9;border:0;border-radius:12px;overflow:hidden;background:#eef4f7;padding:0;cursor:pointer}
 .material-preview img{width:100%;height:100%;object-fit:cover;display:block}
 .material-preview:focus-visible{outline:3px solid var(--mint);outline-offset:2px}
@@ -639,7 +638,6 @@ function renderMaterials() {
     const preview = renderMaterialPreview(item);
     const openControl = materialOpenControl(item, openUrl);
     const downloadButton = (isText || isLink || item.inlineImage) ? '' : `<a class="btn ghost" href="${openUrl}" target="_blank" rel="noopener" download>ダウンロード</a>`;
-    const skillTags = relatedSkillLabels(item.relatedSkillKeys);
     const statusBadge = isAdmin()
       ? item.status === 'draft'
         ? '<span class="badge draft">下書き</span>'
@@ -672,7 +670,6 @@ function renderMaterials() {
         ${preview}
         ${bodyText ? `<p class="manual-body">${bodyText}</p>` : ''}
         ${summary ? `<p class="summary">${summary}</p>` : '<p class="summary">メモはありません。</p>'}
-        ${skillTags ? `<div class="skill-tags">${skillTags}</div>` : ''}
         ${fileName ? `<div class="meta">${fileName}</div>` : ''}
         <div class="card-actions">
           ${openControl}
@@ -1290,15 +1287,6 @@ function setSelectedSkillKeys(keys) {
   document.querySelectorAll('input[name="relatedSkill"]').forEach(input => {
     input.checked = selected.has(input.value);
   });
-}
-
-function relatedSkillLabels(keys) {
-  const values = Array.isArray(keys) ? keys : Object.values(keys || {});
-  return values.map(key => {
-    const [sheet, skill = ''] = String(key).split('::');
-    const [category, item = ''] = skill.split('__');
-    return `<span class="badge">${esc(`${sheet} / ${category} / ${item}`)}</span>`;
-  }).join('');
 }
 
 function meetingSourceParams() {
