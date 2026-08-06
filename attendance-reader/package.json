@@ -1,0 +1,8 @@
+{
+  "name": "kalmia-attendance-reader",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": { "start": "node reader.mjs" },
+  "dependencies": { "pcsclite": "^1.0.1" }
+}

@@ -5437,7 +5437,7 @@ function submitRequest(){
   for(const date of targetDates){
     const status = selectedReqType==='wish'
       ? (wishStatusByDate[date] || 'rejected')
-      : selectedReqType==='work' ? 'pending' : 'approved';
+      : 'pending';
     const req = {
       id: Date.now()+count,
       staffId: currentUser.staffId,
@@ -5455,12 +5455,7 @@ function submitRequest(){
 
     if(status === 'approved'){
       if(!shiftData[currentUser.staffId]) shiftData[currentUser.staffId]={};
-      if(selectedReqType==='paid'){
-        shiftData[currentUser.staffId][date]='paid';
-        if(!paidData[currentUser.staffId]) paidData[currentUser.staffId]={};
-        paidData[currentUser.staffId][date]=true;
-        shiftChanged = true;
-      } else {
+      if(selectedReqType!=='paid'){
         shiftData[currentUser.staffId][date]='wish';
         if(!wishData[currentUser.staffId]) wishData[currentUser.staffId]={};
         wishData[currentUser.staffId][date]=true;
@@ -5472,11 +5467,15 @@ function submitRequest(){
   if(shiftChanged) saveCurrentShift();
 
   result.textContent = selectedReqType==='paid'
-    ? `✅ ${targetDates.length}日分の有給申請を受け付けました（自動承認）`
+    ? `✅ ${targetDates.length}日分の有給申請を受け付けました（勤怠管理者の承認待ち）`
     : selectedReqType==='work'
     ? `✅ ${targetDates.length}日分の出勤希望を受け付けました（承認待ち）`
     : `✅ ${targetDates.length}日分の希望休を自動判定しました（${wishApprovalMessages.join('、')}）`;
   result.style.color='var(--teal)';
+
+  if(selectedReqType==='paid'){
+    notifyAttendanceRequest(`💚 有給申請\n${currentUser.name}さん：${targetDates.join('、')}\n勤怠管理で確認してください。`);
+  }
 
   reqDateList=[];
   renderReqDateList();
@@ -5486,6 +5485,18 @@ function submitRequest(){
   renderRequestHistory(currentUser.staffId);
   renderStaffMonthGrid(currentUser.staffId);
   setTimeout(()=>{ result.textContent=''; }, 4000);
+}
+
+async function notifyAttendanceRequest(text){
+  try {
+    await fetch('https://kalmia-notify.chibakenmin-sugihey.workers.dev', {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json' },
+      body:JSON.stringify({ text })
+    });
+  } catch(e) {
+    console.warn('勤怠申請通知に失敗しました', e);
+  }
 }
 
 function cancelRequest(id){

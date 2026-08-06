@@ -532,6 +532,9 @@
         <span class="toggle-icon">⌄</span>
       </button>
       <div class="category-tools">
+        <a class="tool-item" data-guest-hidden="true" href="#" onclick="goToAttendanceApp();return false;" style="background:linear-gradient(135deg,#e9f8f1,#d9f1e7);border:2px solid #86c9ae;">
+          <span class="tool-linked-badge">試験運用</span><span class="tool-icon">⏱️</span><span class="tool-name">勤怠管理</span>
+        </a>
         <a class="tool-item shift-tool" data-guest-hidden="true" href="#" onclick="goToShiftApp();return false;">
           <span class="tool-linked-badge">連携中</span><span class="tool-icon">📅</span><span class="tool-name">シフト管理</span>
         </a>
@@ -1334,6 +1337,16 @@ function startNoticeSync() {
     _firebaseNotices = snap.val() || {};
     renderNotices();
   });
+}
+
+function goToAttendanceApp() {
+  if (!currentUser) return;
+  const params = new URLSearchParams({
+    sid: currentUser.staffId,
+    name: currentUser.name,
+    p: currentUser.pass || ''
+  });
+  window.location.href = `https://kalmia-dc.github.io/portal/attendance.html?${params}`;
 }
 
 function renderNotices() {

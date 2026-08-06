@@ -1,0 +1,5 @@
+{
+  "databaseUrl": "https://kalmia-shift-default-rtdb.asia-southeast1.firebasedatabase.app",
+  "terminalId": "reception-1",
+  "readerNameContains": "RC-S300"
+}
