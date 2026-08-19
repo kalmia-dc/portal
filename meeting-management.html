@@ -1766,8 +1766,8 @@ function incidentReviewHtml() {
           <div class="review-value">${esc(value)}</div>
         `).join('')}
       </div>
-      ${textBlock('どうなりそうだった？ / 発生した実害', incidentDraft.eventImpact)}
       ${textBlock('具体的な内容', incidentDraft.details)}
+      ${textBlock('どうなりそうだった？ / 発生した実害', incidentDraft.eventImpact)}
       ${incidentDraft.type === 'near_miss' ? textBlock('なぜ防げたか', incidentDraft.goodPoint) : ''}
       ${textBlock('原因【人・行動】', incidentDraft.causeHuman)}
       ${textBlock('原因【環境・連携】', incidentDraft.causeEnvironment)}
@@ -3154,10 +3154,10 @@ function renderIncidentReports() {
           ${incidentLinkedTaskBadgeHtml(report)}
         </div>
       </div>
+      ${textBlock('具体的な内容', report.details)}
       ${textBlock('どうなりそうだった？ / 発生した実害', report.eventImpact)}
       ${textBlock('発生場所', report.occurredPlace)}
       ${textBlock('作業内容', report.workContent)}
-      ${textBlock('具体的な内容', report.details)}
       ${textBlock('事象の種類', incidentCategoryText(report))}
       ${textBlock('場面', report.scene)}
       ${incidentTypeKey(report) === 'near_miss' ? textBlock('なぜ防げたか（Good Point）', report.goodPoint) : ''}
