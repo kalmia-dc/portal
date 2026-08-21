@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Googleアカウント事前登録｜カルミアDC</title>
+<style>
+  :root{--green:#176b4b;--green-light:#e8f4ef;--border:#cfe0d8;--text:#20352c;--muted:#5c6f67;--danger:#b3261e}
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;padding:24px 16px;background:#f4f8f6;color:var(--text);font-family:"Yu Gothic UI",Meiryo,sans-serif}
+  main{width:min(620px,100%);margin:0 auto;padding:30px;border:1px solid var(--border);border-radius:20px;background:#fff;box-shadow:0 16px 45px rgba(30,70,52,.12)}
+  h1{margin:0 0 8px;color:var(--green);font-size:clamp(1.35rem,5vw,1.8rem)}
+  h2{margin:26px 0 10px;font-size:1.05rem}
+  p,li{line-height:1.75}
+  .lead{margin-top:0;color:var(--muted)}
+  .deadline{padding:13px 16px;border-left:5px solid var(--danger);border-radius:8px;background:#fff2f1;color:#7c1d18;font-weight:700}
+  .account{padding:12px 14px;border-radius:10px;background:var(--green-light);overflow-wrap:anywhere}
+  label{display:block;margin:16px 0 7px;font-weight:700}
+  select,button{width:100%;min-height:48px;border-radius:10px;font:inherit}
+  select{padding:9px 12px;border:2px solid var(--border);background:#fff;color:var(--text)}
+  .check{display:flex;gap:10px;align-items:flex-start;margin:14px 0;font-weight:400}
+  .check input{width:20px;height:20px;margin-top:3px;flex:0 0 auto}
+  button{margin-top:16px;padding:11px 16px;border:0;background:var(--green);color:#fff;font-weight:700;cursor:pointer}
+  button.secondary{background:var(--green-light);color:#174f3c}
+  button:disabled{opacity:.6;cursor:wait}
+  .hidden{display:none!important}
+  .error{margin-top:14px;color:var(--danger);font-weight:700}
+  .success{padding:18px;border-radius:12px;background:var(--green-light)}
+  .note{font-size:.9rem;color:var(--muted)}
+  footer{margin-top:26px;padding-top:18px;border-top:1px solid var(--border);font-size:.88rem;color:var(--muted)}
+</style>
+</head>
+<body>
+<main>
+  <h1>Googleアカウント事前登録</h1>
+  <p class="lead">カルミアDC スタッフポータルの安全なログインへの切替準備です。</p>
+  <p class="deadline">登録期限：2026年8月31日<br>新ログイン切替：2026年9月2日 診療終了後</p>
+
+  <section id="loginSection">
+    <h2>1. Googleアカウントでログイン</h2>
+    <p>Googleフォームへ登録したものと同じGoogleアカウントを使用してください。</p>
+    <button type="button" id="loginButton">Googleアカウントでログイン</button>
+    <p class="note">医院がGoogleアカウントのパスワードを確認・保存することはありません。</p>
+  </section>
+
+  <section id="registerSection" class="hidden">
+    <h2>2. 名字を選んで登録</h2>
+    <p class="account">ログイン中：<strong id="accountEmail"></strong></p>
+    <form id="registerForm">
+      <label for="staffId">お名前（名字）</label>
+      <select id="staffId" required>
+        <option value="">選択してください</option>
+        <option value="sugihira">杉平</option>
+        <option value="shimanaka">嶋中</option>
+        <option value="hokari">保刈</option>
+        <option value="tsuruta">鶴田</option>
+        <option value="yoshida">吉田</option>
+        <option value="takagi">高木</option>
+        <option value="matsumoto">松本</option>
+        <option value="yamada">山田</option>
+        <option value="tamiya">田宮</option>
+        <option value="tanaka">田中</option>
+        <option value="momo">百々</option>
+      </select>
+      <label class="check"><input type="checkbox" id="sameAccount" required><span>Googleフォームへ登録したものと同じアカウントです。</span></label>
+      <label class="check"><input type="checkbox" id="noPassword" required><span>Googleアカウントのパスワードを医院へ伝えません。</span></label>
+      <button type="submit" id="registerButton">この内容で事前登録する</button>
+    </form>
+    <button type="button" id="changeAccountButton" class="secondary">別のGoogleアカウントを使う</button>
+    <p id="errorMessage" class="error hidden" role="alert"></p>
+  </section>
+
+  <section id="completeSection" class="hidden success">
+    <h2>事前登録を受け付けました</h2>
+    <p><strong id="completeName"></strong>さんの申請を保存しました。</p>
+    <p>百々さんがGoogleフォームの回答とスタッフ名簿を照合します。9月2日の切替までは、現在のポータルをそのまま利用できます。</p>
+    <p class="note">登録内容に誤りがある場合は、百々さんへご連絡ください。パスワードは伝えないでください。</p>
+  </section>
+
+  <footer>このページでは、ポータル利用申請に必要なFirebase UID、Googleアカウントの確認済みメールアドレス、選択したスタッフIDだけを保存します。シフト・勤怠などの業務データは読み込みません。</footer>
+</main>
+
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import {
+  browserLocalPersistence,
+  getAuth,
+  getRedirectResult,
+  GoogleAuthProvider,
+  onAuthStateChanged,
+  setPersistence,
+  signInWithPopup,
+  signInWithRedirect,
+  signOut,
+} from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+import { getDatabase, ref, serverTimestamp, update } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
+
+const firebaseConfig={apiKey:'AIzaSyCo7tV_7vr5UAbOt88TrUmR4hoII64AC7o',authDomain:'kalmia-shift.firebaseapp.com',databaseURL:'https://kalmia-shift-default-rtdb.asia-southeast1.firebasedatabase.app',projectId:'kalmia-shift',storageBucket:'kalmia-shift.firebasestorage.app',messagingSenderId:'867073534141',appId:'1:867073534141:web:ee2d29f060b6c54ca2e9f1'};
+const staffNames={sugihira:'杉平',shimanaka:'嶋中',hokari:'保刈',tsuruta:'鶴田',yoshida:'吉田',takagi:'高木',matsumoto:'松本',yamada:'山田',tamiya:'田宮',tanaka:'田中',momo:'百々'};
+const app=initializeApp(firebaseConfig);
+const auth=getAuth(app);
+const db=getDatabase(app);
+const loginSection=document.getElementById('loginSection');
+const registerSection=document.getElementById('registerSection');
+const completeSection=document.getElementById('completeSection');
+const errorMessage=document.getElementById('errorMessage');
+
+function showError(error){
+  const messages={
+    'auth/operation-not-allowed':'Googleログインの準備が完了していません。時間をおいて再度お試しください。',
+    'auth/popup-closed-by-user':'ログイン画面が閉じられました。もう一度お試しください。',
+    'auth/network-request-failed':'通信できません。インターネット接続を確認してください。',
+    'PERMISSION_DENIED':'登録を保存できませんでした。百々さんへ表示内容をご連絡ください。',
+  };
+  errorMessage.textContent=messages[error?.code]||messages[error?.message]||error?.message||'登録中にエラーが発生しました。';
+  errorMessage.classList.remove('hidden');
+}
+
+async function login(){
+  const provider=new GoogleAuthProvider();
+  provider.setCustomParameters({prompt:'select_account'});
+  try{
+    await signInWithPopup(auth,provider);
+  }catch(error){
+    if(error?.code==='auth/popup-blocked'||error?.code==='auth/operation-not-supported-in-this-environment'){
+      await signInWithRedirect(auth,provider);
+      return;
+    }
+    showError(error);
+  }
+}
+
+await setPersistence(auth,browserLocalPersistence);
+try{await getRedirectResult(auth);}catch(error){showError(error);}
+
+onAuthStateChanged(auth,user=>{
+  const isGoogle=user?.providerData?.some(provider=>provider.providerId==='google.com');
+  loginSection.classList.toggle('hidden',Boolean(isGoogle));
+  registerSection.classList.toggle('hidden',!isGoogle);
+  if(isGoogle) document.getElementById('accountEmail').textContent=user.email||user.displayName||'Googleアカウント';
+});
+
+document.getElementById('loginButton').addEventListener('click',login);
+document.getElementById('changeAccountButton').addEventListener('click',async()=>{await signOut(auth);location.reload();});
+document.getElementById('registerForm').addEventListener('submit',async event=>{
+  event.preventDefault();
+  errorMessage.classList.add('hidden');
+  const user=auth.currentUser;
+  const staffId=document.getElementById('staffId').value;
+  const button=document.getElementById('registerButton');
+  if(!user||!user.email||!user.providerData.some(provider=>provider.providerId==='google.com')||!staffNames[staffId]) return showError(new Error('Googleアカウントと名字を確認してください。'));
+  button.disabled=true;
+  try{
+    await update(ref(db,`portalAccessRequests/${user.uid}`),{
+      uid:user.uid,
+      email:user.email,
+      emailVerified:user.emailVerified===true,
+      displayName:user.displayName||'',
+      requestedStaffId:staffId,
+      requestedName:staffNames[staffId],
+      source:'pre-registration-page',
+      status:'pending',
+      lastRequestedAt:serverTimestamp(),
+    });
+    registerSection.classList.add('hidden');
+    completeSection.classList.remove('hidden');
+    document.getElementById('completeName').textContent=staffNames[staffId];
+  }catch(error){showError(error);button.disabled=false;}
+});
+</script>
+</body>
+</html>
