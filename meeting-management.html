@@ -3125,11 +3125,14 @@ function readChip(id, isRead, read) {
 }
 
 function renderIncidentReports() {
-  const allReports = visibleIncidentReports();
-  const periodReports = filterIncidentReportsByPeriod(allReports);
+  const summaryReports = filterBySearch(
+    filterIncidentReportsByPeriod(state.incidentReports),
+    incidentReportSearchText
+  );
+  const periodReports = filterIncidentReportsByPeriod(visibleIncidentReports());
   const reports = filterBySearch(periodReports, incidentReportSearchText);
   document.getElementById('incidentCount').textContent = countText(reports.length, periodReports.length);
-  renderIncidentSummary(reports);
+  renderIncidentSummary(summaryReports);
   const list = document.getElementById('incidentList');
   if (!reports.length) {
     list.innerHTML = emptyListHtml('報告');
