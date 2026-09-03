@@ -817,7 +817,7 @@
   /* ── 印刷スタイル ── */
   @media print {
     body { margin:0; padding:0; }
-    #loginScreen, #mainApp, #staffScreen { display:none !important; }
+    #loginScreen, #mainApp, #staffScreen, .modal-overlay { display:none !important; }
     #printArea {
       display:block !important;
       width:100%;
@@ -1402,7 +1402,8 @@
 
 </div><!-- /#mainApp -->
 
-<script src="clinic-leave.js"></script>
+<script src="clinic-leave.js?v=20260903-role-balance"></script>
+<script src="shift-role-balance.js?v=20260903-role-balance"></script>
 <script>
 // ──────────────────────────────────────────────
 //  DATA DEFINITIONS
@@ -1589,7 +1590,7 @@ function getHours(staffId, y, m){
     const k  = shiftData[staffId]?.[ds];
     if(!k) continue;
     const sh = SHIFT[Object.keys(SHIFT).find(s=>SHIFT[s].key===k)];
-    if(sh) h += sh.hours;
+    if(sh) h += k==='clinic' ? clinicCreditHours(staffId) : sh.hours;
   }
   return h;
 }
@@ -1843,15 +1844,15 @@ function shuffle(arr){
   }
   return a;
 }
-function calcShiftHours(k){
-  return k==='clinic'?8:k==='early'?H_EARLY:k==='late'?H_LATE:k==='paid'?H_PAID:
+function calcShiftHours(k, staffId){
+  return k==='clinic'?clinicCreditHours(staffId):k==='early'?H_EARLY:k==='late'?H_LATE:k==='paid'?H_PAID:
     k==='fixed'?H_EARLY:k==='admin'?H_EARLY:k==='hanowa'?4:0;
 }
 function calcHours(id, y, m, days){
   let h=0;
   for(let d=1;d<=days;d++){
     const k=shiftData[id]?.[dateStr(y,m,d)]||'';
-    h+=calcShiftHours(k);
+    h+=calcShiftHours(k, id);
   }
   return Math.round(h*10)/10;
 }
@@ -1878,7 +1879,7 @@ function weeklyHourSummary(id, y, m, days){
       map[key]={ key, start, end, hours:0, isFullWeek:start>=monthStart&&end<=monthEnd };
     }
     const ds=dateStr(y,m,d);
-    map[key].hours += calcShiftHours(shiftData[id]?.[ds]||'');
+    map[key].hours += calcShiftHours(shiftData[id]?.[ds]||'', id);
   }
   return Object.values(map)
     .sort((a,b)=>a.key.localeCompare(b.key))
@@ -4067,6 +4068,8 @@ function generateShift(){
     enforceWednesdayYoshidaOrTsuruta(y, m, wds);
     syncHanowaCoverage(y, m, workDays, true);
 
+    balanceRoleStaffing(y, m, days, wds);
+
     const checked=new Set();
     for(const d of workDays){
       const ds=dateStr(y,m,d);
@@ -4172,11 +4175,7 @@ function printShift(){
       const ds=dateStr(y,m,d);
       const off=isOffDay(y,m,d);
       if(off){ r+=`<td class="print-off-day" style="font-size:8pt;">─</td>`; continue; }
-      const count=roleIds.filter(id=>{
-        if(label==='DA人数') return isFieldDa(id, ds);
-        if(id==='hanowa') return isHanowaAssigned(ds);
-        return isRuleWorking(id, ds);
-      }).length;
+      const count=countRoleStaffing(label.slice(0,2), ds);
       const color=count>=5?'#155724':count>=3?'#004085':'#7B3100';
       r+=`<td style="font-size:9pt;font-weight:800;color:${color};background:#EEF2F7!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;">${count}</td>`;
     }
@@ -4195,9 +4194,10 @@ function printShift(){
   html+=makeGroupRow('DA（歯科助手/事務）');
   daStaff.forEach(s=>{ html+=makeRow(s); });
   html+=makeGroupRow('集計');
+  html+=makeCountRow('DR人数', drStaff.map(s=>s.id));
   html+=makeCountRow('DH人数', dhIds);
   html+=makeCountRow('DA人数', daIds);
-  html+=`</tbody></table>`;
+  html+=`</tbody></table><p style="font-size:7pt">職種別は配置人数（DHは午後勤務を含む、DAは事務勤務を除く）。全時間帯の同時勤務人数ではありません。</p>`;
 
   const area=document.getElementById('printArea');
   area.innerHTML=html;
@@ -4365,6 +4365,7 @@ function renderCalendar(){
     }
     grid.appendChild(el);
   }
+  renderRoleStaffingRows(grid, y, m, days);
 }
 
 function renderSummary(){
@@ -4463,7 +4464,7 @@ function openModal(staffId, ds){
       none:'#F8F8F8;color:#9E9E9E',
     };
     btn.style.cssText = `background:${(colors[sh.key]||'#eee').split(';')[0]};${colors[sh.key]?.split(';')[1]||''}`;
-    btn.innerHTML = sh.label.replace('\n','<br>') + `<br><span style="font-size:.62rem;opacity:.7;">${sh.hours}h</span>`;
+    btn.innerHTML = sh.label.replace('\n','<br>') + `<br><span style="font-size:.62rem;opacity:.7;">${sh.key==='clinic'?clinicCreditHours(staff.id):sh.hours}h</span>`;
     if(sh.key===current) btn.classList.add('selected');
     btn.onclick = ()=>{
       choices.querySelectorAll('button').forEach(b=>b.classList.remove('selected'));
@@ -5233,7 +5234,7 @@ function renderStaffScreen(){
     paid:  { label:'有給休暇', start:'-',    end:'-',     brk:'-',           hrs:'-' },
     wish:  { label:'希望休',   start:'-',    end:'-',     brk:'-',           hrs:'-' },
     none:  { label:'休診日',   start:'-',    end:'-',     brk:'-',           hrs:'-' },
-    clinic:{ label:'規定休',   start:'-',    end:'-',     brk:'-',           hrs:'付与8h' },
+    clinic:{ label:'規定休',   start:'-',    end:'-',     brk:'-',           hrs:`付与${clinicCreditHours(sid)}h` },
   };
   const info = shiftInfo[k] || { label:'未設定', start:'-', end:'-', brk:'-', hrs:'-' };
 

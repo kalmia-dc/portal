@@ -49,11 +49,15 @@ function snapshotClinicShifts(y,m){
 function restoreClinicShifts(snapshot){
   Object.entries(snapshot).forEach(([sid,dates])=>Object.assign(shiftData[sid]??={},dates));
 }
+function clinicCreditHours(sid){
+  const staff=STAFF.find(s=>s.id===sid);
+  return staff && !['part','spot'].includes(staff.type) ? 8 : 0;
+}
 function clinicHourBreakdown(sid,y,m){
   let work=0,paid=0,credit=0;
   for(let d=1;d<=daysInMonth(y,m);d++){
     const k=shiftData[sid]?.[dateStr(y,m,d)];
-    if(k==='clinic') credit+=8;
+    if(k==='clinic') credit+=clinicCreditHours(sid);
     else if(k==='paid') paid+=8;
     else work+=calcShiftHours(k);
   }
@@ -83,7 +87,7 @@ function openClinicManager(){
     modal=document.createElement('div'); modal.id='clinicLeaveModal'; modal.className='modal-overlay';
     modal.innerHTML=`<div class="modal" style="max-height:90vh;overflow:auto;max-width:620px">
       <h2>クリニック規定休・休業日管理</h2>
-      <p style="font-size:.85rem">規定休は全員に1日8時間を付与します。勤務予定時間とは分けて月合計に加算します。</p>
+      <p style="font-size:.85rem">規定休は非常勤・スポットを除き1日8時間を付与します。非常勤・スポットは付与0時間です。勤務予定時間とは分けて月合計に加算します。</p>
       <label>対象年 <input id="clinicYear" type="number" min="2000" max="2100" style="width:100px" onchange="renderClinicManager()"></label>
       <div id="clinicYearState" style="margin:12px 0"></div><div id="clinicPeriodList"></div>
       <fieldset id="clinicEditForm" style="margin-top:16px;padding:12px;border:1px solid #ccc">
