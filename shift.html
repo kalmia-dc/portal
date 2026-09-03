@@ -638,6 +638,7 @@
   .shift-chip.paid   { background: #F3E5F5; color: #6A1B9A; border: 1.5px solid #CE93D8; }
   .shift-chip.wish   { background: #FFF8E1; color: #F57F17; border: 1.5px solid #FFE082; }
   .shift-chip.fixed  { background: #E0F7FA; color: #006064; border: 1.5px solid #80DEEA; }
+  .shift-chip.clinic, .staff-day-cell.clinic { background:#E8EAF6; color:#283593; border:1px solid #9FA8DA; }
   .shift-chip.admin  { background: #F5F5F5; color: #616161; border: 1.5px solid #BDBDBD; }
   .shift-chip.hanowa { background: #FCE4EC; color: #880E4F; border: 1.5px solid #F48FB1; }
   .shift-chip.empty  { background: transparent; border: 1.5px dashed var(--border); color: var(--muted); }
@@ -906,7 +907,7 @@
 <!-- Firebase SDK -->
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-  import { getDatabase, ref, set, get, onValue, push, remove } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+  import { getDatabase, ref, set, get, onValue, push, remove, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
   const firebaseConfig = {
     apiKey: "AIzaSyDdMe7feUF6CKPHH0YIx7Suk-WnXtOYUu8",
@@ -922,7 +923,7 @@
   const db = getDatabase(app);
 
   // ── Firebase API をグローバルに公開 ──
-  window._fb = { db, ref, set, get, onValue, push, remove };
+  window._fb = { db, ref, set, get, onValue, push, remove, runTransaction };
   window.dispatchEvent(new Event('firebaseReady'));
   // 初期表示
   setTimeout(renderLoginHint, 100);
@@ -1001,6 +1002,7 @@
 
   <!-- ① シフト確認タブ -->
   <div id="staffTabShift">
+    <div class="staff-section"><button class="btn btn-secondary" onclick="openHolidayMgr()">🏥 クリニック規定休を見る</button><div id="clinicStaffHours"></div></div>
     <div class="staff-section">
       <h3>📅 今日のシフト</h3>
       <div class="today-card">
@@ -1400,6 +1402,7 @@
 
 </div><!-- /#mainApp -->
 
+<script src="clinic-leave.js"></script>
 <script>
 // ──────────────────────────────────────────────
 //  DATA DEFINITIONS
@@ -1409,6 +1412,7 @@ const SHIFT = {
   LATE:   { key:'late',   label:'遅出\n9:00-',  hours:8.5, shortLabel:'遅出' },
   OFF:    { key:'off',    label:'公休',           hours:0,   shortLabel:'公休' },
   PAID:   { key:'paid',   label:'有給',           hours:8,   shortLabel:'有給' },
+  CLINIC: { key:'clinic', label:'規定休',         hours:8,   shortLabel:'規定休' },
   WISH:   { key:'wish',   label:'希望休',         hours:0,   shortLabel:'希望休' },
   FIXED:  { key:'fixed',  label:'固定出勤\n(固)', hours:9,   shortLabel:'固定' },
   ADMIN:  { key:'admin',  label:'事務',           hours:9,   shortLabel:'事務' },
@@ -1687,7 +1691,7 @@ function isWorking(id, ds){
 }
 function isOff(id, ds){
   const k=shiftData[id]?.[ds]||'';
-  return !k||k==='off'||k==='wish'||k==='paid'||k==='none';
+  return !k||k==='off'||k==='wish'||k==='paid'||k==='none'||k==='clinic';
 }
 function isRuleWorkingKey(k){
   return k==='early'||k==='late'||k==='fixed'||k==='admin';
@@ -1840,7 +1844,7 @@ function shuffle(arr){
   return a;
 }
 function calcShiftHours(k){
-  return k==='early'?H_EARLY:k==='late'?H_LATE:k==='paid'?H_PAID:
+  return k==='clinic'?8:k==='early'?H_EARLY:k==='late'?H_LATE:k==='paid'?H_PAID:
     k==='fixed'?H_EARLY:k==='admin'?H_EARLY:k==='hanowa'?4:0;
 }
 function calcHours(id, y, m, days){
@@ -2502,6 +2506,7 @@ function repairHardConsecutiveExact(staffList, y, m, days, wds, workDays){
   }
 }
 function generateShift(){
+  if(!clinicGenerationReady()) return;
   if(isCurrentMonthLocked()){
     alert(`${currentYear}年${currentMonth+1}月のシフトは確定済みです。\n生成するには確定を解除してください。`);
     return;
@@ -2515,6 +2520,7 @@ function generateShift(){
   txt.innerHTML='<span class="spinner"></span> 生成中...';
 
   setTimeout(()=>{
+    const clinicPreserved = snapshotClinicShifts(y, m);
     STAFF.forEach(s=>{ if(!shiftData[s.id]) shiftData[s.id]={}; });
 
     // ── 申請データをshiftDataに反映（有給・希望休）──
@@ -2532,6 +2538,7 @@ function generateShift(){
         }
       });
 
+    restoreClinicShifts(clinicPreserved);
     const allDays=Array.from({length:days},(_,i)=>i+1);
     const workDays=allDays.filter(d=>!isOffDay(y,m,d));
     const wds=workDays.map(d=>dateStr(y,m,d)); // 診療日の日付文字列リスト
@@ -2556,6 +2563,7 @@ function generateShift(){
 
       STAFF.forEach(s=>{
         const cur=shiftData[s.id][ds];
+        if(isClinicDay(ds)) { shiftData[s.id][ds]=cur||'clinic'; return; }
         if(isAutoProtectedStaff(s.id)) return;
         if(cur==='paid'||cur==='wish') return; // 有給・希望休は絶対優先
 
@@ -4081,6 +4089,7 @@ function generateShift(){
         addAlert('info', ds+': DH兼任モード(DH'+dhF+'+DA'+daF+')');
       }
     }
+    restoreClinicShifts(clinicPreserved);
     // 160h達成確認（百々を含む全常勤）
     addExactHourAlerts(allFullStaff, y, m, days);
     addWeeklyHourAlerts(allFullStaff, y, m, days);
@@ -4124,12 +4133,12 @@ function printShift(){
     for(let d=1;d<=days;d++){
       const ds=dateStr(y,m,d);
       const off=isOffDay(y,m,d);
-      if(off){ r+=`<td class="print-off-day">─</td>`; continue; }
+      if(off && !isClinicDay(ds)){ r+=`<td class="print-off-day">─</td>`; continue; }
       const k=shiftData[s.id]?.[ds]||'';
       const label={
         'early':'通常','late':'遅出','off':'公休',
         'paid':'有給','wish':'希望','fixed':'通常',
-        'admin':'事務','hanowa':'HW','none':'─'
+        'admin':'事務','hanowa':'HW','none':'─','clinic':'規定休'
       }[k]||'─';
       const cls2={
         'early':'print-early','late':'print-late','off':'print-off',
@@ -4214,6 +4223,7 @@ function render(){
   renderSummary();
   renderAlerts();
   updateMonthNavButtons();
+  renderClinicHours();
 }
 
 function renderStaffList(){
@@ -4284,7 +4294,7 @@ function renderCalendar(){
       const cell = document.createElement('div');
       cell.className = 'cal-cell' + (off?' off-day':'');
 
-      if(!off){
+      if(!off || isClinicDay(ds)){
         const k = shiftData[s.id]?.[ds] || '';
         if(k && k !== 'none'){
           const chip = document.createElement('div');
@@ -4304,7 +4314,7 @@ function renderCalendar(){
           cell.appendChild(chip);
         }
 
-        if(s.id !== 'hanowa' || k==='hanowa'){
+        if(s.id !== 'hanowa' || k==='hanowa' || isClinicDay(ds)){
           cell.onclick = () => openModal(s.id, ds);
         }
       }
@@ -4437,6 +4447,7 @@ function openModal(staffId, ds){
     : staff.type==='spot'
     ? [SHIFT.HANOWA, SHIFT.NONE]
     : [SHIFT.EARLY, SHIFT.LATE, SHIFT.OFF, SHIFT.PAID, SHIFT.WISH];
+  if(isClinicDay(ds)) options.push(SHIFT.CLINIC);
 
   options.forEach(sh=>{
     const btn = document.createElement('button');
@@ -4472,6 +4483,7 @@ function closeModal(){
 }
 
 function applyModal(){
+  if(currentUser?.role!=='admin' || isCurrentMonthLocked()) return;
   if(!modalStaffId || !modalDateStr) return;
   if(!shiftData[modalStaffId]) shiftData[modalStaffId] = {};
   shiftData[modalStaffId][modalDateStr] = modalSelected;
@@ -4620,10 +4632,7 @@ function toggleShiftLock(){
 //  休業日管理
 // ══════════════════════════════════════════════
 function openHolidayMgr(){
-  renderHolidayList();
-  // 今日の日付をデフォルトに
-  document.getElementById('newHolidayDate').value = dateStr(currentYear, currentMonth, 1);
-  document.getElementById('holidayMgrModal').classList.add('open');
+  openClinicManager();
 }
 
 function renderHolidayList(){
@@ -5012,13 +5021,16 @@ window.addEventListener('firebaseReady', ()=>{
   // カスタム休業日のリアルタイム同期
   onValue(ref(db, 'custom_holidays'), (snapshot)=>{
     const data = snapshot.val() || {};
+    receiveClinicSettings(data);
     // キーの _ を - に戻す（YYYY_MM_DD → YYYY-MM-DD）
     customHolidays = {};
     Object.entries(data).forEach(([k,v])=>{
+      if(k==='_clinic_rules') return;
       customHolidays[k.replace(/_/g,'-')] = v;
     });
     if(currentUser?.role==='admin') render();
-  });
+    else if(currentUser?.role==='staff') renderStaffMonthGrid(currentUser.staffId);
+  }, ()=>{ clinicSettingsLoaded=false; });
 
   // パスワードのリアルタイム同期
   onValue(ref(db, 'passwords'), (snapshot)=>{
@@ -5221,6 +5233,7 @@ function renderStaffScreen(){
     paid:  { label:'有給休暇', start:'-',    end:'-',     brk:'-',           hrs:'-' },
     wish:  { label:'希望休',   start:'-',    end:'-',     brk:'-',           hrs:'-' },
     none:  { label:'休診日',   start:'-',    end:'-',     brk:'-',           hrs:'-' },
+    clinic:{ label:'規定休',   start:'-',    end:'-',     brk:'-',           hrs:'付与8h' },
   };
   const info = shiftInfo[k] || { label:'未設定', start:'-', end:'-', brk:'-', hrs:'-' };
 
@@ -5253,6 +5266,7 @@ function renderStaffScreen(){
 }
 
 function renderStaffMonthGrid(sid){
+  renderClinicHours();
   const y = currentYear, m = currentMonth;
   const days = daysInMonth(y, m);
   const firstDow = new Date(y, m, 1).getDay();
@@ -5262,7 +5276,7 @@ function renderStaffMonthGrid(sid){
 
   const shiftShort = {
     early:'通常', late:'遅出', fixed:'固定', admin:'事務',
-    hanowa:'HW', off:'公休', paid:'有給', wish:'希望', none:'-'
+    hanowa:'HW', off:'公休', paid:'有給', wish:'希望', none:'-', clinic:'規定休'
   };
 
   grid.innerHTML = ['日','月','火','水','木','金','土'].map((d,i)=>
@@ -5279,9 +5293,9 @@ function renderStaffMonthGrid(sid){
     const off = isOffDay(y,m,d);
     const isTod = (y===today.getFullYear() && m===today.getMonth() && d===today.getDate());
     grid.innerHTML += `
-      <div class="staff-day-cell ${off?'none':k} ${isTod?'today-cell':''}">
+      <div class="staff-day-cell ${off&&!isClinicDay(ds)?'none':k} ${isTod?'today-cell':''}">
         <span class="d-num">${d}</span>
-        <span class="d-shift">${off?'休':shiftShort[k]||''}</span>
+        <span class="d-shift">${off&&!isClinicDay(ds)?'休':shiftShort[k]||''}</span>
       </div>`;
   }
 }
