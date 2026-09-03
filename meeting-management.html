@@ -834,6 +834,7 @@ button{cursor:pointer}
         <h2>取り組み</h2>
         <span class="count-badge" id="taskCount">0件</span>
       </div>
+      <p class="read-status">完了条件を満たし、定着したと判断したら、主任へ報告してください。主任が取りまとめて院長へ定着確認を依頼します。院長の確認をもって完了となります。</p>
       <div class="form-panel" id="taskFormPanel" hidden>
         <form id="taskForm">
           <div class="form-grid">
@@ -2931,7 +2932,7 @@ function leaderProgressHtml(task) {
         <button class="btn sky" type="button" data-action="save-progress" data-id="${escAttr(task.id)}">対策を追加</button>
         ${status === 'todo' ? '<button class="btn ghost" type="button" disabled>未確認スタッフあり</button>' : ''}
         ${status === 'all_read' ? `<button class="btn" type="button" data-action="task-status" data-status="in_progress" data-id="${escAttr(task.id)}">対策を追加して開始</button>` : ''}
-        ${status === 'in_progress' && !isDirector() ? `<button class="btn warn" type="button" data-action="task-status" data-status="review" data-id="${escAttr(task.id)}">確認依頼</button>` : ''}
+        ${status === 'in_progress' && !isDirector() ? `<button class="btn warn" type="button" data-action="task-status" data-status="review" data-id="${escAttr(task.id)}">院長へ定着確認を依頼</button>` : ''}
       </div>
     </div>
   `;
