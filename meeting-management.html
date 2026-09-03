@@ -1076,8 +1076,8 @@ const STATUS_LABELS = {
   todo:'ミーティング未共有',
   all_read:'全員確認済み',
   in_progress:'取り組み中',
-  review:'確認依頼',
-  confirmed:'定着確認済み'
+  review:'院長の確認待ち',
+  confirmed:'定着完了'
 };
 const DECISION_LABELS = {
   pending:'未判断',
@@ -1118,7 +1118,7 @@ const INCIDENT_STATUS_LABELS = {
   decided:'対策決定',
   in_progress:'実施中',
   followup_pending:'定着確認待ち',
-  confirmed:'定着確認済み'
+  confirmed:'定着完了'
 };
 const INCIDENT_TASK_READY_STATUSES = new Set(['decided', 'in_progress', 'followup_pending', 'confirmed']);
 const INCIDENT_TASK_COMPLETION = '実際に運用されている状態を1か月を目安に継続確認し、院長が定着を確認できたら完了';
@@ -2654,17 +2654,17 @@ async function updateTaskStatus(id, status, options = {}) {
   const currentStatus = taskStatus(item);
   if (status === 'confirmed' && !isDirector()) return;
   if (status === 'confirmed' && currentStatus !== 'review') {
-    return showToast('定着確認済みにできるのは確認依頼中のみです');
+    return showToast('定着完了にできるのは院長の確認待ちの取り組みのみです');
   }
   if (status !== 'confirmed' && !(isLeader() || isDirector())) return;
   if (status === 'in_progress' && !options.rejected && currentStatus !== 'all_read') {
     return showToast('取り組み中にできるのは全員確認済みのみです');
   }
   if (status === 'review' && isDirector()) {
-    return showToast('院長は確認依頼せず、確認依頼が来たものを確認してください');
+    return showToast('院長は「院長の確認待ち」の取り組みを確認してください');
   }
   if (status === 'review' && currentStatus !== 'in_progress') {
-    return showToast('確認依頼にできるのは取り組み中のみです');
+    return showToast('院長へ定着確認を依頼できるのは取り組み中のみです');
   }
   if (options.rejected && (!isDirector() || currentStatus !== 'review')) return;
   const now = Date.now();
@@ -3047,7 +3047,7 @@ function progressLogHtml(log) {
 function taskActionsHtml(task) {
   const manageActions = canManageOwnItem(task) ? `
     <button class="btn" type="button" data-action="edit-task" data-id="${escAttr(task.id)}">編集</button>
-    ${isDirector() && task.status === 'review' ? `<button class="btn primary" type="button" data-action="confirm-task" data-id="${escAttr(task.id)}">定着確認済みにする</button>` : ''}
+    ${isDirector() && task.status === 'review' ? `<button class="btn primary" type="button" data-action="confirm-task" data-id="${escAttr(task.id)}">定着完了にする</button>` : ''}
     ${isDirector() && task.status === 'review' ? `<button class="btn danger" type="button" data-action="reject-task" data-id="${escAttr(task.id)}">定着確認依頼を却下</button>` : ''}
     <button class="btn danger" type="button" data-action="delete-task" data-id="${escAttr(task.id)}">削除</button>
   ` : '';
@@ -3394,7 +3394,7 @@ function canChangeIncidentType(report) {
 function incidentConfirmationHtml(report) {
   if (report.counterStatus !== 'confirmed') return '';
   const confirmedDate = report.confirmedAt ? formatDate(report.confirmedAt) : '-';
-  return `<div class="read-status">定着確認済み：${esc(confirmedDate)} / ${esc(report.confirmedBy || '-')}</div>`;
+  return `<div class="read-status">定着完了：${esc(confirmedDate)} / ${esc(report.confirmedBy || '-')}</div>`;
 }
 
 function incidentEditHtml(report) {
@@ -3596,7 +3596,7 @@ async function saveIncidentFollowup(id) {
   let nextStatus = incidentFollowupField(id, 'counterStatus') || currentStatus;
   if (!isDirector() && currentStatus === 'confirmed') nextStatus = 'confirmed';
   if (!isDirector() && nextStatus === 'confirmed' && currentStatus !== 'confirmed') {
-    return showToast('定着確認済みにできるのは院長のみです');
+    return showToast('定着完了にできるのは院長のみです');
   }
   const payload = {
     countermeasure: incidentFollowupField(id, 'countermeasure'),
