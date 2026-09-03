@@ -141,6 +141,16 @@ button{cursor:pointer}
   box-shadow:0 0 0 3px rgba(78,205,196,.16);
 }
 .section{display:none}
+.task-review-shortcut{margin:0 0 14px;min-height:44px}
+.task-review-shortcut[hidden]{display:none}
+.task-review-shortcut.has-pending{background:#fff7df;border-color:#e5b448;color:#805400;box-shadow:0 0 0 2px rgba(229,180,72,.15)}
+.task-stage-summary{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 10px}
+.task-stage{flex:1 1 150px;min-height:48px;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 12px;background:#fff;border:1px solid var(--line);border-radius:8px;color:var(--ink);font-size:13px;font-weight:900}
+.task-stage strong{white-space:nowrap}
+.task-stage[aria-pressed="true"]{border-color:var(--mint);background:#eafaf8;box-shadow:0 0 0 2px rgba(78,205,196,.18)}
+.task-stage:focus-visible{outline:3px solid var(--sky);outline-offset:2px}
+.task-stage.has-pending{border-color:#e5b448;color:#805400}
+.task-stage-caption{color:var(--muted);font-size:12px;margin:0 0 10px}
 .section.active{display:block}
 .section-head{
   display:flex;
@@ -818,6 +828,7 @@ button{cursor:pointer}
   </header>
 
   <main class="main">
+    <button class="btn task-review-shortcut" type="button" id="taskReviewShortcut" hidden>院長の確認待ち 0件</button>
     <nav class="tabs" aria-label="表示切替">
       <button class="tab-btn" type="button" data-tab="tasks">取り組み</button>
       <button class="tab-btn" type="button" data-tab="notices">お知らせ</button>
@@ -834,6 +845,8 @@ button{cursor:pointer}
         <h2>取り組み</h2>
         <span class="count-badge" id="taskCount">0件</span>
       </div>
+      <div id="taskStageSummary" class="task-stage-summary" role="group" aria-label="取り組みの工程別件数と絞り込み"></div>
+      <p class="task-stage-caption">件数は全取り組みが対象です。工程を押すと、その工程だけを表示します。</p>
       <p class="read-status">完了条件を満たし、定着したと判断したら、主任へ報告してください。主任が取りまとめて院長へ定着確認を依頼します。院長の確認をもって完了となります。</p>
       <div class="form-panel" id="taskFormPanel" hidden>
         <form id="taskForm">
@@ -1216,6 +1229,7 @@ const state = {
   opinions:[],
   incidentReports:[],
   searchQuery:'',
+  taskStatusFilter:'all',
   showArchivedIncidents:false,
   incidentPeriodMode:'all',
   incidentPeriodMonth:todayKey().slice(0, 7),
@@ -1232,6 +1246,7 @@ function boot() {
   setupUser();
   setupTabs();
   setupSearch();
+  setupTaskFilters();
   setupIncidentPeriod();
   setupIncidentArchiveToggle();
   setupForms();
@@ -1348,6 +1363,49 @@ function setupSearch() {
     renderActiveTab();
   });
   updateSearchPlaceholder();
+}
+
+function setupTaskFilters() {
+  document.getElementById('taskReviewShortcut').addEventListener('click', () => {
+    if (isDirector()) setTaskStatusFilter('review');
+  });
+  document.getElementById('taskStageSummary').addEventListener('click', event => {
+    const button = event.target.closest('button[data-task-filter]');
+    if (button) setTaskStatusFilter(button.dataset.taskFilter);
+  });
+  renderTaskSummary();
+}
+
+function setTaskStatusFilter(status) {
+  if (status !== 'all' && !Object.hasOwn(STATUS_LABELS, status)) return;
+  state.taskStatusFilter = status;
+  state.searchQuery = '';
+  document.getElementById('listSearch').value = '';
+  document.getElementById('listSearchClear').hidden = true;
+  activateTab('tasks');
+}
+
+function taskStageCounts(tasks) {
+  const counts = Object.fromEntries(Object.keys(STATUS_LABELS).map(status => [status, 0]));
+  for (const task of tasks) {
+    const status = taskStatus(task);
+    if (Object.hasOwn(counts, status)) counts[status]++;
+  }
+  return counts;
+}
+
+function renderTaskSummary() {
+  const counts = taskStageCounts(state.tasks);
+  const shortcut = document.getElementById('taskReviewShortcut');
+  shortcut.hidden = !isDirector();
+  shortcut.textContent = `院長の確認待ち ${counts.review}件`;
+  shortcut.classList.toggle('has-pending', counts.review > 0);
+  const stages = [['all', 'すべて'], ...Object.entries(STATUS_LABELS)];
+  document.getElementById('taskStageSummary').innerHTML = stages.map(([status, label]) => `
+    <button class="task-stage${status === 'review' && counts.review > 0 ? ' has-pending' : ''}" type="button" data-task-filter="${escAttr(status)}" aria-pressed="${state.taskStatusFilter === status}">
+      <span>${esc(label)}</span><strong>${status === 'all' ? state.tasks.length : counts[status]}件</strong>
+    </button>
+  `).join('');
 }
 
 function setupIncidentPeriod() {
@@ -2886,11 +2944,19 @@ function incidentReportSearchText(report) {
 }
 
 function renderTasks() {
-  const tasks = filterBySearch(state.tasks, taskSearchText);
-  document.getElementById('taskCount').textContent = countText(tasks.length, state.tasks.length);
+  renderTaskSummary();
+  const stageTasks = state.taskStatusFilter === 'all'
+    ? state.tasks
+    : state.tasks.filter(task => taskStatus(task) === state.taskStatusFilter);
+  const tasks = filterBySearch(stageTasks, taskSearchText);
+  document.getElementById('taskCount').textContent = state.taskStatusFilter === 'all'
+    ? countText(tasks.length, state.tasks.length)
+    : `${tasks.length}/${state.tasks.length}件`;
   const list = document.getElementById('taskList');
   if (!tasks.length) {
-    list.innerHTML = emptyListHtml('取り組み');
+    list.innerHTML = state.taskStatusFilter === 'all'
+      ? emptyListHtml('取り組み')
+      : `<div class="empty">${esc(STATUS_LABELS[state.taskStatusFilter])}の取り組み${hasSearchQuery() ? 'で検索に一致するもの' : ''}はありません</div>`;
     return;
   }
   list.innerHTML = tasks.map(task => `
