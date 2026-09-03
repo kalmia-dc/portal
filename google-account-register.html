@@ -27,6 +27,10 @@
   .error{margin-top:14px;color:var(--danger);font-weight:700}
   .success{padding:18px;border-radius:12px;background:var(--green-light)}
   .note{font-size:.9rem;color:var(--muted)}
+  .browser-help{padding:16px;border:2px solid var(--border);border-radius:12px;background:#f5faf7}
+  .browser-help h2{margin-top:0}
+  .browser-help a{overflow-wrap:anywhere;color:var(--green)}
+  .browser-help.attention{border-color:var(--danger)}
   footer{margin-top:26px;padding-top:18px;border-top:1px solid var(--border);font-size:.88rem;color:var(--muted)}
 </style>
 </head>
@@ -37,6 +41,20 @@
   <p class="deadline">登録期限：2026年9月3日 15:00<br>新ログイン切替：2026年9月3日 18:00</p>
 
   <section id="loginSection">
+    <aside id="browserHelp" class="browser-help" aria-label="ブラウザでの開き方">
+      <h2>LINE WORKSから開いた方へ</h2>
+      <p><strong>Googleログインは、LINE WORKS内ではなくSafariまたはChromeで行ってください。</strong></p>
+      <ol>
+        <li>下の「登録ページのURLをコピー」を押します。</li>
+        <li>Safari（iPhone）またはChromeを直接起動します。</li>
+        <li>アドレス欄に貼り付けて開き、Googleログインからやり直します。</li>
+      </ol>
+      <p>今表示されているエラー画面のURLではなく、次の登録ページを開いてください。</p>
+      <p><a href="https://kalmia-dc.github.io/portal/google-account-register.html">https://kalmia-dc.github.io/portal/google-account-register.html</a></p>
+      <button type="button" id="copyUrlButton" class="secondary">登録ページのURLをコピー</button>
+      <p id="copyUrlStatus" class="note" role="status"></p>
+      <p class="note">別画面でGoogleログインが開きます。ポップアップが遮断された場合は、このサイトのポップアップを許可して再度お試しください。ブラウザの追跡防止設定を無効にする必要はありません。</p>
+    </aside>
     <h2>1. Googleアカウントでログイン</h2>
     <p>Googleフォームへ登録したものと同じGoogleアカウントを使用してください。</p>
     <button type="button" id="loginButton">Googleアカウントでログイン</button>
@@ -86,12 +104,10 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/fireba
 import {
   browserLocalPersistence,
   getAuth,
-  getRedirectResult,
   GoogleAuthProvider,
   onAuthStateChanged,
   setPersistence,
   signInWithPopup,
-  signInWithRedirect,
   signOut,
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 import { getDatabase, ref, serverTimestamp, update } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
@@ -105,11 +121,29 @@ const loginSection=document.getElementById('loginSection');
 const registerSection=document.getElementById('registerSection');
 const completeSection=document.getElementById('completeSection');
 const errorMessage=document.getElementById('errorMessage');
+const browserHelp=document.getElementById('browserHelp');
+const loginButton=document.getElementById('loginButton');
+const isEmbeddedBrowser=/Line\/|LINEWORKS|LineWorks|WorksMobile|NAVERWORKS|; wv\)/i.test(navigator.userAgent);
+const externalBrowserMessage='LINE WORKS内ではログインできない場合があります。登録ページのURLをコピーし、SafariまたはChromeを直接起動して開き直してください。';
+if(isEmbeddedBrowser) browserHelp.classList.add('attention');
+
+document.getElementById('copyUrlButton').addEventListener('click',async()=>{
+  const status=document.getElementById('copyUrlStatus');
+  try{
+    await navigator.clipboard.writeText('https://kalmia-dc.github.io/portal/google-account-register.html');
+    status.textContent='コピーしました。SafariまたはChromeのアドレス欄に貼り付けてください。';
+  }catch{
+    status.textContent='自動コピーできませんでした。上の登録ページのリンクを長押しして、リンクをコピーしてください。';
+  }
+});
 
 function showError(error){
   const messages={
     'auth/operation-not-allowed':'Googleログインの準備が完了していません。時間をおいて再度お試しください。',
     'auth/popup-closed-by-user':'ログイン画面が閉じられました。もう一度お試しください。',
+    'auth/popup-blocked':'ポップアップが遮断されました。SafariまたはChromeで登録ページを直接開き、このサイトのポップアップを許可して再度ログインしてください。',
+    'auth/operation-not-supported-in-this-environment':externalBrowserMessage,
+    'auth/web-storage-unsupported':'ブラウザの保存領域を利用できません。SafariまたはChromeの通常のタブで登録ページを開き直してください。',
     'auth/network-request-failed':'通信できません。インターネット接続を確認してください。',
     'PERMISSION_DENIED':'登録を保存できませんでした。百々さんへ表示内容をご連絡ください。',
   };
@@ -118,21 +152,26 @@ function showError(error){
 }
 
 async function login(){
+  errorMessage.classList.add('hidden');
+  if(isEmbeddedBrowser){
+    showError(new Error(externalBrowserMessage));
+    browserHelp.scrollIntoView({block:'start',behavior:'smooth'});
+    return;
+  }
   const provider=new GoogleAuthProvider();
   provider.setCustomParameters({prompt:'select_account'});
+  loginButton.disabled=true;
   try{
     await signInWithPopup(auth,provider);
   }catch(error){
-    if(error?.code==='auth/popup-blocked'||error?.code==='auth/operation-not-supported-in-this-environment'){
-      await signInWithRedirect(auth,provider);
-      return;
-    }
     showError(error);
+    browserHelp.classList.add('attention');
+  }finally{
+    loginButton.disabled=false;
   }
 }
 
-await setPersistence(auth,browserLocalPersistence);
-try{await getRedirectResult(auth);}catch(error){showError(error);}
+try{await setPersistence(auth,browserLocalPersistence);}catch(error){showError(error);}
 
 onAuthStateChanged(auth,user=>{
   const isGoogle=user?.providerData?.some(provider=>provider.providerId==='google.com');
