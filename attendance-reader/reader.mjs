@@ -40,7 +40,7 @@ async function heartbeat() {
   try { await put(paths.heartbeat, new Date().toISOString()); } catch {}
 }
 async function sendEvent(event) {
-  await put(paths.event(event.eventId), { ...event, status: 'test-pending' });
+  await put(paths.event(event.eventId), { ...event, status: paths.status });
 }
 async function flushQueue() {
   if (!queue.length) return;
@@ -95,4 +95,4 @@ console.log(`初回は管理者がこのUIDを ${config.terminalId} の端末と
 await refreshSelectedType();
 await heartbeat();
 await flushQueue();
-console.log(`カルミアDC勤怠カード読取を開始しました（分離テスト／端末: ${config.terminalId}）`);
+console.log(`カルミアDC勤怠カード読取を開始しました（${paths.label}／端末: ${config.terminalId}）`);
