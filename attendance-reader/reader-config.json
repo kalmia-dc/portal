@@ -1,5 +1,7 @@
 {
   "databaseUrl": "https://kalmia-shift-default-rtdb.asia-southeast1.firebasedatabase.app",
+  "firebaseApiKey": "AIzaSyDdMe7feUF6CKPHH0YIx7Suk-WnXtOYUu8",
+  "mode": "test",
   "terminalId": "reception-1",
-  "readerNameContains": "RC-S300"
+  "readerNameContains": ["RC-S300", "FELICA PORT/PASORI 4.0"]
 }

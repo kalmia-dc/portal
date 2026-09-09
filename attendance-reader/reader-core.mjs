@@ -1,0 +1,17 @@
+export function readerMatches(name, configuredNames) {
+  const candidate = String(name || '').toUpperCase();
+  const names = Array.isArray(configuredNames) ? configuredNames : [configuredNames];
+  return names.filter(Boolean).some(value => candidate.includes(String(value).toUpperCase()));
+}
+
+export function readerPaths(config) {
+  const terminalId = String(config.terminalId || '').trim();
+  if (!terminalId || !/^[A-Za-z0-9_-]+$/.test(terminalId)) throw new Error('terminalId が不正です。');
+  if (config.mode !== 'test') throw new Error('現在の配布版は mode=test のみ使用できます。');
+  const root = 'attendanceTest/v1';
+  return {
+    selectedType:`${root}/deviceTerminals/${terminalId}/selectedType`,
+    heartbeat:`${root}/deviceTerminals/${terminalId}/heartbeat`,
+    event:eventId => `${root}/devicePunches/${terminalId}/${eventId}`,
+  };
+}

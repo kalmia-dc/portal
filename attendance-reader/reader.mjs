@@ -3,12 +3,18 @@ import path from 'node:path';
 import os from 'node:os';
 import crypto from 'node:crypto';
 import pcsclite from 'pcsclite';
+import { fileURLToPath } from 'node:url';
+import { createTerminalAuth } from './terminal-auth.mjs';
+import { readerMatches, readerPaths } from './reader-core.mjs';
 
-const root = path.dirname(new URL(import.meta.url).pathname.replace(/^\/(.:)/, '$1'));
+const root = path.dirname(fileURLToPath(import.meta.url));
 const config = JSON.parse(fs.readFileSync(path.join(root, 'reader-config.json'), 'utf8'));
 const stateDir = path.join(os.homedir(), 'AppData', 'Local', 'KalmiaAttendanceReader');
 const queuePath = path.join(stateDir, 'offline-queue.json');
+const credentialPath = path.join(stateDir, 'terminal-credential.json');
 fs.mkdirSync(stateDir, { recursive: true });
+const terminalAuth = createTerminalAuth({ apiKey:config.firebaseApiKey, credentialPath });
+const paths = readerPaths(config);
 let queue = readQueue();
 let selectedType = 'in';
 let busy = false;
@@ -19,22 +25,22 @@ function readQueue() {
 function saveQueue() { fs.writeFileSync(queuePath, JSON.stringify(queue, null, 2), 'utf8'); }
 function endpoint(relative) { return `${config.databaseUrl}/${relative}.json`; }
 async function put(relative, value) {
-  const response = await fetch(endpoint(relative), { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(value) });
+  const response = await terminalAuth.authenticatedFetch(endpoint(relative), { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(value) });
   if (!response.ok) throw new Error(`Firebase HTTP ${response.status}`);
 }
 async function getJson(relative) {
-  const response = await fetch(endpoint(relative), { cache: 'no-store' });
+  const response = await terminalAuth.authenticatedFetch(endpoint(relative), { cache: 'no-store' });
   if (!response.ok) throw new Error(`Firebase HTTP ${response.status}`);
   return response.json();
 }
 async function refreshSelectedType() {
-  try { selectedType = await getJson(`attendance/terminals/${config.terminalId}/selectedType`) || 'in'; } catch {}
+  try { selectedType = await getJson(paths.selectedType) || 'in'; } catch {}
 }
 async function heartbeat() {
-  try { await put(`attendance/terminals/${config.terminalId}/heartbeat`, new Date().toISOString()); } catch {}
+  try { await put(paths.heartbeat, new Date().toISOString()); } catch {}
 }
 async function sendEvent(event) {
-  await put(`attendance/terminals/${config.terminalId}/inbox/${event.eventId}`, { ...event, status: 'pending' });
+  await put(paths.event(event.eventId), { ...event, status: 'test-pending' });
 }
 async function flushQueue() {
   if (!queue.length) return;
@@ -54,7 +60,7 @@ async function recordUid(uid) {
 
 const pcsc = pcsclite();
 pcsc.on('reader', reader => {
-  if (config.readerNameContains && !reader.name.toUpperCase().includes(config.readerNameContains.toUpperCase())) {
+  if (!readerMatches(reader.name, config.readerNameContains)) {
     console.log(`対象外リーダー: ${reader.name}`);
     return;
   }
@@ -83,7 +89,10 @@ pcsc.on('error', error => console.error(`PC/SCエラー: ${error.message}`));
 setInterval(refreshSelectedType, 3000);
 setInterval(heartbeat, 15000);
 setInterval(flushQueue, 10000);
+const terminalIdentity = await terminalAuth.getToken();
+console.log(`端末認証UID: ${terminalIdentity.uid}`);
+console.log(`初回は管理者がこのUIDを ${config.terminalId} の端末として許可してください。`);
 await refreshSelectedType();
 await heartbeat();
 await flushQueue();
-console.log(`カルミアDC勤怠カード読取を開始しました（端末: ${config.terminalId}）`);
+console.log(`カルミアDC勤怠カード読取を開始しました（分離テスト／端末: ${config.terminalId}）`);
