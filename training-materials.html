@@ -268,6 +268,7 @@ body.viewer-open{overflow:hidden}
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import { getDatabase, ref, push, set, update, remove, onValue, get }
   from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
+import { startPortalAuth } from './portal-auth.js';
 import { getStorage, ref as storageRef, uploadBytes, uploadBytesResumable, getDownloadURL, deleteObject }
   from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js';
 
@@ -284,6 +285,7 @@ const firebaseConfig = {
 const fbApp = initializeApp(firebaseConfig);
 const db = getDatabase(fbApp);
 const storage = getStorage(fbApp);
+const authenticatedProfile = await startPortalAuth(fbApp, { pageName:'研修資料' });
 const DB_PATH = 'trainingMaterials';
 const CATEGORY_DB_PATH = 'trainingMaterialCategories';
 const MEETING_SOURCE_PATHS = { task:'meetingManagement/tasks', notice:'meetingManagement/notices' };
@@ -291,8 +293,8 @@ const DIRECT_UPLOAD_MAX_BYTES = 20 * 1024 * 1024;
 const INLINE_IMAGE_MAX_DIMENSION = 1200;
 const INLINE_IMAGE_QUALITY = 0.72;
 const INLINE_IMAGE_MAX_DATA_URL_LENGTH = 9.5 * 1024 * 1024;
-const ADMIN_STAFF = ['sugihira', 'momo'];
-const DEFAULT_ADMIN_PASSWORDS = { sugihira:'1001', momo:'3003' };
+const ADMIN_STAFF = ['sugihira', 'momo', 'yamada'];
+const DEFAULT_ADMIN_PASSWORDS = {};
 const DEFAULT_MATERIAL_CATEGORIES = ['歯周治療', 'インプラント'];
 const MATERIAL_CATEGORY_ALIASES = { 'その他':'インプラント' };
 const STAFF_NAMES = {
@@ -359,15 +361,8 @@ onValue(ref(db, DB_PATH), snap => {
 
 function readUser() {
   const params = new URLSearchParams(location.search);
-  const sid = params.get('sid') || '';
-  if (sid) {
-    const user = normalizePortalUser({
-      staffId: sid,
-      sid,
-      name: params.get('name'),
-      role: params.get('role'),
-      pass: params.get('p') || ''
-    });
+  if (authenticatedProfile?.staffId) {
+    const user = normalizePortalUser(authenticatedProfile);
     savePortalUser(user);
     const retained = new URLSearchParams();
     for (const key of ['manualSource', 'sourceId']) {
@@ -488,7 +483,7 @@ window.loginAdmin = async function() {
 };
 
 function isAdmin() {
-  return ADMIN_STAFF.includes(currentUser?.staffId);
+  return authenticatedProfile.isTrainingAdmin === true;
 }
 
 function currentStaffId() {
