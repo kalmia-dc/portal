@@ -1038,6 +1038,7 @@ button{cursor:pointer}
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import { getDatabase, ref, push, set, update, remove, onValue, get } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
+import { startPortalAuth } from './portal-auth.js';
 
 const firebaseConfig = {
   apiKey:            'AIzaSyDdMe7feUF6CKPHH0YIx7Suk-WnXtOYUu8',
@@ -1051,6 +1052,7 @@ const firebaseConfig = {
 
 const fbApp = initializeApp(firebaseConfig);
 const db = getDatabase(fbApp);
+const authenticatedProfile = await startPortalAuth(fbApp, { pageName:'会議・タスク管理' });
 
 const DIRECTOR_ID = 'sugihira';
 const LEADER_IDS = ['momo', 'yamada'];
@@ -1256,17 +1258,9 @@ function boot() {
 }
 
 function readUser() {
-  const params = new URLSearchParams(location.search);
-  const paramStaffId = params.get('sid');
-  if (paramStaffId) {
-    const user = normalizeUser({
-      staffId: paramStaffId,
-      sid: paramStaffId,
-      name: params.get('name') || STAFF_NAMES[paramStaffId] || paramStaffId,
-      pass: params.get('p') || ''
-    });
+  if (authenticatedProfile?.staffId) {
+    const user = normalizeUser(authenticatedProfile);
     sessionStorage.setItem('portalUser', JSON.stringify(user));
-    history.replaceState({}, '', location.pathname);
     return user;
   }
 

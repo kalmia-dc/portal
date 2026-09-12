@@ -1673,6 +1673,7 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import { getDatabase, ref, push, set, remove, onValue, get }
   from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
+import { startPortalAuth } from './portal-auth.js';
 
 const firebaseConfig = {
   apiKey:            'AIzaSyDdMe7feUF6CKPHH0YIx7Suk-WnXtOYUu8',
@@ -1686,6 +1687,7 @@ const firebaseConfig = {
 
 const fbApp = initializeApp(firebaseConfig);
 const db = getDatabase(fbApp);
+const authenticatedProfile = await startPortalAuth(fbApp, { pageName:'目標管理' });
 const DB_PATH = 'monthlyGoals';
 const TARGET_DB_PATH = 'halfYearGoalTargets';
 const PRIVATE_METRICS_PATH = 'privateMetrics';
@@ -1765,6 +1767,7 @@ let pdfJsLoader = null;
 let tesseractLoader = null;
 
 function resolveUser() {
+  if (authenticatedProfile?.staffId) return normalizeUser(authenticatedProfile);
   try {
     const saved = sessionStorage.getItem('portalUser');
     if (saved) {
@@ -1772,17 +1775,6 @@ function resolveUser() {
       if (user?.staffId) return normalizeUser(user);
     }
   } catch(e) {}
-
-  const params = new URLSearchParams(location.search);
-  const sid = params.get('sid') || '';
-  if (sid) {
-    return normalizeUser({
-      staffId: sid,
-      name: params.get('name') || STAFF_NAMES[sid] || sid,
-      pass: params.get('p') || '',
-      role: roleFromStaffId(sid)
-    });
-  }
 
   return { staffId: '', name: 'ゲスト', role: '', pass: '' };
 }

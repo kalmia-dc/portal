@@ -370,43 +370,7 @@
   <div class="login-title">カルミアデンタルクリニック</div>
   <div class="login-sub">STAFF PORTAL</div>
   <div class="login-card">
-    <label class="login-label">スタッフを選択</label>
-    <select class="login-select" id="loginStaff">
-      <option value="">── 選択してください ──</option>
-      <optgroup label="ゲスト">
-        <option value="ゲスト|ゲスト|0000|guest">ゲスト</option>
-      </optgroup>
-      <optgroup label="DR（歯科医師）">
-        <option value="院長|DR|1001|sugihira">院長</option>
-        <option value="嶋中|DR|1002|shimanaka">嶋中</option>
-        <option value="保刈|DR|1003|hokari">保刈</option>
-        <option value="篠田|DR|1004|shinoda">篠田</option>
-      </optgroup>
-      <optgroup label="DH（歯科衛生士）">
-        <option value="鶴田|DH|2001|tsuruta">鶴田</option>
-        <option value="吉田|DH|2002|yoshida">吉田</option>
-        <option value="高木|DH|2003|takagi">高木</option>
-        <option value="松本|DH|2004|matsumoto">松本</option>
-        <option value="山田|DH|2006|yamada">山田</option>
-      </optgroup>
-      <optgroup label="DA（受付・歯科助手）">
-        <option value="田宮|DA|3001|tamiya">田宮</option>
-        <option value="田中|DA|3002|tanaka">田中</option>
-        <option value="百々|DA|3003|momo">百々</option>
-      </optgroup>
-    </select>
-    <label class="login-label">パスワード（数字4桁）</label>
-    <input class="login-input" type="password" id="loginPass" inputmode="numeric" maxlength="4" placeholder="●●●●">
-    <button class="login-btn" onclick="doLogin()">ログイン</button>
-    <div class="login-error" id="loginError">パスワードが違います</div>
-    <div style="margin-top:16px;padding:12px;background:#f8f9fa;border-radius:12px;font-size:11px;color:#636e72;line-height:1.8;">
-      🔑 <strong>初期パスワード</strong><br>
-      <strong>DR</strong>　院長:1001　嶋中:1002　保刈:1003　篠田:1004<br>
-      <strong>DH</strong>　鶴田:2001　吉田:2002　高木:2003　松本:2004　山田:2006<br>
-      <strong>DA</strong>　田宮:3001　田中:3002　百々:3003<br>
-      <strong>ゲスト</strong>　ゲスト:0000<br>
-      <span style="color:#aaa;">※ シフトアプリで変更した場合は新パスワードを使用</span>
-    </div>
+    <p>登録済みのGoogleアカウントでログインしてください。</p>
   </div>
 </div>
 
@@ -592,8 +556,8 @@
         <span class="toggle-icon">⌄</span>
       </button>
       <div class="category-tools">
-        <button class="tool-item" type="button" onclick="openPwModal();return false;">
-          <span class="tool-icon">👤</span><span class="tool-name">パスワード<br>変更</span>
+        <button class="tool-item" type="button" onclick="doLogout();return false;">
+          <span class="tool-icon">🚪</span><span class="tool-name">ログアウト</span>
         </button>
       </div>
     </section>
@@ -637,32 +601,6 @@
   <a class="nav-item" data-guest-hidden="true" href="https://apo-toolboxes.stransa.co.jp/calendar/" target="_blank" rel="noopener"><span class="nav-icon">🗓️</span><span class="nav-label">予約</span></a>
   <button class="nav-item" id="menuNavBtn" onclick="togglePortalMenu()"><span class="nav-icon">☰</span><span class="nav-label">メニュー</span></button>
 </nav>
-
-<!-- パスワード変更モーダル -->
-<div class="modal-overlay" id="pwModal" onclick="closePwModalIfBg(event)">
-  <div class="modal-sheet">
-    <div class="modal-handle"></div>
-    <div class="modal-title">🔑 パスワード変更</div>
-    <div class="pw-field">
-      <label>現在のパスワード</label>
-      <input type="password" id="pwOld" inputmode="numeric" maxlength="4" placeholder="●●●●">
-    </div>
-    <div class="pw-field">
-      <label>新しいパスワード（数字4桁）</label>
-      <input type="password" id="pwNew" inputmode="numeric" maxlength="4" placeholder="●●●●">
-    </div>
-    <div class="pw-field">
-      <label>新しいパスワード（確認）</label>
-      <input type="password" id="pwNew2" inputmode="numeric" maxlength="4" placeholder="●●●●">
-    </div>
-    <div class="pw-msg" id="pwMsg"></div>
-    <button class="pw-btn primary" onclick="submitPwChange()">変更する</button>
-    <button class="pw-btn secondary" onclick="closePwModal()">キャンセル</button>
-    <div style="margin-top:20px;border-top:1px solid var(--light-gray);padding-top:16px;text-align:center;">
-      <button class="pw-btn secondary" onclick="doLogout()" style="background:#fff0f0;color:var(--coral);">🚪 ログアウト</button>
-    </div>
-  </div>
-</div>
 
 <!-- お知らせ投稿モーダル -->
 <div class="modal-overlay" id="noticeModal" onclick="closeNoticeModalIfBg(event)">
@@ -721,13 +659,7 @@ const SHIFT_INFO = {
 };
 
 const ON_SHIFTS = ['通常','遅出'];
-const DEFAULT_PASSWORDS = {
-  sugihira:'1001', shimanaka:'1002', hokari:'1003', shinoda:'1004',
-  tsuruta:'2001',  yoshida:'2002',   takagi:'2003', matsumoto:'2004',
-  yamada:'2006',   hanowa:'2007',
-  tamiya:'3001',   tanaka:'3002',    momo:'3003',
-  guest:'0000'
-};
+const DEFAULT_PASSWORDS = {};
 
 let syncedPasswords = {};
 let passwordsReady = false;
@@ -850,12 +782,10 @@ async function doLogin() {
   showApp();
 }
 
-function doLogout() {
+async function doLogout() {
+  if (window.portalSignOut) return window.portalSignOut();
   removePortalUser();
-  currentUser = null;
-  document.getElementById('app').style.display = 'none';
-  document.getElementById('loginScreen').style.display = 'flex';
-  document.getElementById('loginPass').value = '';
+  location.reload();
 }
 
 // ─────────────────────────────────────────
@@ -971,38 +901,38 @@ function goToTaskApp() {
 
 function goToGoalApp() {
   if (!currentUser) return;
-  const params = new URLSearchParams({ sid: currentUser.staffId, name: currentUser.name, p: currentUser.pass });
+  const params = new URLSearchParams({ sid: currentUser.staffId, name: currentUser.name });
   window.location.href = `https://kalmia-dc.github.io/portal/goal-manager.html?${params}`;
 }
 
 function goToLoanApp() {
   if (!currentUser) return;
-  const params = new URLSearchParams({ sid: currentUser.staffId, name: currentUser.name, p: currentUser.pass });
+  const params = new URLSearchParams({ sid: currentUser.staffId, name: currentUser.name });
   window.location.href = `https://kalmia-dc.github.io/portal/loan-management.html?${params}`;
 }
 
 function goToPrivateMetricsApp() {
   if (!currentUser || !ADMIN_STAFF.includes(currentUser.staffId)) return;
-  const params = new URLSearchParams({ sid: currentUser.staffId, name: currentUser.name, p: currentUser.pass });
+  const params = new URLSearchParams({ sid: currentUser.staffId, name: currentUser.name });
   window.location.href = `https://kalmia-dc.github.io/portal/private-metrics.html?${params}`;
 }
 
 function goToScheduleApp(eventId) {
   if (!currentUser) return;
-  const params = new URLSearchParams({ sid: currentUser.staffId, name: currentUser.name, p: currentUser.pass });
+  const params = new URLSearchParams({ sid: currentUser.staffId, name: currentUser.name });
   if (eventId) params.set('evid', eventId);
   window.location.href = `https://kalmia-dc.github.io/portal/schedule.html?${params}`;
 }
 
 function goToMeetingManagementApp() {
   if (!currentUser) return;
-  const params = new URLSearchParams({ sid: currentUser.staffId, name: currentUser.name, p: currentUser.pass });
+  const params = new URLSearchParams({ sid: currentUser.staffId, name: currentUser.name });
   window.location.href = `https://kalmia-dc.github.io/portal/meeting-management.html?${params}`;
 }
 
 function goToTrainingMaterialsApp() {
   if (!currentUser) return;
-  const params = new URLSearchParams({ sid: currentUser.staffId, name: currentUser.name, p: currentUser.pass });
+  const params = new URLSearchParams({ sid: currentUser.staffId, name: currentUser.name });
   params.set('v', String(Date.now()));
   window.location.href = `https://kalmia-dc.github.io/portal/training-materials.html?${params}`;
 }
@@ -1019,7 +949,7 @@ function redirectToRequestedApp() {
 
 function goToShiftApp(asAdmin = false) {
   if (!currentUser) return;
-  const params = new URLSearchParams({ sid: currentUser.staffId, p: currentUser.pass });
+  const params = new URLSearchParams({ sid: currentUser.staffId });
   if (asAdmin) params.set('admin', '1');
   window.location.href = `https://kalmia-dc.github.io/portal/shift.html?${params}`;
 }
@@ -1287,6 +1217,7 @@ async function buildTodayStaff(now) {
 // ─────────────────────────────────────────
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import { getDatabase, ref, push, remove, onValue, get, set } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
+import { startPortalAuth } from './portal-auth.js';
 
 const firebaseConfig = {
   apiKey:            'AIzaSyDdMe7feUF6CKPHH0YIx7Suk-WnXtOYUu8',
@@ -1300,10 +1231,9 @@ const firebaseConfig = {
 
 const _app = initializeApp(firebaseConfig);
 const _db  = getDatabase(_app);
+const authenticatedProfile = await startPortalAuth(_app, { pageName:'院内ポータル' });
 
-onValue(ref(_db, 'passwords'), snap => {
-  updatePasswordCache(snap.val() || {});
-});
+updatePasswordCache({});
 
 // ─────────────────────────────────────────
 // お知らせ（Firebase /notices + portal-updates.json）
@@ -1341,11 +1271,7 @@ function startNoticeSync() {
 
 function goToAttendanceApp() {
   if (!currentUser) return;
-  const params = new URLSearchParams({
-    sid: currentUser.staffId,
-    name: currentUser.name,
-    p: currentUser.pass || ''
-  });
+  const params = new URLSearchParams({ sid: currentUser.staffId, name: currentUser.name });
   window.location.href = `https://kalmia-dc.github.io/portal/attendance.html?${params}`;
 }
 
@@ -1531,7 +1457,7 @@ function buildNoticeLinkHref(url) {
     if (currentUser && (isLocalPortalPage || isPublicPortalPage)) {
       link.searchParams.set('sid', currentUser.staffId);
       link.searchParams.set('name', currentUser.name);
-      if (currentUser.pass) link.searchParams.set('p', currentUser.pass);
+      link.searchParams.delete('p');
     }
     return link.href;
   } catch(e) {

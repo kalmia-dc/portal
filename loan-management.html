@@ -137,7 +137,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--mint)}
   </section>
 
   <div class="notice">
-    貸付金に関する確認同意書は紙で事前締結する前提です。個別の借用書は、このページで全文確認と4桁パスワード再入力により同意します。
+    貸付金に関する確認同意書は紙で事前締結する前提です。個別の借用書は、登録済みGoogleアカウントで本人確認したうえで、このページの全文を確認して同意します。
   </div>
 
   <section class="toolbar" aria-label="検索と操作">
@@ -248,8 +248,8 @@ input:focus,select:focus,textarea:focus{border-color:var(--mint)}
       </label>
       <div class="agreement-grid">
         <div class="field">
-          <label for="agreePass">4桁パスワード</label>
-          <input id="agreePass" type="password" inputmode="numeric" maxlength="4" autocomplete="current-password" placeholder="●●●●">
+          <label>本人確認</label>
+          <span>Googleアカウントで本人確認済みです。</span>
         </div>
         <button class="btn primary" id="agreeBtn" type="button" onclick="agreeLoan()">同意する</button>
       </div>
@@ -260,8 +260,9 @@ input:focus,select:focus,textarea:focus{border-color:var(--mint)}
 
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getDatabase, ref, push, set, update, onValue, get }
+import { getDatabase, ref, push, set, update, onValue, get, query, orderByChild, equalTo }
   from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
+import { startPortalAuth } from './portal-auth.js';
 
 const firebaseConfig = {
   apiKey:            'AIzaSyDdMe7feUF6CKPHH0YIx7Suk-WnXtOYUu8',
@@ -275,17 +276,12 @@ const firebaseConfig = {
 
 const fbApp = initializeApp(firebaseConfig);
 const db = getDatabase(fbApp);
+const authenticatedProfile = await startPortalAuth(fbApp, { pageName:'貸与品管理' });
 const DB_PATH = 'loanAgreements';
 const PORTAL_USER_STORAGE_KEY = 'portalUser';
 const AGREEMENT_VERSION = 'loan-agreement-v1-2026-07-03';
 const ADMIN_STAFF = ['sugihira', 'momo'];
-const DEFAULT_PASSWORDS = {
-  sugihira:'1001', shimanaka:'1002', hokari:'1003', shinoda:'1004',
-  tsuruta:'2001', yoshida:'2002', takagi:'2003', matsumoto:'2004',
-  yamada:'2006', hanowa:'2007',
-  tamiya:'3001', tanaka:'3002', momo:'3003',
-  guest:'0000'
-};
+const DEFAULT_PASSWORDS = {};
 const STAFF_NAMES = {
   sugihira:'院長', shimanaka:'嶋中', hokari:'保刈', shinoda:'篠田',
   tsuruta:'鶴田', yoshida:'吉田', takagi:'高木', matsumoto:'松本',
@@ -337,10 +333,10 @@ function init() {
   renderStatusOptions();
   updateComputedFields();
   document.getElementById('loanAmount')?.addEventListener('input', updateComputedFields);
-  document.getElementById('agreePass')?.addEventListener('keydown', event => {
-    if (event.key === 'Enter') window.agreeLoan();
-  });
-  onValue(ref(db, DB_PATH), snap => {
+  const loanRef = isAdmin()
+    ? ref(db, DB_PATH)
+    : query(ref(db, DB_PATH), orderByChild('staffId'), equalTo(currentUser.staffId));
+  onValue(loanRef, snap => {
     const data = snap.val() || {};
     loans = Object.entries(data).map(([id, item]) => ({ id, ...item }))
       .sort((a, b) => (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0));
@@ -355,17 +351,7 @@ function init() {
 }
 
 function readUser() {
-  const params = new URLSearchParams(location.search);
-  const sid = params.get('sid') || '';
-  if (sid) {
-    return savePortalUser(normalizePortalUser({
-      staffId: sid,
-      sid,
-      name: params.get('name'),
-      role: params.get('role'),
-      pass: params.get('p') || ''
-    }));
-  }
+  if (authenticatedProfile?.staffId) return savePortalUser(normalizePortalUser(authenticatedProfile));
   for (const storage of [sessionStorage, localStorage]) {
     try {
       const saved = storage.getItem(PORTAL_USER_STORAGE_KEY);
@@ -725,7 +711,6 @@ function openLoan(id) {
   const canAgree = canAgreeLoan(loan, status);
   agreementBox.classList.toggle('hidden', !canAgree);
   document.getElementById('agreeCheck').checked = false;
-  document.getElementById('agreePass').value = '';
   setAgreeStatus('');
   document.getElementById('loanModal').classList.add('open');
 }
@@ -753,10 +738,6 @@ async function agreeLoan() {
   if (!loan || loan.staffId !== currentUser.staffId) return setAgreeStatus('対象案件を確認できません。', 'err');
   if (effectiveStatus(loan) !== 'pending_agreement') return setAgreeStatus('この案件は同意できる状態ではありません。', 'err');
   if (!document.getElementById('agreeCheck').checked) return setAgreeStatus('確認チェックを入れてください。', 'err');
-  const pass = document.getElementById('agreePass').value;
-  if (!/^\d{4}$/.test(pass)) return setAgreeStatus('4桁パスワードを入力してください。', 'err');
-  await ensurePasswordsLoaded();
-  if (pass !== passwordForStaff(currentUser.staffId)) return setAgreeStatus('パスワードが違います。', 'err');
   const documentText = buildLoanDocumentText(loan);
   const now = Date.now();
   const agreeBtn = document.getElementById('agreeBtn');

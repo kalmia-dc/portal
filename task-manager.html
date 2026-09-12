@@ -927,6 +927,7 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import { getDatabase, ref, push, set, remove, onValue, get }
   from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
+import { startPortalAuth } from './portal-auth.js';
 
 // ===== FIREBASE =====
 const firebaseConfig = {
@@ -940,6 +941,7 @@ const firebaseConfig = {
 };
 const fbApp = initializeApp(firebaseConfig);
 const db    = getDatabase(fbApp);
+const authenticatedProfile = await startPortalAuth(fbApp, { pageName:'タスク管理' });
 
 // ===== GOOGLE TASKS =====
 const GCLIENT_ID = '218253038073-v3nrmbet629g11ljjd1t0rqbn6t4evpr.apps.googleusercontent.com';

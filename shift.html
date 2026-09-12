@@ -907,7 +907,8 @@
 <!-- Firebase SDK -->
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-  import { getDatabase, ref, set, get, onValue, push, remove, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+  import { getDatabase, ref, set, get, onValue, push, remove, query, orderByChild, equalTo, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+  import { startPortalAuth } from "./portal-auth.js";
 
   const firebaseConfig = {
     apiKey: "AIzaSyDdMe7feUF6CKPHH0YIx7Suk-WnXtOYUu8",
@@ -921,9 +922,11 @@
 
   const app = initializeApp(firebaseConfig);
   const db = getDatabase(app);
+  window.portalAuthReady = startPortalAuth(app, { pageName:'シフト管理' });
+  const authenticatedProfile = await window.portalAuthReady;
 
   // ── Firebase API をグローバルに公開 ──
-  window._fb = { db, ref, set, get, onValue, push, remove, runTransaction };
+  window._fb = { db, ref, set, get, onValue, push, remove, query, orderByChild, equalTo, authenticatedProfile, runTransaction };
   window.dispatchEvent(new Event('firebaseReady'));
   // 初期表示
   setTimeout(renderLoginHint, 100);
@@ -971,21 +974,10 @@
           </optgroup>
         </select>
       </div>
-      <div class="login-field">
-        <label>パスワード（数字4桁）</label>
-        <input type="password" id="staffPass" placeholder="例：2001" inputmode="numeric" pattern="[0-9]*" maxlength="4" onkeydown="if(event.key==='Enter')doLogin()">
-      </div>
+      <div class="login-field">登録済みのGoogleアカウントでログインしてください。</div>
     </div>
-    <button class="login-btn" onclick="doLogin()">ログイン</button>
     <div class="login-error" id="loginError"></div>
-    <div class="login-hint" id="loginHint">
-      🔑 <strong>初期パスワード</strong><br>
-      <strong>DR</strong>　杉平:1001　嶋中:1002　保刈:1003　篠田:1004<br>
-      <strong>DH</strong>　鶴田:2001　吉田:2002　高木:2003<br>
-      　　松本:2004　山田:2006<br>
-      <strong>DA</strong>　田宮:3001　田中:3002　百々:3003<br><br>
-      <span style="color:#888;font-size:.8rem;">パスワードはログイン後に変更してください</span>
-    </div>
+    <div class="login-hint" id="loginHint">Googleログイン画面を確認してください。</div>
   </div>
 </div>
 
@@ -4735,16 +4727,7 @@ function resetPassword(id){
 function renderLoginHint(){
   const el = document.getElementById('loginHint');
   if(!el) return;
-  const groups = { DR:[], DH:[], DA:[] };
-  STAFF.filter(s=>!s.kyoseiDoc && s.type!=='spot').forEach(s=>{
-    if(groups[s.role]) groups[s.role].push(`${s.name}:${STAFF_PASSWORDS[s.id]||'----'}`);
-  });
-  el.innerHTML = `🔑 <strong>初期パスワード</strong><br>
-    <strong>DR</strong>　${groups.DR.join('　')}<br>
-    <strong>DH</strong>　${groups.DH.slice(0,3).join('　')}<br>
-    ${groups.DH.length>3?'　　'+groups.DH.slice(3).join('　')+'<br>':''}
-    <strong>DA</strong>　${groups.DA.join('　')}<br><br>
-    <span style="color:#888;font-size:.8rem;">パスワードはログイン後に変更してください</span>`;
+  el.textContent = 'Googleログイン画面を確認してください。';
 }
 
 function autoGenPassword(){
@@ -4968,13 +4951,7 @@ function rejectReq(id){
 //  AUTH / LOGIN
 // ══════════════════════════════════════════════
 
-// スタッフの初期パスワード（数字4桁）
-const DEFAULT_PASSWORDS = {
-  sugihira:'1001', shimanaka:'1002', hokari:'1003', shinoda:'1004',
-  tsuruta:'2001',  yoshida:'2002',   takagi:'2003', matsumoto:'2004',
-  yamada:'2006',
-  tamiya:'3001',   tanaka:'3002',    momo:'3003',
-};
+const DEFAULT_PASSWORDS = {};
 // デフォルト＋localStorageの変更をマージ（Firebase同期前の暫定値）
 let STAFF_PASSWORDS = Object.assign({}, DEFAULT_PASSWORDS,
   JSON.parse(localStorage.getItem('carmia_passwords')||'{}'));
@@ -5007,7 +4984,7 @@ let requestData = [];
 
 // Firebase準備完了後にリアルタイム同期を開始
 window.addEventListener('firebaseReady', ()=>{
-  const { db, ref, onValue } = window._fb;
+  const { db, ref, onValue, query, orderByChild, equalTo, authenticatedProfile } = window._fb;
 
   // シフト確定ロック状態の同期
   onValue(ref(db, 'shift_locks'), (snapshot)=>{
@@ -5033,19 +5010,11 @@ window.addEventListener('firebaseReady', ()=>{
     else if(currentUser?.role==='staff') renderStaffMonthGrid(currentUser.staffId);
   }, ()=>{ clinicSettingsLoaded=false; });
 
-  // パスワードのリアルタイム同期
-  onValue(ref(db, 'passwords'), (snapshot)=>{
-    const data = snapshot.val();
-    if(data){
-      // FirebaseのデータでSTAFF_PASSWORDSを更新
-      Object.assign(STAFF_PASSWORDS, data);
-      localStorage.setItem('carmia_passwords', JSON.stringify(STAFF_PASSWORDS));
-      renderLoginHint();
-    }
-  });
-
   // 申請データのリアルタイム同期
-  onValue(ref(db, 'requests'), (snapshot)=>{
+  const requestsRef = authenticatedProfile.portalRole === 'admin'
+    ? ref(db, 'requests')
+    : query(ref(db, 'requests'), orderByChild('staffId'), equalTo(authenticatedProfile.staffId));
+  onValue(requestsRef, (snapshot)=>{
     const data = snapshot.val();
     requestData = data ? Object.values(data) : [];
     if(currentUser){
@@ -5129,14 +5098,9 @@ function submitChangePassword(){
   }
 }
 
-function doLogout(){
-  currentUser = null;
-  document.getElementById('loginScreen').style.display = 'flex';
-  document.getElementById('mainApp').style.display    = 'none';
-  document.getElementById('staffScreen').style.display = 'none';
-  document.getElementById('staffPass').value  = '';
-  document.getElementById('staffSelect').value = '';
-  document.getElementById('loginError').textContent = '';
+async function doLogout(){
+  if(window.portalSignOut) return window.portalSignOut();
+  location.href = './index.html';
 }
 
 function showAdminApp(){
@@ -5152,13 +5116,14 @@ function goBackToPortal(){
 
 // URLパラメータ ?admin で管理画面に直接入る
 // URLパラメータ ?sid=staffId でスタッフ自動ログイン
-window.addEventListener('load', ()=>{
+window.addEventListener('load', async ()=>{
+  const authenticated = await window.portalAuthReady;
   const params = new URLSearchParams(location.search);
   const fromPortal = params.get('sid') || location.search.includes('admin');
   if(fromPortal) document.body.classList.add('portal-return-visible');
 
-  if(location.search.includes('admin') || location.hash === '#admin'){
-    currentUser = { role:'admin', name:'管理者' };
+  if(authenticated.portalRole === 'admin'){
+    currentUser = { role:'admin', staffId:authenticated.staffId, name:authenticated.name };
     showAdminApp();
     if(fromPortal){
       const btn = document.getElementById('adminBackToPortalBtn');
@@ -5166,9 +5131,9 @@ window.addEventListener('load', ()=>{
       const logout = document.querySelector('.admin-logout:not(#adminBackToPortalBtn)');
       if(logout) logout.style.display = 'none';
     }
-  } else if(params.get('sid')){
-    const sid = params.get('sid');
-    const s = STAFF.find(x=>x.id===sid);
+  } else {
+    const sid = authenticated.staffId;
+    const s = STAFF.find(x=>x.id===sid) || { id:sid, name:authenticated.name };
     if(s){
       currentUser = { role:'staff', staffId:sid, name:s.name };
       showStaffApp();

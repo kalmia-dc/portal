@@ -139,6 +139,7 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getDatabase, ref, get, set, update, remove } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+import { startPortalAuth } from "./portal-auth.js";
 
 const firebaseConfig = {
   apiKey:            'AIzaSyDdMe7feUF6CKPHH0YIx7Suk-WnXtOYUu8',
@@ -152,23 +153,23 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
+const authenticatedProfile = await startPortalAuth(app, { pageName:'日程調整' });
 
 // ─── スタッフデータ（ポータルと共通） ───────────────────────
 const STAFF = [
-  {id:'sugihira', name:'院長',  role:'DR', pin:'1001'},
-  {id:'shimanaka',name:'嶋中',  role:'DR', pin:'1002'},
-  {id:'hokari',   name:'保刈',  role:'DR', pin:'1003'},
-  {id:'shinoda',  name:'篠田',  role:'DR', pin:'1004'},
-  {id:'tsuruta',  name:'鶴田',  role:'DH', pin:'2001'},
-  {id:'yoshida',  name:'吉田',  role:'DH', pin:'2002'},
-  {id:'takagi',   name:'高木',  role:'DH', pin:'2003'},
-  {id:'matsumoto',name:'松本',  role:'DH', pin:'2004'},
-  {id:'yamada',   name:'山田',  role:'DH', pin:'2006'},
-  {id:'hanowa',   name:'ハノワ',role:'DH', pin:'2007'},
-  {id:'tamiya',   name:'田宮',  role:'DA', pin:'3001'},
-  {id:'tanaka',   name:'田中',  role:'DA', pin:'3002'},
-  {id:'momo',     name:'百々',  role:'DA', pin:'3003'},
-  {id:'guest',    name:'ゲスト', role:'GUEST', pin:'0000'},
+  {id:'sugihira', name:'院長',  role:'DR'},
+  {id:'shimanaka',name:'嶋中',  role:'DR'},
+  {id:'hokari',   name:'保刈',  role:'DR'},
+  {id:'shinoda',  name:'篠田',  role:'DR'},
+  {id:'tsuruta',  name:'鶴田',  role:'DH'},
+  {id:'yoshida',  name:'吉田',  role:'DH'},
+  {id:'takagi',   name:'高木',  role:'DH'},
+  {id:'matsumoto',name:'松本',  role:'DH'},
+  {id:'yamada',   name:'山田',  role:'DH'},
+  {id:'hanowa',   name:'ハノワ',role:'DH'},
+  {id:'tamiya',   name:'田宮',  role:'DA'},
+  {id:'tanaka',   name:'田中',  role:'DA'},
+  {id:'momo',     name:'百々',  role:'DA'},
 ];
 const ADMINS = ['sugihira','momo'];
 const EVENT_STAFF = STAFF.filter(s => s.id !== 'guest');
@@ -1202,19 +1203,12 @@ window.doDeleteEvent = async () => {
 };
 
 // ─── Boot ─────────────────────────────────────────────────
-// URLパラメータからログイン（ポータルからの遷移専用）
-// パラメータなし・不正な場合はポータルに戻す
+// Google認証済みプロフィールから利用者を確定する。
 (async function() {
   const params = new URLSearchParams(location.search);
-  const sid = params.get('sid');
-  const p   = params.get('p');
-
-  if (sid && p) {
-    const staff = STAFF.find(s => s.id === sid);
-    if (staff) {
-      const stored  = JSON.parse(localStorage.getItem('carmia_passwords') || '{}');
-      const correct = stored[sid] || staff.pin;
-      if (p === correct) {
+  const sid = authenticatedProfile.staffId;
+  const staff = STAFF.find(s => s.id === sid) || { id:sid, name:authenticatedProfile.name, role:authenticatedProfile.role };
+  if (staff) {
         state.user = staff;
         state.view = 'main';
         state.tab  = 'list';
@@ -1236,11 +1230,9 @@ window.doDeleteEvent = async () => {
         }
         render();
         return;
-      }
-    }
   }
 
-  // パラメータなし・認証失敗 → ポータルへリダイレクト
+  // スタッフ対応がない場合はポータルへ戻す。
   window.location.href = 'https://kalmia-dc.github.io/portal/';
 })();
 </script>
