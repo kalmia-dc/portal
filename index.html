@@ -1061,17 +1061,7 @@ function redirectTerminalProfile() {
     location.replace('./attendance.html');
     return true;
   }
-  if (mode === 'meeting') {
-    location.replace('./meeting-management.html');
-    return true;
-  }
-  document.getElementById('loginScreen').innerHTML = `
-    <div class="login-card">
-      <div class="login-title">共用PCの設定が必要です</div>
-      <p>管理者アカウントでこのPCの用途を設定してから、端末用アカウントでログインしてください。</p>
-      <button class="pw-btn secondary" type="button" onclick="doLogout()">ログアウト</button>
-    </div>`;
-  document.getElementById('loginScreen').style.display = 'flex';
+  location.replace('./meeting-management.html');
   return true;
 }
 

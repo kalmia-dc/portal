@@ -1053,7 +1053,7 @@ const firebaseConfig = {
 const fbApp = initializeApp(firebaseConfig);
 const db = getDatabase(fbApp);
 const authenticatedProfile = await startPortalAuth(fbApp, { pageName:'会議・タスク管理' });
-if (authenticatedProfile.portalRole === 'terminal' && localStorage.getItem('portalTerminalMode') !== 'meeting') {
+if (authenticatedProfile.portalRole === 'terminal' && localStorage.getItem('portalTerminalMode') === 'attendance') {
   location.replace('./index.html');
   await new Promise(() => {});
 }

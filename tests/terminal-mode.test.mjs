@@ -27,7 +27,8 @@ for (const name of ['index.html', 'attendance.html', 'meeting-management.html', 
 const index = source('index.html');
 assert.match(index, /portalTerminalMode/);
 assert.match(index, /mode === 'attendance'/);
-assert.match(index, /mode === 'meeting'/);
+assert.match(index, /location\.replace\(['"]\.\/meeting-management\.html['"]\)/);
+assert.doesNotMatch(index, /共用PCの設定が必要です/);
 assert.match(index, /authenticatedProfile\?\.portalRole !== 'terminal'/);
 
 const setup = source('terminal-setup.html');
@@ -44,7 +45,7 @@ const meeting = source('meeting-management.html');
 assert.match(meeting, /function isReadOnlyTerminal\(\)/);
 assert.match(meeting, /incidentFormPanel['"]\)\.hidden = isReadOnlyTerminal\(\)/);
 assert.match(meeting, /if \(isReadOnlyTerminal\(\)\) return;/);
-assert.match(meeting, /portalTerminalMode['"]\) !== ['"]meeting['"]/);
+assert.match(meeting, /portalTerminalMode['"]\) === ['"]attendance['"]/);
 
 const rules = JSON.parse(source('database.rules.json'));
 const meetingRules = rules.rules.meetingManagement;
