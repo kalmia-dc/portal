@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>共用PC 端末設定</title>
+  <style>
+    :root{font-family:"Yu Gothic UI",Meiryo,sans-serif;color:#20352c;background:#f4f8f6}
+    *{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;padding:20px}
+    main{width:min(680px,100%);padding:28px;border:1px solid #cfe0d8;border-radius:20px;background:#fff;box-shadow:0 18px 50px rgba(30,70,52,.12)}
+    h1{margin:0 0 10px;color:#176b4b;font-size:1.55rem}p{line-height:1.7}.note{color:#52655d;font-size:.92rem}
+    .modes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin:22px 0}
+    button,a{display:block;width:100%;border:0;border-radius:14px;padding:16px;text-align:center;font:inherit;font-weight:800;text-decoration:none;cursor:pointer}
+    .mode{min-height:130px;border:2px solid #b9d8ca;background:#f6fbf8;color:#174f3c}.mode strong{display:block;margin-bottom:7px;font-size:1.15rem}.mode.selected{border-color:#176b4b;background:#e7f5ee;box-shadow:0 0 0 3px rgba(23,107,75,.12)}
+    .secondary{margin-top:10px;background:#e8f1ed;color:#174f3c}.status{min-height:24px;color:#176b4b;font-weight:800}
+    [hidden]{display:none!important}@media(max-width:560px){.modes{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+<main id="app" hidden>
+  <h1>共用PCの用途を設定</h1>
+  <p>このブラウザで端末用アカウントにログインしたとき、最初に開く画面を選びます。</p>
+  <div class="modes">
+    <button class="mode" type="button" data-mode="attendance"><strong>打刻端末</strong>勤怠の打刻画面を自動表示</button>
+    <button class="mode" type="button" data-mode="meeting"><strong>ミーティング閲覧端末</strong>閲覧専用のミーティング画面を自動表示</button>
+  </div>
+  <div class="status" id="status" aria-live="polite"></div>
+  <p class="note">設定はこのブラウザだけに保存されます。別のPCには影響しません。</p>
+  <button class="secondary" id="signOutButton" type="button">管理者をログアウトして端末用アカウントへ切り替える</button>
+  <a class="secondary" href="./index.html">ポータルへ戻る</a>
+</main>
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import { startPortalAuth, signOutPortal } from './portal-auth.js';
+
+const firebaseConfig={apiKey:'AIzaSyDdMe7feUF6CKPHH0YIx7Suk-WnXtOYUu8',authDomain:'kalmia-shift.firebaseapp.com',databaseURL:'https://kalmia-shift-default-rtdb.asia-southeast1.firebasedatabase.app',projectId:'kalmia-shift',storageBucket:'kalmia-shift.firebasestorage.app',messagingSenderId:'714175473480',appId:'1:714175473480:web:7d6626a46e4a9dcb1fb57d'};
+const MODE_KEY='portalTerminalMode';
+const app=initializeApp(firebaseConfig);
+const profile=await startPortalAuth(app,{pageName:'共用PC 端末設定'});
+if(profile.portalRole!=='admin'){
+  document.body.innerHTML='<main><h1>管理者専用です</h1><p>共用PCの用途設定は、管理者アカウントで行ってください。</p><button id="limitedSignOut" class="secondary" type="button">ログアウト</button></main>';
+  document.getElementById('limitedSignOut').addEventListener('click',signOutPortal);
+}else{
+  const status=document.getElementById('status');
+  const buttons=[...document.querySelectorAll('[data-mode]')];
+  function render(){
+    const selected=localStorage.getItem(MODE_KEY)||'';
+    buttons.forEach(button=>button.classList.toggle('selected',button.dataset.mode===selected));
+    status.textContent=selected==='attendance'?'現在の設定：打刻端末':selected==='meeting'?'現在の設定：ミーティング閲覧端末':'用途が未設定です';
+  }
+  buttons.forEach(button=>button.addEventListener('click',()=>{localStorage.setItem(MODE_KEY,button.dataset.mode);render()}));
+  document.getElementById('signOutButton').addEventListener('click',signOutPortal);
+  document.getElementById('app').hidden=false;
+  render();
+}
+</script>
+</body>
+</html>

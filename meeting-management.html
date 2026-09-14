@@ -974,7 +974,7 @@ button{cursor:pointer}
         <div class="period-caption" id="incidentPeriodCaption">全期間の報告を集計しています。</div>
       </div>
       <div class="incident-summary" id="incidentSummary" aria-label="報告数集計"></div>
-      <div class="form-panel">
+      <div class="form-panel" id="incidentFormPanel">
         <form id="incidentForm" class="incident-wizard">
           <div class="wizard-progress">
             <span id="incidentStepText">STEP 1</span>
@@ -989,7 +989,7 @@ button{cursor:pointer}
           </div>
         </form>
       </div>
-      <div class="form-panel import-panel">
+      <div class="form-panel import-panel" id="incidentImportPanel">
         <div class="import-title">
           <div>
             <h3>過去報告書の取り込み</h3>
@@ -1053,6 +1053,10 @@ const firebaseConfig = {
 const fbApp = initializeApp(firebaseConfig);
 const db = getDatabase(fbApp);
 const authenticatedProfile = await startPortalAuth(fbApp, { pageName:'会議・タスク管理' });
+if (authenticatedProfile.portalRole === 'terminal' && localStorage.getItem('portalTerminalMode') !== 'meeting') {
+  location.replace('./index.html');
+  await new Promise(() => {});
+}
 
 const DIRECTOR_ID = 'sugihira';
 const LEADER_IDS = ['momo', 'yamada'];
@@ -1286,6 +1290,7 @@ function normalizeUser(raw) {
 }
 
 function roleKey() {
+  if (authenticatedProfile?.portalRole === 'terminal') return 'terminal';
   if (currentUser.staffId === DIRECTOR_ID) return 'director';
   if (LEADER_IDS.includes(currentUser.staffId)) return 'leader';
   return 'staff';
@@ -1293,8 +1298,9 @@ function roleKey() {
 
 function isDirector() { return roleKey() === 'director'; }
 function isLeader() { return roleKey() === 'leader'; }
+function isReadOnlyTerminal() { return roleKey() === 'terminal'; }
 function isNoticeTarget() { return Boolean(NOTICE_TARGETS[currentUser.staffId]); }
-function canSeeNotices() { return isDirector() || isLeader() || isNoticeTarget(); }
+function canSeeNotices() { return isReadOnlyTerminal() || isDirector() || isLeader() || isNoticeTarget(); }
 function canSeeOpinions() { return isDirector() || isLeader(); }
 function canCreateManagedItems() { return isDirector() || isLeader(); }
 function canCreateManuals() { return MANUAL_ADMIN_IDS.includes(currentUser.staffId); }
@@ -1308,9 +1314,11 @@ function setupUser() {
   const chip = document.getElementById('userChip');
   chip.classList.add(`role-${role}`);
   const staffRole = NOTICE_TARGETS[currentUser.staffId]?.role || 'スタッフ';
-  const label = role === 'director' ? '院長' : role === 'leader' ? '主任' : staffRole;
+  const label = role === 'director' ? '院長' : role === 'leader' ? '主任' : role === 'terminal' ? '閲覧専用' : staffRole;
   chip.querySelector('span').textContent = `${currentUser.name} / ${label}`;
-  document.getElementById('scopeText').textContent = canSeeOpinions()
+  document.getElementById('scopeText').textContent = isReadOnlyTerminal()
+    ? '閲覧専用：取り組み・お知らせ・報告'
+    : canSeeOpinions()
     ? '取り組み・お知らせ・院長への意見・提案・報告'
     : canSeeNotices()
       ? '取り組み・お知らせ・報告'
@@ -1320,6 +1328,8 @@ function setupUser() {
   document.getElementById('taskFormPanel').hidden = !canCreateManagedItems();
   document.getElementById('noticeFormPanel').hidden = !canCreateManagedItems();
   document.getElementById('opinionFormPanel').hidden = !isLeader();
+  document.getElementById('incidentFormPanel').hidden = isReadOnlyTerminal();
+  document.getElementById('incidentImportPanel').hidden = isReadOnlyTerminal();
 }
 
 function setupTabs() {
@@ -2564,6 +2574,7 @@ async function handleActions(event) {
 
   const btn = event.target.closest('[data-action]');
   if (!btn) return;
+  if (isReadOnlyTerminal()) return;
   const id = btn.dataset.id;
   const action = btn.dataset.action;
 

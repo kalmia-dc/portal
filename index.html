@@ -547,6 +547,9 @@
         <a class="tool-item" id="privateMetricsToolBtn" data-guest-hidden="true" href="#" onclick="goToPrivateMetricsApp();return false;" style="display:none;background:linear-gradient(135deg,#fff6f0,#ffe4d6);border:2px solid #ffb996;">
           <span class="tool-icon">秘</span><span class="tool-name">非公開<br>経営数値</span>
         </a>
+        <a class="tool-item" id="terminalSetupToolBtn" data-guest-hidden="true" href="./terminal-setup.html" style="display:none;background:linear-gradient(135deg,#eef7ff,#e4f0ff);border:2px solid #9fc5f8;">
+          <span class="tool-icon">PC</span><span class="tool-name">共用PC<br>端末設定</span>
+        </a>
       </div>
     </section>
 
@@ -664,6 +667,7 @@ const DEFAULT_PASSWORDS = {};
 let syncedPasswords = {};
 let passwordsReady = false;
 const GUEST_STAFF_ID = 'guest';
+const TERMINAL_MODE_STORAGE_KEY = 'portalTerminalMode';
 
 function isGuestUser(user = currentUser) {
   return user?.staffId === GUEST_STAFF_ID;
@@ -980,9 +984,11 @@ function updateMenuVisibility() {
   const adminBtn = document.getElementById('adminToolBtn');
   const privateMetricsBtn = document.getElementById('privateMetricsToolBtn');
   const skillBtn = document.getElementById('skillToolBtn');
+  const terminalSetupBtn = document.getElementById('terminalSetupToolBtn');
   if (adminBtn) adminBtn.style.display = adminVisible ? 'block' : 'none';
   if (privateMetricsBtn) privateMetricsBtn.style.display = adminVisible ? 'block' : 'none';
   if (skillBtn) skillBtn.style.display = guest ? 'none' : 'block';
+  if (terminalSetupBtn) terminalSetupBtn.style.display = authenticatedProfile?.isAdmin ? 'block' : 'none';
 
   document.querySelectorAll('[data-menu-section]').forEach(section => {
     const hasVisibleItem = [...section.querySelectorAll('.tool-item')]
@@ -1045,6 +1051,28 @@ function showApp() {
   document.getElementById('app').style.display = 'block';
   if (redirectToRequestedApp()) return;
   initApp();
+}
+
+function redirectTerminalProfile() {
+  if (authenticatedProfile?.portalRole !== 'terminal') return false;
+  currentUser = savePortalUser(authenticatedProfile);
+  const mode = localStorage.getItem(TERMINAL_MODE_STORAGE_KEY);
+  if (mode === 'attendance') {
+    location.replace('./attendance.html');
+    return true;
+  }
+  if (mode === 'meeting') {
+    location.replace('./meeting-management.html');
+    return true;
+  }
+  document.getElementById('loginScreen').innerHTML = `
+    <div class="login-card">
+      <div class="login-title">共用PCの設定が必要です</div>
+      <p>管理者アカウントでこのPCの用途を設定してから、端末用アカウントでログインしてください。</p>
+      <button class="pw-btn secondary" type="button" onclick="doLogout()">ログアウト</button>
+    </div>`;
+  document.getElementById('loginScreen').style.display = 'flex';
+  return true;
 }
 
 async function initApp() {
@@ -1824,6 +1852,7 @@ Object.assign(window, {
 // 起動：セッション復元
 // ─────────────────────────────────────────
 (function() {
+  if (redirectTerminalProfile()) return;
   currentUser = readStoredPortalUser();
   if (currentUser) {
     showApp();

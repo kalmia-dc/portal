@@ -97,9 +97,9 @@
         ".write": "auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && root.child('portalAccess/users').child(auth.uid).child('role').val() !== 'terminal'"
       },
       "incidentReports": {
-        ".read": "auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin'",
+        ".read": "auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && (root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin' || root.child('portalAccess/users').child(auth.uid).child('role').val() === 'terminal')",
         "$reportId": {
-          ".write": "auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && (root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin' || (!data.exists() && newData.child('reporterId').val() === root.child('portalAccess/users').child(auth.uid).child('staffId').val()))"
+          ".write": "auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && root.child('portalAccess/users').child(auth.uid).child('role').val() !== 'terminal' && (root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin' || (!data.exists() && newData.child('reporterId').val() === root.child('portalAccess/users').child(auth.uid).child('staffId').val()))"
         }
       },
       "$other": {
