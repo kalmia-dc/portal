@@ -826,6 +826,11 @@ button{cursor:pointer}
 .meeting-guide-step p:last-child{margin-bottom:0}
 .meeting-guide-step ul{margin:8px 0;padding-left:1.5em}
 .meeting-guide-note{padding:12px;border:1px solid #f1c46d;border-radius:8px;background:#fff8e7;font-weight:700}
+.linked-case{margin:12px 0;padding:12px;border:1px solid #b8e5df;border-radius:8px;background:#f0fbfa;line-height:1.7}
+.case-focus{outline:3px solid var(--sky);outline-offset:3px}
+.workflow-help{margin:0 0 14px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.form-panel,.item{scroll-margin-top:90px}
+.draft-context{margin:0 0 12px;padding:10px;border:1px solid #f1c46d;background:#fff8e7;border-radius:8px;line-height:1.7}
 </style>
 </head>
 <body>
@@ -840,6 +845,7 @@ button{cursor:pointer}
   </header>
 
   <main class="main">
+    <div class="workflow-help"><a class="btn" href="./meeting-guide.html" target="_blank" rel="noopener">ミーティングの進め方（画面付き）</a></div>
     <button class="btn task-review-shortcut" type="button" id="taskReviewShortcut" hidden>院長の確認待ち 0件</button>
     <nav class="tabs" aria-label="表示切替">
       <button class="tab-btn" type="button" data-tab="tasks">取り組み</button>
@@ -888,6 +894,7 @@ button{cursor:pointer}
       <p class="task-stage-caption">件数は全取り組みが対象です。工程を押すと、その工程だけを表示します。</p>
       <p class="read-status">完了条件を満たし、定着したと判断したら、主任へ報告してください。主任が取りまとめて院長へ定着確認を依頼します。院長の確認をもって完了となります。</p>
       <div class="form-panel" id="taskFormPanel" hidden>
+        <p class="draft-context" id="taskDraftContext" hidden></p>
         <form id="taskForm">
           <div class="form-grid">
             <div class="field">
@@ -927,7 +934,9 @@ button{cursor:pointer}
         <h2>お知らせ</h2>
         <span class="count-badge" id="noticeCount">0件</span>
       </div>
+      <div class="workflow-help"><button class="btn ghost" type="button" id="noticeHistoryToggle" aria-pressed="false">確認済みの履歴を表示</button><span id="noticeHistoryCaption">未確認のお知らせを表示しています。</span></div>
       <div class="form-panel" id="noticeFormPanel" hidden>
+        <p class="draft-context" id="noticeDraftContext" hidden></p>
         <form id="noticeForm">
           <div class="form-grid">
             <div class="field">
@@ -1264,6 +1273,8 @@ const PATHS = {
 
 let currentUser = readUser();
 let editingTaskId = null;
+const routingDraft = { tasks:null, notices:null };
+let routingBusy = false;
 let editingNoticeId = null;
 let incidentStepIndex = 0;
 let incidentDraft = {};
@@ -1276,6 +1287,7 @@ const state = {
   searchQuery:'',
   taskStatusFilter:'all',
   showArchivedIncidents:false,
+  showNoticeHistory:false,
   incidentPeriodMode:'all',
   incidentPeriodMonth:todayKey().slice(0, 7),
   incidentPeriodYear:todayKey().slice(0, 4)
@@ -1296,6 +1308,7 @@ function boot() {
   setupIncidentArchiveToggle();
   setupForms();
   setupViewer();
+  setupNoticeHistory();
   attachDataListeners();
   document.getElementById('app').hidden = false;
 }
@@ -1532,7 +1545,7 @@ function setupForms() {
   document.getElementById('incidentImportClearBtn').addEventListener('click', clearIncidentImports);
   document.getElementById('incidentImportSaveBtn').addEventListener('click', saveIncidentImports);
   document.addEventListener('change', handleDecisionChange);
-  document.addEventListener('click', handleActions);
+  document.addEventListener('click', event => { handleActions(event).catch(error => showToast(error.message || '操作を保存できませんでした')); });
   resetIncidentWizard();
 }
 
@@ -1548,10 +1561,12 @@ function attachDataListeners() {
   onValue(ref(db, PATHS.tasks), snap => {
     state.tasks = toList(snap.val()).sort(sortTasks);
     renderTasks();
+    renderIncidentReports();
   });
   onValue(ref(db, PATHS.notices), snap => {
     state.notices = toList(snap.val()).sort((a,b) => (b.createdAt || 0) - (a.createdAt || 0));
     if (canSeeNotices()) renderNotices();
+    renderIncidentReports();
   });
   if (canSeeOpinions()) {
     onValue(ref(db, PATHS.opinions), snap => {
@@ -1562,6 +1577,8 @@ function attachDataListeners() {
   onValue(ref(db, PATHS.incidentReports), snap => {
     state.incidentReports = toList(snap.val()).sort(sortIncidentReports);
     renderIncidentReports();
+    renderTasks();
+    if (canSeeNotices()) renderNotices();
   });
 }
 
@@ -1596,6 +1613,7 @@ async function saveTask(event) {
   const completion = valueOf('taskCompletion');
   if (!title || !detail || !completion) return showToast('未入力の項目があります');
 
+  if (routingDraft.tasks) return saveRoutedDraft('tasks');
   const existing = state.tasks.find(item => item.id === editingTaskId);
   if (editingTaskId && !canManageOwnItem(existing)) return;
   try {
@@ -1626,6 +1644,8 @@ async function saveTask(event) {
 }
 
 function resetTaskForm() {
+  routingDraft.tasks = null;
+  document.getElementById('taskDraftContext').hidden = true;
   editingTaskId = null;
   document.getElementById('taskForm').reset();
   resetTaskCompletionOptions();
@@ -1658,6 +1678,7 @@ async function saveNotice(event) {
   const body = valueOf('noticeBody');
   if (!title || !body) return showToast('未入力の項目があります');
 
+  if (routingDraft.notices) return saveRoutedDraft('notices');
   const existing = state.notices.find(item => item.id === editingNoticeId);
   if (editingNoticeId && !canManageOwnItem(existing)) return;
   try {
@@ -1686,6 +1707,8 @@ async function saveNotice(event) {
 }
 
 function resetNoticeForm() {
+  routingDraft.notices = null;
+  document.getElementById('noticeDraftContext').hidden = true;
   editingNoticeId = null;
   document.getElementById('noticeForm').reset();
   document.getElementById('noticeCancelBtn').hidden = true;
@@ -1899,6 +1922,7 @@ async function saveIncidentReport() {
     createdAt: now,
     createdBy: currentUser.name,
     createdById: currentUser.staffId,
+    reporterId: currentUser.staffId,
     updatedAt: now,
     updatedBy: currentUser.name
   };
@@ -2057,6 +2081,7 @@ async function saveIncidentImports() {
       createdAt: now,
       createdBy: candidate.reporterName || currentUser.name,
       createdById: currentUser.staffId,
+      reporterId: currentUser.staffId,
       updatedAt: now,
       updatedBy: currentUser.name
     });
@@ -2613,9 +2638,12 @@ async function handleActions(event) {
 
   const btn = event.target.closest('[data-action]');
   if (!btn) return;
-  if (isReadOnlyTerminal()) return;
   const id = btn.dataset.id;
   const action = btn.dataset.action;
+  if (action === 'open-related') return openRelatedCase(btn.dataset.kind, id);
+  if (isReadOnlyTerminal()) return;
+  if (action === 'route-notice') return startRoutingDraft(id, 'notices');
+  if (action === 'route-task') return startRoutingDraft(id, 'tasks');
 
   if (action === 'edit-task') return fillTaskForm(id);
   if (action === 'delete-task') return deleteItem(PATHS.tasks, id, '取り組み', state.tasks.find(task => task.id === id));
@@ -2634,7 +2662,7 @@ async function handleActions(event) {
   if (action === 'toggle-incident-edit') return toggleIncidentEdit(id);
   if (action === 'save-incident-report') return saveIncidentReportEdit(id);
   if (action === 'save-incident-followup') return saveIncidentFollowup(id);
-  if (action === 'create-incident-task') return createTaskFromIncident(id);
+  if (action === 'create-incident-task') return startRoutingDraft(id, 'tasks');
   if (action === 'delete-incident') return deleteIncidentReport(id);
 }
 
@@ -2654,6 +2682,7 @@ function fillTaskForm(id) {
   const item = state.tasks.find(task => task.id === id);
   if (!canManageOwnItem(item)) return;
   if (!item) return;
+  resetTaskForm();
   editingTaskId = id;
   document.getElementById('taskTitle').value = item.title || '';
   document.getElementById('taskDetail').value = item.detail || '';
@@ -2669,6 +2698,7 @@ function fillNoticeForm(id) {
   const item = state.notices.find(notice => notice.id === id);
   if (!canManageOwnItem(item)) return;
   if (!item) return;
+  resetNoticeForm();
   editingNoticeId = id;
   document.getElementById('noticeTitle').value = item.title || '';
   document.getElementById('noticeBody').value = item.body || '';
@@ -2868,12 +2898,6 @@ async function markNoticeRead(id) {
     readAt: Date.now()
   };
   await set(ref(db, `${PATHS.notices}/${id}/readBy/${currentUser.staffId}`), readEntry);
-  const latestSnap = await get(ref(db, `${PATHS.notices}/${id}`));
-  const latestNotice = latestSnap.val();
-  if (latestNotice && isNoticeFullyRead(latestNotice, { [currentUser.staffId]: readEntry })) {
-    await remove(ref(db, `${PATHS.notices}/${id}`));
-    return showToast('全員確認済みのため、お知らせを削除しました');
-  }
   showToast('確認済みにしました');
 }
 
@@ -3004,7 +3028,7 @@ function renderTasks() {
     return;
   }
   list.innerHTML = tasks.map(task => `
-    <article class="item">
+    <article class="item" tabindex="-1" data-case-kind="tasks" data-case-id="${escAttr(task.id)}">
       <div class="item-top">
         <div class="item-title">
           <h3>${esc(task.title || '')}</h3>
@@ -3019,6 +3043,7 @@ function renderTasks() {
           <span class="badge status-${escAttr(taskStatus(task))}">${STATUS_LABELS[taskStatus(task)] || STATUS_LABELS.todo}</span>
         </div>
       </div>
+      ${sourceReportHtml(task, 'tasks')}
       ${textBlock('詳細', task.detail)}
       ${textBlock('完了条件', task.completion)}
       ${progressLogsHtml(task)}
@@ -3132,15 +3157,16 @@ function taskReadSummaryHtml(task) {
 }
 
 function renderNotices() {
-  const notices = filterBySearch(state.notices, noticeSearchText);
-  document.getElementById('noticeCount').textContent = countText(notices.length, state.notices.length);
+  const visible = state.notices.filter(notice => isNoticeFullyRead(notice) === state.showNoticeHistory);
+  const notices = filterBySearch(visible, noticeSearchText);
+  document.getElementById('noticeCount').textContent = countText(notices.length, visible.length);
   const list = document.getElementById('noticeList');
   if (!notices.length) {
-    list.innerHTML = emptyListHtml('お知らせ');
+    list.innerHTML = '<div class="empty">' + (state.showNoticeHistory ? '確認済みのお知らせはありません' : '未確認のお知らせはありません') + '</div>';
     return;
   }
   list.innerHTML = notices.map(notice => `
-    <article class="item">
+    <article class="item" tabindex="-1" data-case-kind="notices" data-case-id="${escAttr(notice.id)}">
       <div class="item-top">
         <div class="item-title">
           <h3>${esc(notice.title || '')}</h3>
@@ -3150,6 +3176,8 @@ function renderNotices() {
           </div>
         </div>
       </div>
+      ${sourceReportHtml(notice, 'notices')}
+      ${isNoticeFullyRead(notice) ? '<div class="read-status">確認済みの履歴</div>' : ''}
       ${textBlock('本文', notice.body)}
       ${imagesHtml(notice.images)}
       ${noticeReadButtonHtml(notice)}
@@ -3250,7 +3278,7 @@ function renderIncidentReports() {
     return;
   }
   list.innerHTML = reports.map(report => `
-    <article class="item">
+    <article class="item" tabindex="-1" data-case-kind="incidents" data-case-id="${escAttr(report.id)}">
       <div class="item-top">
         <div class="item-title">
           <h3>${esc(report.reportNumber || buildIncidentReportNumber(report))}</h3>
@@ -3264,7 +3292,7 @@ function renderIncidentReports() {
         <div class="item-badges">
           <span class="badge incident-type-${escAttr(incidentTypeKey(report))}">${esc(INCIDENT_TYPE_LABELS[incidentTypeKey(report)] || '-')}</span>
           <span class="badge">${esc(INCIDENT_LEVEL_LABELS[report.level] || '-')}</span>
-          <span class="badge incident-status-${escAttr(report.counterStatus || 'pending')}">${esc(INCIDENT_STATUS_LABELS[report.counterStatus || 'pending'])}</span>
+          <span class="badge incident-status-${escAttr(report.counterStatus || 'pending')}">${esc(reportWorkflowLabel(report))}</span>
           ${incidentLinkedTaskBadgeHtml(report)}
         </div>
       </div>
@@ -3279,7 +3307,8 @@ function renderIncidentReports() {
       ${textBlock('原因【環境・連携】', report.causeEnvironment)}
       ${textBlock('ミーティングへの申し送り', report.handoff)}
       ${textBlock('対策（ミーティングにて記入）', report.countermeasure)}
-      ${incidentConfirmationHtml(report)}
+      ${report.linkedTaskId || report.linkedNoticeId ? '' : incidentConfirmationHtml(report)}
+      ${relatedDestinationHtml(report)}
       ${incidentEditHtml(report)}
       ${incidentFollowupHtml(report)}
       ${canEditIncidentReport(report) || canManageIncidentReport(report) ? `
@@ -3293,7 +3322,7 @@ function renderIncidentReports() {
 }
 
 function visibleIncidentReports() {
-  return state.incidentReports.filter(report => Boolean(report.linkedTaskId) === state.showArchivedIncidents);
+  return state.incidentReports.filter(report => Boolean(report.linkedTaskId || report.linkedNoticeId) === state.showArchivedIncidents);
 }
 
 function renderIncidentSummary(reports) {
@@ -3420,7 +3449,7 @@ function incidentTypeKey(report) {
 }
 
 function incidentLinkedTaskBadgeHtml(report) {
-  return report?.linkedTaskId ? '<span class="badge incident-linked-task">報告済み</span>' : '';
+  return report?.linkedTaskId ? '<span class="badge incident-linked-task">取り組みへ振り分け済み</span>' : report?.linkedNoticeId ? '<span class="badge incident-linked-task">お知らせへ振り分け済み</span>' : '';
 }
 
 function canManageIncidentReport() {
@@ -3544,7 +3573,7 @@ function toggleIncidentEdit(id) {
 }
 
 function incidentFollowupHtml(report) {
-  if (!canManageIncidentReport(report)) return '';
+  if (!canManageIncidentReport(report) || report.linkedTaskId || report.linkedNoticeId) return '';
   const status = report.counterStatus || 'pending';
   const statusDisabled = status === 'confirmed' && !isDirector() ? 'disabled' : '';
   return `
@@ -3574,11 +3603,9 @@ function incidentFollowupHtml(report) {
 }
 
 function incidentTaskMigrationButtonHtml(report) {
-  if (report.linkedTaskId) {
-    return '<button class="btn ghost" type="button" disabled>取り組み移行済み</button>';
-  }
-  const disabled = isIncidentTaskReady(report) ? '' : 'disabled';
-  return `<button class="btn sky" type="button" data-action="create-incident-task" data-id="${escAttr(report.id)}" ${disabled}>取り組みへ移行</button>`;
+  if (report.linkedTaskId || report.linkedNoticeId) return '';
+  return `<button class="btn sky" type="button" data-action="route-notice" data-id="${escAttr(report.id)}">共有のみ → お知らせにする</button>
+    <button class="btn sky" type="button" data-action="route-task" data-id="${escAttr(report.id)}">継続対応 → 取り組みにする</button>`;
 }
 
 function incidentStatusOptionsHtml(currentStatus) {
@@ -3635,7 +3662,7 @@ async function saveIncidentReportEdit(id) {
 async function saveIncidentFollowup(id) {
   if (!canManageIncidentReport()) return;
   const report = state.incidentReports.find(item => item.id === id);
-  if (!report) return;
+  if (!report || report.linkedTaskId || report.linkedNoticeId) return;
   const currentStatus = report.counterStatus || 'pending';
   let nextStatus = incidentFollowupField(id, 'counterStatus') || currentStatus;
   if (!isDirector() && currentStatus === 'confirmed') nextStatus = 'confirmed';
@@ -3671,40 +3698,171 @@ function isIncidentTaskReady(report) {
     && INCIDENT_TASK_READY_STATUSES.has(report?.counterStatus || 'pending');
 }
 
-async function createTaskFromIncident(id) {
-  if (!canManageIncidentReport()) return;
+
+function setupNoticeHistory() {
+  document.getElementById('noticeHistoryToggle').addEventListener('click', () => {
+    setNoticeHistory(!state.showNoticeHistory);
+    renderNotices();
+  });
+}
+
+function setNoticeHistory(show) {
+  state.showNoticeHistory = show;
+  const button = document.getElementById('noticeHistoryToggle');
+  button.textContent = show ? '未確認のお知らせを表示' : '確認済みの履歴を表示';
+  button.setAttribute('aria-pressed', String(show));
+  document.getElementById('noticeHistoryCaption').textContent = show
+    ? '確認対象者全員が確認したお知らせの履歴です。' : '未確認のお知らせを表示しています。';
+}
+
+function relatedButton(kind, id, label) {
+  return `<button class="btn" type="button" data-action="open-related" data-kind="${escAttr(kind)}" data-id="${escAttr(id)}">${esc(label)}</button>`;
+}
+
+function sourceReportHtml(item, kind) {
+  const report = state.incidentReports.find(report => report.id === item.sourceIncidentId ||
+    (kind === 'tasks' ? report.linkedTaskId === item.id : report.linkedNoticeId === item.id));
+  const id = report?.id || item.sourceIncidentId;
+  if (!id) return '';
+  return `<div class="linked-case">元の報告：${esc(report?.reportNumber || item.sourceIncidentNumber || '報告')}
+    <div class="item-actions">${relatedButton('incidents', id, '元の報告を開く')}</div></div>`;
+}
+
+function reportWorkflowLabel(report) {
+  if (report.linkedTaskId) {
+    const task = state.tasks.find(item => item.id === report.linkedTaskId);
+    return task ? STATUS_LABELS[taskStatus(task)] : '関連する取り組みを確認できません';
+  }
+  if (report.linkedNoticeId) {
+    const notice = state.notices.find(item => item.id === report.linkedNoticeId);
+    return notice ? (isNoticeFullyRead(notice) ? 'お知らせ：全員確認済み' : 'お知らせ：確認待ち') : '関連するお知らせを確認できません';
+  }
+  return INCIDENT_STATUS_LABELS[report.counterStatus || 'pending'] || '未対応';
+}
+
+function relatedDestinationHtml(report) {
+  if (!report.linkedTaskId && !report.linkedNoticeId) return '';
+  const kind = report.linkedTaskId ? 'tasks' : 'notices';
+  const id = report.linkedTaskId || report.linkedNoticeId;
+  const label = kind === 'tasks' ? '取り組み' : 'お知らせ';
+  return `<div class="linked-case"><strong>${esc(reportWorkflowLabel(report))}</strong>
+    <div>${label}側の状況を表示しています。</div>
+    <div class="item-actions">${relatedButton(kind, id, `${label}を開く`)}</div></div>`;
+}
+
+function openRelatedCase(kind, id) {
+  const items = kind === 'incidents' ? state.incidentReports : state[kind];
+  if (!['tasks', 'notices', 'incidents'].includes(kind) || !Array.isArray(items)) return;
+  if (kind === 'notices' && !canSeeNotices()) return showToast('このお知らせを表示する権限がありません');
+  const item = items.find(entry => entry.id === id);
+  if (!item) return showToast('関連する内容を確認できません。主任に確認してください');
+  state.searchQuery = '';
+  document.getElementById('listSearch').value = '';
+  document.getElementById('listSearchClear').hidden = true;
+  if (kind === 'tasks') state.taskStatusFilter = 'all';
+  if (kind === 'notices') setNoticeHistory(isNoticeFullyRead(item));
+  if (kind === 'incidents') {
+    state.showArchivedIncidents = Boolean(item.linkedTaskId || item.linkedNoticeId);
+    state.incidentPeriodMode = 'all';
+    document.getElementById('incidentPeriodMode').value = 'all';
+    updateIncidentPeriodControls();
+    const toggle = document.getElementById('incidentArchiveToggle');
+    toggle.textContent = state.showArchivedIncidents ? '通常の報告を表示' : 'アーカイブを表示';
+    toggle.classList.toggle('primary', state.showArchivedIncidents);
+  }
+  activateTab(kind);
+  const card = Array.from(document.querySelectorAll('[data-case-id]')).find(el => el.dataset.caseKind === kind && el.dataset.caseId === id);
+  if (card) {
+    document.querySelectorAll('.case-focus').forEach(el => el.classList.remove('case-focus'));
+    card.classList.add('case-focus');
+    card.focus({preventScroll:true});
+    card.scrollIntoView({behavior:'smooth', block:'center'});
+  }
+}
+
+function startRoutingDraft(id, kind) {
+  if (!canManageIncidentReport() || !['tasks', 'notices'].includes(kind) || routingBusy) return;
   const report = state.incidentReports.find(item => item.id === id);
   if (!report) return;
-  if (report.linkedTaskId) return showToast('すでに取り組みへ移行済みです');
-  if (!isIncidentTaskReady(report)) {
-    return showToast('対策内容を入力し、実施状況を対策決定以降にしてください');
+  if (report.linkedTaskId || report.linkedNoticeId) return showToast('振り分け済みです。関連する案件を開いてください');
+  if (kind === 'tasks' && incidentTypeKey(report) === INCIDENT_REVIEW_REQUIRED_TYPE) return showToast('報告の種別を確認してから取り組みにしてください');
+  const prefix = kind === 'tasks' ? 'task' : 'notice';
+  const detailField = kind === 'tasks' ? 'taskDetail' : 'noticeBody';
+  if (valueOf(prefix + 'Title') || valueOf(detailField)) {
+    if (!confirm('入力中の内容を、この報告からの下書きに置き換えますか？')) return;
   }
-  const now = Date.now();
-  const taskRef = push(ref(db, PATHS.tasks));
-  const reportNumber = report.reportNumber || buildIncidentReportNumber(report);
-  await update(ref(db), {
-    [`${PATHS.tasks}/${taskRef.key}`]: {
-      title: buildIncidentTaskTitle(report),
-      detail: buildIncidentTaskDetail(report),
-      completion: INCIDENT_TASK_COMPLETION,
-      images: [],
-      progress:'',
-      status:'todo',
-      sourceIncidentId: id,
-      sourceIncidentNumber: reportNumber,
-      createdAt: now,
-      createdBy: currentUser.name,
-      createdById: currentUser.staffId,
-      updatedAt: now,
-      updatedBy: currentUser.name
-    },
-    [`${PATHS.incidentReports}/${id}/linkedTaskId`]: taskRef.key,
-    [`${PATHS.incidentReports}/${id}/linkedTaskCreatedAt`]: now,
-    [`${PATHS.incidentReports}/${id}/linkedTaskCreatedBy`]: currentUser.name,
-    [`${PATHS.incidentReports}/${id}/updatedAt`]: now,
-    [`${PATHS.incidentReports}/${id}/updatedBy`]: currentUser.name
-  });
-  showToast('取り組みへ移行しました');
+  // Include any meeting notes currently being edited, without writing the original report.
+  const countermeasure = document.querySelector(`[data-incident-followup="${cssEscape(id)}"][data-field="countermeasure"]`)?.value.trim() ?? report.countermeasure;
+  const draftReport = {...report, countermeasure};
+  if (kind === 'tasks') resetTaskForm(); else resetNoticeForm();
+  routingDraft[kind] = id;
+  document.getElementById(prefix + 'Title').value = kind === 'tasks'
+    ? buildIncidentTaskTitle(report) : `【共有】${report.reportNumber || buildIncidentReportNumber(report)}`;
+  document.getElementById(detailField).value = buildIncidentTaskDetail(draftReport);
+  const context = document.getElementById(prefix + 'DraftContext');
+  context.textContent = '報告から引き継いだ下書きです。内容を確認・調整して登録してください。登録するまで元の報告は変わりません。';
+  context.hidden = false;
+  document.getElementById(prefix + 'CancelBtn').hidden = false;
+  if (kind === 'notices') setNoticeHistory(false);
+  state.searchQuery = '';
+  document.getElementById('listSearch').value = '';
+  document.getElementById('listSearchClear').hidden = true;
+  activateTab(kind);
+  document.getElementById(prefix + 'FormPanel').scrollIntoView({behavior:'smooth', block:'start'});
+  document.getElementById(prefix + 'Title').focus({preventScroll:true});
+}
+
+async function saveRoutedDraft(kind) {
+  if (!canManageIncidentReport() || routingBusy || !routingDraft[kind]) return;
+  const reportId = routingDraft[kind];
+  const prefix = kind === 'tasks' ? 'task' : 'notice';
+  const button = document.getElementById(prefix + 'SubmitBtn');
+  routingBusy = true;
+  button.disabled = true;
+  const cancel = document.getElementById(prefix + 'CancelBtn');
+  cancel.disabled = true;
+  try {
+    const snapshot = await get(ref(db, `${PATHS.incidentReports}/${reportId}`));
+    const report = snapshot.val();
+    if (!report) throw new Error('元の報告が見つかりません。登録を中止しました');
+    if (report.linkedTaskId || report.linkedNoticeId) throw new Error('この報告はすでに振り分け済みです');
+    const title = valueOf(prefix + 'Title');
+    const body = valueOf(kind === 'tasks' ? 'taskDetail' : 'noticeBody');
+    const completion = kind === 'tasks' ? valueOf('taskCompletion') : '';
+    if (!title || !body || (kind === 'tasks' && !completion)) throw new Error('未入力の項目があります');
+    const images = await imagesFromInput(prefix + 'Images', []);
+    const now = Date.now();
+    const target = push(ref(db, PATHS[kind]));
+    const item = {
+      title, images, sourceIncidentId:reportId,
+      sourceIncidentNumber:report.reportNumber || buildIncidentReportNumber(report),
+      createdAt:now, createdBy:currentUser.name, createdById:currentUser.staffId,
+      updatedAt:now, updatedBy:currentUser.name,
+      ...(kind === 'tasks' ? {detail:body, completion, progress:'', status:'todo'} : {body})
+    };
+    const linkKey = kind === 'tasks' ? 'linkedTaskId' : 'linkedNoticeId';
+    await update(ref(db), {
+      [`${PATHS[kind]}/${target.key}`]:item,
+      [`${PATHS.incidentReports}/${reportId}/${linkKey}`]:target.key,
+      [`${PATHS.incidentReports}/${reportId}/routedAt`]:now,
+      [`${PATHS.incidentReports}/${reportId}/routedBy`]:currentUser.name,
+      [`${PATHS.incidentReports}/${reportId}/updatedAt`]:now,
+      [`${PATHS.incidentReports}/${reportId}/updatedBy`]:currentUser.name
+    });
+    // Make navigation immediate even if the database listener has not delivered its echo yet.
+    if (!state[kind].some(entry => entry.id === target.key)) state[kind].push({id:target.key, ...item});
+    const original = state.incidentReports.find(entry => entry.id === reportId);
+    if (original) original[linkKey] = target.key;
+    if (kind === 'tasks') resetTaskForm(); else resetNoticeForm();
+    openRelatedCase(kind, target.key);
+    showToast(kind === 'tasks' ? '取り組みに登録しました' : 'お知らせに登録しました');
+  } catch (error) {
+    showToast(error.message || '登録できませんでした。内容を確認して再試行してください');
+  } finally {
+    routingBusy = false;
+    button.disabled = false;
+    cancel.disabled = false;
+  }
 }
 
 function buildIncidentTaskTitle(report) {
