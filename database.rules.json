@@ -2,7 +2,6 @@
   "rules": {
     ".read": false,
     ".write": false,
-
     "portalAccess": {
       "users": {
         "$uid": {
@@ -12,19 +11,16 @@
         }
       }
     },
-
     "portalAccessRequests": {
       "$uid": {
         ".read": "auth != null && (auth.uid === $uid || root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin')",
         ".write": "auth != null && ((auth.uid === $uid && auth.token.email != null && newData.child('uid').val() === auth.uid && newData.child('email').val() === auth.token.email) || (root.child('portalAccess/users').child(auth.uid).child('active').val() === true && root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin'))"
       }
     },
-
     "passwords": {
       ".read": false,
       ".write": false
     },
-
     "custom_holidays": {
       ".read": "auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true",
       ".write": "auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin'"
@@ -45,23 +41,22 @@
       ".read": "auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true",
       ".write": "auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin'"
     },
-
     "requests": {
       ".read": "auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && (root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin' || (query.orderByChild === 'staffId' && query.equalTo === root.child('portalAccess/users').child(auth.uid).child('staffId').val()))",
       "$requestId": {
         ".write": "auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && (root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin' || (newData.child('staffId').val() === root.child('portalAccess/users').child(auth.uid).child('staffId').val() && (!data.exists() || data.child('staffId').val() === root.child('portalAccess/users').child(auth.uid).child('staffId').val())))",
         ".validate": "!newData.exists() || (newData.child('staffId').isString() && newData.child('staffId').val().length > 0)"
       },
-      ".indexOn": ["staffId"]
+      ".indexOn": [
+        "staffId"
+      ]
     },
-
     "skills": {
       "$staffId": {
         ".read": "auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && ($staffId === root.child('portalAccess/users').child(auth.uid).child('staffId').val() || root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin' || root.child('portalAccess/users').child(auth.uid).child('role').val() === 'trainingAdmin')",
         ".write": "auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && ($staffId === root.child('portalAccess/users').child(auth.uid).child('staffId').val() || root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin' || root.child('portalAccess/users').child(auth.uid).child('role').val() === 'trainingAdmin')"
       }
     },
-
     "trainingMaterialCategories": {
       ".read": "auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true",
       ".write": "auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && (root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin' || root.child('portalAccess/users').child(auth.uid).child('role').val() === 'trainingAdmin')"
@@ -70,7 +65,6 @@
       ".read": "auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true",
       ".write": "auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && (root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin' || root.child('portalAccess/users').child(auth.uid).child('role').val() === 'trainingAdmin')"
     },
-
     "notices": {
       ".read": "auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true",
       ".write": "auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin'"
@@ -90,7 +84,30 @@
       },
       "notices": {
         ".read": "auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true",
-        ".write": "auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin'"
+        ".write": "auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && root.child('portalAccess/users').child(auth.uid).child('role').val() !== 'terminal' && (root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin' || root.child('portalAccess/users').child(auth.uid).child('staffId').val() === 'momo' || root.child('portalAccess/users').child(auth.uid).child('staffId').val() === 'yamada')",
+        "$noticeId": {
+          "readBy": {
+            "$staffId": {
+              ".write": "auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && root.child('portalAccess/users').child(auth.uid).child('role').val() !== 'terminal' && root.child('portalAccess/users').child(auth.uid).child('staffId').val() === $staffId && root.child('meetingManagement/notices').child($noticeId).exists() && !data.exists() && newData.exists() && ($staffId === 'shimanaka' || $staffId === 'tsuruta' || $staffId === 'yoshida' || $staffId === 'takagi' || $staffId === 'matsumoto' || $staffId === 'yamada' || $staffId === 'tamiya' || $staffId === 'tanaka' || $staffId === 'momo')",
+              ".validate": "newData.hasChildren(['staffId','name','role','readAt']) && newData.child('staffId').val() === $staffId",
+              "staffId": {
+                ".validate": "newData.isString()"
+              },
+              "name": {
+                ".validate": "newData.isString()"
+              },
+              "role": {
+                ".validate": "newData.isString()"
+              },
+              "readAt": {
+                ".validate": "newData.isNumber() && newData.val() <= now"
+              },
+              "$other": {
+                ".validate": false
+              }
+            }
+          }
+        }
       },
       "opinions": {
         ".read": "auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true",
@@ -99,7 +116,7 @@
       "incidentReports": {
         ".read": "auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true",
         "$reportId": {
-          ".write": "auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && root.child('portalAccess/users').child(auth.uid).child('role').val() !== 'terminal' && (root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin' || (!data.exists() && newData.child('reporterId').val() === root.child('portalAccess/users').child(auth.uid).child('staffId').val()))"
+          ".write": "auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && root.child('portalAccess/users').child(auth.uid).child('role').val() !== 'terminal' && ((root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin' || root.child('portalAccess/users').child(auth.uid).child('staffId').val() === 'momo' || root.child('portalAccess/users').child(auth.uid).child('staffId').val() === 'yamada') || (!data.exists() && newData.child('reporterId').val() === root.child('portalAccess/users').child(auth.uid).child('staffId').val()))"
         }
       },
       "$other": {
@@ -107,7 +124,6 @@
         ".write": "auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin'"
       }
     },
-
     "attendance": {
       "settings": {
         ".read": "auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true",
@@ -144,12 +160,16 @@
         "$id": {
           ".write": "auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && (root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin' || (newData.child('staffId').val() === root.child('portalAccess/users').child(auth.uid).child('staffId').val() && (!data.exists() || data.child('staffId').val() === root.child('portalAccess/users').child(auth.uid).child('staffId').val())))"
         },
-        ".indexOn": ["staffId"]
+        ".indexOn": [
+          "staffId"
+        ]
       },
       "leaveTransactions": {
         ".read": "auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && (root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin' || (query.orderByChild === 'staffId' && query.equalTo === root.child('portalAccess/users').child(auth.uid).child('staffId').val()))",
         ".write": "auth != null && root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin'",
-        ".indexOn": ["staffId"]
+        ".indexOn": [
+          "staffId"
+        ]
       },
       "monthLocks": {
         ".read": "auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true",
@@ -164,7 +184,6 @@
         ".write": "auth != null && root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin'"
       }
     },
-
     "attendanceTest": {
       ".read": "auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin'",
       ".write": "auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin'",
@@ -186,7 +205,6 @@
         }
       }
     },
-
     "monthlyGoals": {
       ".read": "auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true",
       ".write": "auth != null && root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin'"
@@ -212,7 +230,9 @@
       "$loanId": {
         ".write": "auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && (root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin' || (data.exists() && data.child('staffId').val() === root.child('portalAccess/users').child(auth.uid).child('staffId').val() && newData.child('staffId').val() === data.child('staffId').val() && data.child('status').val() === 'pending_agreement' && newData.child('status').val() === 'agreed' && newData.child('amount').val() === data.child('amount').val() && newData.child('description').val() === data.child('description').val() && newData.child('loanDate').val() === data.child('loanDate').val() && newData.child('exemptionDate').val() === data.child('exemptionDate').val()))"
       },
-      ".indexOn": ["staffId"]
+      ".indexOn": [
+        "staffId"
+      ]
     },
     "portalDailySummaryNotifications": {
       ".read": "auth != null && root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin'",
