@@ -814,6 +814,18 @@ button{cursor:pointer}
   .btn{width:100%}
   .search-panel .btn{width:auto;flex:0 0 auto}
 }
+/* Staff meeting guide */
+.meeting-guide{margin:0 0 18px;border:1px solid #b8e5df;border-radius:8px;background:#fff;overflow:hidden}
+.meeting-guide summary{padding:14px 16px;background:#eafaf8;cursor:pointer;font-size:16px;font-weight:900;line-height:1.5}
+.meeting-guide summary:focus-visible{outline:3px solid var(--sky);outline-offset:-3px}
+.meeting-guide-body{padding:0 16px 16px;line-height:1.8;overflow-wrap:anywhere}
+.meeting-guide-body p{margin:12px 0}
+.meeting-guide-step{padding:12px 0;border-top:1px solid var(--line)}
+.meeting-guide-step h3{margin:0;font-size:15px;line-height:1.6}
+.meeting-guide-step h3 span{display:block;color:var(--muted);font-size:12px;font-weight:700}
+.meeting-guide-step p:last-child{margin-bottom:0}
+.meeting-guide-step ul{margin:8px 0;padding-left:1.5em}
+.meeting-guide-note{padding:12px;border:1px solid #f1c46d;border-radius:8px;background:#fff8e7;font-weight:700}
 </style>
 </head>
 <body>
@@ -845,6 +857,33 @@ button{cursor:pointer}
         <h2>取り組み</h2>
         <span class="count-badge" id="taskCount">0件</span>
       </div>
+      <details class="meeting-guide" open>
+        <summary>ミーティングの進め方</summary>
+        <div class="meeting-guide-body">
+          <p>ミーティングでは、共有した内容を日々の業務で実践し、定着するまで継続して確認します。</p>
+          <section class="meeting-guide-step" aria-labelledby="meetingGuideUnderstand">
+            <h3 id="meetingGuideUnderstand">① 内容を理解する<span>スタッフ全員</span></h3>
+            <p>「取り組み」の詳細と完了条件を確認し、説明を受けて理解したら<strong>「確認しました」</strong>を押します。分からない点は、押す前に確認してください。</p>
+            <p>欠席者には主任が後から説明し、確認状況もチェックします。</p>
+          </section>
+          <section class="meeting-guide-step" aria-labelledby="meetingGuidePractice">
+            <h3 id="meetingGuidePractice">② 対策を決めて実践する<span>主任・スタッフ全員</span></h3>
+            <p>全員の確認後、主任が対策を入力し、<strong>「対策を追加して開始」</strong>を押します。スタッフは、共有された対策を日々の業務で実践します。</p>
+          </section>
+          <section class="meeting-guide-step" aria-labelledby="meetingGuideReview">
+            <h3 id="meetingGuideReview">③ 毎回振り返る<span>主任・スタッフ全員</span></h3>
+            <p>ミーティングでは、取り組み中の項目について次の3点を確認します。</p>
+            <ul><li>できていること</li><li>困っていること</li><li>追加する対策</li></ul>
+            <p>主任は追加の対策を<strong>「対策を追加」</strong>から記録します。</p>
+          </section>
+          <section class="meeting-guide-step" aria-labelledby="meetingGuideConfirm">
+            <h3 id="meetingGuideConfirm">④ 定着を確認する<span>主任・院長</span></h3>
+            <p>主任が、その取り組みの「完了条件」を満たしていることを確認し、<strong>「院長へ定着確認を依頼」</strong>を押します。</p>
+            <p>院長が確認し、定着していれば<strong>「定着完了」</strong>とします。継続が必要な場合は取り組み中へ戻し、対策を見直します。</p>
+          </section>
+          <p class="meeting-guide-note">「確認しました」は、内容を理解したという確認です。取り組みの完了を意味するものではありません。</p>
+        </div>
+      </details>
       <div id="taskStageSummary" class="task-stage-summary" role="group" aria-label="取り組みの工程別件数と絞り込み"></div>
       <p class="task-stage-caption">件数は全取り組みが対象です。工程を押すと、その工程だけを表示します。</p>
       <p class="read-status">完了条件を満たし、定着したと判断したら、主任へ報告してください。主任が取りまとめて院長へ定着確認を依頼します。院長の確認をもって完了となります。</p>
