@@ -22,7 +22,7 @@ vm.runInContext(main,context);
 await vm.runInContext('window.__holidayDataReady',context);
 const run=s=>vm.runInContext(s,context);
 run("STAFF.push({id:'s',name:'Test',type:'full',role:'DH'})");
-run("currentUser={role:'admin'};clinicSettingsLoaded=true;");
+run("currentUser={role:'admin'};clinicSettingsLoaded=true;attendanceProfilesLoaded=true;");
 assert.equal(run('clinicGenerationReady()'),false);assert.equal(confirmationCount,1);
 confirmAnswer=true;assert.equal(run('clinicGenerationReady()'),true);
 run("clinicSettings.years[2026]='none';currentYear=2026");
@@ -137,3 +137,23 @@ assert.equal(run('balanceRoleStaffing(2026,8,30,dates)'),0);
 run("STAFF=[{id:'a',role:'DR'},{id:'hanowa',role:'DH'},{id:'momo',role:'DA'},{id:'b',role:'DA'}];shiftData={a:{x:'clinic'},hanowa:{x:'hanowa'},momo:{x:'admin'},b:{x:'early'}}");
 assert.equal(run("countRoleStaffing('DR','x')"),0);assert.equal(run("countRoleStaffing('DH','x')"),1);assert.equal(run("countRoleStaffing('DA','x')"),1);
 console.log('PASS: excluded credit, actual headcounts, balancing improvement, unchanged hours, approved requests, leave, fixed patterns, employment types and shortage guard');
+
+// Flexible-hour profiles do not receive a 160h target; existing profiles keep it.
+run("STAFF=[...DEFAULT_STAFF];attendanceProfiles={tamiya:{employmentType:'flexiblePartTime'},takagi:{employmentType:'flexiblePartTime'}}");
+assert.equal(run("usesMonthlyHoursTarget(STAFF.find(s=>s.id==='tamiya'))"),false);
+assert.equal(run("usesMonthlyHoursTarget(STAFF.find(s=>s.id==='tanaka'))"),true);
+assert.equal(run("isAutoProtectedStaff('takagi')"),true);
+run("alertMessages=[];shiftData={tamiya:{},tanaka:{}};addExactHourAlerts(STAFF.filter(s=>['tamiya','tanaka'].includes(s.id)),2026,8,30)");
+assert.equal(run("alertMessages.some(a=>a.msg.includes('田宮'))"),false);
+assert.equal(run("alertMessages.some(a=>a.msg.includes('田中'))"),true);
+run("attendanceProfilesLoaded=false;generateShift()");
+assert.match(alerts.at(-1),/勤怠プロフィール/);
+console.log('Flexible monthly targets and load-failure guard PASS');
+
+// Run the actual generator with a newly flexible member; manual shifts stay intact.
+run("STAFF=[...DEFAULT_STAFF];attendanceProfiles={takagi:{employmentType:'flexiblePartTime'}};attendanceProfilesLoaded=true;currentUser={role:'admin'};currentYear=2026;currentMonth=8;clinicSettings={periods:{},years:{2026:'none'}};customHolidays={};clinicSettingsLoaded=true;shiftLocks={};requestData=[];shiftData={takagi:{'2026-09-01':'early','2026-09-02':'off'}};render=()=>{};renderAlerts=()=>{};saveCurrentShift=()=>{};generateShift()");
+for(const f of timers.splice(0))f();
+assert.equal(run("shiftData.takagi['2026-09-01']"),'early');
+assert.equal(run("shiftData.takagi['2026-09-02']"),'off');
+assert.equal(run("Object.keys(shiftData.takagi).length"),2);
+console.log('Flexible staff shifts preserved through complete generator PASS');
