@@ -313,6 +313,8 @@ const PORTAL_USER_STORAGE_KEY = 'portalUser';
 
 let currentUser = readUser();
 let materials = [];
+let materialsLoaded = false;
+let materialsLoadError = '';
 let materialCategories = [...DEFAULT_MATERIAL_CATEGORIES];
 let editingId = '';
 let editingMaterial = null;
@@ -353,10 +355,13 @@ onValue(ref(db, DB_PATH), snap => {
   const data = snap.val() || {};
   materials = Object.entries(data).map(([id, item]) => ({ id, ...item }))
     .sort((a, b) => (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0));
+  materialsLoaded = true;
+  materialsLoadError = '';
   renderMaterials();
 }, error => {
-  showListError(`マニュアル一覧を読み込めませんでした: ${error.message}`);
-  setStatus(`マニュアル一覧を読み込めませんでした: ${error.message}`, 'err');
+  materialsLoadError = `マニュアル一覧を読み込めませんでした: ${error.message}`;
+  showListError(materialsLoadError);
+  setStatus(materialsLoadError, 'err');
 });
 
 function readUser() {
@@ -595,6 +600,15 @@ function sortMaterialsForDisplay(a, b) {
 
 function renderMaterials() {
   const list = document.getElementById('materialList');
+  if (materialsLoadError) {
+    showListError(materialsLoadError);
+    return;
+  }
+  if (!materialsLoaded) {
+    document.getElementById('materialCount').textContent = '読み込み中です';
+    list.innerHTML = '';
+    return;
+  }
   const q = document.getElementById('searchText').value.trim().toLowerCase();
   const category = document.getElementById('categoryFilter').value;
   const filtered = materials.filter(item => {
