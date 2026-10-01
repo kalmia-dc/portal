@@ -1832,14 +1832,16 @@ function init() {
     showToast('半期目標の読み込みに失敗しました: ' + err.message);
   });
 
-  onValue(ref(db, PRIVATE_METRICS_PATH), snap => {
-    allPrivateMetrics = snap.val() || {};
-    populatePeriodFilter(true);
-    populateEntryMonthFilter();
-    render();
-  }, err => {
-    showToast('経営数値の読み込みに失敗しました: ' + err.message);
-  });
+  if (authenticatedProfile.portalRole === 'admin') {
+    onValue(ref(db, PRIVATE_METRICS_PATH), snap => {
+      allPrivateMetrics = snap.val() || {};
+      populatePeriodFilter(true);
+      populateEntryMonthFilter();
+      render();
+    }, err => {
+      showToast('経営数値の読み込みに失敗しました: ' + err.message);
+    });
+  }
 }
 
 function currentMonth(date = new Date()) {

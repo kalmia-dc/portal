@@ -1113,9 +1113,10 @@ async function initApp() {
     }
   }
 
-  // 締切バナー（毎月25日までに翌々月分を提出）
+  // 締切バナー（毎月25日いっぱいまでに4ヶ月先の分を提出）
   // 例：4/25までに8月分、5/25までに9月分
-  const deadline = new Date(now.getFullYear(), now.getMonth(), 25);
+  const deadline = new Date(now.getFullYear(), now.getMonth(), 26); // 翌日0時を締切境界にする
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const targetMonth = now.getMonth() + 4; // 翌々々月（0始まり+4=翌々月の月名）
   const targetYear  = now.getFullYear() + Math.floor((now.getMonth() + 4) / 12);
   const targetMonthName = ((now.getMonth() + 4) % 12) + 1;
@@ -1130,8 +1131,8 @@ async function initApp() {
       deadlineEl.textContent = `${mainText} ${subText}`;
     }
   };
-  if (now <= deadline) {
-    const daysLeft = Math.ceil((deadline - now) / 86400000);
+  if (now < deadline) {
+    const daysLeft = Math.round((new Date(now.getFullYear(), now.getMonth(), 25) - today) / 86400000);
     setDeadlineNotice(`シフト提出締切：${targetMonthName}月分`, `${now.getMonth()+1}月25日まで（残り${daysLeft}日）`);
   } else {
     // 25日を過ぎたら翌月分を案内

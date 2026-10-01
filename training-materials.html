@@ -152,25 +152,12 @@ body.viewer-open{overflow:hidden}
       <p class="lead">文章、PDF、画像、動画、リンクをまとめて保管し、必要な手順をすぐ確認できます。</p>
     </div>
 
-    <section class="auth-panel" id="authPanel" aria-label="管理者ログイン">
+    <section class="auth-panel" id="authPanel" aria-label="ログインと編集権限">
       <div class="panel-head">
-        <div class="panel-title">管理者ログイン</div>
+        <div class="panel-title">Googleログインと編集権限</div>
       </div>
-      <div class="auth-grid">
-        <div class="field">
-          <label for="adminStaff">管理者</label>
-          <select id="adminStaff">
-            <option value="sugihira">院長</option>
-            <option value="momo">百々</option>
-          </select>
-        </div>
-        <div class="field">
-          <label for="adminPass">パスワード</label>
-          <input id="adminPass" type="password" inputmode="numeric" autocomplete="current-password" placeholder="パスワード">
-        </div>
-        <button class="btn primary" type="button" onclick="loginAdmin()">ログイン</button>
-      </div>
-      <div class="status" id="authStatus"></div>
+      <p>登録済みのGoogleアカウントでログインしています。マニュアルの追加・編集は、編集権限のあるアカウントで利用できます。</p>
+      <p>編集が必要な場合は、百々さんへ権限をご確認ください。</p>
     </section>
 
     <section class="admin-panel" aria-label="マニュアル追加">
@@ -293,8 +280,6 @@ const DIRECT_UPLOAD_MAX_BYTES = 20 * 1024 * 1024;
 const INLINE_IMAGE_MAX_DIMENSION = 1200;
 const INLINE_IMAGE_QUALITY = 0.72;
 const INLINE_IMAGE_MAX_DATA_URL_LENGTH = 9.5 * 1024 * 1024;
-const ADMIN_STAFF = ['sugihira', 'momo', 'yamada'];
-const DEFAULT_ADMIN_PASSWORDS = {};
 const DEFAULT_MATERIAL_CATEGORIES = ['歯周治療', 'インプラント'];
 const MATERIAL_CATEGORY_ALIASES = { 'その他':'インプラント' };
 const STAFF_NAMES = {
@@ -319,13 +304,8 @@ let materialCategories = [...DEFAULT_MATERIAL_CATEGORIES];
 let editingId = '';
 let editingMaterial = null;
 let skillCatalog = {};
-let syncedPasswords = {};
-let passwordsReady = false;
 
 renderAuthState();
-document.getElementById('adminPass')?.addEventListener('keydown', event => {
-  if (event.key === 'Enter') window.loginAdmin();
-});
 document.querySelectorAll('input[name="materialMode"]').forEach(input => {
   input.addEventListener('change', updateMaterialMode);
 });
@@ -415,77 +395,10 @@ function readStoredPortalUser() {
   return null;
 }
 
-function readLocalPasswords() {
-  try {
-    return JSON.parse(localStorage.getItem('carmia_passwords') || '{}') || {};
-  } catch(e) {
-    return {};
-  }
-}
-
-function updatePasswordCache(data) {
-  if (data && typeof data === 'object') {
-    syncedPasswords = { ...syncedPasswords, ...data };
-    localStorage.setItem('carmia_passwords', JSON.stringify({ ...readLocalPasswords(), ...syncedPasswords }));
-  }
-  passwordsReady = true;
-}
-
-async function ensurePasswordsLoaded() {
-  if (passwordsReady) return;
-  try {
-    const snap = await get(ref(db, 'passwords'));
-    updatePasswordCache(snap.val() || {});
-  } catch(e) {
-    passwordsReady = true;
-  }
-}
-
-function passwordForAdmin(staffId) {
-  const localPasswords = readLocalPasswords();
-  return syncedPasswords[staffId] || localPasswords[staffId] || DEFAULT_ADMIN_PASSWORDS[staffId] || '';
-}
-
 function renderAuthState() {
   document.body.classList.toggle('is-admin', isAdmin());
-  if (isAdmin()) {
-    const staffSelect = document.getElementById('adminStaff');
-    if (staffSelect) staffSelect.value = currentUser.staffId;
-  }
   if (materials.length) renderMaterials();
 }
-
-function setAuthStatus(text, type = '') {
-  const el = document.getElementById('authStatus');
-  if (!el) return;
-  el.textContent = text || '';
-  el.className = `status ${type}`.trim();
-}
-
-window.loginAdmin = async function() {
-  const staffId = document.getElementById('adminStaff').value;
-  const pass = document.getElementById('adminPass').value;
-  if (!ADMIN_STAFF.includes(staffId)) return setAuthStatus('管理者を選択してください。', 'err');
-  if (!pass) return setAuthStatus('パスワードを入力してください。', 'err');
-
-  setAuthStatus('確認しています。');
-  await ensurePasswordsLoaded();
-
-  if (pass !== passwordForAdmin(staffId)) {
-    return setAuthStatus('パスワードが違います。', 'err');
-  }
-
-  currentUser = savePortalUser({
-    staffId,
-    sid: staffId,
-    name: STAFF_NAMES[staffId] || staffId,
-    role: STAFF_ROLES[staffId] || '',
-    pass
-  });
-  document.getElementById('adminPass').value = '';
-  renderAuthState();
-  setAuthStatus('管理者としてログインしました。', 'ok');
-};
 
 function isAdmin() {
   return authenticatedProfile.isTrainingAdmin === true;
