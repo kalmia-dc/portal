@@ -1801,7 +1801,6 @@ function getHanowaCoverageReasons(ds, y, m){
   const dd=dow(y,m,d);
   const reasons=[];
 
-  if(dd===4) reasons.push('木曜固定');
   if(countCoreDrDh(ds)<5) reasons.push('DR+DH不足');
   if(countCoreDh(ds)+countFieldDa(ds)<6) reasons.push('DH+DA不足');
 
@@ -1822,10 +1821,7 @@ function syncHanowaCoverage(y, m, workDays, addAlerts){
     if(reasons.length){
       shiftData['hanowa'][ds]='hanowa';
       if(addAlerts&& !wasAssigned){
-        const dd=dow(y,m,d);
-        const label=dd===4&&reasons.length===1
-          ? ds+'(木): ハノワ固定出勤'
-          : ds+': 人数不足補填 → ハノワを配置（'+reasons.join('・')+'）';
+        const label=ds+': 人数不足補填 → ハノワを配置（'+reasons.join('・')+'）';
         addAlert('info', label);
       }
     } else {
@@ -3331,7 +3327,7 @@ function generateShift(){
       }
     }
 
-    // ══ STEP 8: ハノワ配置（木曜固定・不足日は全て補填） ══
+    // ══ STEP 8: ハノワ配置（不足日は全て補填） ══
     syncHanowaCoverage(y, m, workDays, true);
 
     // ══ STEP 9: 最終強制クリーンアップ（18日・160h保証） ══
