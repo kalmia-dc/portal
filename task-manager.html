@@ -760,6 +760,8 @@
 
 <!-- Google Identity Services -->
 <script src="https://accounts.google.com/gsi/client" async defer></script>
+<link rel="stylesheet" href="./portal-common.css?v=20261005">
+<script defer src="./portal-common.js?v=20261005"></script>
 </head>
 <body>
 
@@ -1262,6 +1264,7 @@ function gFetch(url, opts = {}) {
 }
 
 // ===== INIT =====
+let initialTaskOpened=false;
 function init() {
   if (currentUser) {
     if (isGuestUser()) setupGuestReadonly();
@@ -1274,6 +1277,8 @@ function init() {
   onValue(ref(db, 'tasks'), snap => {
     tasks = snap.val() || {};
     render();
+    const requested=new URLSearchParams(location.search).get('task');
+    if(!initialTaskOpened&&requested&&tasks[requested]){initialTaskOpened=true;openModal(requested);}
     startTaskMaintenance();
   });
 }

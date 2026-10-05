@@ -832,6 +832,8 @@ button{cursor:pointer}
 .form-panel,.item{scroll-margin-top:90px}
 .draft-context{margin:0 0 12px;padding:10px;border:1px solid #f1c46d;background:#fff8e7;border-radius:8px;line-height:1.7}
 </style>
+<link rel="stylesheet" href="./portal-common.css?v=20261005">
+<script defer src="./portal-common.js?v=20261005"></script>
 </head>
 <body>
 <div id="app" class="app-shell" hidden>
@@ -1557,16 +1559,25 @@ function setupViewer() {
   });
 }
 
+let initialCaseOpened=false;
+function openInitialCase(){
+ if(initialCaseOpened)return;
+ const p=new URLSearchParams(location.search),kind=p.get('caseKind'),id=p.get('caseId');
+ if(!['tasks','notices'].includes(kind)||!id||(kind==='notices'&&!canSeeNotices()))return;
+ if(state[kind].some(x=>x.id===id)){initialCaseOpened=true;openRelatedCase(kind,id);}
+}
 function attachDataListeners() {
   onValue(ref(db, PATHS.tasks), snap => {
     state.tasks = toList(snap.val()).sort(sortTasks);
     renderTasks();
     renderIncidentReports();
+    openInitialCase();
   });
   onValue(ref(db, PATHS.notices), snap => {
     state.notices = toList(snap.val()).sort((a,b) => (b.createdAt || 0) - (a.createdAt || 0));
     if (canSeeNotices()) renderNotices();
     renderIncidentReports();
+    openInitialCase();
   });
   if (canSeeOpinions()) {
     onValue(ref(db, PATHS.opinions), snap => {

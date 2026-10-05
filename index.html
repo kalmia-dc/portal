@@ -359,6 +359,9 @@
   .d1{animation-delay:.05s} .d2{animation-delay:.10s} .d3{animation-delay:.15s}
   .d4{animation-delay:.20s} .d5{animation-delay:.25s} .d6{animation-delay:.30s}
 </style>
+<link rel="stylesheet" href="./portal-common.css?v=20261005">
+<script defer src="./portal-common.js?v=20261005"></script>
+<script src="./portal-shift-time.js?v=20261005"></script>
 </head>
 <body>
 
@@ -418,8 +421,8 @@
   <!-- 自分のタスク（hero内） -->
   <div class="hero-task-card" id="heroTaskCard" style="display:none;">
     <div class="hero-notice-label">
-      <span>📋 自分のタスク</span>
-      <button class="hero-notice-post-btn visible" onclick="goToTaskApp()" style="display:inline-block;">すべて見る →</button>
+      <span>📋 今日やること</span>
+      <button class="hero-notice-post-btn visible" onclick="goToTaskApp()" style="display:inline-block;">タスク一覧 →</button>
     </div>
     <div id="heroTaskList"></div>
   </div>
@@ -497,7 +500,7 @@
       </button>
       <div class="category-tools">
         <a class="tool-item" data-guest-hidden="true" href="#" onclick="goToAttendanceApp();return false;" style="background:linear-gradient(135deg,#e9f8f1,#d9f1e7);border:2px solid #86c9ae;">
-          <span class="tool-linked-badge">試験運用</span><span class="tool-icon">⏱️</span><span class="tool-name">勤怠管理</span>
+          <span class="tool-linked-badge">試験運用</span><span class="tool-icon">⏱️</span><span class="tool-name">院内勤怠（試験）</span>
         </a>
         <a class="tool-item shift-tool" data-guest-hidden="true" href="#" onclick="goToShiftApp();return false;">
           <span class="tool-linked-badge">連携中</span><span class="tool-icon">📅</span><span class="tool-name">シフト管理</span>
@@ -599,8 +602,8 @@
 
 <!-- スマホ下部ナビ -->
 <nav class="bottom-nav">
-  <button class="nav-item active" onclick="goToTaskApp()"><span class="nav-icon">📋</span><span class="nav-label">タスク</span></button>
-  <a class="nav-item" data-guest-hidden="true" href="https://ssl.jobcan.jp/employee" target="_blank" rel="noopener"><span class="nav-icon">🕐</span><span class="nav-label">勤怠</span></a>
+  <button class="nav-item" onclick="goToTaskApp()"><span class="nav-icon">📋</span><span class="nav-label">タスク</span></button>
+  <a class="nav-item" data-guest-hidden="true" href="https://ssl.jobcan.jp/employee" target="_blank" rel="noopener"><span class="nav-icon">🕐</span><span class="nav-label">Jobcan（本運用）</span></a>
   <a class="nav-item" data-guest-hidden="true" href="https://apo-toolboxes.stransa.co.jp/calendar/" target="_blank" rel="noopener"><span class="nav-icon">🗓️</span><span class="nav-label">予約</span></a>
   <button class="nav-item" id="menuNavBtn" onclick="togglePortalMenu()"><span class="nav-icon">☰</span><span class="nav-label">メニュー</span></button>
 </nav>
@@ -641,6 +644,7 @@
 </div><!-- /#app -->
 
 <script type="module">
+import {todayItems,localDay,noticeTargets} from "./portal-today.mjs";
 // ─────────────────────────────────────────
 // スタッフ定義（シフトアプリと同じ）
 // ─────────────────────────────────────────
@@ -1103,7 +1107,11 @@ async function initApp() {
     const s = await getShift(u.name, now);
     if (shiftGoBtn) shiftGoBtn.style.display = '';
     if (s) {
-      const info = SHIFT_INFO[s] || { label:s, time:'', cls:'on' };
+      const info = {...(SHIFT_INFO[s] || { label:s, time:'', cls:'on' })};
+      const ds=localDay(now),month=await getMonthShifts(now.getFullYear(),now.getMonth()+1);
+      const manual=PortalShiftTime.manualTime(month,u.staffId,ds);
+      if(manual)info.time=manual.start+'〜'+manual.end+' / 休憩'+manual.breakMinutes+'分 / 実働'+(Math.round(manual.workMinutes/60*100)/100)+'時間';
+      timeEl.style.display='none';
       typeEl.textContent = info.label;
       typeEl.className = 'hero-shift-type' + (info.cls==='off'||info.cls==='hope' ? ' dim' : '');
       if (info.time) { timeEl.textContent=info.time; timeEl.style.display='block'; }
@@ -1667,58 +1675,36 @@ async function loadCalendar() {
 // ─────────────────────────────────────────
 // 自分のタスク（Firebase /tasks）→ hero内に表示
 // ─────────────────────────────────────────
-async function loadMyTasks(staffName) {
-  const card = document.getElementById('heroTaskCard');
-  const list = document.getElementById('heroTaskList');
-  try {
-    const snap = await get(ref(_db, 'tasks'));
-    const all  = snap.val() || {};
-    const today = new Date().toISOString().split('T')[0];
-
-    const mine = Object.entries(all)
-      .filter(([, t]) => {
-        const assignees = t.assignees;
-        // assigneesが配列で、かつstaffNameが含まれる場合のみ
-        if (!Array.isArray(assignees) || assignees.length === 0) return false;
-        if (t.status === '完了') return false;
-        return assignees.includes(staffName);
-      })
-      .map(([id, t]) => ({ id, ...t }))
-      .sort((a, b) => {
-        const da = a.date || '9999-99-99';
-        const db2 = b.date || '9999-99-99';
-        return da < db2 ? -1 : da > db2 ? 1 : 0;
-      })
-      .slice(0, 5);
-
-    if (!mine.length) return; // タスクなしなら非表示のまま
-
-    card.style.display = 'block';
-
-    list.innerHTML = mine.map(t => {
-      const priCls = t.priority || 'med';
-      let dateStr = '';
-      if (t.date) {
-        const diff = Math.round((new Date(t.date+'T00:00:00') - new Date(today+'T00:00:00')) / 86400000);
-        if (diff < 0)        dateStr = `⚠ 期限切れ`;
-        else if (diff === 0) dateStr = `今日`;
-        else if (diff <= 3)  dateStr = `あと${diff}日`;
-        else {
-          const dt = new Date(t.date+'T00:00:00');
-          dateStr = `${dt.getMonth()+1}/${dt.getDate()}`;
-        }
-      }
-      return `
-        <div class="hero-task-item">
-          <div class="hero-task-pri ${priCls}"></div>
-          <div class="hero-task-title">${escHtml(t.title)}</div>
-          ${dateStr ? `<div class="hero-task-date">${dateStr}</div>` : ''}
-        </div>`;
-    }).join('');
-
-  } catch(e) {
-    console.warn('タスク読み込みエラー:', e);
-  }
+const todaySources={},todayErrors=new Set();
+let todayExtraStarted=false;
+function renderTodayActions(){
+ const card=document.getElementById('heroTaskCard'),list=document.getElementById('heroTaskList');
+ if(isGuestUser()||authenticatedProfile.portalRole==='terminal'){card.style.display='none';return;}
+ card.style.display='block';
+ const items=todayItems(todaySources,authenticatedProfile);
+ let html='';
+ for(const group of ['期限切れ','今日','確認待ち']){
+   const rows=items.filter(x=>x.group===group);
+   if(rows.length)html+='<div class="today-group">'+group+'（'+rows.length+'）</div>'+rows.map(x=>'<a class="today-link" href="'+escHtml(x.url)+'"><span>'+escHtml(x.title||x.kind)+'</span><small>'+escHtml(x.kind)+(x.date?' / '+escHtml(x.date):'')+' →</small></a>').join('');
+ }
+ list.innerHTML=html||'<p class="today-status">今日までのタスク・確認待ちはありません</p>';
+ if(todayErrors.size)list.innerHTML+='<p class="today-status">一部を取得できません：'+escHtml([...todayErrors].join('、'))+'。各ページで確認してください。</p>';
+}
+function watchToday(key,path,label){
+ onValue(ref(_db,path),snap=>{todaySources[key]=snap.val()||{};todayErrors.delete(label);renderTodayActions();},()=>{delete todaySources[key];todayErrors.add(label);renderTodayActions();});
+}
+function loadMyTasks(staffName){
+ if(todayExtraStarted)return;todayExtraStarted=true;
+ if(isGuestUser()||authenticatedProfile.portalRole==='terminal')return;
+ watchToday('tasks','tasks','タスク');
+ if(noticeTargets.includes(authenticatedProfile.staffId)||authenticatedProfile.staffId==='sugihira'){
+   watchToday('meetingTasks','meetingManagement/tasks','ミーティング');
+   if(noticeTargets.includes(authenticatedProfile.staffId))watchToday('meetingNotices','meetingManagement/notices','お知らせ');
+ }
+ if(authenticatedProfile.portalRole==='admin'){
+   watchToday('corrections','attendance/corrections','勤怠修正');
+   watchToday('requests','requests','有給申請');
+ }
 }
 
 // ─────────────────────────────────────────
@@ -1732,7 +1718,8 @@ async function loadScheduleEvents(staffId) {
   try {
     const snap = await get(ref(_db, 'scheduling/events'));
     const all  = snap.val() || {};
-    const today = new Date().toISOString().split('T')[0];
+    todaySources.schedule=all;todayErrors.delete('日程調整');renderTodayActions();
+    const today = localDay();
     const DAY_JP = ['日','月','火','水','木','金','土'];
 
     const fmt = d => {
@@ -1740,57 +1727,11 @@ async function loadScheduleEvents(staffId) {
       return `${dt.getMonth()+1}月${dt.getDate()}日(${DAY_JP[dt.getDay()]})`;
     };
 
-    // ── 未回答イベント（hero） ──
-    const pending = Object.entries(all)
-      .filter(([, ev]) => {
-        if (ev.decided) return false; // 決定済みは除外
-        const dates = ev.dates || [];
-        const myRes = ev.responses?.[staffId] || {};
-        return dates.length > 0 && !dates.every(d => myRes[d]);
-      })
-      .sort((a, b) => {
-        const da = a[1].deadline || '9999-99-99';
-        const db = b[1].deadline || '9999-99-99';
-        return da < db ? -1 : da > db ? 1 : 0;
-      })
-      .slice(0, 3);
-
-    if (pending.length) {
-      card.style.display = 'block';
-      list.innerHTML = pending.map(([id, ev]) => {
-        const dates    = ev.dates || [];
-        const myRes    = ev.responses?.[staffId] || {};
-        const answered = dates.filter(d => myRes[d]).length;
-        const total    = dates.length;
-        const dateStr  = dates.slice(0, 2).map(d => {
-          const dt = new Date(d + 'T00:00:00');
-          return `${dt.getMonth()+1}/${dt.getDate()}(${DAY_JP[dt.getDay()]})`;
-        }).join('・') + (dates.length > 2 ? ` 他${dates.length - 2}件` : '');
-
-        let dlBadge = '';
-        if (ev.deadline) {
-          const diff = Math.round((new Date(ev.deadline + 'T00:00:00') - new Date(today + 'T00:00:00')) / 86400000);
-          if (diff < 0)        dlBadge = `<span style="background:rgba(255,107,107,.3);border-radius:8px;padding:1px 6px;font-size:10px;margin-left:4px">期限切れ</span>`;
-          else if (diff === 0) dlBadge = `<span style="background:rgba(255,107,107,.3);border-radius:8px;padding:1px 6px;font-size:10px;margin-left:4px">本日締切</span>`;
-          else if (diff <= 3)  dlBadge = `<span style="background:rgba(255,217,61,.4);border-radius:8px;padding:1px 6px;font-size:10px;margin-left:4px">残り${diff}日</span>`;
-        }
-
-        return `
-          <div class="hero-task-item" onclick="goToScheduleApp('${id}')" style="cursor:pointer;">
-            <div style="flex:1;min-width:0;">
-              <div class="hero-task-title">${escHtml(ev.name)}${dlBadge}</div>
-              <div style="font-size:10px;opacity:.75;margin-top:2px">${dateStr}</div>
-            </div>
-            <div style="font-size:10px;opacity:.8;white-space:nowrap;flex-shrink:0;margin-left:8px">
-              ${answered}/${total}回答
-            </div>
-          </div>`;
-      }).join('');
-    }
+    card.style.display='none';
 
     // ── 決定済みイベント（main） ──
     const decided = Object.entries(all)
-      .filter(([, ev]) => ev.decided)
+      .filter(([, ev]) => ev.decided && (!ev.members || (Array.isArray(ev.members)&&ev.members.includes(staffId))))
       .sort((a, b) => a[1].decided < b[1].decided ? -1 : 1); // 日付昇順
 
     if (decided.length) {
@@ -1826,6 +1767,7 @@ async function loadScheduleEvents(staffId) {
     }
 
   } catch(e) {
+    todayErrors.add('日程調整');renderTodayActions();
     console.warn('日程調整読み込みエラー:', e);
   }
 }
