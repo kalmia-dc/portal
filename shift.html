@@ -267,7 +267,7 @@
   }
   .staff-month-grid {
     display: grid;
-    grid-template-columns: repeat(7, 1fr);
+    grid-template-columns: repeat(7, minmax(0, 1fr));
     gap: 3px;
   }
   .staff-month-grid .dow-label {
@@ -277,6 +277,8 @@
   }
   .staff-day-cell {
     aspect-ratio: 1;
+    width:100%;
+    min-width:0;
     border-radius: 10px;
     display: flex;
     flex-direction: column;
@@ -288,6 +290,8 @@
     transition: transform .1s;
   }
   .staff-day-cell:active { transform: scale(.92); }
+  .staff-day-cell:has(.manual-time-detail) { min-height:90px; aspect-ratio:auto; }
+  .staff-day-cell .manual-time-detail { max-width:100%; overflow-wrap:anywhere; text-align:center; }
   .staff-day-cell .d-num   { font-size: .8rem; font-weight: 700; line-height: 1; }
   .staff-day-cell .d-shift { font-size: .5rem; margin-top: 2px; opacity: .85; }
   .staff-day-cell.early  { background: #E8F5E9; color: #2E7D32; }
@@ -690,6 +694,8 @@
     padding: 28px;
     width: 380px;
     max-width: 95vw;
+    max-height: 95vh;
+    overflow-y: auto;
     box-shadow: 0 20px 60px rgba(0,0,0,.2);
     transform: translateY(12px);
     transition: transform .2s;
@@ -1268,9 +1274,19 @@
   <div class="modal">
     <h2 id="modalTitle">シフト編集</h2>
     <div class="modal-grid" id="shiftChoices"></div>
+    <div id="manualTimeEditor" style="margin:16px 0">
+      <label><input type="checkbox" id="manualTimeEnabled" onchange="refreshManualTimeEditor()"> 時間を手動設定</label>
+      <div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:12px">
+        <label>出勤時刻<br><input type="time" id="manualStart" step="60" oninput="previewManualHours()"></label>
+        <label>退勤時刻<br><input type="time" id="manualEnd" step="60" oninput="previewManualHours()"></label>
+        <label>休憩（分）<br><input type="number" id="manualBreak" min="0" step="1" style="width:100px" oninput="previewManualHours()"></label>
+      </div>
+      <p id="manualHoursPreview" aria-live="polite" style="margin:10px 0;font-size:.85rem"></p>
+    </div>
+    <p id="manualTimeError" role="alert" style="color:var(--red);font-size:.85rem"></p>
     <div class="modal-actions">
       <button class="btn btn-secondary" onclick="closeModal()">キャンセル</button>
-      <button class="btn btn-primary" onclick="applyModal()">適用</button>
+      <button class="btn btn-primary" id="applyShiftButton" onclick="applyModal()">保存</button>
     </div>
   </div>
 </div>
@@ -1394,7 +1410,7 @@
 
 </div><!-- /#mainApp -->
 
-<script src="clinic-leave.js?v=20260903-role-balance"></script>
+<script src="clinic-leave.js?v=20261005-manual-time"></script>
 <script src="shift-role-balance.js?v=20260903-role-balance"></script>
 <script>
 // ──────────────────────────────────────────────
@@ -1579,6 +1595,39 @@ function addAlert(type, msg){
 }
 function clearAlerts(){ alertMessages = []; }
 
+// Keep shift category strings compatible with existing portal consumers.
+// Time overrides share the month node and are written atomically with the category.
+function isTimedShift(k){ return ['early','late','fixed','admin','hanowa'].includes(k); }
+function timeMinutes(value){
+  if(!/^([01]\d|2[0-3]):[0-5]\d$/.test(value||'')) throw Error('出勤・退勤時刻を入力してください。');
+  const [h,m]=value.split(':').map(Number); return h*60+m;
+}
+function manualMinutes(t){
+  const start=timeMinutes(t.start), end=timeMinutes(t.end);
+  if(end<=start) throw Error('退勤時刻は出勤時刻より後にしてください。');
+  if(t.breakMinutes==='' || t.breakMinutes==null || !Number.isInteger(Number(t.breakMinutes)) || Number(t.breakMinutes)<0)
+    throw Error('休憩は0以上の整数（分）で入力してください。');
+  if(Number(t.breakMinutes)>=end-start) throw Error('休憩は出勤から退勤までの時間より短くしてください。');
+  return end-start-Number(t.breakMinutes);
+}
+function manualTimeFor(id,ds,data=shiftData){
+  const t=data.__manualTimes?.[id]?.[ds];
+  if(!t || !isTimedShift(data[id]?.[ds]) || t.key!==data[id]?.[ds]) return null;
+  try { manualMinutes(t); return t; } catch { return null; }
+}
+function dayShiftHours(id,ds){
+  const t=manualTimeFor(id,ds);
+  return t ? manualMinutes(t)/60 : calcShiftHours(shiftData[id]?.[ds]||'',id);
+}
+function roundedHours(h){return Math.round((h+Number.EPSILON)*100)/100;}
+function manualTimeText(id,ds){
+  const t=manualTimeFor(id,ds);
+  return t ? t.start+'～'+t.end+' 休憩'+t.breakMinutes+'分 '+roundedHours(manualMinutes(t)/60)+'h' : '';
+}
+function manualTimeMarkup(id,ds){
+  const t=manualTimeFor(id,ds);
+  return t ? '<small class="manual-time-detail" style="display:block;font-size:.6rem;line-height:1.3">'+t.start+'～'+t.end+'<br>休'+t.breakMinutes+'分 / '+roundedHours(manualMinutes(t)/60)+'h</small>' : '';
+}
 function getHours(staffId, y, m){
   const days = daysInMonth(y, m);
   let h = 0;
@@ -1586,10 +1635,9 @@ function getHours(staffId, y, m){
     const ds = dateStr(y,m,d);
     const k  = shiftData[staffId]?.[ds];
     if(!k) continue;
-    const sh = SHIFT[Object.keys(SHIFT).find(s=>SHIFT[s].key===k)];
-    if(sh) h += k==='clinic' ? clinicCreditHours(staffId) : sh.hours;
+    h += dayShiftHours(staffId, ds);
   }
-  return h;
+  return roundedHours(h);
 }
 
 // ──────────────────────────────────────────────
@@ -1845,9 +1893,9 @@ function calcHours(id, y, m, days){
   let h=0;
   for(let d=1;d<=days;d++){
     const k=shiftData[id]?.[dateStr(y,m,d)]||'';
-    h+=calcShiftHours(k, id);
+    h+=dayShiftHours(id, dateStr(y,m,d));
   }
-  return Math.round(h*10)/10;
+  return roundedHours(h);
 }
 function getMondayStart(dt){
   const d=new Date(dt.getFullYear(), dt.getMonth(), dt.getDate());
@@ -1872,11 +1920,11 @@ function weeklyHourSummary(id, y, m, days){
       map[key]={ key, start, end, hours:0, isFullWeek:start>=monthStart&&end<=monthEnd };
     }
     const ds=dateStr(y,m,d);
-    map[key].hours += calcShiftHours(shiftData[id]?.[ds]||'', id);
+    map[key].hours += dayShiftHours(id, ds);
   }
   return Object.values(map)
     .sort((a,b)=>a.key.localeCompare(b.key))
-    .map(w=>({ ...w, hours:Math.round(w.hours*10)/10, label:formatWeekLabel(w.start) }));
+    .map(w=>({ ...w, hours:roundedHours(w.hours), label:formatWeekLabel(w.start) }));
 }
 function addWeeklyHourAlerts(staffList, y, m, days){
   staffList.forEach(s=>{
@@ -2515,6 +2563,7 @@ function generateShift(){
   txt.innerHTML='<span class="spinner"></span> 生成中...';
 
   setTimeout(()=>{
+    delete shiftData.__manualTimes; // Regeneration creates a new schedule; manual edits follow generation.
     const clinicPreserved = snapshotClinicShifts(y, m);
     STAFF.forEach(s=>{ if(!shiftData[s.id]) shiftData[s.id]={}; });
 
@@ -4126,7 +4175,7 @@ function printShift(){
 
   // スタッフ行生成
   const makeRow=(s)=>{
-    let r=`<tr><td class="staff-col">${s.name}</td>`;
+    let r=`<tr><td class="staff-col">${s.name}<br><small>${getHours(s.id,y,m)}h</small></td>`;
     for(let d=1;d<=days;d++){
       const ds=dateStr(y,m,d);
       const off=isOffDay(y,m,d);
@@ -4142,7 +4191,7 @@ function printShift(){
         'paid':'print-paid','wish':'print-wish','fixed':'print-early',
         'admin':'print-early','hanowa':'print-hanowa','none':'print-off-day'
       }[k]||'print-off';
-      r+=`<td class="${cls2}">${label}</td>`;
+      r+=`<td class="${cls2}">${label}${manualTimeMarkup(s.id,ds)}</td>`;
     }
     return r+`</tr>`;
   };
@@ -4294,7 +4343,8 @@ function renderCalendar(){
           const chip = document.createElement('div');
           chip.className = `shift-chip ${k}`;
           const sh = Object.values(SHIFT).find(x=>x.key===k);
-          chip.innerHTML = sh ? sh.shortLabel.replace('\n','<br>') : k;
+          chip.innerHTML = (sh ? sh.shortLabel.replace('\n','<br>') : k) + (manualTimeFor(s.id,ds)?'<br><small>時間指定</small>':'');
+          chip.title = manualTimeText(s.id,ds);
           if(k==='late'){
             const dot = document.createElement('span');
             dot.className = 'late-dot';
@@ -4426,6 +4476,7 @@ function renderAlerts(){
 //  MODAL
 // ──────────────────────────────────────────────
 function openModal(staffId, ds){
+  if(currentUser?.role!=='admin' || isCurrentMonthLocked()) return;
   modalStaffId = staffId;
   modalDateStr = ds;
   const staff = STAFF.find(s=>s.id===staffId);
@@ -4442,6 +4493,7 @@ function openModal(staffId, ds){
     : staff.type==='spot'
     ? [SHIFT.HANOWA, SHIFT.NONE]
     : [SHIFT.EARLY, SHIFT.LATE, SHIFT.OFF, SHIFT.PAID, SHIFT.WISH];
+  if(current==='fixed') options.unshift(SHIFT.FIXED);
   if(isClinicDay(ds)) options.push(SHIFT.CLINIC);
 
   options.forEach(sh=>{
@@ -4464,38 +4516,86 @@ function openModal(staffId, ds){
       choices.querySelectorAll('button').forEach(b=>b.classList.remove('selected'));
       btn.classList.add('selected');
       modalSelected = sh.key;
+      fillManualTimeEditor();
     };
     choices.appendChild(btn);
   });
 
   modalSelected = current;
+  fillManualTimeEditor();
+  document.getElementById('manualTimeError').textContent='';
   document.getElementById('editModal').classList.add('open');
 }
 
 function closeModal(){
+  if(manualSavePending) return;
   document.getElementById('editModal').classList.remove('open');
   modalStaffId = modalDateStr = modalSelected = null;
 }
 
-function applyModal(){
-  if(currentUser?.role!=='admin' || isCurrentMonthLocked()) return;
+function fillManualTimeEditor(){
+  const t=manualTimeFor(modalStaffId,modalDateStr);
+  const active=t?.key===modalSelected?t:null;
+  const defaults={early:['08:30','18:30',90],late:['09:00','18:30',90],fixed:['09:00','17:00',60],admin:['08:30','18:30',90],hanowa:['15:00','18:30',0]};
+  const d=defaults[modalSelected]||['','',0];
+  document.getElementById('manualTimeEnabled').checked=!!active;
+  document.getElementById('manualStart').value=active?.start||d[0];
+  document.getElementById('manualEnd').value=active?.end||d[1];
+  document.getElementById('manualBreak').value=active?.breakMinutes??d[2];
+  refreshManualTimeEditor();
+}
+function refreshManualTimeEditor(){
+  const working=isTimedShift(modalSelected);
+  document.getElementById('manualTimeEditor').style.display=working?'block':'none';
+  const enabled=working&&document.getElementById('manualTimeEnabled').checked;
+  for(const id of ['manualStart','manualEnd','manualBreak']) document.getElementById(id).disabled=!enabled;
+  previewManualHours();
+}
+function readManualTimeInput(){
+  const t={key:modalSelected,start:document.getElementById('manualStart').value,end:document.getElementById('manualEnd').value,breakMinutes:document.getElementById('manualBreak').value};
+  manualMinutes(t);t.breakMinutes=Number(t.breakMinutes);return t;
+}
+function previewManualHours(){
+  const el=document.getElementById('manualHoursPreview');
+  el.textContent='';
+  if(!isTimedShift(modalSelected)) return;
+  if(!document.getElementById('manualTimeEnabled').checked){el.textContent='勤務区分の標準時間で集計します。';return;}
+  try {el.textContent='勤務時間：'+roundedHours(manualMinutes(readManualTimeInput())/60)+'時間';}
+  catch(e){el.textContent=e.message;}
+}
+let manualSavePending=false;
+async function applyModal(){
+  if(currentUser?.role!=='admin' || isCurrentMonthLocked() || manualSavePending) return;
   if(!modalStaffId || !modalDateStr) return;
-  if(!shiftData[modalStaffId]) shiftData[modalStaffId] = {};
-  shiftData[modalStaffId][modalDateStr] = modalSelected;
-
-  // 有給フラグ同期
-  if(modalSelected==='paid'){
-    if(!paidData[modalStaffId]) paidData[modalStaffId] = {};
-    paidData[modalStaffId][modalDateStr] = true;
+  const error=document.getElementById('manualTimeError');error.textContent='';
+  const sid=modalStaffId, ds=modalDateStr, key=modalSelected, month=ds.slice(0,7);
+  let time=null;
+  try {
+    if(!Object.values(SHIFT).some(s=>s.key===key)) throw Error('勤務区分を選択してください。');
+    if(isTimedShift(key)&&document.getElementById('manualTimeEnabled').checked) time=readManualTimeInput();
+    if(!window._fb) throw Error('接続を確認して、もう一度保存してください。');
+    manualSavePending=true;document.getElementById('applyShiftButton').disabled=true;
+    const {db,ref,runTransaction,get}=window._fb;
+    const lock=await get(ref(db,'shift_locks/'+firebaseSafeKey(month)));
+    if(lock.val()) throw Error('確定済みのシフトは編集できません。確定を解除してください。');
+    const result=await runTransaction(ref(db,'shifts/'+month),data=>{
+      const next=data||{};
+      (next[sid]??={})[ds]=key;
+      if(time) ((next.__manualTimes??={})[sid]??={})[ds]=time;
+      else if(next.__manualTimes?.[sid]) delete next.__manualTimes[sid][ds];
+      return next;
+    },{applyLocally:false});
+    if(!result.committed) throw Error('保存できませんでした。もう一度お試しください。');
+    allShiftData[month]=result.snapshot.val()||{};
+    if(monthKey(currentYear,currentMonth)===month) loadShiftForMonth(currentYear,currentMonth);
+    if(key==='paid') (paidData[sid]??={})[ds]=true;
+    if(key==='wish') (wishData[sid]??={})[ds]=true;
+    manualSavePending=false;closeModal();render();
+  } catch(e) {
+    error.textContent='保存できません：'+e.message;
+  } finally {
+    manualSavePending=false;document.getElementById('applyShiftButton').disabled=false;
   }
-  if(modalSelected==='wish'){
-    if(!wishData[modalStaffId]) wishData[modalStaffId] = {};
-    wishData[modalStaffId][modalDateStr] = true;
-  }
-
-  closeModal();
-  render();
-  saveCurrentShift(); // 手動編集後も保存
 }
 
 // Close modal on overlay click
@@ -4519,7 +4619,7 @@ function exportCSV(){
       const ds = dateStr(y,m,d);
       const k = shiftData[s.id]?.[ds]||'-';
       const sh = Object.values(SHIFT).find(x=>x.key===k);
-      cells.push(sh?sh.shortLabel:k==='none'?'休診':'-');
+      cells.push((sh?sh.shortLabel:k==='none'?'休診':'-')+(manualTimeFor(s.id,ds)?' '+manualTimeText(s.id,ds):''));
     }
     cells.push(getHours(s.id, y, m));
     return cells;
@@ -5044,7 +5144,7 @@ window.addEventListener('firebaseReady', ()=>{
       allShiftData = data;
       loadShiftForMonth(currentYear, currentMonth);
       if(currentUser?.role==='admin') render();
-      else if(currentUser?.role==='staff') renderStaffMonthGrid(currentUser.staffId);
+      else if(currentUser?.role==='staff') renderStaffScreen();
     }
   });
 
@@ -5197,7 +5297,7 @@ function renderStaffScreen(){
   // 今日のシフト
   const td = today;
   const ds = dateStr(td.getFullYear(), td.getMonth(), td.getDate());
-  const k  = shiftData[sid]?.[ds] || '';
+  const k  = allShiftData[ds.slice(0,7)]?.[sid]?.[ds] || '';
   const dayNames = ['日','月','火','水','木','金','土'];
 
   document.getElementById('todayLabel').textContent =
@@ -5215,7 +5315,10 @@ function renderStaffScreen(){
     none:  { label:'休診日',   start:'-',    end:'-',     brk:'-',           hrs:'-' },
     clinic:{ label:'規定休',   start:'-',    end:'-',     brk:'-',           hrs:`付与${clinicCreditHours(sid)}h` },
   };
-  const info = shiftInfo[k] || { label:'未設定', start:'-', end:'-', brk:'-', hrs:'-' };
+  const info = {...(shiftInfo[k] || { label:'未設定', start:'-', end:'-', brk:'-', hrs:'-' })};
+  const todayData=allShiftData[ds.slice(0,7)]||{};
+  const manual=manualTimeFor(sid,ds,todayData);
+  if(manual) Object.assign(info,{start:manual.start,end:manual.end,brk:manual.breakMinutes+'分',hrs:roundedHours(manualMinutes(manual)/60)+'h'});
 
   const shiftEl = document.getElementById('todayShiftBig');
   shiftEl.textContent = info.label;
@@ -5277,7 +5380,7 @@ function renderStaffMonthGrid(sid){
     grid.innerHTML += `
       <div class="staff-day-cell ${off&&!isClinicDay(ds)?'none':k} ${isTod?'today-cell':''}">
         <span class="d-num">${d}</span>
-        <span class="d-shift">${off&&!isClinicDay(ds)?'休':shiftShort[k]||''}</span>
+        <span class="d-shift">${off&&!isClinicDay(ds)?'休':shiftShort[k]||''}</span>${manualTimeMarkup(sid,ds)}
       </div>`;
   }
 }
@@ -5287,7 +5390,8 @@ function staffChangeMonth(delta){
   if(currentMonth > 11){ currentMonth = 0; currentYear++; }
   if(currentMonth < 0) { currentMonth = 11; currentYear--; }
   if(currentUser?.role === 'staff'){
-    renderStaffMonthGrid(currentUser.staffId);
+    loadShiftForMonth(currentYear,currentMonth);
+    renderStaffScreen();
   }
 }
 

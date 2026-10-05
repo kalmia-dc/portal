@@ -59,9 +59,9 @@ function clinicHourBreakdown(sid,y,m){
     const k=shiftData[sid]?.[dateStr(y,m,d)];
     if(k==='clinic') credit+=clinicCreditHours(sid);
     else if(k==='paid') paid+=8;
-    else work+=calcShiftHours(k);
+    else work+=dayShiftHours(sid,dateStr(y,m,d));
   }
-  return {work,paid,credit,total:work+paid+credit};
+  return {work:roundedHours(work),paid,credit,total:roundedHours(work+paid+credit)};
 }
 function clinicHourLabel(sid){
   const h=clinicHourBreakdown(sid,currentYear,currentMonth);
