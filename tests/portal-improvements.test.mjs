@@ -58,7 +58,9 @@ test('meeting deep link waits for its data and opens once through existing routi
  const meeting=fs.readFileSync('meeting-management.html','utf8');
  const code=meeting.slice(meeting.indexOf('let initialCaseOpened=false;'),meeting.indexOf('function attachDataListeners()'));
  const state={notices:[],tasks:[]},opened=[];
- const c=vm.createContext({URLSearchParams,location:{search:'?caseKind=notices&caseId=sample'},state,canSeeNotices:()=>true,openRelatedCase:(...args)=>opened.push(args)});
+ let highlighted=false;
+ const document={querySelectorAll:()=>[{dataset:{caseKind:'notices',caseId:'sample'},classList:{add:()=>highlighted=true}}]};
+ const c=vm.createContext({document,URLSearchParams,location:{search:'?caseKind=notices&caseId=sample'},state,canSeeNotices:()=>true,openRelatedCase:(...args)=>opened.push(args)});
  vm.runInContext(code+'openInitialCase();',c);assert.equal(opened.length,0);
- state.notices.push({id:'sample'});vm.runInContext('openInitialCase();openInitialCase();',c);assert.deepEqual(opened,[['notices','sample']]);
+ state.notices.push({id:'sample'});vm.runInContext('openInitialCase();openInitialCase();',c);assert.deepEqual(opened,[['notices','sample']]);assert.equal(highlighted,true);
 });

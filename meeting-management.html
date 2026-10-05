@@ -1561,9 +1561,13 @@ function setupViewer() {
 
 let initialCaseOpened=false;
 function openInitialCase(){
- if(initialCaseOpened)return;
  const p=new URLSearchParams(location.search),kind=p.get('caseKind'),id=p.get('caseId');
  if(!['tasks','notices'].includes(kind)||!id||(kind==='notices'&&!canSeeNotices()))return;
+ if(initialCaseOpened){
+   const card=Array.from(document.querySelectorAll('[data-case-id]')).find(el=>el.dataset.caseKind===kind&&el.dataset.caseId===id);
+   if(card)card.classList.add('case-focus');
+   return;
+ }
  if(state[kind].some(x=>x.id===id)){initialCaseOpened=true;openRelatedCase(kind,id);}
 }
 function attachDataListeners() {
@@ -1590,6 +1594,7 @@ function attachDataListeners() {
     renderIncidentReports();
     renderTasks();
     if (canSeeNotices()) renderNotices();
+    openInitialCase();
   });
 }
 
