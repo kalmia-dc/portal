@@ -1451,14 +1451,13 @@
 
   <section class="utility-bar" aria-label="補助操作">
     <div>
-      <div class="utility-title">出力・通知・取込</div>
+      <div class="utility-title">出力・取込</div>
       <div class="utility-note">日常入力は上の月次入力から行い、補助操作はこちらにまとめています。</div>
     </div>
     <div class="utility-actions">
       <button class="btn secondary" onclick="exportCSV()">CSV</button>
       <button class="btn secondary" onclick="window.print()">印刷</button>
       <button class="btn secondary editor-only" onclick="openImportModal()">写真/PDF取込</button>
-      <button class="btn secondary editor-only" onclick="sendLineWorksSummary()">LINE WORKS通知</button>
     </div>
   </section>
 
@@ -1694,7 +1693,6 @@ const DB_PATH = 'monthlyGoals';
 const TARGET_DB_PATH = 'halfYearGoalTargets';
 const PRIVATE_METRICS_PATH = 'privateMetrics';
 const IMPORT_HISTORY_PATH = 'monthlyGoalImportHistory';
-const NOTIFY_URL = 'https://kalmia-notify.chibakenmin-sugihey.workers.dev';
 const EDITOR_IDS = ['sugihira', 'momo'];
 const HISTORY_MONTH_COUNT = 6;
 const BREAK_EVEN_SALES = 11_000_000;
@@ -4027,47 +4025,6 @@ function historyCsvValue(goal, index) {
   if (!item) return '';
   return `${item.label || ''}:${item.value ?? ''}`;
 }
-
-window.sendLineWorksSummary = async function() {
-  if (!isEditor()) return;
-  const month = selectedPeriodMonth();
-  const goals = periodGoals(month);
-  if (!goals.length) { showToast('通知する目標がありません'); return; }
-  const done = goals.filter(g => goalStatus(g) === 'done');
-  const behind = goals.filter(g => goalStatus(g) === 'behind');
-  const noTarget = goals.filter(g => goalStatus(g) === 'noTarget');
-  const blank = goals.filter(g => goalStatus(g) === 'blank');
-  const avgRates = goals.map(calcRate).filter(v => v !== null);
-  const avg = avgRates.length ? Math.round(avgRates.reduce((a, b) => a + b, 0) / avgRates.length) : '-';
-  const lowLines = behind.slice(0, 5).map(g => {
-    const rate = calcRate(g);
-    return `・${monthShortLabel(g.month)} ${g.item}: ${rate === null ? '-' : Math.round(rate) + '%'}（実績 ${fmtNumber(actualValueForGoal(g), g.unit)} / 目標 ${fmtNumber(targetValueForGoal(g), g.unit)}）`;
-  });
-  const text = [
-    `【半期目標】${periodLabel(month)} 達成状況`,
-    `集計期間: ${periodLabel(month)}`,
-    `登録: ${goals.length}件`,
-    `達成: ${done.length}件`,
-    `未達: ${behind.length}件`,
-    `目標未設定: ${noTarget.length}件`,
-    `実績未入力: ${blank.length}件`,
-    `平均達成率: ${avg}%`,
-    lowLines.length ? '\n要確認:\n' + lowLines.join('\n') : '',
-    `\n送信者: ${currentUser.name}`
-  ].filter(Boolean).join('\n');
-
-  try {
-    const res = await fetch(NOTIFY_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text })
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    showToast('LINE WORKSに通知しました');
-  } catch(e) {
-    showToast('通知に失敗しました: ' + e.message);
-  }
-};
 
 function showToast(message) {
   const toast = document.getElementById('toast');
