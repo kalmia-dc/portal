@@ -86,7 +86,7 @@ async function load(success='一覧を読み込みました。') {
     for(const [uid,member] of Object.entries(users)) {
       const node=row($('members'),uid,member);
       text(node,`${member.active === true ? '許可中' : '解除済み'} / ${member.role} / スタッフID: ${member.staffId}`);
-      const protectedAccount=uid===actor.uid || ['admin','terminal'].includes(member.role);
+      const protectedAccount=uid===actor.uid || !['staff','trainingAdmin'].includes(member.role);
       const label=protectedAccount?'保護されたアカウント':member.active===true?'許可解除':'再許可';
       const b=button(node,label,()=>change(uid,member,member.active===true?'revoke':'restore'),protectedAccount);
       if(!protectedAccount && member.active===true) b.className='danger';

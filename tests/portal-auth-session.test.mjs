@@ -10,7 +10,8 @@ test('real auth entry clears cached identity and visible data on revoked permiss
   const elements=new Map();
   const el=()=>({append(){},replaceChildren(){},setAttribute(){},addEventListener(){},remove(){elements.delete('portal-auth-overlay')},set id(value){elements.set(value,this)}});
   const storage={setItem:(k,v)=>store.set(k,v),removeItem:k=>store.delete(k)};
-  const document={title:'test',head:el(),body:{append(){},replaceChildren(){cleared++}},createElement:el,getElementById:id=>elements.get(id)};
+  const page={style:{}};
+  const document={title:'test',head:el(),body:{children:[page],append(){},replaceChildren(){cleared++}},createElement:el,getElementById:id=>elements.get(id),querySelectorAll:()=>[]};
   const context=vm.createContext({document,sessionStorage:storage,localStorage:storage,window:{dispatchEvent(){}},CustomEvent:class{},location:{reload(){},assign(){}},console});
   const auth={getAuth:()=>({}),GoogleAuthProvider:class{},browserLocalPersistence:'local',getRedirectResult:async()=>null,
     onAuthStateChanged:(a,fn)=>{queueMicrotask(()=>fn(user));return()=>{}},setPersistence:async()=>{},signInWithPopup:async()=>{},signInWithRedirect:async()=>{},signOut:async()=>{signouts++}};
@@ -24,6 +25,10 @@ test('real auth entry clears cached identity and visible data on revoked permiss
   await entry.evaluate();
   const profile=await entry.namespace.startPortalAuth({},{});
   assert.equal(profile.staffId,'tanaka');assert.ok(store.has('portalUser'));
+  listeners.get('.info/connected').next({val:()=>false});
+  assert.equal(signouts,0);assert.equal(page.inert,true);assert.equal(page.style.visibility,'hidden');
+  listeners.get('.info/connected').next({val:()=>true});
+  assert.equal(signouts,0);assert.equal(page.inert,true);
   listeners.get('portalAccess/users/u').next({val:()=>({...raw,active:false})});
   assert.equal(store.has('portalUser'),false);assert.equal(context.window.portalAuth,undefined);
   assert.equal(cleared,1);assert.equal(signouts,1);assert.ok(elements.has('portal-auth-overlay'));

@@ -18,6 +18,7 @@ test('unauthenticated, non-admin, self, protected roles and invalid UID are reje
   for(const profile of [null,{}, {uid:'staff',portalRole:'staff'},{uid:'training',portalRole:'trainingAdmin'}]) assert.throws(()=>memberChange({...args,actor:profile}),/管理者/);
   assert.throws(()=>memberChange({...args,uid:'admin'}),/自分自身/);
   for(const role of ['admin','terminal']) assert.throws(()=>memberChange({...args,current:{...member,role}}),/変更できません/);
+  assert.throws(()=>memberChange({...args,current:{...member,role:'notification'}}),/用途/);
   assert.throws(()=>memberChange({...args,uid:'a/b'}),/不正/);
 });
 test('revoke and restore preserve staff history linkage and existing metadata',()=>{
@@ -47,13 +48,23 @@ test('write abort/failure is never reported as success; repeat action is rejecte
   assert.deepEqual(await performMemberChange({...options,transact}),{cancelled:false});
   await assert.rejects(performMemberChange({...options,transact}),/変更されました/);
 });
-test('session invalidates once on revoke, role change, failed read, disconnect or signout',()=>{
-  for(const reason of ['revoke','role','error','disconnect','signout']) {
+test('session invalidates once on revoke, role change, failed read or signout',()=>{
+  for(const reason of ['revoke','role','error','signout']) {
     let next,error,auth,connection;const stopped=[];
     watchPortalSession({userId:'u',initial:member,normalize:x=>x?.active?x:null,
-      subscribe:(n,e)=>{next=n;error=e;return()=>{}},subscribeAuth:n=>{auth=n;return()=>{}},subscribeConnection:n=>{connection=n;return()=>{}},invalidate:r=>stopped.push(r)});
+      subscribe:(n,e)=>{next=n;error=e;return()=>{}},subscribeAuth:n=>{auth=n;return()=>{}},subscribeConnection:n=>{connection=n;return()=>{}},invalidate:r=>stopped.push(r),suspend(){},reconnect(){}});
     next({...member});auth({uid:'u'});connection(true);assert.deepEqual(stopped,[]);
     ({revoke:()=>next({...member,active:false}),role:()=>next({...member,role:'trainingAdmin'}),error:()=>error(Error('offline')),disconnect:()=>connection(false),signout:()=>auth(null)})[reason]();
     error();assert.equal(stopped.length,1);
   }
+});
+test('brief disconnect locks once without signout; reconnect stays locked until fresh page',()=>{
+  let next,connection,suspended=0,reconnected=0,invalidated=0;
+  watchPortalSession({userId:'u',initial:member,normalize:x=>x?.active?x:null,
+    subscribe:n=>{next=n;return()=>{}},subscribeAuth:()=>()=>{},subscribeConnection:n=>{connection=n;return()=>{}},
+    invalidate:()=>invalidated++,suspend:()=>suspended++,reconnect:()=>reconnected++});
+  connection(true);connection(false);connection(false);connection(true);
+  assert.equal(suspended,1);assert.equal(invalidated,0);assert.equal(reconnected,1);
+  next({...member,active:false});assert.equal(invalidated,1);
+  connection(true);assert.equal(reconnected,1);
 });

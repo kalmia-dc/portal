@@ -228,17 +228,34 @@ export async function startPortalAuth(app, { pageName = document.title } = {}) {
   window.portalSignOut = signOutPortal;
   document.getElementById(OVERLAY_ID)?.remove();
   window.dispatchEvent(new CustomEvent('portalAuthReady', { detail: profile }));
+  const lockForConnection = connected => {
+    clearPortalProfile();
+    document.querySelectorAll('dialog[open]').forEach(dialog => dialog.close('cancel'));
+    // Lock focus and conceal the existing page without deleting unsaved state.
+    // It is intentionally not unlocked from an SDK cache after reconnecting.
+    for (const child of document.body.children) {
+      if (child.id === OVERLAY_ID) continue;
+      child.inert = true;
+      child.style.visibility = 'hidden';
+    }
+    showCard(connected ? '通信が復旧しました' : '通信が途切れています',
+      connected ? '<p>Googleのログイン状態は保持しています。再読み込みして最新の利用許可を確認してください。</p><p>再読み込みすると未保存の入力内容は失われます。</p>'
+        : '<p>利用許可を確認できないため、画面を一時的にロックしています。通信の復旧をお待ちください。</p><p>Googleのログイン状態は保持しています。</p>',
+      connected ? [{ label:'利用許可を確認して再開', onClick:() => location.reload() }] : []);
+  };
   watchPortalSession({
     userId:user.uid, initial:profile,
     normalize:raw => normalizeAccessProfile(user.uid, user, raw),
     subscribe:(next, error) => onValue(ref(db, `portalAccess/users/${user.uid}`), snap => next(snap.val()), error),
     subscribeAuth:next => onAuthStateChanged(auth, next),
     subscribeConnection:next => onValue(ref(db, '.info/connected'), snap => next(snap.val() === true)),
+    suspend:() => lockForConnection(false),
+    reconnect:() => lockForConnection(true),
     invalidate:() => {
       clearPortalProfile();
       window.portalAuth = undefined;
       document.body.replaceChildren();
-      showCard('利用許可の再確認が必要です', '<p>利用許可の変更、ログアウト、または通信切断を検出しました。画面を閉じました。</p><p>再読み込みしてログイン状態を確認してください。</p>', [
+      showCard('利用許可の再確認が必要です', '<p>利用許可の変更、ログアウト、または利用許可の読み取りエラーを検出しました。画面を閉じました。</p><p>再読み込みしてログイン状態を確認してください。</p>', [
         { label:'再読み込み', onClick:() => location.reload() },
       ]);
       void signOut(auth).catch(() => {});

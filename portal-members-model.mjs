@@ -9,6 +9,7 @@ export function memberChange({ actor, uid, current, expected, action, request, s
   assertAdmin(actor);
   checkUid(uid);
   if (uid === actor.uid || current?.role === 'admin' || current?.role === 'terminal') throw new Error('管理者・端末・自分自身のアカウントはこの画面で変更できません。');
+  if (current && !['staff','trainingAdmin'].includes(current.role)) throw new Error('用途を確認できないアカウントは変更できません。');
   // Compare the entire confirmed record: concurrent changes must be reviewed again.
   const stable = value => Array.isArray(value) ? value.map(stable)
     : value && typeof value === 'object' ? Object.fromEntries(Object.keys(value).sort().map(key => [key,stable(value[key])])) : value;
