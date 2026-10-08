@@ -213,40 +213,57 @@ const NOTIFY_URL = 'https://kalmia-notify.chibakenmin-sugihey.workers.dev';
 
 async function sendNotify(text) {
   try {
-    await fetch(NOTIFY_URL, {
+    const response = await fetch(NOTIFY_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text })
     });
-  } catch(e) { console.warn('通知失敗:', e); }
+    if (!response.ok || (await response.json()).ok !== true) {
+      console.warn('通知失敗');
+      return false;
+    }
+    return true;
+  } catch(e) { console.warn('通知失敗'); return false; }
 }
 
 
 // ─── 回答期限前日通知 ───────────────────────────────────
+let scheduleDeadlineCheckRunning = false;
+function scheduleDateKey(now = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit'
+  }).formatToParts(now);
+  const value = type => parts.find(part => part.type === type).value;
+  return `${value('year')}-${value('month')}-${value('day')}`;
+}
+
 async function checkScheduleDeadlines() {
-  const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
-  const today    = new Date().toISOString().split('T')[0];
+  if (scheduleDeadlineCheckRunning) return;
+  scheduleDeadlineCheckRunning = true;
+  try {
+    const today = scheduleDateKey();
+    const tomorrow = new Date(Date.parse(`${today}T00:00:00Z`) + 86400000).toISOString().split('T')[0];
 
-  // 今日すでに通知済みのイベントIDを記録（localStorageで管理）
-  const storageKey = `schedule_notified_${today}`;
-  const notified = new Set(JSON.parse(localStorage.getItem(storageKey) || '[]'));
+    // 今日すでに通知済みのイベントIDを記録（localStorageで管理）
+    const storageKey = `schedule_notified_${today}`;
+    const notified = new Set(JSON.parse(localStorage.getItem(storageKey) || '[]'));
 
-  for (const [evId, ev] of Object.entries(state.events)) {
-    if (!ev.deadline) continue;
-    if (ev.decided) continue; // 決定済みはスキップ
-    if (notified.has(evId)) continue; // 今日すでに通知済み
+    for (const [evId, ev] of Object.entries(state.events)) {
+      if (!ev.deadline) continue;
+      if (ev.decided) continue; // 決定済みはスキップ
+      if (notified.has(evId)) continue; // 今日すでに通知済み
 
-    if (ev.deadline === tomorrow) {
-      await sendNotify(`⏰ 【明日期限】日程調整「${ev.name}」の回答期限は明日です。\nポータルから回答してください。`);
-      notified.add(evId);
-    } else if (ev.deadline === today) {
-      await sendNotify(`⚠️ 【本日期限】日程調整「${ev.name}」の回答期限は今日です！\nポータルから回答してください。`);
-      notified.add(evId);
+      if (ev.deadline === tomorrow) {
+        if (await sendNotify(`⏰ 【明日期限】日程調整「${ev.name}」の回答期限は明日です。\nポータルから回答してください。`)) notified.add(evId);
+      } else if (ev.deadline === today) {
+        if (await sendNotify(`⚠️ 【本日期限】日程調整「${ev.name}」の回答期限は今日です！\nポータルから回答してください。`)) notified.add(evId);
+      }
+      localStorage.setItem(storageKey, JSON.stringify([...notified]));
     }
-  }
 
-  // 通知済みリストを保存（翌日以降は自動的に別キーになるので蓄積しない）
-  localStorage.setItem(storageKey, JSON.stringify([...notified]));
+  } finally {
+    scheduleDeadlineCheckRunning = false;
+  }
 }
 
 async function saveEvent(id, ev) {
