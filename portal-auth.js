@@ -12,10 +12,12 @@ import {
 import {
   getDatabase,
   get,
+  onValue,
   ref,
   serverTimestamp,
   update,
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
+import { watchPortalSession } from './portal-session-watch.mjs';
 
 export const PORTAL_ROLES = Object.freeze({
   ADMIN: 'admin',
@@ -202,7 +204,16 @@ export async function startPortalAuth(app, { pageName = document.title } = {}) {
     throw new Error('Googleアカウントでのログインが必要です。');
   }
 
-  const profile = await loadApprovedProfile(db, user);
+  let profile;
+  try {
+    profile = await loadApprovedProfile(db, user);
+  } catch (error) {
+    clearPortalProfile();
+    showCard('利用許可を確認できません', '<p>通信状況を確認して、再読み込みしてください。</p>', [
+      { label:'再読み込み', onClick:() => location.reload() },
+    ]);
+    throw error;
+  }
   if (!profile) {
     clearPortalProfile();
     await recordAccessRequest(db, user, pageName);
@@ -217,6 +228,22 @@ export async function startPortalAuth(app, { pageName = document.title } = {}) {
   window.portalSignOut = signOutPortal;
   document.getElementById(OVERLAY_ID)?.remove();
   window.dispatchEvent(new CustomEvent('portalAuthReady', { detail: profile }));
+  watchPortalSession({
+    userId:user.uid, initial:profile,
+    normalize:raw => normalizeAccessProfile(user.uid, user, raw),
+    subscribe:(next, error) => onValue(ref(db, `portalAccess/users/${user.uid}`), snap => next(snap.val()), error),
+    subscribeAuth:next => onAuthStateChanged(auth, next),
+    subscribeConnection:next => onValue(ref(db, '.info/connected'), snap => next(snap.val() === true)),
+    invalidate:() => {
+      clearPortalProfile();
+      window.portalAuth = undefined;
+      document.body.replaceChildren();
+      showCard('利用許可の再確認が必要です', '<p>利用許可の変更、ログアウト、または通信切断を検出しました。画面を閉じました。</p><p>再読み込みしてログイン状態を確認してください。</p>', [
+        { label:'再読み込み', onClick:() => location.reload() },
+      ]);
+      void signOut(auth).catch(() => {});
+    },
+  });
   return profile;
 }
 

@@ -550,6 +550,7 @@
         <a class="tool-item" id="privateMetricsToolBtn" data-guest-hidden="true" href="#" onclick="goToPrivateMetricsApp();return false;" style="display:none;background:linear-gradient(135deg,#fff6f0,#ffe4d6);border:2px solid #ffb996;">
           <span class="tool-icon">秘</span><span class="tool-name">非公開<br>経営数値</span>
         </a>
+        <a class="tool-item" id="memberManagementToolBtn" data-guest-hidden="true" href="./portal-members.html" style="display:none"><span class="tool-icon">人</span><span class="tool-name">ログイン<br>メンバー管理</span></a>
         <a class="tool-item" id="terminalSetupToolBtn" data-guest-hidden="true" href="./terminal-setup.html" style="display:none;background:linear-gradient(135deg,#eef7ff,#e4f0ff);border:2px solid #9fc5f8;">
           <span class="tool-icon">PC</span><span class="tool-name">共用PC<br>端末設定</span>
         </a>
@@ -989,6 +990,7 @@ function updateMenuVisibility() {
   const privateMetricsBtn = document.getElementById('privateMetricsToolBtn');
   const skillBtn = document.getElementById('skillToolBtn');
   const terminalSetupBtn = document.getElementById('terminalSetupToolBtn');
+  document.getElementById('memberManagementToolBtn').style.display = authenticatedProfile?.isAdmin ? 'block' : 'none';
   if (adminBtn) adminBtn.style.display = adminVisible ? 'block' : 'none';
   if (privateMetricsBtn) privateMetricsBtn.style.display = adminVisible ? 'block' : 'none';
   if (skillBtn) skillBtn.style.display = guest ? 'none' : 'block';
