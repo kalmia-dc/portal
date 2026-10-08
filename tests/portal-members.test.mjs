@@ -58,11 +58,11 @@ test('session invalidates once on revoke, role change, failed read or signout',(
     error();assert.equal(stopped.length,1);
   }
 });
-test('brief disconnect locks once without signout; reconnect stays locked until fresh page',()=>{
+test('brief disconnect locks once without signout; cached profile cannot unlock',async()=>{
   let next,connection,suspended=0,reconnected=0,invalidated=0;
   watchPortalSession({userId:'u',initial:member,normalize:x=>x?.active?x:null,
     subscribe:n=>{next=n;return()=>{}},subscribeAuth:()=>()=>{},subscribeConnection:n=>{connection=n;return()=>{}},
-    invalidate:()=>invalidated++,suspend:()=>suspended++,reconnect:()=>reconnected++});
+    invalidate:()=>invalidated++,suspend:()=>suspended++,verifying:()=>reconnected++,verify:()=>new Promise(()=>{}),resume:()=>{throw Error('Unexpected resume')}});
   connection(true);connection(false);connection(false);connection(true);
   assert.equal(suspended,1);assert.equal(invalidated,0);assert.equal(reconnected,1);
   next({...member,active:false});assert.equal(invalidated,1);

@@ -1,0 +1,17 @@
+{
+  "portalAccess": {
+    "users": {
+      "$uid": {
+        ".read": "auth != null && (auth.uid === $uid || root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin')",
+        ".write": "auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin'",
+        ".validate": "newData.hasChildren(['staffId', 'name', 'role', 'active']) && newData.child('staffId').isString() && newData.child('name').isString() && newData.child('role').isString() && (newData.child('role').val() === 'admin' || newData.child('role').val() === 'trainingAdmin' || newData.child('role').val() === 'staff' || newData.child('role').val() === 'terminal') && newData.child('active').isBoolean()"
+      }
+    }
+  },
+  "portalAccessRequests": {
+    "$uid": {
+      ".read": "auth != null && (auth.uid === $uid || root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin')",
+      ".write": "auth != null && ((auth.uid === $uid && auth.token.email != null && newData.child('uid').val() === auth.uid && newData.child('email').val() === auth.token.email) || (root.child('portalAccess/users').child(auth.uid).child('active').val() === true && root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin'))"
+    }
+  }
+}

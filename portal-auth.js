@@ -18,6 +18,7 @@ import {
   update,
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 import { watchPortalSession } from './portal-session-watch.mjs';
+import { readServerProfile } from './portal-server-profile.mjs';
 
 export const PORTAL_ROLES = Object.freeze({
   ADMIN: 'admin',
@@ -228,20 +229,17 @@ export async function startPortalAuth(app, { pageName = document.title } = {}) {
   window.portalSignOut = signOutPortal;
   document.getElementById(OVERLAY_ID)?.remove();
   window.dispatchEvent(new CustomEvent('portalAuthReady', { detail: profile }));
-  const lockForConnection = connected => {
-    clearPortalProfile();
+  const lockedElements = new Map();
+  const lockForConnection = () => {
     document.querySelectorAll('dialog[open]').forEach(dialog => dialog.close('cancel'));
-    // Lock focus and conceal the existing page without deleting unsaved state.
-    // It is intentionally not unlocked from an SDK cache after reconnecting.
+    // Preserve DOM/form state; unlock only after a fresh server REST read.
     for (const child of document.body.children) {
       if (child.id === OVERLAY_ID) continue;
+      if(!lockedElements.has(child)) lockedElements.set(child,{inert:child.inert,visibility:child.style.visibility});
       child.inert = true;
       child.style.visibility = 'hidden';
     }
-    showCard(connected ? '通信が復旧しました' : '通信が途切れています',
-      connected ? '<p>Googleのログイン状態は保持しています。再読み込みして最新の利用許可を確認してください。</p><p>再読み込みすると未保存の入力内容は失われます。</p>'
-        : '<p>利用許可を確認できないため、画面を一時的にロックしています。通信の復旧をお待ちください。</p><p>Googleのログイン状態は保持しています。</p>',
-      connected ? [{ label:'利用許可を確認して再開', onClick:() => location.reload() }] : []);
+    showCard('通信が途切れています','<p>入力内容とログイン状態を保持して、操作を一時停止しています。</p><p>通信復旧後、サーバーで利用許可を確認して自動的に再開します。</p>');
   };
   watchPortalSession({
     userId:user.uid, initial:profile,
@@ -249,8 +247,15 @@ export async function startPortalAuth(app, { pageName = document.title } = {}) {
     subscribe:(next, error) => onValue(ref(db, `portalAccess/users/${user.uid}`), snap => next(snap.val()), error),
     subscribeAuth:next => onAuthStateChanged(auth, next),
     subscribeConnection:next => onValue(ref(db, '.info/connected'), snap => next(snap.val() === true)),
-    suspend:() => lockForConnection(false),
-    reconnect:() => lockForConnection(true),
+    suspend:lockForConnection,
+    verifying:() => showCard('利用許可を再確認しています','<p>サーバーに接続しています。確認が完了するまで入力内容を保持してお待ちください。</p>'),
+    verify:() => readServerProfile({databaseURL:app.options.databaseURL,user}),
+    resume:() => {
+      for(const [child,previous] of lockedElements){child.inert=previous.inert;child.style.visibility=previous.visibility;}
+      lockedElements.clear();
+      savePortalProfile(profile);
+      document.getElementById(OVERLAY_ID)?.remove();
+    },
     invalidate:() => {
       clearPortalProfile();
       window.portalAuth = undefined;

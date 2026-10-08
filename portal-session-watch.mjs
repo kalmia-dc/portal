@@ -1,22 +1,30 @@
-// Revalidate the exact profile throughout a page's lifetime, not just at login.
-export function watchPortalSession({ subscribe, subscribeAuth, subscribeConnection, userId, initial, normalize, invalidate, suspend, reconnect }) {
-  let stopped = false;
-  let suspended = false;
-  let connectionState;
-  const stop = reason => { if (!stopped) { stopped = true; invalidate(reason); } };
-  const offProfile = subscribe(raw => {
-    const next = normalize(raw);
-    if (!next || JSON.stringify(next) !== JSON.stringify(initial)) stop('changed');
-  }, () => stop('read-failed'));
-  const offAuth = subscribeAuth(user => { if (user?.uid !== userId) stop('signed-out'); });
-  // Transport loss is not revocation. Keep Firebase authentication, but do not
-  // expose cached content or allow actions until a fresh page confirms access.
-  const offConnection = subscribeConnection(connected => {
-    if (stopped) return;
-    if (connected === connectionState) return;
-    connectionState = connected;
-    if (!connected) { suspended = true; suspend(); }
-    else if (connected && suspended) reconnect();
+// Only a current server response can unlock a suspended page. Cached SDK
+// notifications may invalidate access, but can never resume it.
+export function watchPortalSession({ subscribe, subscribeAuth, subscribeConnection, userId, initial, normalize, invalidate, suspend, verify, resume, verifying=()=>{}, retryLater=setTimeout, cancelRetry=clearTimeout }) {
+  let stopped=false,suspended=false,connected,epoch=0,retry,attempt=0;
+  const same=raw=>{const next=normalize(raw);return next && JSON.stringify(next)===JSON.stringify(initial);};
+  const stop=reason=>{if(!stopped){stopped=true;epoch++;cancelRetry(retry);invalidate(reason);}};
+  async function check(version) {
+    if(stopped || version!==epoch || !connected) return;
+    verifying();
+    try {
+      const raw=await verify();
+      if(stopped || version!==epoch || !connected) return;
+      if(!same(raw)) {stop('changed');return;}
+      suspended=false;attempt=0;resume();
+    } catch(error) {
+      if(stopped || version!==epoch || !connected) return;
+      if(error?.code==='access-denied') {stop('access-denied');return;}
+      retry=retryLater(()=>{void check(version);},Math.min(1000*2**attempt++,15000));
+    }
+  }
+  const offProfile=subscribe(raw=>{if(!same(raw))stop('changed');},()=>stop('read-failed'));
+  const offAuth=subscribeAuth(user=>{if(user?.uid!==userId)stop('signed-out');});
+  const offConnection=subscribeConnection(value=>{
+    if(stopped || value===connected) return;
+    connected=value;epoch++;cancelRetry(retry);
+    if(!connected){suspended=true;suspend();}
+    else if(suspended){attempt=0;void check(epoch);}
   });
-  return () => { stopped = true; offProfile(); offAuth(); offConnection(); };
+  return ()=>{stopped=true;epoch++;cancelRetry(retry);offProfile();offAuth();offConnection();};
 }

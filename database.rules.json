@@ -5,8 +5,8 @@
     "portalAccess": {
       "users": {
         "$uid": {
-          ".read": "auth != null && auth.uid === $uid",
-          ".write": "auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin' && auth.uid !== $uid && newData.exists() && ((!data.exists() && newData.child('role').val() === 'staff' && newData.child('active').val() === true && root.child('portalAccessRequests').child($uid).child('uid').val() === $uid && root.child('portalAccessRequests').child($uid).child('email').isString() && newData.child('email').val() === root.child('portalAccessRequests').child($uid).child('email').val()) || (data.exists() && (data.child('role').val() === 'staff' || data.child('role').val() === 'trainingAdmin') && newData.child('active').val() !== data.child('active').val() && newData.child('staffId').val() === data.child('staffId').val() && newData.child('name').val() === data.child('name').val() && newData.child('staffRole').val() === data.child('staffRole').val() && newData.child('role').val() === data.child('role').val() && newData.child('email').val() === data.child('email').val() && newData.child('terminalId').val() === data.child('terminalId').val()))",
+          ".read": "(auth != null && auth.uid === $uid) && (auth != null && auth.uid !== root.child('serviceAccess/notifications').child('uid').val())",
+          ".write": "(auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin' && auth.uid !== $uid && newData.exists() && ((!data.exists() && newData.child('role').val() === 'staff' && newData.child('active').val() === true && root.child('portalAccessRequests').child($uid).child('uid').val() === $uid && root.child('portalAccessRequests').child($uid).child('email').isString() && newData.child('email').val() === root.child('portalAccessRequests').child($uid).child('email').val()) || (data.exists() && (data.child('role').val() === 'staff' || data.child('role').val() === 'trainingAdmin') && newData.child('active').val() !== data.child('active').val() && newData.child('staffId').val() === data.child('staffId').val() && newData.child('name').val() === data.child('name').val() && newData.child('staffRole').val() === data.child('staffRole').val() && newData.child('role').val() === data.child('role').val() && newData.child('email').val() === data.child('email').val() && newData.child('terminalId').val() === data.child('terminalId').val()))) && (auth != null && auth.uid !== root.child('serviceAccess/notifications').child('uid').val()) && $uid !== root.child('serviceAccess/notifications').child('uid').val()",
           ".validate": "newData.hasChildren(['staffId','name','role','active','updatedBy','updatedAt']) && newData.child('staffId').isString() && newData.child('staffId').val().length > 0 && newData.child('name').isString() && newData.child('name').val().length > 0 && newData.child('active').isBoolean() && newData.child('updatedBy').val() === auth.uid && newData.child('updatedAt').isNumber() && newData.child('updatedAt').val() === now",
           "staffId": {
             ".validate": true
@@ -36,15 +36,15 @@
             ".validate": "data.exists() && newData.val() === data.val()"
           }
         },
-        ".read": "auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin'"
+        ".read": "(auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin') && (auth != null && auth.uid !== root.child('serviceAccess/notifications').child('uid').val())"
       }
     },
     "portalAccessRequests": {
       "$uid": {
-        ".read": "auth != null && auth.uid === $uid",
-        ".write": "auth != null && ((auth.uid === $uid && auth.token.email != null && newData.child('uid').val() === auth.uid && newData.child('email').val() === auth.token.email) || (root.child('portalAccess/users').child(auth.uid).child('active').val() === true && root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin'))"
+        ".read": "(auth != null && auth.uid === $uid) && (auth != null && auth.uid !== root.child('serviceAccess/notifications').child('uid').val())",
+        ".write": "(auth != null && ((auth.uid === $uid && auth.token.email != null && newData.child('uid').val() === auth.uid && newData.child('email').val() === auth.token.email) || (root.child('portalAccess/users').child(auth.uid).child('active').val() === true && root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin'))) && (auth != null && auth.uid !== root.child('serviceAccess/notifications').child('uid').val()) && $uid !== root.child('serviceAccess/notifications').child('uid').val()"
       },
-      ".read": "auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin'"
+      ".read": "(auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin') && (auth != null && auth.uid !== root.child('serviceAccess/notifications').child('uid').val())"
     },
     "passwords": {
       ".read": false,

@@ -14,9 +14,11 @@ export async function startPortalAuth(){return {uid:mode==='staff'?'staff':'admi
 http.createServer((req,res)=>{
  const url=new URL(req.url,'http://127.0.0.1');
  if(url.pathname==='/__mock.mjs'){res.setHeader('Content-Type','text/javascript; charset=utf-8');res.end(mock);return;}
+ if(url.pathname==='/session-test.html'){res.setHeader('Content-Type','text/html; charset=utf-8');res.end(`<!doctype html><html lang="ja"><meta charset="utf-8"><title>通信復旧テスト（架空データ）</title><h1>通信復旧テスト（架空データのみ）</h1><p>接続→サーバー確認まで画面はロック。入力を維持して再開します。</p><button data-signal="disconnect">通信を切断</button> <button data-signal="connect">再接続</button> <button data-signal="verify-ok">サーバー確認成功</button> <button data-signal="revoke">利用許可解除</button><iframe title="テスト用ポータル" src="/tests/fixtures/session-content.html" style="display:block;width:95%;height:700px;margin-top:20px"></iframe><script>document.querySelectorAll('button').forEach(b=>b.onclick=()=>document.querySelector('iframe').contentWindow.postMessage(b.dataset.signal,location.origin));</script></html>`);return;}
  const file=path.resolve(root,'.'+decodeURIComponent(url.pathname));
  if(!file.startsWith(root+path.sep)){res.writeHead(403).end();return;}
  try{let content=fs.readFileSync(file);if(file.endsWith('portal-members.js'))content=content.toString().replace(/from 'https:\/\/www.gstatic.com\/[^']+'/g,"from './__mock.mjs'").replace("from './portal-auth.js'","from './__mock.mjs'");
+ if(file.endsWith('portal-auth.js'))content=content.toString().replace(/from 'https:\/\/www.gstatic.com\/[^']+'/g,"from './tests/fixtures/session-sdk.mjs'");
  res.setHeader('Content-Type',file.endsWith('.html')?'text/html; charset=utf-8':file.endsWith('.css')?'text/css; charset=utf-8':'text/javascript; charset=utf-8');res.end(content);
  }catch{res.writeHead(404).end();}
 }).listen(8768,'127.0.0.1',()=>console.log('Offline member UI fixture: http://127.0.0.1:8768/portal-members.html'));
