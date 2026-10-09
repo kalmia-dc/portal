@@ -411,6 +411,29 @@
   </div>
 </header>
 
+<div class="hero" id="homePriorities">
+  <div class="hero-greeting" id="greeting">おはようございます 👋</div>
+  <div class="hero-title" id="heroTitle">さん</div>
+
+  <!-- 自分のタスク（hero内） -->
+  <div class="hero-task-card" id="heroTaskCard" style="display:none;">
+    <div class="hero-notice-label">
+      <span>📋 今やること</span>
+      <button class="hero-notice-post-btn visible" onclick="goToTaskApp()" style="display:inline-block;">タスク一覧 →</button>
+    </div>
+    <div id="heroTaskList"><p class="today-status">読み込み中です…</p></div>
+  </div>
+
+  <div class="notice-strip">
+    <div class="notice-dot"></div>
+    <div class="notice-deadline-text" id="deadlineNotice" aria-live="polite">
+      <span class="notice-deadline-main" id="deadlineNoticeMain">...</span>
+      <span class="notice-deadline-sub" id="deadlineNoticeSub"></span>
+    </div>
+  </div>
+  <div class="hero-notice-card" id="importantNoticeCard" style="display:none"><div class="hero-notice-label">📌 締切・確認依頼</div><div id="importantNoticeList"></div></div>
+</div>
+
 <section class="home-functions" id="homeFunctions" hidden aria-labelledby="homeFunctionsTitle">
   <div class="home-heading"><h1 id="homeFunctionsTitle" tabindex="-1">機能一覧</h1>
     <div id="homeModeSwitch" class="home-mode-switch" role="group" aria-label="ホームの表示切替" hidden>
@@ -517,9 +540,6 @@
 </section>
 
 <div class="hero">
-  <div class="hero-greeting" id="greeting">おはようございます 👋</div>
-  <div class="hero-title" id="heroTitle">さん</div>
-
   <!-- お知らせ（Firebase連携） -->
   <div class="hero-notice-card" id="heroNoticeCard">
     <div class="hero-notice-label">
@@ -539,15 +559,6 @@
     <div id="heroScheduleList"></div>
   </div>
 
-  <!-- 自分のタスク（hero内） -->
-  <div class="hero-task-card" id="heroTaskCard" style="display:none;">
-    <div class="hero-notice-label">
-      <span>📋 今日やること</span>
-      <button class="hero-notice-post-btn visible" onclick="goToTaskApp()" style="display:inline-block;">タスク一覧 →</button>
-    </div>
-    <div id="heroTaskList"></div>
-  </div>
-
   <!-- 今日のシフト（localStorage連携） -->
   <div class="hero-shift-card">
     <div class="hero-shift-label">📅 今日のシフト</div>
@@ -558,13 +569,6 @@
     </div>
   </div>
 
-  <div class="notice-strip">
-    <div class="notice-dot"></div>
-    <div class="notice-deadline-text" id="deadlineNotice" aria-live="polite">
-      <span class="notice-deadline-main" id="deadlineNoticeMain">...</span>
-      <span class="notice-deadline-sub" id="deadlineNoticeSub"></span>
-    </div>
-  </div>
 </div>
 
 <main>
@@ -642,7 +646,7 @@
 </div><!-- /#app -->
 
 <script type="module">
-import {todayItems,localDay,noticeTargets} from "./portal-today.mjs";
+import {todayItems,localDay,noticeTargets} from "./portal-today.mjs?v=20261009-priority";
 // ─────────────────────────────────────────
 // スタッフ定義（シフトアプリと同じ）
 // ─────────────────────────────────────────
@@ -1088,6 +1092,8 @@ async function initApp() {
   currentUser = savePortalUser(currentUser);
   updateMenuVisibility();
   const u   = currentUser;
+  startNoticeSync();
+  if(!isGuestUser(u)){loadMyTasks(u.name);loadScheduleEvents(u.staffId);}
   const now = new Date();
   const DAY_NAMES = ['日','月','火','水','木','金','土'];
 
@@ -1175,7 +1181,6 @@ async function initApp() {
   await buildTodayStaff(now);
 
   // お知らせ（Firebase同期）
-  startNoticeSync();
   applyUpdateDraftFromUrl();
 
   // 院長の予定（Googleカレンダー）
@@ -1190,7 +1195,7 @@ async function initApp() {
 
   // 日程調整（未回答）
   if (!isGuestUser(u)) {
-    loadScheduleEvents(u.staffId);
+    // Already requested before personal shift/calendar reads.
   } else {
     document.getElementById('heroScheduleCard').style.display = 'none';
   }
@@ -1287,6 +1292,7 @@ let _noticesUnsub = null;
 let _firebaseNotices = {};
 let _portalUpdateNotices = {};
 let _portalUpdateNoticeLoadStarted = false;
+let portalUpdateLoadState='loading',firebaseNoticeLoadState='loading';
 const PORTAL_UPDATES_FILE = 'portal-updates.json';
 const NOTICE_TYPES = {
   new: '新規追加',
@@ -1309,9 +1315,9 @@ function startNoticeSync() {
   loadPortalUpdateNotices();
   const noticesRef = ref(_db, 'notices');
   onValue(noticesRef, snap => {
-    _firebaseNotices = snap.val() || {};
+    _firebaseNotices = snap.val() || {};firebaseNoticeLoadState='ready';
     renderNotices();
-  });
+  },()=>{_firebaseNotices={};firebaseNoticeLoadState='error';renderNotices();});
 }
 
 function goToAttendanceApp() {
@@ -1331,28 +1337,37 @@ function renderNotices() {
   else         postBtn.classList.remove('visible');
 
   const data = { ..._portalUpdateNotices, ..._firebaseNotices };
-  const items = Object.entries(data)
+  const allItems = Object.entries(data)
     .filter(([, n]) => isActiveNotice(n) && canViewPortalUpdate(n))
     .sort((a,b) => noticeCreatedAtTime(b[1]?.createdAt) - noticeCreatedAtTime(a[1]?.createdAt));
 
+  const important=allItems.filter(([,n])=>n.portalUpdate!==true&&['request','deadline'].includes(resolveNoticeType(n.type)));
+  const items=allItems.filter(row=>!important.includes(row));
+  document.getElementById('importantNoticeCard').style.display=important.length||firebaseNoticeLoadState==='error'?'block':'none';
+  document.getElementById('importantNoticeList').innerHTML=noticeRows(important,isAdmin)+(firebaseNoticeLoadState==='error'?'<p class="today-status">締切・確認依頼を読み込めませんでした。再読み込みしてください。</p>':'');
+  const states=[portalUpdateLoadState,firebaseNoticeLoadState];
+  const status=states.includes('error')?'更新情報の一部を読み込めませんでした。再読み込みしてください。':states.includes('loading')?'更新情報を読み込み中です…':'';
   const historyButton=document.getElementById('noticeHistoryButton');
   historyButton.hidden=items.length<=2;
   historyButton.setAttribute('aria-expanded',String(noticeHistoryExpanded));
   historyButton.textContent=noticeHistoryExpanded?'最新2件だけ表示':'更新情報をすべて見る（'+items.length+'件）';
   if (!items.length && !isAdmin) {
     card.classList.add('has-items');
-    list.innerHTML = '<div style="font-size:12px;opacity:.7;">現在表示中の更新情報はありません</div>';
+    list.innerHTML = '<div class="today-status">'+(status||'現在表示中の更新情報はありません')+'</div>';
     return;
   }
 
   card.classList.add('has-items');
 
   if (!items.length) {
-    list.innerHTML = '<div style="font-size:12px;opacity:.7;">現在表示中の更新情報はありません</div>';
+    list.innerHTML = '<div class="today-status">'+(status||'現在表示中の更新情報はありません')+'</div>';
     return;
   }
 
-  list.innerHTML = items.slice(0,noticeHistoryExpanded?items.length:2).map(([key, n]) => {
+  list.innerHTML = noticeRows(items.slice(0,noticeHistoryExpanded?items.length:2),isAdmin)+(status?'<p class="today-status">'+status+'</p>':'');
+}
+function noticeRows(rows,isAdmin){
+  return rows.map(([key, n]) => {
     const createdAt = noticeCreatedAtTime(n.createdAt);
     const d = createdAt ? new Date(createdAt) : null;
     const dateStr = d ? `${d.getMonth()+1}/${d.getDate()}` : '';
@@ -1382,10 +1397,10 @@ async function loadPortalUpdateNotices() {
   try {
     const res = await fetch(`${PORTAL_UPDATES_FILE}?v=${Date.now()}`, { cache: 'no-store' });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    _portalUpdateNotices = normalizePortalUpdateNotices(await res.json());
+    _portalUpdateNotices = normalizePortalUpdateNotices(await res.json());portalUpdateLoadState='ready';
   } catch (e) {
     console.warn('portal-updates.jsonを読み込めませんでした', e);
-    _portalUpdateNotices = {};
+    _portalUpdateNotices = {};portalUpdateLoadState='error';
   } finally {
     renderNotices();
   }
@@ -1492,7 +1507,7 @@ function noticeExpiryEndTime(value) {
   const dateValue = normalizeNoticeExpiry(value);
   if (!dateValue) return null;
   const [y, m, d] = dateValue.split('-').map(Number);
-  return new Date(y, m - 1, d, 23, 59, 59, 999).getTime();
+  return Date.parse(`${dateValue}T23:59:59.999+09:00`);
 }
 
 function syncNoticeExpiryDefault(force = false) {
@@ -1711,7 +1726,7 @@ async function loadCalendar() {
 // ─────────────────────────────────────────
 // 自分のタスク（Firebase /tasks）→ hero内に表示
 // ─────────────────────────────────────────
-const todaySources={},todayErrors=new Set();
+const todaySources={},todayErrors=new Set(),todayPending=new Set();
 let todayExtraStarted=false;
 function renderTodayActions(){
  const card=document.getElementById('heroTaskCard'),list=document.getElementById('heroTaskList');
@@ -1723,11 +1738,13 @@ function renderTodayActions(){
    const rows=items.filter(x=>x.group===group);
    if(rows.length)html+='<div class="today-group">'+group+'（'+rows.length+'）</div>'+rows.map(x=>'<a class="today-link" href="'+escHtml(x.url)+'"><span>'+escHtml(x.title||x.kind)+'</span><small>'+escHtml(x.kind)+(x.date?' / '+escHtml(x.date):'')+' →</small></a>').join('');
  }
- list.innerHTML=html||'<p class="today-status">今日までのタスク・確認待ちはありません</p>';
+ list.innerHTML=html||'<p class="today-status">'+(todayPending.size?'やることを読み込み中です…':todayErrors.size?'取得できた情報には、今日までのタスク・確認待ちはありません。':'今日までのタスク・確認待ちはありません')+'</p>';
+ if(html&&todayPending.size)list.innerHTML+='<p class="today-status">一部を読み込み中です…</p>';
  if(todayErrors.size)list.innerHTML+='<p class="today-status">一部を取得できません：'+escHtml([...todayErrors].join('、'))+'。各ページで確認してください。</p>';
 }
 function watchToday(key,path,label){
- onValue(ref(_db,path),snap=>{todaySources[key]=snap.val()||{};todayErrors.delete(label);renderTodayActions();},()=>{delete todaySources[key];todayErrors.add(label);renderTodayActions();});
+ todayPending.add(label);renderTodayActions();
+ onValue(ref(_db,path),snap=>{todayPending.delete(label);todaySources[key]=snap.val()||{};todayErrors.delete(label);renderTodayActions();},()=>{todayPending.delete(label);delete todaySources[key];todayErrors.add(label);renderTodayActions();});
 }
 function loadMyTasks(staffName){
  if(todayExtraStarted)return;todayExtraStarted=true;
@@ -1751,10 +1768,11 @@ async function loadScheduleEvents(staffId) {
   const list    = document.getElementById('heroScheduleList');
   const section = document.getElementById('decidedScheduleSection');
   const board   = document.getElementById('decidedScheduleBoard');
+  todayPending.add('日程調整');renderTodayActions();
   try {
     const snap = await get(ref(_db, 'scheduling/events'));
     const all  = snap.val() || {};
-    todaySources.schedule=all;todayErrors.delete('日程調整');renderTodayActions();
+    todaySources.schedule=all;todayPending.delete('日程調整');todayErrors.delete('日程調整');renderTodayActions();
     const today = localDay();
     const DAY_JP = ['日','月','火','水','木','金','土'];
 
@@ -1803,7 +1821,7 @@ async function loadScheduleEvents(staffId) {
     }
 
   } catch(e) {
-    todayErrors.add('日程調整');renderTodayActions();
+    todayPending.delete('日程調整');todayErrors.add('日程調整');renderTodayActions();
     console.warn('日程調整読み込みエラー:', e);
   }
 }

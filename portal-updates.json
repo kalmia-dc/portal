@@ -1,5 +1,14 @@
 [
   {
+    "id": "2026-10-09-role-home",
+    "type": "change",
+    "audience": "all",
+    "text": "ホームの機能入口を役割別に整理しました。管理者は「スタッフ用／管理者用」で切り替えられます。更新情報は「すべて見る」から過去の内容も確認できます。",
+    "createdAt": "2026-10-09T15:08:00+09:00",
+    "linkUrl": "index.html#homeFunctions",
+    "linkLabel": "ホームの機能一覧を見る"
+  },
+  {
     "id": "2026-10-09-shift-history",
     "type": "change",
     "audience": "shift-admin",

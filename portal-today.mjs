@@ -1,5 +1,5 @@
 export const noticeTargets=['shimanaka','tsuruta','yoshida','takagi','matsumoto','yamada','tamiya','tanaka','momo'];
-export function localDay(date=new Date()) {return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;}
+export function localDay(date=new Date()) {return new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Tokyo',year:'numeric',month:'2-digit',day:'2-digit'}).format(date);}
 export function todayItems(source,profile,today=localDay()) {
   if(!profile?.staffId||profile.staffId==='guest'||profile.portalRole==='terminal') return [];
   const sid=profile.staffId, items=[];
