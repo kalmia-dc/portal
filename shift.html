@@ -908,6 +908,14 @@
     }
     @page { size:A4 landscape; margin:6mm 8mm; }
   }
+  #editModal .modal { max-width:calc(100vw - 24px); max-height:90vh; overflow-y:auto; }
+  #editModal .modal-actions { flex-wrap:wrap; }
+  @media screen and (max-width:700px) {
+    #mainApp > header { height:auto; min-height:56px; flex-wrap:wrap; gap:8px; }
+    #mainApp .app { flex-direction:column; height:auto; }
+    #mainApp .calendar-wrapper { order:-1; flex:none; width:100%; }
+    #mainApp aside { width:100%; overflow:visible; }
+  }
 </style>
 <link rel="stylesheet" href="./portal-common.css?v=20261005">
 <script defer src="./portal-common.js?v=20261005"></script>
@@ -935,6 +943,8 @@
 
   // ── Firebase API をグローバルに公開 ──
   window._fb = { db, ref, set, get, onValue, push, remove, query, orderByChild, equalTo, authenticatedProfile, runTransaction };
+  window._fb.shiftConnected=false;
+  onValue(ref(db,'.info/connected'),snapshot=>{window._fb.shiftConnected=snapshot.val()===true;});
   window.dispatchEvent(new Event('firebaseReady'));
   // 初期表示
   setTimeout(renderLoginHint, 100);
@@ -1245,7 +1255,7 @@
       <button class="btn btn-full" style="background:#E3F2FD;color:#1565C0;" onclick="printShift()">🖨️ 印刷</button>
       <button class="btn btn-full" style="background:#E8F5E9;color:#2E7D32;" onclick="openStaffMgr()">👥 スタッフ管理</button>
       <button class="btn btn-full" style="background:#FCE4EC;color:#880E4F;" onclick="openHolidayMgr()">🏥 休業日管理</button>
-      <button class="btn btn-danger btn-full" onclick="clearShift()">🗑 クリア</button>
+      <button class="btn btn-danger btn-full" onclick="clearShift()">🗑 月全体をクリア</button>
     </div>
 
     <div style="padding:12px;">
@@ -1258,6 +1268,12 @@
 
   <!-- CALENDAR -->
   <main class="calendar-wrapper">
+    <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:end;margin-bottom:12px">
+      <label>スタッフ・職種<br><select id="entryStaff" style="max-width:100%;padding:8px"></select></label>
+      <label>勤務日<br><input type="date" id="entryDate" style="padding:8px"></label>
+      <button class="btn btn-primary" onclick="openSelectedShift()">シフトを登録・編集</button>
+      <span style="font-size:.78rem;color:var(--muted)">DR（歯科医師）も選択できます。削除・復元は各セルから。</span>
+    </div>
     <div class="summary-bar" id="topSummary">
       <span><span class="label">診療日数: </span><span class="value" id="s-workdays">-</span></span>
       <span><span class="label">DH不足日: </span><span class="value" id="s-dhshort">-</span></span>
@@ -1286,7 +1302,16 @@
       <p id="manualHoursPreview" aria-live="polite" style="margin:10px 0;font-size:.85rem"></p>
     </div>
     <p id="manualTimeError" role="alert" style="color:var(--red);font-size:.85rem"></p>
+    <div id="shiftEntryConfirm" role="alertdialog" aria-label="シフト変更の確認" hidden style="padding:12px;border:1px solid #ddd;border-radius:10px;margin:12px 0">
+      <p id="shiftEntryConfirmText" style="white-space:pre-line;font-size:.85rem"></p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-secondary" onclick="finishShiftEntryConfirmation(false)">変更しない</button>
+        <button class="btn btn-danger" id="confirmShiftEntryButton" onclick="finishShiftEntryConfirmation(true)">確認して実行</button>
+      </div>
+    </div>
     <div class="modal-actions">
+      <button class="btn btn-danger" id="deleteShiftButton" onclick="cancelOrRestoreShift()">このシフトを削除</button>
+      <button class="btn btn-secondary" id="restoreShiftButton" onclick="cancelOrRestoreShift(true)">削除を取り消す（復元）</button>
       <button class="btn btn-secondary" onclick="closeModal()">キャンセル</button>
       <button class="btn btn-primary" id="applyShiftButton" onclick="applyModal()">保存</button>
     </div>
@@ -1414,6 +1439,7 @@
 
 <script src="clinic-leave.js?v=20261005-manual-time"></script>
 <script src="shift-role-balance.js?v=20260903-role-balance"></script>
+<script src="shift-entry.js?v=20261009"></script>
 <script>
 // ──────────────────────────────────────────────
 //  DATA DEFINITIONS
@@ -4255,6 +4281,7 @@ function render(){
 }
 
 function renderStaffList(){
+  renderShiftEntryPicker();
   const el = document.getElementById('staffList');
   el.innerHTML = '<h3>スタッフ一覧</h3>';
   const groups = { DR:'DR（歯科医師）', DH:'DH（歯科衛生士）', DA:'DA（歯科助手/事務）' };
@@ -4311,7 +4338,7 @@ function renderCalendar(){
     const nameEl = document.createElement('div');
     nameEl.className = 'cal-staff-name';
     const h = getHours(s.id, y, m);
-    nameEl.innerHTML = `<span class="sname">${s.name}</span>
+    nameEl.innerHTML = `<span class="badge ${s.role}">${s.role}</span><span class="sname">${s.name}</span>
       ${usesMonthlyHoursTarget(s)?`<span class="shours">${h}h/${160}h</span>`:
         `<span class="shours" style="color:var(--muted)">${shiftEmploymentLabel(s)}</span>`}`;
     grid.appendChild(nameEl);
@@ -4322,7 +4349,7 @@ function renderCalendar(){
       const cell = document.createElement('div');
       cell.className = 'cal-cell' + (off?' off-day':'');
 
-      if(!off || isClinicDay(ds)){
+      if(!off || isClinicDay(ds) || shiftData[s.id]?.[ds] || shiftData.__cancelledShifts?.[s.id]?.[ds]){
         const k = shiftData[s.id]?.[ds] || '';
         if(k && k !== 'none'){
           const chip = document.createElement('div');
@@ -4336,14 +4363,14 @@ function renderCalendar(){
             chip.appendChild(dot);
           }
           cell.appendChild(chip);
-        } else if(!off) {
+        } else if(!off || shiftData.__cancelledShifts?.[s.id]?.[ds]) {
           const chip = document.createElement('div');
           chip.className = 'shift-chip empty';
-          chip.textContent = '+';
+          chip.textContent = shiftData.__cancelledShifts?.[s.id]?.[ds]?'取消済':'+';
           cell.appendChild(chip);
         }
 
-        if(s.id !== 'hanowa' || k==='hanowa' || isClinicDay(ds)){
+        if(s.id !== 'hanowa' || k==='hanowa' || isClinicDay(ds) || shiftData.__cancelledShifts?.[s.id]?.[ds]){
           cell.onclick = () => openModal(s.id, ds);
         }
       }
@@ -4461,21 +4488,25 @@ function renderAlerts(){
 //  MODAL
 // ──────────────────────────────────────────────
 function openModal(staffId, ds){
-  if(currentUser?.role!=='admin' || isCurrentMonthLocked()) return;
+  if(currentUser?.role!=='admin' || isCurrentMonthLocked() || manualSavePending || shiftEntryConfirmation) return;
+  if(!STAFF.some(s=>s.id===staffId))return;
   modalStaffId = staffId;
   modalDateStr = ds;
   const staff = STAFF.find(s=>s.id===staffId);
   const current = shiftData[staffId]?.[ds] || '';
+  modalEntrySnapshot=structuredClone(shiftEntrySnapshot(shiftData,staffId,ds));
+  document.getElementById('deleteShiftButton').style.display=current?'':'none';
+  document.getElementById('restoreShiftButton').style.display=!current&&modalEntrySnapshot.cancelled?'':'none';
 
   document.getElementById('modalTitle').textContent =
-    `${staff.name} ─ ${ds.slice(5).replace('-','/')}`;
+    `${staff.name}（${staff.role}） ─ ${ds}`;
 
   const choices = document.getElementById('shiftChoices');
   choices.innerHTML = '';
 
   const options = staff.role==='DA' && staff.admin
     ? [SHIFT.EARLY, SHIFT.LATE, SHIFT.ADMIN, SHIFT.OFF, SHIFT.PAID, SHIFT.WISH]
-    : staff.type==='spot'
+    : staff.type==='spot' && staff.role==='DH'
     ? [SHIFT.HANOWA, SHIFT.NONE]
     : [SHIFT.EARLY, SHIFT.LATE, SHIFT.OFF, SHIFT.PAID, SHIFT.WISH];
   if(current==='fixed') options.unshift(SHIFT.FIXED);
@@ -4514,6 +4545,7 @@ function openModal(staffId, ds){
 
 function closeModal(){
   if(manualSavePending) return;
+  finishShiftEntryConfirmation(false);
   document.getElementById('editModal').classList.remove('open');
   modalStaffId = modalDateStr = modalSelected = null;
 }
@@ -4550,36 +4582,39 @@ function previewManualHours(){
 }
 let manualSavePending=false;
 async function applyModal(){
-  if(currentUser?.role!=='admin' || isCurrentMonthLocked() || manualSavePending) return;
+  if(currentUser?.role!=='admin' || isCurrentMonthLocked() || manualSavePending || shiftEntryConfirmation) return;
   if(!modalStaffId || !modalDateStr) return;
   const error=document.getElementById('manualTimeError');error.textContent='';
   const sid=modalStaffId, ds=modalDateStr, key=modalSelected, month=ds.slice(0,7);
+  const expected=structuredClone(modalEntrySnapshot);
   let time=null;
   try {
     if(!Object.values(SHIFT).some(s=>s.key===key)) throw Error('勤務区分を選択してください。');
     if(isTimedShift(key)&&document.getElementById('manualTimeEnabled').checked) time=readManualTimeInput();
-    if(!window._fb) throw Error('接続を確認して、もう一度保存してください。');
-    manualSavePending=true;document.getElementById('applyShiftButton').disabled=true;
+    if(!window._fb || window._fb.shiftConnected!==true) throw Error('接続を確認して、もう一度保存してください。');
+    setShiftEntryPending(true);error.textContent='サーバー確認中です。通信が切れた場合は再接続までお待ちください。';
     const {db,ref,runTransaction,get}=window._fb;
     const lock=await get(ref(db,'shift_locks/'+firebaseSafeKey(month)));
     if(lock.val()) throw Error('確定済みのシフトは編集できません。確定を解除してください。');
     const result=await runTransaction(ref(db,'shifts/'+month),data=>{
+      if(currentUser?.role!=='admin'||shiftLocks[month]||!sameShiftEntry(shiftEntrySnapshot(data,sid,ds),expected))return;
       const next=data||{};
       (next[sid]??={})[ds]=key;
       if(time) ((next.__manualTimes??={})[sid]??={})[ds]=time;
       else if(next.__manualTimes?.[sid]) delete next.__manualTimes[sid][ds];
+      if(next.__cancelledShifts?.[sid])delete next.__cancelledShifts[sid][ds];
       return next;
     },{applyLocally:false});
-    if(!result.committed) throw Error('保存できませんでした。もう一度お試しください。');
+    if(!result.committed) throw Error('別の更新または権限・確定状態の変更があります。閉じて開き直してください。');
     allShiftData[month]=result.snapshot.val()||{};
     if(monthKey(currentYear,currentMonth)===month) loadShiftForMonth(currentYear,currentMonth);
     if(key==='paid') (paidData[sid]??={})[ds]=true;
     if(key==='wish') (wishData[sid]??={})[ds]=true;
-    manualSavePending=false;closeModal();render();
+    setShiftEntryPending(false);closeModal();render();
   } catch(e) {
     error.textContent='保存できません：'+e.message;
   } finally {
-    manualSavePending=false;document.getElementById('applyShiftButton').disabled=false;
+    setShiftEntryPending(false);
   }
 }
 
