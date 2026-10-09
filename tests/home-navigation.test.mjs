@@ -47,8 +47,8 @@ test('updates default to latest two; expansion preserves all and staff view has 
  h.run("setHomeViewMode('admin')");assert.equal((h.field('heroNoticeList').innerHTML.match(/class="hero-notice-item"/g)||[]).length,2);
  const reloaded=setup();assert.equal(reloaded.run('homeViewMode'),'admin');
 });
-test('existing function routes retained, duplicate labels unified, entrances precede updates and remain initially hidden',()=>{
- assert(html.indexOf('id="homeFunctions"')<html.indexOf('id="heroNoticeCard"'));assert(html.includes('id="homeFunctions" hidden'));
+test('existing function routes retained, duplicate labels unified, updates precede entrances and remain initially hidden',()=>{
+ assert(html.indexOf('id="heroNoticeCard"')<html.indexOf('id="homeFunctions"'));assert(html.includes('id="homeFunctions" hidden'));
  assert(!html.includes('院内研修<br>資料'));
  for(const page of ['task-manager','meeting-management','training-materials','attendance','shift','loan-management','goal-manager','schedule','skill','private-metrics','portal-members','terminal-setup'])assert(html.includes(page+'.html'),page);
  assert(html.includes('https://ssl.jobcan.jp/employee'));assert(html.includes('https://apo-toolboxes.stransa.co.jp/calendar/'));assert(html.includes('https://kalmia-dc.doctor-hr.com/'));

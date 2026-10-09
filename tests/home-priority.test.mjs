@@ -35,8 +35,8 @@ test('task loading, empty and failure remain distinct; failed data does not masq
 test('public home update appears for staff and both admin modes; restricted notices never widen',()=>{
  const raw=JSON.parse(fs.readFileSync('portal-updates.json','utf8'));
  for(const admin of [false,true])for(const mode of ['staff','admin']){
-  const h=setup(admin);h.c.raw=raw;h.c.homeViewMode=mode;h.run('_portalUpdateNotices=normalizePortalUpdateNotices(raw);renderNotices()');assert.match(h.field('heroNoticeList').innerHTML,/ホームの機能入口を役割別/);
-  if(!admin||mode==='staff'){assert(!h.field('heroNoticeList').innerHTML.includes('shift.html'));assert(!h.field('heroNoticeList').innerHTML.includes('portal-members.html'));}
+  const h=setup(admin);h.c.raw=raw;h.c.homeViewMode=mode;h.run('_portalUpdateNotices=normalizePortalUpdateNotices(raw);renderNotices()');assert.match(h.field('heroNoticeList').innerHTML,/ホームの機能一覧を整理/);
+  if(!admin||mode==='staff'){for(const row of raw.filter(x=>x.audience==='admin')){assert(!h.field('heroNoticeList').innerHTML.includes(row.text));if(row.linkLabel)assert(!h.field('heroNoticeList').innerHTML.includes(row.linkLabel));}assert(!h.field('heroNoticeList').innerHTML.includes('管理者'));assert(!h.field('heroNoticeList').innerHTML.includes('経営'));assert(!h.field('heroNoticeList').innerHTML.includes('shift.html'));assert(!h.field('heroNoticeList').innerHTML.includes('portal-members.html'));}
  }
 });
 test('notice loader distinguishes loading, true empty, failure and existing typed requests',async()=>{
