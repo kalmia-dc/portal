@@ -358,6 +358,21 @@
   .fu { animation:fadeUp .4s ease forwards; opacity:0; }
   .d1{animation-delay:.05s} .d2{animation-delay:.10s} .d3{animation-delay:.15s}
   .d4{animation-delay:.20s} .d5{animation-delay:.25s} .d6{animation-delay:.30s}
+  .home-functions{max-width:1100px;margin:0 auto;padding:24px 20px 0}
+  .home-functions[hidden],.home-mode-switch[hidden],#noticeHistoryButton[hidden]{display:none!important}
+  .home-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:8px}
+  .home-heading h1{font-size:22px;margin:0;color:var(--dark)}
+  .home-mode-switch{display:flex;gap:6px;background:#e8eef0;padding:5px;border-radius:12px}
+  .home-mode-switch button{font:inherit;font-weight:800;border:0;background:transparent;padding:10px 16px;border-radius:8px;cursor:pointer;color:#40545d}
+  .home-mode-switch button[aria-pressed="true"]{background:#167d77;color:white}
+  .home-description{font-size:13px;color:#536871;margin-bottom:18px}
+  .home-functions .menu-panel{display:block;position:static;max-height:none;overflow:visible;padding:0;background:none;box-shadow:none;margin-bottom:24px}
+  .home-functions .primary-menu-section{display:block}
+  .home-functions .section-toggle{font-size:14px;cursor:default;padding:0 0 10px;background:none;box-shadow:none;border-radius:0}
+  .home-functions .tool-section .category-tools{display:grid}
+  .home-functions .tool-item{min-height:90px;display:flex;flex-direction:column;justify-content:center}
+  .notice-history-button{background:none;border:1px solid #ffffff70;border-radius:8px;padding:9px 14px;cursor:pointer;margin-top:12px}
+  @media(max-width:720px){.home-functions{padding:18px 16px 0}.home-heading h1{font-size:20px}.home-functions .category-tools{grid-template-columns:repeat(2,minmax(0,1fr))}.home-functions .tool-item{padding:14px 10px}.home-mode-switch button{padding:10px 14px}}
 </style>
 <link rel="stylesheet" href="./portal-common.css?v=20261005">
 <script defer src="./portal-common.js?v=20261005"></script>
@@ -396,6 +411,111 @@
   </div>
 </header>
 
+<section class="home-functions" id="homeFunctions" hidden aria-labelledby="homeFunctionsTitle">
+  <div class="home-heading"><h1 id="homeFunctionsTitle" tabindex="-1">機能一覧</h1>
+    <div id="homeModeSwitch" class="home-mode-switch" role="group" aria-label="ホームの表示切替" hidden>
+      <button id="staffHomeButton" type="button" aria-pressed="false" onclick="setHomeViewMode('staff')">スタッフ用</button>
+      <button id="adminHomeButton" type="button" aria-pressed="false" onclick="setHomeViewMode('admin')">管理者用</button>
+    </div>
+  </div>
+  <p id="homeModeDescription" class="home-description"></p>
+  <div class="menu-panel" id="portalMenuPanel" aria-label="メニュー">
+    <section class="tool-section open primary-menu-section" data-menu-section data-home-scope="staff">
+      <h2 class="section-toggle" >
+        <span><span class="section-title-text">クイックアクセス</span></span>
+
+      </h2>
+      <div class="category-tools">
+        <a class="tool-item" href="#" onclick="goToTaskApp();return false;" style="background:linear-gradient(135deg,#eef7f0,#dff0e8);border:2px solid #a8d8b8;">
+          <span class="tool-icon">📋</span><span class="tool-name">タスク管理</span>
+        </a>
+        <a class="tool-item" href="#" onclick="goToMeetingManagementApp();return false;" style="background:linear-gradient(135deg,#f0fbff,#e6f7f5);border:2px solid #86d9d1;">
+          <span class="tool-icon">MTG</span><span class="tool-name">ミーティング</span>
+        </a>
+        <a class="tool-item" href="#" onclick="goToTrainingMaterialsApp();return false;" style="background:linear-gradient(135deg,#f7f8ff,#e6fbff);border:2px solid #9edce7;">
+          <span class="tool-icon">LIB</span><span class="tool-name">マニュアル</span>
+        </a>
+      </div>
+    </section>
+
+    <section class="tool-section" data-menu-section data-home-scope="staff">
+      <h2 class="section-toggle" >
+        <span><span class="section-title-text">申請・管理</span></span>
+
+      </h2>
+      <div class="category-tools">
+        <a class="tool-item" data-guest-hidden="true" href="#" onclick="goToAttendanceApp();return false;" style="background:linear-gradient(135deg,#e9f8f1,#d9f1e7);border:2px solid #86c9ae;">
+          <span class="tool-linked-badge">試験運用</span><span class="tool-icon">⏱️</span><span class="tool-name">院内勤怠（試験）</span>
+        </a>
+        <a class="tool-item shift-tool" data-guest-hidden="true" href="#" onclick="goToShiftApp();return false;">
+          <span class="tool-linked-badge">連携中</span><span class="tool-icon">📅</span><span class="tool-name">シフト管理</span>
+        </a>
+        <a class="tool-item" data-guest-hidden="true" href="#" onclick="goToLoanApp();return false;" style="background:linear-gradient(135deg,#f0fbf7,#e2f3ff);border:2px solid #9dd7d1;">
+          <span class="tool-icon">￥</span><span class="tool-name">貸付・借用</span>
+        </a>
+        <a class="tool-item" href="#" onclick="goToGoalApp();return false;" style="background:linear-gradient(135deg,#eef5ff,#dbeafe);border:2px solid #9fc5f8;">
+          <span class="tool-icon">◎</span><span class="tool-name">目標管理</span>
+        </a>
+        <a class="tool-item" href="#" onclick="goToScheduleApp();return false;" style="background:linear-gradient(135deg,#fff0f8,#ffe0f0);border:2px solid #ffb8d8;">
+          <span class="tool-icon">🎉</span><span class="tool-name">日程調整</span>
+        </a>
+        <a class="tool-item" id="skillToolBtn" data-guest-hidden="true" href="#" onclick="goToSkillApp();return false;" style="display:none;background:linear-gradient(135deg,#f3f0ff,#e8e0ff);border:2px solid #c8b8ff;">
+          <span class="tool-icon">📋</span><span class="tool-name">スキル<br>チェック</span>
+        </a>
+      </div>
+    </section>
+
+    <section class="tool-section" data-menu-section data-home-scope="staff">
+      <h2 class="section-toggle" >
+        <span><span class="section-title-text">外部サービス</span></span>
+
+      </h2>
+      <div class="category-tools">
+        <a class="tool-item" data-guest-hidden="true" href="https://ssl.jobcan.jp/employee" target="_blank" rel="noopener">
+          <span class="tool-icon">🕐</span><span class="tool-name">ジョブカン勤怠</span>
+        </a>
+        <a class="tool-item" data-guest-hidden="true" href="https://apo-toolboxes.stransa.co.jp/calendar/" target="_blank" rel="noopener">
+          <span class="tool-icon">🗓️</span><span class="tool-name">予約カレンダー</span>
+        </a>
+        <a class="tool-item" data-guest-hidden="true" href="https://kalmia-dc.doctor-hr.com/" target="_blank" rel="noopener">
+          <span class="tool-icon">👨‍⚕️</span><span class="tool-name">Doctor HR</span>
+        </a>
+      </div>
+    </section>
+
+    <section class="tool-section" data-menu-section data-home-scope="admin">
+      <h2 class="section-toggle">
+        <span><span class="section-title-text">管理者専用</span></span>
+
+      </h2>
+      <div class="category-tools">
+        <a class="tool-item" id="adminToolBtn" data-guest-hidden="true" href="#" onclick="goToShiftApp(true);return false;" style="display:none;background:linear-gradient(135deg,#fff8e0,#ffefc8);border:2px solid #ffd97a;">
+          <span class="tool-icon">⚙️</span><span class="tool-name">シフト管理（管理者）</span>
+        </a>
+        <a class="tool-item" id="privateMetricsToolBtn" data-guest-hidden="true" href="#" onclick="goToPrivateMetricsApp();return false;" style="display:none;background:linear-gradient(135deg,#fff6f0,#ffe4d6);border:2px solid #ffb996;">
+          <span class="tool-icon">秘</span><span class="tool-name">非公開<br>経営数値</span>
+        </a>
+        <a class="tool-item" id="memberManagementToolBtn" data-guest-hidden="true" href="./portal-members.html" style="display:none"><span class="tool-icon">人</span><span class="tool-name">ログイン<br>メンバー管理</span></a>
+        <a class="tool-item" id="terminalSetupToolBtn" data-guest-hidden="true" href="./terminal-setup.html" style="display:none;background:linear-gradient(135deg,#eef7ff,#e4f0ff);border:2px solid #9fc5f8;">
+          <span class="tool-icon">PC</span><span class="tool-name">共用PC<br>端末設定</span>
+        </a>
+      </div>
+    </section>
+
+    <section class="tool-section" data-menu-section data-home-scope="both" data-guest-hidden="true">
+      <h2 class="section-toggle" >
+        <span><span class="section-title-text">アカウント設定</span></span>
+
+      </h2>
+      <div class="category-tools">
+        <button class="tool-item" type="button" onclick="doLogout();return false;">
+          <span class="tool-icon">🚪</span><span class="tool-name">ログアウト</span>
+        </button>
+      </div>
+    </section>
+  </div>
+</section>
+
 <div class="hero">
   <div class="hero-greeting" id="greeting">おはようございます 👋</div>
   <div class="hero-title" id="heroTitle">さん</div>
@@ -407,6 +527,7 @@
       <button class="hero-notice-post-btn" id="noticePostBtn" onclick="openNoticeModal()">＋ 投稿</button>
     </div>
     <div id="heroNoticeList"></div>
+    <button id="noticeHistoryButton" class="hero-notice-link notice-history-button" type="button" onclick="toggleNoticeHistory()" aria-expanded="false" hidden>更新情報をすべて見る</button>
   </div>
 
   <!-- 日程調整（未回答） -->
@@ -448,128 +569,6 @@
 
 <main>
 
-  <section class="quick-actions fu d1" aria-label="クイックアクセス">
-    <div class="section-title">クイックアクセス</div>
-    <div class="quick-grid">
-      <a class="quick-card quick-task" href="#" onclick="goToTaskApp();return false;">
-        <div>
-          <span class="quick-icon">TASK</span>
-          <div class="quick-title">タスク管理</div>
-        </div>
-      </a>
-      <a class="quick-card quick-meeting" href="#" onclick="goToMeetingManagementApp();return false;">
-        <div>
-          <span class="quick-icon">MTG</span>
-          <div class="quick-title">ミーティング</div>
-        </div>
-      </a>
-      <a class="quick-card quick-training" href="#" onclick="goToTrainingMaterialsApp();return false;">
-        <div>
-          <span class="quick-icon">LIB</span>
-          <div class="quick-title">マニュアル</div>
-        </div>
-      </a>
-    </div>
-  </section>
-
-  <div class="menu-backdrop" id="menuBackdrop" onclick="closePortalMenu()"></div>
-
-  <div class="menu-panel fu d2" id="portalMenuPanel" aria-label="メニュー">
-    <section class="tool-section open primary-menu-section" data-menu-section>
-      <button class="section-toggle" type="button" onclick="toggleMenuSection(this)">
-        <span><span class="section-title-text">クイックアクセス</span></span>
-        <span class="toggle-icon">⌄</span>
-      </button>
-      <div class="category-tools">
-        <a class="tool-item" href="#" onclick="goToTaskApp();return false;" style="background:linear-gradient(135deg,#eef7f0,#dff0e8);border:2px solid #a8d8b8;">
-          <span class="tool-icon">📋</span><span class="tool-name">タスク管理</span>
-        </a>
-        <a class="tool-item" href="#" onclick="goToMeetingManagementApp();return false;" style="background:linear-gradient(135deg,#f0fbff,#e6f7f5);border:2px solid #86d9d1;">
-          <span class="tool-icon">MTG</span><span class="tool-name">ミーティング</span>
-        </a>
-        <a class="tool-item" href="#" onclick="goToTrainingMaterialsApp();return false;" style="background:linear-gradient(135deg,#f7f8ff,#e6fbff);border:2px solid #9edce7;">
-          <span class="tool-icon">LIB</span><span class="tool-name">院内研修<br>資料</span>
-        </a>
-      </div>
-    </section>
-
-    <section class="tool-section" data-menu-section>
-      <button class="section-toggle" type="button" onclick="toggleMenuSection(this)">
-        <span><span class="section-title-text">申請・管理</span></span>
-        <span class="toggle-icon">⌄</span>
-      </button>
-      <div class="category-tools">
-        <a class="tool-item" data-guest-hidden="true" href="#" onclick="goToAttendanceApp();return false;" style="background:linear-gradient(135deg,#e9f8f1,#d9f1e7);border:2px solid #86c9ae;">
-          <span class="tool-linked-badge">試験運用</span><span class="tool-icon">⏱️</span><span class="tool-name">院内勤怠（試験）</span>
-        </a>
-        <a class="tool-item shift-tool" data-guest-hidden="true" href="#" onclick="goToShiftApp();return false;">
-          <span class="tool-linked-badge">連携中</span><span class="tool-icon">📅</span><span class="tool-name">シフト管理</span>
-        </a>
-        <a class="tool-item" data-guest-hidden="true" href="#" onclick="goToLoanApp();return false;" style="background:linear-gradient(135deg,#f0fbf7,#e2f3ff);border:2px solid #9dd7d1;">
-          <span class="tool-icon">￥</span><span class="tool-name">貸付・借用</span>
-        </a>
-        <a class="tool-item" href="#" onclick="goToGoalApp();return false;" style="background:linear-gradient(135deg,#eef5ff,#dbeafe);border:2px solid #9fc5f8;">
-          <span class="tool-icon">◎</span><span class="tool-name">目標管理</span>
-        </a>
-        <a class="tool-item" href="#" onclick="goToScheduleApp();return false;" style="background:linear-gradient(135deg,#fff0f8,#ffe0f0);border:2px solid #ffb8d8;">
-          <span class="tool-icon">🎉</span><span class="tool-name">日程調整</span>
-        </a>
-        <a class="tool-item" id="skillToolBtn" data-guest-hidden="true" href="#" onclick="goToSkillApp();return false;" style="display:none;background:linear-gradient(135deg,#f3f0ff,#e8e0ff);border:2px solid #c8b8ff;">
-          <span class="tool-icon">📋</span><span class="tool-name">スキル<br>チェック</span>
-        </a>
-      </div>
-    </section>
-
-    <section class="tool-section" data-menu-section>
-      <button class="section-toggle" type="button" onclick="toggleMenuSection(this)">
-        <span><span class="section-title-text">外部サービス</span></span>
-        <span class="toggle-icon">⌄</span>
-      </button>
-      <div class="category-tools">
-        <a class="tool-item" data-guest-hidden="true" href="https://ssl.jobcan.jp/employee" target="_blank" rel="noopener">
-          <span class="tool-icon">🕐</span><span class="tool-name">ジョブカン勤怠</span>
-        </a>
-        <a class="tool-item" data-guest-hidden="true" href="https://apo-toolboxes.stransa.co.jp/calendar/" target="_blank" rel="noopener">
-          <span class="tool-icon">🗓️</span><span class="tool-name">予約カレンダー</span>
-        </a>
-        <a class="tool-item" data-guest-hidden="true" href="https://kalmia-dc.doctor-hr.com/" target="_blank" rel="noopener">
-          <span class="tool-icon">👨‍⚕️</span><span class="tool-name">Doctor HR</span>
-        </a>
-      </div>
-    </section>
-
-    <section class="tool-section" data-menu-section>
-      <button class="section-toggle" type="button" onclick="toggleMenuSection(this)">
-        <span><span class="section-title-text">管理者専用</span></span>
-        <span class="toggle-icon">⌄</span>
-      </button>
-      <div class="category-tools">
-        <a class="tool-item" id="adminToolBtn" data-guest-hidden="true" href="#" onclick="goToShiftApp(true);return false;" style="display:none;background:linear-gradient(135deg,#fff8e0,#ffefc8);border:2px solid #ffd97a;">
-          <span class="tool-icon">⚙️</span><span class="tool-name">シフト管理（管理者）</span>
-        </a>
-        <a class="tool-item" id="privateMetricsToolBtn" data-guest-hidden="true" href="#" onclick="goToPrivateMetricsApp();return false;" style="display:none;background:linear-gradient(135deg,#fff6f0,#ffe4d6);border:2px solid #ffb996;">
-          <span class="tool-icon">秘</span><span class="tool-name">非公開<br>経営数値</span>
-        </a>
-        <a class="tool-item" id="memberManagementToolBtn" data-guest-hidden="true" href="./portal-members.html" style="display:none"><span class="tool-icon">人</span><span class="tool-name">ログイン<br>メンバー管理</span></a>
-        <a class="tool-item" id="terminalSetupToolBtn" data-guest-hidden="true" href="./terminal-setup.html" style="display:none;background:linear-gradient(135deg,#eef7ff,#e4f0ff);border:2px solid #9fc5f8;">
-          <span class="tool-icon">PC</span><span class="tool-name">共用PC<br>端末設定</span>
-        </a>
-      </div>
-    </section>
-
-    <section class="tool-section" data-menu-section data-guest-hidden="true">
-      <button class="section-toggle" type="button" onclick="toggleMenuSection(this)">
-        <span><span class="section-title-text">アカウント設定</span></span>
-        <span class="toggle-icon">⌄</span>
-      </button>
-      <div class="category-tools">
-        <button class="tool-item" type="button" onclick="doLogout();return false;">
-          <span class="tool-icon">🚪</span><span class="tool-name">ログアウト</span>
-        </button>
-      </div>
-    </section>
-  </div>
-
   <!-- 日程決定済みイベント -->
   <div id="decidedScheduleSection" style="display:none;">
     <div class="section-title fu d2">✅ 開催決定</div>
@@ -602,11 +601,9 @@
 </main>
 
 <!-- スマホ下部ナビ -->
-<nav class="bottom-nav">
-  <button class="nav-item" onclick="goToTaskApp()"><span class="nav-icon">📋</span><span class="nav-label">タスク</span></button>
-  <a class="nav-item" data-guest-hidden="true" href="https://ssl.jobcan.jp/employee" target="_blank" rel="noopener"><span class="nav-icon">🕐</span><span class="nav-label">Jobcan（本運用）</span></a>
-  <a class="nav-item" data-guest-hidden="true" href="https://apo-toolboxes.stransa.co.jp/calendar/" target="_blank" rel="noopener"><span class="nav-icon">🗓️</span><span class="nav-label">予約</span></a>
-  <button class="nav-item" id="menuNavBtn" onclick="togglePortalMenu()"><span class="nav-icon">☰</span><span class="nav-label">メニュー</span></button>
+<nav class="bottom-nav" aria-label="ホーム内の移動">
+  <button class="nav-item" id="menuNavBtn" onclick="togglePortalMenu()"><span class="nav-icon">☰</span><span class="nav-label">機能一覧</span></button>
+  <button class="nav-item" onclick="showHomeUpdates()"><span class="nav-icon">📢</span><span class="nav-label">更新情報</span></button>
 </nav>
 
 <!-- お知らせ投稿モーダル -->
@@ -963,10 +960,15 @@ function goToShiftApp(asAdmin = false) {
   window.location.href = `https://kalmia-dc.github.io/portal/shift.html?${params}`;
 }
 
-function togglePortalMenu() {
-  const open = !document.body.classList.contains('menu-open');
-  document.body.classList.toggle('menu-open', open);
-  document.getElementById('menuNavBtn')?.classList.toggle('active', open);
+let homeViewMode=null;
+function setHomeViewMode(mode){
+  if(!authenticatedProfile?.isAdmin||isGuestUser()||!['staff','admin'].includes(mode))return;
+  homeViewMode=mode;noticeHistoryExpanded=false;updateMenuVisibility();renderNotices();
+}
+function showHomeUpdates(){document.getElementById('heroNoticeCard')?.scrollIntoView({block:'start'});}
+function togglePortalMenu(){
+  document.getElementById('homeFunctions')?.scrollIntoView({block:'start'});
+  document.getElementById('homeFunctionsTitle')?.focus({preventScroll:true});
 }
 
 function closePortalMenu() {
@@ -981,11 +983,20 @@ function toggleMenuSection(button) {
 
 function updateMenuVisibility() {
   const guest = isGuestUser();
+  const home=document.getElementById('homeFunctions');
+  if(!currentUser||!authenticatedProfile||authenticatedProfile.portalRole==='terminal'){home.hidden=true;return;}
+  const canSwitch=authenticatedProfile.isAdmin===true&&!guest;
+  homeViewMode=canSwitch?(homeViewMode||'admin'):'staff';
+  document.getElementById('homeModeSwitch').hidden=!canSwitch;
+  document.getElementById('staffHomeButton').setAttribute('aria-pressed',String(homeViewMode==='staff'));
+  document.getElementById('adminHomeButton').setAttribute('aria-pressed',String(homeViewMode==='admin'));
+  document.getElementById('homeFunctionsTitle').textContent=homeViewMode==='admin'?'管理者用の機能':'スタッフ用の機能';
+  document.getElementById('homeModeDescription').textContent=homeViewMode==='admin'?'管理する機能を選んでください。日常業務は「スタッフ用」から開けます。':'日常業務の機能を選んでください。';
   document.querySelectorAll('[data-guest-hidden="true"]').forEach(el => {
     el.style.display = guest ? 'none' : '';
   });
 
-  const adminVisible = !guest && ADMIN_STAFF.includes(currentUser?.staffId);
+  const adminVisible = canSwitch && ADMIN_STAFF.includes(currentUser?.staffId);
   const adminBtn = document.getElementById('adminToolBtn');
   const privateMetricsBtn = document.getElementById('privateMetricsToolBtn');
   const skillBtn = document.getElementById('skillToolBtn');
@@ -999,8 +1010,10 @@ function updateMenuVisibility() {
   document.querySelectorAll('[data-menu-section]').forEach(section => {
     const hasVisibleItem = [...section.querySelectorAll('.tool-item')]
       .some(el => el.style.display !== 'none');
-    section.style.display = hasVisibleItem ? '' : 'none';
+    const scope=section.dataset.homeScope;
+    section.style.display = hasVisibleItem && (scope==='both'||scope===homeViewMode) ? '' : 'none';
   });
+  home.hidden=false;
 }
 
 // ─────────────────────────────────────────
@@ -1073,6 +1086,7 @@ function redirectTerminalProfile() {
 
 async function initApp() {
   currentUser = savePortalUser(currentUser);
+  updateMenuVisibility();
   const u   = currentUser;
   const now = new Date();
   const DAY_NAMES = ['日','月','火','水','木','金','土'];
@@ -1267,6 +1281,8 @@ updatePasswordCache({});
 // ─────────────────────────────────────────
 // お知らせ（Firebase /notices + portal-updates.json）
 // ─────────────────────────────────────────
+let noticeHistoryExpanded=false;
+function toggleNoticeHistory(){noticeHistoryExpanded=!noticeHistoryExpanded;renderNotices();}
 let _noticesUnsub = null;
 let _firebaseNotices = {};
 let _portalUpdateNotices = {};
@@ -1308,7 +1324,7 @@ function renderNotices() {
   const card    = document.getElementById('heroNoticeCard');
   const list    = document.getElementById('heroNoticeList');
   const postBtn = document.getElementById('noticePostBtn');
-  const isAdmin = ADMIN_STAFF.includes(currentUser?.staffId);
+  const isAdmin = authenticatedProfile?.isAdmin === true && homeViewMode !== 'staff' && ADMIN_STAFF.includes(currentUser?.staffId);
 
   // 管理者には投稿ボタンを表示
   if (isAdmin) postBtn.classList.add('visible');
@@ -1319,9 +1335,13 @@ function renderNotices() {
     .filter(([, n]) => isActiveNotice(n) && canViewPortalUpdate(n))
     .sort((a,b) => noticeCreatedAtTime(b[1]?.createdAt) - noticeCreatedAtTime(a[1]?.createdAt));
 
+  const historyButton=document.getElementById('noticeHistoryButton');
+  historyButton.hidden=items.length<=2;
+  historyButton.setAttribute('aria-expanded',String(noticeHistoryExpanded));
+  historyButton.textContent=noticeHistoryExpanded?'最新2件だけ表示':'更新情報をすべて見る（'+items.length+'件）';
   if (!items.length && !isAdmin) {
-    card.classList.remove('has-items');
-    list.innerHTML = '';
+    card.classList.add('has-items');
+    list.innerHTML = '<div style="font-size:12px;opacity:.7;">現在表示中の更新情報はありません</div>';
     return;
   }
 
@@ -1332,7 +1352,7 @@ function renderNotices() {
     return;
   }
 
-  list.innerHTML = items.map(([key, n]) => {
+  list.innerHTML = items.slice(0,noticeHistoryExpanded?items.length:2).map(([key, n]) => {
     const createdAt = noticeCreatedAtTime(n.createdAt);
     const d = createdAt ? new Date(createdAt) : null;
     const dateStr = d ? `${d.getMonth()+1}/${d.getDate()}` : '';
@@ -1403,7 +1423,7 @@ function normalizePortalUpdateNotices(raw) {
 function canViewPortalUpdate(n) {
   if(n.portalUpdate !== true) return true;
   if(n.audience === 'all') return true;
-  if(isGuestUser() || !authenticatedProfile?.isAdmin) return false;
+  if(isGuestUser() || !authenticatedProfile?.isAdmin || homeViewMode==='staff') return false;
   if(n.audience === 'member-admin') return true;
   if(n.audience === 'shift-admin') return ADMIN_STAFF.includes(currentUser?.staffId);
   return false;
@@ -1792,7 +1812,7 @@ async function loadScheduleEvents(staffId) {
 Object.assign(window, {
   doLogin, doLogout,
   goToAttendanceApp, goToShiftApp, goToSkillApp, goToTaskApp, goToGoalApp, goToLoanApp, goToPrivateMetricsApp, goToScheduleApp, goToMeetingManagementApp, goToTrainingMaterialsApp,
-  togglePortalMenu, closePortalMenu, toggleMenuSection,
+  togglePortalMenu, closePortalMenu, toggleMenuSection, setHomeViewMode, showHomeUpdates, toggleNoticeHistory,
   openPwModal, closePwModal, closePwModalIfBg, submitPwChange,
   openNoticeModal, closeNoticeModal, closeNoticeModalIfBg, submitNotice, deleteNotice
 });

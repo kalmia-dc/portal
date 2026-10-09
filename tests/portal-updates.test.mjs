@@ -4,14 +4,14 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 const html=fs.readFileSync('index.html','utf8'),raw=JSON.parse(fs.readFileSync('portal-updates.json','utf8'));
 function setup(){
- const nodes={};const field=id=>nodes[id]??={innerHTML:'',classList:{add(){},remove(){}}};
- const c=vm.createContext({Date,URL,console,document:{getElementById:field},window:{location:{href:'https://kalmia-dc.github.io/portal/index.html',origin:'https://kalmia-dc.github.io'}},currentUser:{staffId:'sugihira',name:'検証'},authenticatedProfile:{isAdmin:true},ADMIN_STAFF:['sugihira','momo'],isGuestUser:()=>false,raw});
+ const nodes={};const field=id=>nodes[id]??={innerHTML:'',setAttribute(){},classList:{add(){},remove(){}}};
+ const c=vm.createContext({Date,URL,console,document:{getElementById:field},window:{location:{href:'https://kalmia-dc.github.io/portal/index.html',origin:'https://kalmia-dc.github.io'}},currentUser:{staffId:'sugihira',name:'検証'},authenticatedProfile:{isAdmin:true},homeViewMode:null,ADMIN_STAFF:['sugihira','momo'],isGuestUser:()=>false,raw});
  const run=s=>vm.runInContext(s,c);
- run(html.slice(html.indexOf('let _noticesUnsub'),html.indexOf('async function deleteNotice')));
+ run(html.slice(html.indexOf('let noticeHistoryExpanded'),html.indexOf('async function deleteNotice')));
  run('_portalUpdateNotices=normalizePortalUpdateNotices(raw)');return {run,c,field};
 }
 test('home updates newest first, links retain existing routing, no metadata or unpublished notification claims',()=>{
- const h=setup();h.run('renderNotices()');const out=h.field('heroNoticeList').innerHTML;
+ const h=setup();h.run('noticeHistoryExpanded=true;renderNotices()');const out=h.field('heroNoticeList').innerHTML;
  assert(out.indexOf('解除済みスタッフは')<out.indexOf('スタッフ1人の表示月'));
  assert(out.includes('shift.html?admin=1&amp;sid=sugihira'));assert(out.includes('portal-members.html?sid=sugihira'));
  assert(out.includes('シフト管理で履歴を確認'));assert(!out.includes('bf25bb5'));assert(!out.includes('Worker'));assert(!out.includes('朝サマリー'));

@@ -34,11 +34,11 @@ http.createServer((req,res)=>{
  }
  if(url.pathname==='/updates.html'){
   const original=fs.readFileSync(path.join(root,'index.html'),'utf8');
-  const functions=original.slice(original.indexOf('let _noticesUnsub'),original.indexOf('async function deleteNotice'));
-  const visibility=original.slice(original.indexOf('function updateMenuVisibility()'),original.indexOf('// Firebaseからシフトデータを読む'));
+  const functions=original.slice(original.indexOf('let noticeHistoryExpanded'),original.indexOf('async function deleteNotice'));
+  const visibility=original.slice(original.indexOf('let homeViewMode'),original.indexOf('// Firebaseからシフトデータを読む'));
   const staff=url.searchParams.has('staff');
   let page=original.replace(/<script[^>]*>[\s\S]*?<\/script>/g,'').replace(/@import url\([^;]+;/g,'');
-  const boot='<script>const ADMIN_STAFF=["test_admin"];const currentUser={staffId:'+JSON.stringify(staff?'test_staff':'test_admin')+',name:"架空ユーザー"};const authenticatedProfile={isAdmin:'+!staff+'};function isGuestUser(){return false};'+functions+visibility+';_portalUpdateNotices=normalizePortalUpdateNotices('+fs.readFileSync(path.join(root,'portal-updates.json'),'utf8')+');renderNotices();updateMenuVisibility();document.getElementById("heroTitle").textContent="架空ユーザーさん";</script>';
+  const boot='<script>const ADMIN_STAFF=["test_admin"];const currentUser={staffId:'+JSON.stringify(staff?'test_staff':'test_admin')+',name:"架空ユーザー"};const authenticatedProfile={portalRole:'+JSON.stringify(staff?'staff':'admin')+',isAdmin:'+!staff+'};function isGuestUser(){return false};'+functions+visibility+';_portalUpdateNotices=normalizePortalUpdateNotices('+fs.readFileSync(path.join(root,'portal-updates.json'),'utf8')+');renderNotices();updateMenuVisibility();document.getElementById("heroTitle").textContent="架空ユーザーさん";</script>';
   page=page.replace('</head>','<style>#loginScreen{display:none!important}#app{display:block!important}</style></head>').replace('</body>',boot+'</body>');
   res.setHeader('Content-Security-Policy',"default-src 'self' 'unsafe-inline'; connect-src 'self'; font-src 'none'; img-src 'self' data:");res.setHeader('Content-Type','text/html; charset=utf-8');res.end(page);return;
  }
