@@ -373,6 +373,39 @@
   .home-functions .tool-item{min-height:90px;display:flex;flex-direction:column;justify-content:center}
   .notice-history-button{background:none;border:1px solid #ffffff70;border-radius:8px;padding:9px 14px;cursor:pointer;margin-top:12px}
   @media(max-width:720px){.home-functions{padding:18px 16px 0}.home-heading h1{font-size:20px}.home-functions .category-tools{grid-template-columns:repeat(2,minmax(0,1fr))}.home-functions .tool-item{padding:14px 10px}.home-mode-switch button{padding:10px 14px}}
+
+  /* Home-only calm surfaces; shared portal styles are intentionally unchanged. */
+  body { --bg:#f4f7f7; --dark:#243b42; --gray:#52676e; }
+  #app .hero { background:none; max-width:1100px; margin:0 auto; padding:24px 20px 0; }
+  #app .hero::before, #app .hero::after { content:none; }
+  #app header { box-shadow:none; border-bottom:1px solid #dce5e5; }
+  #app .hero-greeting { color:#52676e; margin-top:20px; }
+  #app .hero-title { color:#243b42; }
+  #app .hero-title span { background:#e8f3f1; }
+  #app .hero-notice-card, #app .hero-task-card, #app .hero-shift-card, #app .notice-strip {
+    background:#fff; color:#243b42; border:1px solid #dce5e5; backdrop-filter:none;
+    box-shadow:0 2px 8px rgba(36,59,66,.035); border-radius:14px;
+  }
+  #app #heroNoticeCard { border-top:3px solid #247b73; }
+  #app .hero-notice-label, #app .hero-shift-label { color:#405d64; opacity:1; font-size:12px; }
+  #app .hero-notice-date, #app .hero-task-date { color:#52676e; opacity:1; }
+  #app .hero-notice-type, #app .hero-shift-time { background:#eaf3f1; color:#27645f; opacity:1; }
+  #app .hero-notice-text { line-height:1.7; }
+  #app .hero-notice-item, #app .hero-task-item, #app .today-link { border-bottom-color:#e3eaea; }
+  #app .today-link { color:#243b42; }
+  #app .today-link small, #app .today-status { color:#52676e; opacity:1; }
+  #app .hero-notice-link, #app .hero-shift-go, #app .hero-notice-del { color:#176d66; }
+  #app .hero-notice-post-btn, #app .hero-shift-go { background:#eaf3f1; color:#176d66; }
+  #app .notice-history-button { border-color:#b8cfcb; background:#f5faf9; }
+  #app .notice-strip { background:#eef5f3; }
+  #app .notice-dot { background:#247b73; animation:none; }
+  #app .today-badge, #app .avatar { background:#eaf3f1; color:#27645f; }
+  #app .tool-item, #app .shift-preview, #app .staff-section, #app .notice-board {
+    border:1px solid #dce5e5; box-shadow:0 2px 8px rgba(36,59,66,.035);
+  }
+  #app .tool-item.shift-tool { background:#edf6f3; border-color:#c7ded8; }
+  #app a:focus-visible, #app button:focus-visible { outline:3px solid #247b73; outline-offset:3px; }
+  @media(max-width:720px){ #app .hero { padding:18px 16px 0; } }
 </style>
 <link rel="stylesheet" href="./portal-common.css?v=20261005">
 <script defer src="./portal-common.js?v=20261005"></script>
