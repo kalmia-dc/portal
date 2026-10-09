@@ -14,6 +14,8 @@ function setup(admin=false){
  return {c,run,field,callbacks};
 }
 test('priority lane precedes functions; independent subscriptions start before slower personal reads',()=>{
+ assert(html.indexOf('id="heroNoticeCard"')<html.indexOf('id="greeting"'));
+ assert(html.indexOf('id="heroNoticeCard"')<html.indexOf('id="heroTaskCard"'));
  for(const id of ['homePriorities','heroTaskCard','deadlineNotice','importantNoticeCard'])assert(html.indexOf('id="'+id+'"')<html.indexOf('id="homeFunctions"'),id);
  const init=html.slice(html.indexOf('async function initApp()'),html.indexOf('async function buildWeek('));
  assert(init.indexOf('loadMyTasks(u.name)')<init.indexOf('await '));assert(init.indexOf('loadScheduleEvents(u.staffId)')<init.indexOf('await '));assert(init.indexOf('startNoticeSync()')<init.indexOf('await '));

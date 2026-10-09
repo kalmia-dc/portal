@@ -412,6 +412,15 @@
 </header>
 
 <div class="hero" id="homePriorities">
+  <div class="hero-notice-card" id="heroNoticeCard">
+    <div class="hero-notice-label">
+      <span>📢 更新情報</span>
+      <button class="hero-notice-post-btn" id="noticePostBtn" onclick="openNoticeModal()">＋ 投稿</button>
+    </div>
+    <div id="heroNoticeList"></div>
+    <button id="noticeHistoryButton" class="hero-notice-link notice-history-button" type="button" onclick="toggleNoticeHistory()" aria-expanded="false" hidden>更新情報をすべて見る</button>
+  </div>
+
   <div class="hero-greeting" id="greeting">おはようございます 👋</div>
   <div class="hero-title" id="heroTitle">さん</div>
 
@@ -541,15 +550,6 @@
 
 <div class="hero">
   <!-- お知らせ（Firebase連携） -->
-  <div class="hero-notice-card" id="heroNoticeCard">
-    <div class="hero-notice-label">
-      <span>📢 更新情報</span>
-      <button class="hero-notice-post-btn" id="noticePostBtn" onclick="openNoticeModal()">＋ 投稿</button>
-    </div>
-    <div id="heroNoticeList"></div>
-    <button id="noticeHistoryButton" class="hero-notice-link notice-history-button" type="button" onclick="toggleNoticeHistory()" aria-expanded="false" hidden>更新情報をすべて見る</button>
-  </div>
-
   <!-- 日程調整（未回答） -->
   <div class="hero-task-card" id="heroScheduleCard" style="display:none;">
     <div class="hero-notice-label">
