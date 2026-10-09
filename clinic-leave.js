@@ -79,7 +79,7 @@ function renderClinicHours(){
   }
   let el=document.getElementById('clinicHoursSummary');
   if(!el){ el=document.createElement('div');el.id='clinicHoursSummary';document.getElementById('staffList')?.appendChild(el); }
-  if(el) el.innerHTML='<h3>月合計の内訳</h3>'+STAFF.map(s=>`<div style="font-size:.72rem;margin:6px 0">${clinicEscape(s.name)}：${clinicHourLabel(s.id)}</div>`).join('');
+  if(el) el.innerHTML='<h3>月合計の内訳</h3>'+(typeof visibleShiftStaff==='function'?visibleShiftStaff():STAFF).map(s=>`<div style="font-size:.72rem;margin:6px 0">${clinicEscape(s.name)}：${clinicHourLabel(s.id)}</div>`).join('');
 }
 function openClinicManager(){
   let modal=document.getElementById('clinicLeaveModal');

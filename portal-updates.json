@@ -1,5 +1,50 @@
 [
   {
+    "id": "2026-10-09-shift-history",
+    "type": "change",
+    "audience": "shift-admin",
+    "text": "解除済みスタッフはシフト一覧で非表示になります。「解除済みも表示（履歴確認）」で過去の勤務を確認できます。勤務データや集計は変わりません。",
+    "createdAt": "2026-10-09T12:48:00+09:00",
+    "linkUrl": "shift.html?admin=1",
+    "linkLabel": "シフト管理で履歴を確認"
+  },
+  {
+    "id": "2026-10-09-shift-month-order",
+    "type": "new",
+    "audience": "shift-admin",
+    "text": "スタッフ1人の表示月を一括クリア・復元できるようになりました。「スタッフ表示順」から並び順も保存できます。解除済みスタッフへの新しいシフト登録はできません。",
+    "createdAt": "2026-10-09T12:43:00+09:00",
+    "linkUrl": "shift.html?admin=1",
+    "linkLabel": "シフト管理を開く"
+  },
+  {
+    "id": "2026-10-09-shift-entry",
+    "type": "new",
+    "audience": "shift-admin",
+    "text": "誤登録したシフトを各セルから削除・復元できます。歯科医師（DR）の勤務も「スタッフ・職種」から選んで登録できます。",
+    "createdAt": "2026-10-09T11:37:00+09:00",
+    "linkUrl": "shift.html?admin=1",
+    "linkLabel": "シフトを登録・編集"
+  },
+  {
+    "id": "2026-10-08-shift-admin-label",
+    "type": "change",
+    "audience": "shift-admin",
+    "text": "管理者専用メニューの名称を「シフト管理（管理者）」にしました。シフトの作成・編集はこちらから開けます。",
+    "createdAt": "2026-10-08T18:40:00+09:00",
+    "linkUrl": "shift.html?admin=1",
+    "linkLabel": "シフト管理（管理者）を開く"
+  },
+  {
+    "id": "2026-10-08-members",
+    "type": "new",
+    "audience": "member-admin",
+    "text": "「ログインメンバー管理」から、ポータルを利用するメンバーの許可・解除を管理できます。",
+    "createdAt": "2026-10-08T16:33:00+09:00",
+    "linkUrl": "portal-members.html",
+    "linkLabel": "ログインメンバー管理を開く"
+  },
+  {
     "id": "2026-07-09-index-auto-updates",
     "type": "new",
     "text": "更新情報がポータル公開更新と同時に表示されるようになりました",

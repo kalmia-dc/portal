@@ -35,12 +35,12 @@ function renderShiftEntryPicker(){
   select.disabled=!shiftMembersLoaded;
   const management=document.getElementById('monthStaff'),previous=management.value;
   management.innerHTML='';
-  for(const staff of orderedShiftStaff()){
+  for(const staff of visibleShiftStaff()){
     const option=document.createElement('option');option.value=staff.id;
     option.textContent=`${staff.name}（${staff.role}）`+(shiftMembersLoaded&&staffAccessIssue(staff.id)?'・解除/要確認（取消可）':'');
     management.appendChild(option);
   }
-  if(STAFF.some(s=>s.id===previous))management.value=previous;
+  if(visibleShiftStaff().some(s=>s.id===previous))management.value=previous;
   renderStaffMonthActions();
   const date=document.getElementById('entryDate');
   if(!date.value)date.value=dateStr(currentYear,currentMonth,1);

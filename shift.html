@@ -1283,6 +1283,11 @@
       <button class="btn btn-secondary" onclick="openStaffOrder()">スタッフ表示順</button>
       <span id="staffMonthLabel" style="font-size:.78rem"></span>
     </div>
+    <div style="margin:10px 0;font-size:.85rem;line-height:1.7">
+      <label style="display:inline-flex;align-items:center;gap:8px;padding:8px 0"><input id="showRevokedShiftStaff" type="checkbox" onchange="setShowRevokedShiftStaff(this.checked)">解除済みも表示（履歴確認）</label>
+      <p id="staffVisibilityStatus" role="status"></p>
+      <p style="color:var(--muted)">表示切替は勤務データ・集計を変更しません。CSV・印刷は非表示のスタッフも従来の出力対象に含みます。</p>
+    </div>
     <p id="staffMonthStatus" role="status" style="font-size:.85rem;color:var(--teal-dk)"></p>
     <div class="summary-bar" id="topSummary">
       <span><span class="label">診療日数: </span><span class="value" id="s-workdays">-</span></span>
@@ -1472,11 +1477,11 @@
 
 </div><!-- /#mainApp -->
 
-<script src="clinic-leave.js?v=20261009-member-access"></script>
+<script src="clinic-leave.js?v=20261009-visibility"></script>
 <script src="shift-role-balance.js?v=20260903-role-balance"></script>
-<script src="shift-entry.js?v=20261009-staff-month"></script>
+<script src="shift-entry.js?v=20261009-visibility"></script>
 <script src="shift-staff-month.js?v=20261009"></script>
-<script src="shift-member-access.js?v=20261009"></script>
+<script src="shift-member-access.js?v=20261009-visibility"></script>
 <script src="shift-staff-order.js?v=20261009"></script>
 <script>
 // ──────────────────────────────────────────────
@@ -4335,6 +4340,7 @@ function render(){
 
 function renderStaffList(){
   renderShiftEntryPicker();
+  renderShiftStaffVisibility();
   const el = document.getElementById('staffList');
   el.innerHTML = '<h3>スタッフ一覧</h3>';
   const groups = { DR:'DR（歯科医師）', DH:'DH（歯科衛生士）', DA:'DA（歯科助手/事務）' };
@@ -4342,7 +4348,7 @@ function renderStaffList(){
     const div = document.createElement('div');
     div.style.marginBottom = '8px';
     div.innerHTML = `<div style="font-size:.68rem;color:var(--muted);margin-bottom:4px;">${groups[role]}</div>`;
-    orderedShiftStaff().filter(s=>s.role===role).forEach(s=>{
+    visibleShiftStaff().filter(s=>s.role===role).forEach(s=>{
       const h = getHours(s.id, currentYear, currentMonth);
       const pct = Math.min(100, Math.round(h/160*100));
       div.innerHTML += `
@@ -4387,7 +4393,7 @@ function renderCalendar(){
   }
 
   // 各スタッフ行
-  orderedShiftStaff().forEach(s=>{
+  visibleShiftStaff().forEach(s=>{
     const nameEl = document.createElement('div');
     nameEl.className = 'cal-staff-name';
     const h = getHours(s.id, y, m);
@@ -4513,7 +4519,7 @@ function renderSummary(){
   // sidebar summary
   const sl = document.getElementById('summaryList');
   sl.innerHTML = '';
-  STAFF.filter(usesMonthlyHoursTarget).forEach(s=>{
+  visibleShiftStaff().filter(usesMonthlyHoursTarget).forEach(s=>{
     const h = getHours(s.id, y, m);
     const pct = Math.round(h/160*100);
     const color = h>=155?'var(--teal)':h>=140?'var(--amber)':'var(--red)';
@@ -5167,8 +5173,8 @@ window.addEventListener('firebaseReady', ()=>{
   const { db, ref, onValue, query, orderByChild, equalTo, authenticatedProfile } = window._fb;
   if(authenticatedProfile.portalRole==='admin')onValue(ref(db,'portalAccess/users'),snapshot=>{
     receiveShiftMembers(snapshot.val());
-    if(currentUser?.role==='admin')renderShiftEntryPicker();
-  },()=>{shiftMembersLoaded=false;shiftMembersVersion++;if(currentUser?.role==='admin')renderShiftEntryPicker();});
+    redrawShiftMemberViews();
+  },()=>{shiftMembersLoaded=false;shiftMembersVersion++;redrawShiftMemberViews();});
   onValue(ref(db,'shifts/__displayOrder'),snapshot=>{
     staffOrderRecord=snapshot.val();staffOrderLoaded=true;
     if(currentUser?.role==='admin')render();

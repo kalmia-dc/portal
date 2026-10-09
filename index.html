@@ -1316,11 +1316,12 @@ function renderNotices() {
 
   const data = { ..._portalUpdateNotices, ..._firebaseNotices };
   const items = Object.entries(data)
-    .filter(([, n]) => isActiveNotice(n))
+    .filter(([, n]) => isActiveNotice(n) && canViewPortalUpdate(n))
     .sort((a,b) => noticeCreatedAtTime(b[1]?.createdAt) - noticeCreatedAtTime(a[1]?.createdAt));
 
   if (!items.length && !isAdmin) {
     card.classList.remove('has-items');
+    list.innerHTML = '';
     return;
   }
 
@@ -1349,7 +1350,7 @@ function renderNotices() {
           ${canDelete ? `<button class="hero-notice-del visible" onclick="deleteNotice('${key}')" title="削除">✕</button>` : ''}
         </div>
         <div class="hero-notice-text">${escHtml(n.text || '')}</div>
-        ${linkUrl ? `<a class="hero-notice-link" href="${escAttr(linkUrl)}">開く →</a>` : ''}
+        ${linkUrl ? `<a class="hero-notice-link" href="${escAttr(linkUrl)}">${escHtml(n.linkLabel || '開く')} →</a>` : ''}
       </div>
     </div>`;
   }).join('');
@@ -1382,9 +1383,11 @@ function normalizePortalUpdateNotices(raw) {
     if (!text || !createdAt) return null;
     const rawId = String(item.id || `item-${createdAt}-${index}`).trim();
     const key = rawId.replace(/[^a-z0-9_-]+/gi, '-') || `item-${index}`;
-    const expiresAt = normalizeNoticeExpiry(item.expiresAt) || defaultNoticeExpiryFromCreatedAt(createdAt);
+    const expiresAt = normalizeNoticeExpiry(item.expiresAt);
     return [`portal-update-${key}`, {
       text,
+      audience: item.audience || 'all',
+      linkLabel: String(item.linkLabel || '開く'),
       type: resolveNoticeType(item.type),
       expiresAt,
       linkUrl: normalizeNoticeLink(item.linkUrl),
@@ -1396,6 +1399,16 @@ function normalizePortalUpdateNotices(raw) {
   }).filter(Boolean));
 }
 
+// Match the existing home cards. Unknown audiences fail closed.
+function canViewPortalUpdate(n) {
+  if(n.portalUpdate !== true) return true;
+  if(n.audience === 'all') return true;
+  if(isGuestUser() || !authenticatedProfile?.isAdmin) return false;
+  if(n.audience === 'member-admin') return true;
+  if(n.audience === 'shift-admin') return ADMIN_STAFF.includes(currentUser?.staffId);
+  return false;
+}
+
 function noticeCreatedAtTime(value) {
   if (!value) return 0;
   if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
@@ -1405,6 +1418,7 @@ function noticeCreatedAtTime(value) {
 
 function isActiveNotice(n) {
   if (!n || n.hidden === true) return false;
+  if(n.portalUpdate === true && !n.expiresAt) return true;
   const expiresAt = n.expiresAt || defaultNoticeExpiryFromCreatedAt(n.createdAt);
   const expiryTime = noticeExpiryEndTime(expiresAt);
   return !expiryTime || expiryTime >= Date.now();

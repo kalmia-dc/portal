@@ -14,8 +14,8 @@ async function refreshShiftMembers(){
   try{
     const data=await window._fb.readMembersFromServer();
     if(!window._fb.shiftConnected)throw Error('offline');
-    receiveShiftMembers(data);
-  }catch(e){shiftMembersLoaded=false;shiftMembersVersion++;throw e;}
+    receiveShiftMembers(data);redrawShiftMemberViews();
+  }catch(e){shiftMembersLoaded=false;shiftMembersVersion++;redrawShiftMemberViews();throw e;}
   return shiftMembersVersion;
 }
 async function assertShiftStaffCanRegister(sid){
@@ -49,3 +49,18 @@ function restoreRevokedShiftData(snapshot){
     else if(shiftData.__manualTimes)delete shiftData.__manualTimes[sid];
   }
 }
+
+// Display preference is local to this open page; data, totals and saved order are unchanged.
+let showRevokedShiftStaff=false;
+function visibleShiftStaff(){
+  return orderedShiftStaff().filter(s=>!shiftMembersLoaded||showRevokedShiftStaff||!staffAccessIssue(s.id));
+}
+function setShowRevokedShiftStaff(value){showRevokedShiftStaff=value===true;render();}
+function renderShiftStaffVisibility(){
+  const toggle=document.getElementById('showRevokedShiftStaff'),status=document.getElementById('staffVisibilityStatus');
+  toggle.checked=showRevokedShiftStaff;toggle.disabled=!shiftMembersLoaded;
+  const count=STAFF.filter(s=>!!staffAccessIssue(s.id)).length;
+  status.textContent=!shiftMembersLoaded?'解除状態を確認できていないため、全員を表示しています。登録時は最新状態を確認します。':
+    showRevokedShiftStaff?'解除・要確認のスタッフ '+count+'人を含めて表示中です。':'解除・要確認のスタッフ '+count+'人を非表示にしています。';
+}
+function redrawShiftMemberViews(){if(currentUser?.role==='admin')render();}
