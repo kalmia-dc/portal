@@ -925,6 +925,7 @@
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
   import { getDatabase, ref, set, get, onValue, push, remove, query, orderByChild, equalTo, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
   import { startPortalAuth } from "./portal-auth.js";
+  import { readServerMembers } from "./portal-server-members.mjs";
 
   const firebaseConfig = {
     apiKey: "AIzaSyDdMe7feUF6CKPHH0YIx7Suk-WnXtOYUu8",
@@ -944,6 +945,7 @@
   // ── Firebase API をグローバルに公開 ──
   window._fb = { db, ref, set, get, onValue, push, remove, query, orderByChild, equalTo, authenticatedProfile, runTransaction };
   window._fb.shiftConnected=false;
+  window._fb.readMembersFromServer=()=>readServerMembers({databaseURL:firebaseConfig.databaseURL,user:window.portalAuth?.auth.currentUser});
   onValue(ref(db,'.info/connected'),snapshot=>{window._fb.shiftConnected=snapshot.val()===true;});
   window.dispatchEvent(new Event('firebaseReady'));
   // 初期表示
@@ -1274,6 +1276,14 @@
       <button class="btn btn-primary" onclick="openSelectedShift()">シフトを登録・編集</button>
       <span style="font-size:.78rem;color:var(--muted)">DR（歯科医師）も選択できます。削除・復元は各セルから。</span>
     </div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px">
+      <label>一括操作のスタッフ <select id="monthStaff" style="padding:8px;max-width:100%"></select></label>
+      <button class="btn btn-danger" onclick="openStaffMonthOperation()">このスタッフの表示月をクリア</button>
+      <button class="btn btn-secondary" onclick="openStaffMonthOperation(true)">直前の一括クリアを復元</button>
+      <button class="btn btn-secondary" onclick="openStaffOrder()">スタッフ表示順</button>
+      <span id="staffMonthLabel" style="font-size:.78rem"></span>
+    </div>
+    <p id="staffMonthStatus" role="status" style="font-size:.85rem;color:var(--teal-dk)"></p>
     <div class="summary-bar" id="topSummary">
       <span><span class="label">診療日数: </span><span class="value" id="s-workdays">-</span></span>
       <span><span class="label">DH不足日: </span><span class="value" id="s-dhshort">-</span></span>
@@ -1288,6 +1298,31 @@
 </div>
 
 <!-- SHIFT EDIT MODAL -->
+<div class="modal-overlay" id="staffOrderModal" role="dialog" aria-modal="true" aria-labelledby="staffOrderTitle">
+  <div class="modal" style="width:520px">
+    <h2 id="staffOrderTitle">スタッフ表示順</h2>
+    <p style="font-size:.85rem;line-height:1.7">上下ボタンで移動し、保存してください。全管理者・全月で共通です。シフト表は職種をまたいで並べ替えられます。職種別の一覧・印刷ではグループ内の順番に反映します。</p>
+    <div id="staffOrderList"></div>
+    <p id="staffOrderError" role="alert" style="color:var(--red);font-size:.85rem;margin:12px 0"></p>
+    <div class="modal-actions" style="flex-wrap:wrap">
+      <button class="btn btn-secondary" onclick="closeStaffOrder()">変更しない</button>
+      <button class="btn btn-primary" onclick="saveStaffOrder()">表示順を保存</button>
+    </div>
+  </div>
+</div>
+<div class="modal-overlay" id="staffMonthModal" role="dialog" aria-modal="true" aria-labelledby="staffBulkTitle">
+  <div class="modal">
+    <h2 id="staffBulkTitle"></h2>
+    <p id="staffMonthTarget" style="white-space:pre-line;font-weight:700;line-height:1.8"></p>
+    <p id="staffMonthDetail" style="font-size:.85rem;line-height:1.7;margin:12px 0"></p>
+    <p style="font-size:.85rem">他スタッフ・他月・休暇申請・勤怠記録・スタッフ登録は変更しません。</p>
+    <p id="staffMonthError" role="alert" style="color:var(--red);font-size:.85rem;margin:12px 0"></p>
+    <div class="modal-actions" style="flex-wrap:wrap">
+      <button class="btn btn-secondary" onclick="closeStaffMonthOperation()">変更しない</button>
+      <button class="btn btn-danger" id="staffMonthConfirmButton" onclick="confirmStaffMonthOperation()">クリアする</button>
+    </div>
+  </div>
+</div>
 <div class="modal-overlay" id="editModal">
   <div class="modal">
     <h2 id="modalTitle">シフト編集</h2>
@@ -1437,9 +1472,12 @@
 
 </div><!-- /#mainApp -->
 
-<script src="clinic-leave.js?v=20261005-manual-time"></script>
+<script src="clinic-leave.js?v=20261009-member-access"></script>
 <script src="shift-role-balance.js?v=20260903-role-balance"></script>
-<script src="shift-entry.js?v=20261009"></script>
+<script src="shift-entry.js?v=20261009-staff-month"></script>
+<script src="shift-staff-month.js?v=20261009"></script>
+<script src="shift-member-access.js?v=20261009"></script>
+<script src="shift-staff-order.js?v=20261009"></script>
 <script>
 // ──────────────────────────────────────────────
 //  DATA DEFINITIONS
@@ -1529,7 +1567,7 @@ async function confirmShift() {
   if (!confirm(`${y}年${m}月のシフトを確定しますか？`)) return;
 
   // シフトを保存
-  saveCurrentShift();
+  if(await saveCurrentShift()===false)return;
 
   // シフト確定と同時にロックを設定する
   const key = monthKey(y, currentMonth);
@@ -1550,13 +1588,26 @@ let allShiftData = {};   // allShiftData['2026-03'][staffId][dateStr] = shiftKey
 function monthKey(y, m){ return `${y}-${String(m+1).padStart(2,'0')}`; }
 function firebaseSafeKey(key){ return key.replace(/-/g,'_'); }
 function restoreFirebaseKey(key){ return key.replace(/_/g,'-'); }
-function saveCurrentShift(){
-  const key=monthKey(currentYear, currentMonth);
-  allShiftData[key] = JSON.parse(JSON.stringify(shiftData));
-  // Firebaseに保存（shifts/YYYY-MM/staffId/date 形式）
-  if(window._fb){
-    const { db, ref, set } = window._fb;
-    set(ref(db, 'shifts/'+key), allShiftData[key]);
+async function saveCurrentShift(){
+  const key=monthKey(currentYear,currentMonth),candidate=structuredClone(shiftData),expected=structuredClone(allShiftData[key]||{});
+  try{
+    if(currentUser?.role!=='admin')throw Error('シフト保存は管理者専用です。');
+    const version=await refreshShiftMembers();
+    assertMonthRegistrationAllowed(candidate,expected);
+    const {db,ref,get,runTransaction}=window._fb;
+    if((await get(ref(db,'shift_locks/'+firebaseSafeKey(key)))).val())throw Error('確定済みの月は変更できません。');
+    const result=await runTransaction(ref(db,'shifts/'+key),data=>{
+      if(currentUser?.role!=='admin'||!window._fb.shiftConnected||!shiftMembersLoaded||shiftMembersVersion!==version||shiftLocks[key]||!sameStaffMonthState(data||{},expected))return;
+      try{assertMonthRegistrationAllowed(candidate,data||{});}catch{return;}
+      return candidate;
+    },{applyLocally:false});
+    if(!result.committed)throw Error('シフトまたは許可状態が変わりました。再読込して確認してください。');
+    allShiftData[key]=result.snapshot.val()||{};
+    if(monthKey(currentYear,currentMonth)===key)loadShiftForMonth(currentYear,currentMonth);
+    return true;
+  }catch(e){
+    if(monthKey(currentYear,currentMonth)===key){loadShiftForMonth(currentYear,currentMonth);render();}
+    alert('シフトを保存できません：'+e.message);return false;
   }
 }
 function loadShiftForMonth(y, m){
@@ -1655,8 +1706,7 @@ function getHours(staffId, y, m){
 //  MONTH NAVIGATION
 // ──────────────────────────────────────────────
 function changeMonth(delta){
-  // 現在月のシフトを保存
-  saveCurrentShift();
+  if(manualSavePending||staffMonthOperation||staffOrderDraft)return;
 
   currentMonth += delta;
   if(currentMonth > 11){ currentMonth = 0; currentYear++; }
@@ -1710,7 +1760,7 @@ const MOMO_MAX_CONSECUTIVE_DAYS = 5;
 const AUTO_PROTECTED_STAFF_IDS = ['tamiya','yamada'];
 
 function isAutoProtectedStaff(id){
-  return AUTO_PROTECTED_STAFF_IDS.includes(id)||isFlexibleAttendance(id);
+  return AUTO_PROTECTED_STAFF_IDS.includes(id)||isFlexibleAttendance(id)||(shiftMembersLoaded&&!!staffAccessIssue(id));
 }
 function isFixedOffDay(id, ds){
   if(id!=='momo') return false;
@@ -2559,6 +2609,7 @@ function repairHardConsecutiveExact(staffList, y, m, days, wds, workDays){
   }
 }
 function generateShift(){
+  if(!shiftMembersLoaded){alert('メンバーの許可状態を読み込んでから自動生成してください。');return;}
   if(!attendanceProfilesLoaded){alert('勤怠プロフィールを読み込めていないため、自動生成できません。再読み込みしてください。');return;}
   if(!clinicGenerationReady()) return;
   if(isCurrentMonthLocked()){
@@ -2574,6 +2625,7 @@ function generateShift(){
   txt.innerHTML='<span class="spinner"></span> 生成中...';
 
   setTimeout(()=>{
+    const revokedShiftSnapshot=snapshotRevokedShiftData();
     delete shiftData.__manualTimes; // Regeneration creates a new schedule; manual edits follow generation.
     const clinicPreserved = snapshotClinicShifts(y, m);
     STAFF.forEach(s=>{ if(!shiftData[s.id]) shiftData[s.id]={}; });
@@ -2581,7 +2633,7 @@ function generateShift(){
     // ── 申請データをshiftDataに反映（有給・希望休）──
     const monthStr = monthKey(y, m); // 'YYYY-MM'
     requestData
-      .filter(r=>!r.cancelled && r.status==='approved' && r.date && r.date.startsWith(monthStr))
+      .filter(r=>!r.cancelled && r.status==='approved' && r.date && r.date.startsWith(monthStr) && !staffAccessIssue(r.staffId))
       .forEach(r=>{
         if(!shiftData[r.staffId]) shiftData[r.staffId]={};
         if(r.type==='paid'){
@@ -4123,6 +4175,7 @@ function generateShift(){
     syncHanowaCoverage(y, m, workDays, true);
 
     balanceRoleStaffing(y, m, days, wds);
+    restoreRevokedShiftData(revokedShiftSnapshot);
 
     const checked=new Set();
     for(const d of workDays){
@@ -4167,9 +4220,9 @@ function printShift(){
   const monthStr=`${y}年${m+1}月 シフト表`;
 
   // 印刷対象スタッフ（役職グループ別）
-  const drStaff=STAFF.filter(s=>s.role==='DR'&&(s.type==='full'||s.type==='director'||s.type==='part'));
-  const dhStaff=STAFF.filter(s=>s.role==='DH');
-  const daStaff=STAFF.filter(s=>s.role==='DA'&&(s.type==='full'||s.type==='part'));
+  const drStaff=orderedShiftStaff().filter(s=>s.role==='DR'&&(s.type==='full'||s.type==='director'||s.type==='part'));
+  const dhStaff=orderedShiftStaff().filter(s=>s.role==='DH');
+  const daStaff=orderedShiftStaff().filter(s=>s.role==='DA'&&(s.type==='full'||s.type==='part'));
 
   // ヘッダー行生成
   const makeHeader=()=>{
@@ -4289,7 +4342,7 @@ function renderStaffList(){
     const div = document.createElement('div');
     div.style.marginBottom = '8px';
     div.innerHTML = `<div style="font-size:.68rem;color:var(--muted);margin-bottom:4px;">${groups[role]}</div>`;
-    STAFF.filter(s=>s.role===role).forEach(s=>{
+    orderedShiftStaff().filter(s=>s.role===role).forEach(s=>{
       const h = getHours(s.id, currentYear, currentMonth);
       const pct = Math.min(100, Math.round(h/160*100));
       div.innerHTML += `
@@ -4334,7 +4387,7 @@ function renderCalendar(){
   }
 
   // 各スタッフ行
-  STAFF.forEach(s=>{
+  orderedShiftStaff().forEach(s=>{
     const nameEl = document.createElement('div');
     nameEl.className = 'cal-staff-name';
     const h = getHours(s.id, y, m);
@@ -4488,7 +4541,7 @@ function renderAlerts(){
 //  MODAL
 // ──────────────────────────────────────────────
 function openModal(staffId, ds){
-  if(currentUser?.role!=='admin' || isCurrentMonthLocked() || manualSavePending || shiftEntryConfirmation) return;
+  if(currentUser?.role!=='admin' || isCurrentMonthLocked() || manualSavePending || shiftEntryConfirmation || staffMonthOperation || staffOrderDraft) return;
   if(!STAFF.some(s=>s.id===staffId))return;
   modalStaffId = staffId;
   modalDateStr = ds;
@@ -4539,7 +4592,7 @@ function openModal(staffId, ds){
 
   modalSelected = current;
   fillManualTimeEditor();
-  document.getElementById('manualTimeError').textContent='';
+  document.getElementById('manualTimeError').textContent=shiftMembersLoaded?staffAccessIssue(staffId):'メンバーの許可状態を確認中です。取消は可能ですが、保存時に最新状態を確認します。';
   document.getElementById('editModal').classList.add('open');
 }
 
@@ -4582,7 +4635,7 @@ function previewManualHours(){
 }
 let manualSavePending=false;
 async function applyModal(){
-  if(currentUser?.role!=='admin' || isCurrentMonthLocked() || manualSavePending || shiftEntryConfirmation) return;
+  if(currentUser?.role!=='admin' || isCurrentMonthLocked() || manualSavePending || shiftEntryConfirmation || staffMonthOperation || staffOrderDraft) return;
   if(!modalStaffId || !modalDateStr) return;
   const error=document.getElementById('manualTimeError');error.textContent='';
   const sid=modalStaffId, ds=modalDateStr, key=modalSelected, month=ds.slice(0,7);
@@ -4593,11 +4646,12 @@ async function applyModal(){
     if(isTimedShift(key)&&document.getElementById('manualTimeEnabled').checked) time=readManualTimeInput();
     if(!window._fb || window._fb.shiftConnected!==true) throw Error('接続を確認して、もう一度保存してください。');
     setShiftEntryPending(true);error.textContent='サーバー確認中です。通信が切れた場合は再接続までお待ちください。';
+    const memberVersion=await assertShiftStaffCanRegister(sid);
     const {db,ref,runTransaction,get}=window._fb;
     const lock=await get(ref(db,'shift_locks/'+firebaseSafeKey(month)));
     if(lock.val()) throw Error('確定済みのシフトは編集できません。確定を解除してください。');
     const result=await runTransaction(ref(db,'shifts/'+month),data=>{
-      if(currentUser?.role!=='admin'||shiftLocks[month]||!sameShiftEntry(shiftEntrySnapshot(data,sid,ds),expected))return;
+      if(!shiftRegistrationStillAllowed(sid,memberVersion)||shiftLocks[month]||!sameShiftEntry(shiftEntrySnapshot(data,sid,ds),expected))return;
       const next=data||{};
       (next[sid]??={})[ds]=key;
       if(time) ((next.__manualTimes??={})[sid]??={})[ds]=time;
@@ -4633,7 +4687,7 @@ function exportCSV(){
     Array.from({length:days},(_,i)=>`${m+1}/${i+1}`)
   ).concat(['合計時間']);
 
-  const rows = STAFF.map(s=>{
+  const rows = orderedShiftStaff().map(s=>{
     const cells = [s.name, s.role, s.type==='full'?'常勤':s.type==='director'?'院長':s.type==='part'?'非常勤':'スポット'];
     for(let d=1; d<=days; d++){
       const ds = dateStr(y,m,d);
@@ -5017,9 +5071,13 @@ function renderApprovalList(){
     </div>`).join('');
 }
 
-function approveReq(id){
+async function approveReq(id){
   const r = requestData.find(x=>String(x.id)===String(id));
-  if(!r) return;
+  if(!r||r.status!=='pending') return;
+  if(currentUser?.role!=='admin'||manualSavePending)return;
+  manualSavePending=true;
+  try{await assertShiftStaffCanRegister(r.staffId);}catch(e){alert(e.message);return;}
+  finally{manualSavePending=false;}
   r.status = 'approved';
   if(!shiftData[r.staffId]) shiftData[r.staffId]={};
   if(r.type==='paid'){
@@ -5107,6 +5165,14 @@ let requestData = [];
 // Firebase準備完了後にリアルタイム同期を開始
 window.addEventListener('firebaseReady', ()=>{
   const { db, ref, onValue, query, orderByChild, equalTo, authenticatedProfile } = window._fb;
+  if(authenticatedProfile.portalRole==='admin')onValue(ref(db,'portalAccess/users'),snapshot=>{
+    receiveShiftMembers(snapshot.val());
+    if(currentUser?.role==='admin')renderShiftEntryPicker();
+  },()=>{shiftMembersLoaded=false;shiftMembersVersion++;if(currentUser?.role==='admin')renderShiftEntryPicker();});
+  onValue(ref(db,'shifts/__displayOrder'),snapshot=>{
+    staffOrderRecord=snapshot.val();staffOrderLoaded=true;
+    if(currentUser?.role==='admin')render();
+  },()=>{staffOrderLoaded=false;});
 
   // 管理者は全員分、スタッフは自分の勤務区分のみ読む。
   if(authenticatedProfile.portalRole!=='terminal'){
@@ -5177,7 +5243,7 @@ window.addEventListener('firebaseReady', ()=>{
     extraStaff.forEach(s=>{ if(s.password) STAFF_PASSWORDS[s.id]=s.password; });
     renderLoginHint();
     if(currentUser?.role==='admin'){
-      renderStaffList();
+      render();
       if(document.getElementById('staffMgrModal')?.classList.contains('open')) renderStaffMgrList();
     }
   });

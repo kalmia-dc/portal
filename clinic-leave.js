@@ -235,11 +235,13 @@ async function applyClinicToSavedShifts(before,after){
   const months=[...new Set(dates.map(ds=>ds.slice(0,7)))];const report=[];
   for(const month of months){
     try{
+      const memberVersion=await refreshShiftMembers();
       const lock=await get(ref(db,'shift_locks/'+firebaseSafeKey(month)));
       if(lock.val()){report.push(month+'：確定済みのためシフトは保持。確定解除後に反映を再試行してください。');continue;}
       let conflicts=[];
       const result=await runTransaction(ref(db,'shifts/'+month),data=>{
-        const merged=mergeClinicMonth(data,dates.filter(ds=>ds.startsWith(month)),next,STAFF);
+        if(!shiftMembersLoaded||shiftMembersVersion!==memberVersion||!window._fb.shiftConnected||currentUser?.role!=='admin')return;
+        const merged=mergeClinicMonth(data,dates.filter(ds=>ds.startsWith(month)),next,STAFF.filter(s=>canRegisterShiftStaff(s.id)));
         conflicts=merged.conflicts;return merged.data;
       },{applyLocally:false});
       if(!result.committed)throw Error('保存未完了');

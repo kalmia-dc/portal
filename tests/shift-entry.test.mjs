@@ -9,7 +9,7 @@ const c=vm.createContext({console,structuredClone,Date,Math,Set,Object,Array,Str
  alert(){},confirm:s=>{confirmation=s;return answer},setTimeout(){},fetch:async()=>({ok:true,json:async()=>JSON.parse(fs.readFileSync('portal-holidays.json'))}),
  window:{addEventListener(){}},document:{getElementById:field,querySelectorAll:()=>[],createElement:node,body:node()},localStorage:{getItem:()=>null},location:{search:'',hash:''}});
 const run=s=>vm.runInContext(s,c);
-for(const file of ['clinic-leave.js','shift-role-balance.js','shift-entry.js'])run(fs.readFileSync(file,'utf8'));
+for(const file of ['clinic-leave.js','shift-role-balance.js','shift-entry.js','shift-staff-month.js','shift-member-access.js','shift-staff-order.js'])run(fs.readFileSync(file,'utf8'));
 run([...html.matchAll(/<script([^>]*)>([\s\S]*?)<\/script>/g)].find(([,a,s])=>!a&&s.includes('const SHIFT'))[2]);
 await run('window.__holidayDataReady');
 run("var confirmationResult=requestShiftEntryConfirmation('対象確認')");
@@ -20,7 +20,7 @@ run(`currentYear=2026;currentMonth=9;currentUser={role:'admin'};render=()=>{};
 STAFF=[{id:'test_dr',name:'架空医師',role:'DR',type:'spot'},{id:'test_dh',name:'架空衛生士',role:'DH',type:'full'}];
 var initial={test_dr:{'2026-10-05':'early','2026-10-06':'late'},test_dh:{'2026-10-05':'early'},__manualTimes:{test_dr:{'2026-10-05':{key:'early',start:'09:00',end:'17:00',breakMinutes:60}}}};
 var data=structuredClone(initial),writes=0,denied=false,locked=false,hold=null;
-window._fb={shiftConnected:true,db:{},ref:(_,p)=>p,get:async()=>({val:()=>locked}),runTransaction:async(p,fn)=>{
+window._fb={shiftConnected:true,readMembersFromServer:async()=>({}),db:{},ref:(_,p)=>p,get:async()=>({val:()=>locked}),runTransaction:async(p,fn)=>{
  if(p!=='shifts/2026-10')throw Error('unexpected write path');
  if(hold)await hold;if(denied)throw Error('PERMISSION_DENIED');
  const next=fn(structuredClone(data));if(next===undefined)return {committed:false};data=next;writes++;return {committed:true,snapshot:{val:()=>structuredClone(data)}};

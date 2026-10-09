@@ -25,18 +25,29 @@ function renderShiftEntryPicker(){
   for(const role of ['DR','DH','DA']){
     const group=document.createElement('optgroup');
     group.label={DR:'DR（歯科医師）',DH:'DH（歯科衛生士）',DA:'DA（歯科助手）'}[role];
-    for(const staff of STAFF.filter(s=>s.role===role)){
+    for(const staff of orderedShiftStaff().filter(s=>s.role===role&&canRegisterShiftStaff(s.id))){
       const option=document.createElement('option');option.value=staff.id;
       option.textContent=staff.name+'（'+shiftEmploymentLabel(staff)+'）';group.appendChild(option);
     }
     select.appendChild(group);
   }
   if(STAFF.some(s=>s.id===selected))select.value=selected;
+  select.disabled=!shiftMembersLoaded;
+  const management=document.getElementById('monthStaff'),previous=management.value;
+  management.innerHTML='';
+  for(const staff of orderedShiftStaff()){
+    const option=document.createElement('option');option.value=staff.id;
+    option.textContent=`${staff.name}（${staff.role}）`+(shiftMembersLoaded&&staffAccessIssue(staff.id)?'・解除/要確認（取消可）':'');
+    management.appendChild(option);
+  }
+  if(STAFF.some(s=>s.id===previous))management.value=previous;
+  renderStaffMonthActions();
   const date=document.getElementById('entryDate');
   if(!date.value)date.value=dateStr(currentYear,currentMonth,1);
 }
 function openSelectedShift(){
-  if(currentUser?.role!=='admin'||manualSavePending||shiftEntryConfirmation)return;
+  if(currentUser?.role!=='admin'||manualSavePending||shiftEntryConfirmation||staffMonthOperation||staffOrderDraft)return;
+  if(!canRegisterShiftStaff(document.getElementById('entryStaff').value))return alert('登録できるスタッフを選択してください。メンバーの許可状態を確認できない場合も登録できません。');
   const ds=document.getElementById('entryDate').value;
   if(!/^\d{4}-\d{2}-\d{2}$/.test(ds))return alert('日付を選択してください。');
   const [y,m,d]=ds.split('-').map(Number);
@@ -51,7 +62,7 @@ function setShiftEntryPending(pending){
   if(!pending)refreshManualTimeEditor();
 }
 async function cancelOrRestoreShift(restore=false){
-  if(currentUser?.role!=='admin'||manualSavePending||shiftEntryConfirmation||isCurrentMonthLocked()||!modalStaffId)return;
+  if(currentUser?.role!=='admin'||manualSavePending||shiftEntryConfirmation||staffMonthOperation||staffOrderDraft||isCurrentMonthLocked()||!modalStaffId)return;
   const sid=modalStaffId,ds=modalDateStr,month=ds.slice(0,7);
   const expected=structuredClone(modalEntrySnapshot),staff=STAFF.find(s=>s.id===sid);
   const entry=restore?expected.cancelled:expected;
@@ -64,11 +75,12 @@ async function cancelOrRestoreShift(restore=false){
   try{
     if(!window._fb||window._fb.shiftConnected!==true)throw Error('接続を確認して、もう一度操作してください。');
     setShiftEntryPending(true);error.textContent='サーバー確認中です。通信が切れた場合は再接続までお待ちください。';
+    const memberVersion=restore?await assertShiftStaffCanRegister(sid):null;
     const {db,ref,get,runTransaction}=window._fb;
     if((await get(ref(db,'shift_locks/'+firebaseSafeKey(month)))).val())throw Error('確定済みのシフトは変更できません。');
     const cancelledAt=new Date().toISOString();
     const result=await runTransaction(ref(db,'shifts/'+month),data=>{
-      if(currentUser?.role!=='admin'||shiftLocks[month]||!sameShiftEntry(shiftEntrySnapshot(data,sid,ds),expected))return;
+      if(currentUser?.role!=='admin'||window._fb.shiftConnected!==true||(restore&&!shiftRegistrationStillAllowed(sid,memberVersion))||shiftLocks[month]||!sameShiftEntry(shiftEntrySnapshot(data,sid,ds),expected))return;
       const next=data||{};
       if(restore){
         if(next[sid]?.[ds])return;

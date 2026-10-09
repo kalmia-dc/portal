@@ -11,13 +11,13 @@ const context=vm.createContext({console,structuredClone,Date,Math,Set,Object,Arr
   alert(){},confirm:()=>false,setTimeout(){},fetch:async()=>({ok:true,json:async()=>JSON.parse(fs.readFileSync(base+'/portal-holidays.json'))}),
   window:{addEventListener(){}},document:{getElementById:id=>{if(!nodes.has(id))nodes.set(id,node());return nodes.get(id);},querySelectorAll:()=>[],createElement:node,body:node()},localStorage:{getItem:()=>null},location:{search:'',hash:''}});
 const run=s=>vm.runInContext(s,context);
-for(const file of ['clinic-leave.js','shift-role-balance.js','shift-entry.js'])run(fs.readFileSync(base+'/'+file,'utf8'));
+for(const file of ['clinic-leave.js','shift-role-balance.js','shift-entry.js','shift-staff-month.js','shift-member-access.js','shift-staff-order.js'])run(fs.readFileSync(base+'/'+file,'utf8'));
 run(scripts.find(([,a,c])=>!a&&c.includes('const SHIFT'))[2]);
 await run('window.__holidayDataReady');
 run(`currentYear=2026;currentMonth=9;currentUser={role:'admin'};render=()=>{};
 var fakeMonth={tsuruta:{'2026-10-05':'early'},yoshida:{'2026-10-05':'late'}};
 var denied=false,locked=false,writes=0;
-window._fb={shiftConnected:true,db:{},ref:(_,p)=>p,get:async()=>({val:()=>locked}),runTransaction:async(p,fn)=>{
+window._fb={shiftConnected:true,readMembersFromServer:async()=>({}),db:{},ref:(_,p)=>p,get:async()=>({val:()=>locked}),runTransaction:async(p,fn)=>{
  if(denied)throw Error('TEST_DENIED');writes++;fakeMonth=fn(structuredClone(fakeMonth));return {committed:true,snapshot:{val:()=>structuredClone(fakeMonth)}};
 }};
 allShiftData={'2026-10':structuredClone(fakeMonth)};loadShiftForMonth(2026,9);openModal('tsuruta','2026-10-05');`);

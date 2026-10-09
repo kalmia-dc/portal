@@ -18,7 +18,9 @@ const context=vm.createContext({console,structuredClone,Date,Math,Set,Object,Arr
   window:{addEventListener(){}},document:{getElementById:id=>{if(!nodes.has(id))nodes.set(id,node());return nodes.get(id);},querySelectorAll:()=>[],createElement:node,body:node()},localStorage:{getItem:()=>null},location:{search:'',hash:''}});
 vm.runInContext(extension,context);vm.runInContext(balance,context);
 const main=scripts.find(([,a,c])=>!a&&c.includes('const SHIFT'))[2];
+for(const file of ['shift-entry.js','shift-staff-month.js','shift-member-access.js','shift-staff-order.js'])vm.runInContext(fs.readFileSync(base+'/'+file,'utf8'),context);
 vm.runInContext(main,context);
+vm.runInContext('receiveShiftMembers({})',context);
 await vm.runInContext('window.__holidayDataReady',context);
 const run=s=>vm.runInContext(s,context);
 run("STAFF.push({id:'s',name:'Test',type:'full',role:'DH'})");
@@ -57,7 +59,7 @@ run(`
   renderClinicManager=()=>{};resetClinicForm=()=>{};
   var fakeDb={custom_holidays:{},shifts:{'2026-08':{tsuruta:{'2026-08-13':'early'}}},shift_locks:{}};
   var failSave=false;
-  window._fb={db:{},ref:(_,p)=>p,get:async p=>({val:()=>p.split('/').reduce((o,k)=>o?.[k],fakeDb)}),runTransaction:async(p,fn)=>{
+  window._fb={shiftConnected:true,readMembersFromServer:async()=>({}),db:{},ref:(_,p)=>p,get:async p=>({val:()=>p.split('/').reduce((o,k)=>o?.[k],fakeDb)}),runTransaction:async(p,fn)=>{
     if(failSave)throw Error('TEST_PERMISSION_DENIED');
     const keys=p.split('/');const key=keys.pop();let parent=fakeDb;for(const k of keys)parent=parent[k]??={};
     const value=fn(structuredClone(parent[key]||null));if(value===undefined)return {committed:false};
@@ -157,3 +159,10 @@ assert.equal(run("shiftData.takagi['2026-09-01']"),'early');
 assert.equal(run("shiftData.takagi['2026-09-02']"),'off');
 assert.equal(run("Object.keys(shiftData.takagi).length"),2);
 console.log('Flexible staff shifts preserved through complete generator PASS');
+
+// Revoked members retain only existing history, including custom times, through generation.
+run("receiveShiftMembers({revoked:{role:'staff',staffId:'tanaka',active:false}});shiftData={tanaka:{'2026-09-01':'early','2026-09-02':'paid'},__manualTimes:{tanaka:{'2026-09-01':{start:'09:00',end:'12:00',breakMinutes:0}}}};revokedBefore=structuredClone(shiftData);generateShift()");
+for(const f of timers.splice(0))f();
+assert.equal(run("JSON.stringify(shiftData.tanaka)===JSON.stringify(revokedBefore.tanaka)"),true);
+assert.equal(run("JSON.stringify(shiftData.__manualTimes.tanaka)===JSON.stringify(revokedBefore.__manualTimes.tanaka)"),true);
+console.log('Revoked staff history and custom time preserved through complete generator PASS');
