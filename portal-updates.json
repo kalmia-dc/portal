@@ -1,5 +1,14 @@
 [
   {
+    "id": "2026-10-11-member-onboarding",
+    "type": "change",
+    "audience": "member-admin",
+    "text": "メンバー管理で新入社員の名簿追加とGoogleログインの利用許可を行えるようになりました。本人のGoogleログイン申請とメールアドレスを確認して登録してください。",
+    "createdAt": "2026-10-11T00:12:00+09:00",
+    "linkUrl": "portal-members.html",
+    "linkLabel": "ログインメンバー管理を開く"
+  },
+  {
     "id": "2026-10-10-incident-owner-edit-fix",
     "type": "fix",
     "audience": "all",
