@@ -2,8 +2,8 @@ import fs from 'node:fs';
 import {pathToFileURL} from 'node:url';
 
 // Review-only candidate. Not imported by the live app and never deployed here.
-export const ownerFields=['type','occurredDate','occurredTime','occurredAtText','entryDate','discovererName','verifierName','occurredPlace','workContent','categoryText','category','level','overview','scene','eventImpact','details','goodPoint','causeHuman','causeEnvironment','handoff','updatedAt','updatedBy'];
-export function ownerPayload(payload){return Object.fromEntries(Object.entries(payload).filter(([key])=>ownerFields.includes(key)));}
+import {ownerFields} from '../incident-owner-policy.mjs';
+export {ownerFields,ownerPayload} from '../incident-owner-policy.mjs';
 export function buildCandidate(baseline){
  const next=structuredClone(baseline),branch=next.rules.meetingManagement.incidentReports.$reportId;
  if(Object.keys(branch).some(k=>k!=='.write'))throw Error('Unexpected existing incident child rules: review before merging');

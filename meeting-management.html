@@ -1089,6 +1089,7 @@ button{cursor:pointer}
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import { getDatabase, ref, push, set, update, remove, onValue, get } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 import { startPortalAuth } from './portal-auth.js';
+import { canEditOwnIncident, ownerPayload } from './incident-owner-policy.mjs';
 
 const firebaseConfig = {
   apiKey:            'AIzaSyDdMe7feUF6CKPHH0YIx7Suk-WnXtOYUu8',
@@ -3500,7 +3501,7 @@ function canManageIncidentReport() {
 }
 
 function canEditIncidentReport(report) {
-  return isDirector() || isLeader() || report?.createdById === currentUser.staffId;
+  return isDirector() || isLeader() || canEditOwnIncident(report, authenticatedProfile);
 }
 
 function canChangeIncidentType(report) {
@@ -3518,12 +3519,13 @@ function incidentEditHtml(report) {
   const categoryText = report.categoryText || incidentCategoryText(report);
   const typeKey = incidentTypeKey(report);
   const typeDisabled = canChangeIncidentType(report) ? '' : 'disabled';
+  const identityReadOnly = canManageIncidentReport() ? '' : 'readonly aria-readonly="true"';
   return `
     <div class="incident-edit-panel" data-incident-edit-panel="${escAttr(report.id)}" hidden>
       <div class="form-grid">
         <div class="field">
           <label>報告番号</label>
-          <input data-incident-edit="${escAttr(report.id)}" data-field="reportNumber" value="${escAttr(report.reportNumber || buildIncidentReportNumber(report))}">
+          <input ${identityReadOnly} data-incident-edit="${escAttr(report.id)}" data-field="reportNumber" value="${escAttr(report.reportNumber || buildIncidentReportNumber(report))}">
         </div>
         <div class="field">
           <label>種別</label>
@@ -3545,7 +3547,7 @@ function incidentEditHtml(report) {
         </div>
         <div class="field">
           <label>記入者名</label>
-          <input data-incident-edit="${escAttr(report.id)}" data-field="reporterName" value="${escAttr(report.reporterName || '')}">
+          <input ${identityReadOnly} data-incident-edit="${escAttr(report.id)}" data-field="reporterName" value="${escAttr(report.reporterName || '')}">
         </div>
         <div class="field">
           <label>発見者名</label>
@@ -3663,10 +3665,6 @@ async function saveIncidentReportEdit(id) {
   const report = state.incidentReports.find(item => item.id === id);
   if (!report || !canEditIncidentReport(report) || incidentEditSaving.has(id)) return;
   rememberIncidentEdits();
-  // Keep the existing database policy; do not attempt a known forbidden update.
-  if (authenticatedProfile.portalRole !== 'admin' && !isLeader()) {
-    return showToast('現在、登録済み報告の保存は管理者・リーダーのみ可能です。入力内容はこの画面に保持しています。修正を依頼してください。');
-  }
   const value = field => document.querySelector(`[data-incident-edit="${cssEscape(id)}"][data-field="${field}"]`)?.value.trim() || '';
   const reportNumber = value('reportNumber') || buildIncidentReportNumber(report);
   const duplicate = state.incidentReports.find(item => item.id !== id && item.reportNumber === reportNumber);
@@ -3707,7 +3705,7 @@ async function saveIncidentReportEdit(id) {
   incidentEditSaving.add(id);
   restoreIncidentEdits();
   try {
-    await update(ref(db, `${PATHS.incidentReports}/${id}`), payload);
+    await update(ref(db, `${PATHS.incidentReports}/${id}`), canManageIncidentReport() ? payload : ownerPayload(payload));
     incidentEditDrafts.delete(id);
     showToast('報告内容を保存しました');
   } catch (error) {

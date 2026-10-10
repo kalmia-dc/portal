@@ -4,6 +4,7 @@ import {createRequire} from 'node:module';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {buildCandidate,ownerPayload,ownerFields} from '../tools/build-incident-owner-rule-candidate.mjs';
+import {harness} from './incident-edit-harness.mjs';
 const require=createRequire(process.env.PORTAL_TEST_DEPS?path.join(process.env.PORTAL_TEST_DEPS,'package.json'):import.meta.url);
 const {initializeTestEnvironment,assertFails,assertSucceeds}=require('@firebase/rules-unit-testing');
 const {ref,set,update,get}=require('firebase/database');
@@ -13,6 +14,25 @@ test('candidate changes only explicit incident fields and preserves all existing
  for(const key of ownerFields)delete stripped.rules.meetingManagement.incidentReports.$reportId[key];
  assert.deepEqual(stripped,baseline);
  assert.deepEqual(ownerPayload({details:'text',createdById:'bad',reporterName:'bad',reportNumber:'bad',countermeasure:'bad',updatedAt:1}),{details:'text',updatedAt:1});
+});
+test('actual UI save handler with candidate rules saves own content, preserves fixed fields, and retains input after server rejection',async()=>{
+ const env=await initializeTestEnvironment({projectId:'demo-incident-ui-integration',database:{host:'127.0.0.1',port:9015,rules:JSON.stringify(buildCandidate(baseline))}});
+ try{
+  const user={active:true,role:'staff',staffId:'author',name:'架空'};
+  const report={createdById:'author',reporterId:'author',reporterName:'登録時の名前',reportNumber:'ORIGINAL',type:'near_miss',details:'旧本文',countermeasure:'管理者対策',confirmedBy:'管理者',linkedTaskId:'keep'};
+  await env.withSecurityRulesDisabled(c=>set(ref(c.database()),{portalAccess:{users:{owner:user}},meetingManagement:{incidentReports:{one:report}}}));
+  const h=harness('staff'),db=env.authenticatedContext('owner').database();
+  Object.assign(h.context,{db,ref,update,PATHS:{incidentReports:'meetingManagement/incidentReports'}});
+  await h.run("saveIncidentReportEdit('one')");assert.equal(h.messages.at(-1),'報告内容を保存しました');
+  const saved=(await get(ref(db,'meetingManagement/incidentReports/one'))).val();
+  assert.equal(saved.details,'未保存の架空入力');assert.equal(saved.reportNumber,'ORIGINAL');assert.equal(saved.reporterName,'登録時の名前');assert.equal(saved.countermeasure,'管理者対策');assert.equal(saved.confirmedBy,'管理者');assert.equal(saved.linkedTaskId,'keep');
+  // Simulate role revocation after the editor was opened, without changing local identity.
+  await env.withSecurityRulesDisabled(c=>set(ref(c.database(),'portalAccess/users/owner/active'),false));
+  h.fields.details.value='失敗時も保持';await h.run("saveIncidentReportEdit('one')");assert.match(h.messages.at(-1),/権限がありません/);assert.equal(h.fields.details.value,'失敗時も保持');assert.equal(h.button.disabled,false);
+  let writes=0;h.context.update=async()=>{writes++};
+  h.context.state.incidentReports[0].reporterId=null;await h.run("saveIncidentReportEdit('one')");assert.equal(writes,0);
+  h.context.state.incidentReports[0].reporterId='other';await h.run("saveIncidentReportEdit('one')");assert.equal(writes,0);
+ }finally{await env.cleanup()}
 });
 test('candidate permits only own content update and protects authorship, management, routing, deletion and legacy records',async()=>{
  const env=await initializeTestEnvironment({projectId:'demo-incident-owner-candidate',database:{host:'127.0.0.1',port:9015,rules:JSON.stringify(buildCandidate(baseline))}});
