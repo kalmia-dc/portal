@@ -42,7 +42,7 @@ test('unavailable login/profile hides entrances; lost role returns to staff; ter
 test('updates default to latest two; expansion preserves all and staff view has no admin article links',()=>{
  const h=setup();h.c.raw=JSON.parse(fs.readFileSync('portal-updates.json','utf8'));h.run('_portalUpdateNotices=normalizePortalUpdateNotices(raw);renderNotices()');
  assert.equal((h.field('heroNoticeList').innerHTML.match(/class="hero-notice-item"/g)||[]).length,2);
- h.run('toggleNoticeHistory()');assert.equal((h.field('heroNoticeList').innerHTML.match(/class="hero-notice-item"/g)||[]).length,6);
+ h.run('toggleNoticeHistory()');assert.equal((h.field('heroNoticeList').innerHTML.match(/class="hero-notice-item"/g)||[]).length,7);
  h.run("setHomeViewMode('staff')");assert(!h.field('heroNoticeList').innerHTML.includes('shift.html'));assert(!h.field('heroNoticeList').innerHTML.includes('portal-members.html'));
  h.run("setHomeViewMode('admin')");assert.equal((h.field('heroNoticeList').innerHTML.match(/class="hero-notice-item"/g)||[]).length,2);
  const reloaded=setup();assert.equal(reloaded.run('homeViewMode'),'admin');

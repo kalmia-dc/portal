@@ -20,7 +20,7 @@ test('home updates newest first, links retain existing routing, no metadata or u
 test('staff, guest, terminal and limited administrator do not receive inappropriate administrator update links',()=>{
  const h=setup();
  for(const role of ['staff','terminal']){h.c.authenticatedProfile={isAdmin:false,portalRole:role};h.c.currentUser={staffId:'unlinked',name:'検証'};h.run('renderNotices()');assert(!h.field('heroNoticeList').innerHTML.includes('shift.html'));assert(!h.field('heroNoticeList').innerHTML.includes('portal-members.html'));}
- h.c.authenticatedProfile={isAdmin:true};h.run('renderNotices()');assert(!h.field('heroNoticeList').innerHTML.includes('shift.html'));assert(h.field('heroNoticeList').innerHTML.includes('portal-members.html'));
+ h.c.authenticatedProfile={isAdmin:true};h.run('noticeHistoryExpanded=true;renderNotices()');assert(!h.field('heroNoticeList').innerHTML.includes('shift.html'));assert(h.field('heroNoticeList').innerHTML.includes('portal-members.html'));
  h.c.isGuestUser=()=>true;h.run('renderNotices()');assert(!h.field('heroNoticeList').innerHTML.includes('portal-members.html'));
  assert.equal(h.run("canViewPortalUpdate({portalUpdate:true,audience:'unknown'})"),false);
 });
@@ -29,4 +29,11 @@ test('static history stays visible without expiry; explicit expiry and ordinary 
  assert.equal(h.run("isActiveNotice({portalUpdate:true,createdAt:'2020-01-01',expiresAt:'2020-02-01'})"),false);
  assert.equal(h.run("isActiveNotice({createdAt:'2020-01-01'})"),false);
  h.run("_firebaseNotices={fixture:{text:'<script>test</script>',createdAt:Date.now(),type:'new'}};renderNotices()");assert(h.field('heroNoticeList').innerHTML.includes('&lt;script&gt;'));
+});
+
+test('verified incident fix is dated, public, newest and remains in expandable history',()=>{
+ const row=raw.find(x=>x.id==='2026-10-10-incident-owner-edit-fix');assert.equal(row.type,'fix');assert.equal(row.audience,'all');assert.match(row.createdAt,/^2026-10-10T/);assert(!row.expiresAt);
+ const h=setup();h.c.authenticatedProfile={isAdmin:false,portalRole:'staff'};h.c.currentUser={staffId:'fixture',name:'架空'};h.run('renderNotices()');const out=h.field('heroNoticeList').innerHTML;assert(out.includes(row.text));assert(out.includes('不具合修正'));assert(out.includes('meeting-management.html'));assert(!out.includes('portal-members.html'));assert(!out.includes('shift.html?admin'));
+ h.run('noticeHistoryExpanded=true;renderNotices()');assert(h.field('heroNoticeList').innerHTML.includes(row.text));
+ for(const privateTerm of ['田宮','DB','ルール','権限','Worker','通知復旧'])assert(!row.text.includes(privateTerm));
 });

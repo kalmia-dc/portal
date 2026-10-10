@@ -1,5 +1,14 @@
 [
   {
+    "id": "2026-10-10-incident-owner-edit-fix",
+    "type": "fix",
+    "audience": "all",
+    "text": "インシデント報告の本人編集で保存エラーになる不具合を修正しました。保存に失敗した場合も、編集中の内容が画面に残るよう改善しました。",
+    "createdAt": "2026-10-10T17:25:00+09:00",
+    "linkUrl": "meeting-management.html",
+    "linkLabel": "インシデント報告を開く"
+  },
+  {
     "id": "2026-10-09-role-home",
     "type": "change",
     "audience": "all",
