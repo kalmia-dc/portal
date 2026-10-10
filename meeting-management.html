@@ -1281,6 +1281,8 @@ let editingNoticeId = null;
 let incidentStepIndex = 0;
 let incidentDraft = {};
 let incidentImportCandidates = [];
+const incidentEditDrafts = new Map();
+const incidentEditSaving = new Set();
 const state = {
   tasks:[],
   notices:[],
@@ -3279,7 +3281,31 @@ function readChip(id, isRead, read) {
   return `<span class="read-chip ${isRead ? 'read' : 'unread'}">${esc(name)}${esc(suffix)}</span>`;
 }
 
+function rememberIncidentEdits() {
+  document.querySelectorAll('[data-incident-edit-panel]').forEach(panel => {
+    if (panel.hidden) return;
+    const fields = {};
+    panel.querySelectorAll('[data-incident-edit][data-field]').forEach(input => { fields[input.dataset.field] = input.value; });
+    incidentEditDrafts.set(panel.dataset.incidentEditPanel, fields);
+  });
+}
+
+function restoreIncidentEdits() {
+  document.querySelectorAll('[data-incident-edit-panel]').forEach(panel => {
+    const id = panel.dataset.incidentEditPanel;
+    const fields = incidentEditDrafts.get(id);
+    if (!fields) return;
+    panel.hidden = false;
+    panel.querySelectorAll('[data-incident-edit][data-field]').forEach(input => {
+      if (Object.hasOwn(fields, input.dataset.field)) input.value = fields[input.dataset.field];
+    });
+    const button = panel.querySelector('[data-action="save-incident-report"]');
+    if (button) button.disabled = incidentEditSaving.has(id);
+  });
+}
+
 function renderIncidentReports() {
+  rememberIncidentEdits();
   const summaryReports = filterBySearch(
     filterIncidentReportsByPeriod(state.incidentReports),
     incidentReportSearchText
@@ -3335,6 +3361,7 @@ function renderIncidentReports() {
       ` : ''}
     </article>
   `).join('');
+  restoreIncidentEdits();
 }
 
 function visibleIncidentReports() {
@@ -3586,6 +3613,7 @@ function toggleIncidentEdit(id) {
   const panel = document.querySelector(`[data-incident-edit-panel="${cssEscape(id)}"]`);
   if (!panel) return;
   panel.hidden = !panel.hidden;
+  if (panel.hidden) incidentEditDrafts.delete(id);
 }
 
 function incidentFollowupHtml(report) {
@@ -3633,7 +3661,12 @@ function incidentStatusOptionsHtml(currentStatus) {
 
 async function saveIncidentReportEdit(id) {
   const report = state.incidentReports.find(item => item.id === id);
-  if (!report || !canEditIncidentReport(report)) return;
+  if (!report || !canEditIncidentReport(report) || incidentEditSaving.has(id)) return;
+  rememberIncidentEdits();
+  // Keep the existing database policy; do not attempt a known forbidden update.
+  if (authenticatedProfile.portalRole !== 'admin' && !isLeader()) {
+    return showToast('現在、登録済み報告の保存は管理者・リーダーのみ可能です。入力内容はこの画面に保持しています。修正を依頼してください。');
+  }
   const value = field => document.querySelector(`[data-incident-edit="${cssEscape(id)}"][data-field="${field}"]`)?.value.trim() || '';
   const reportNumber = value('reportNumber') || buildIncidentReportNumber(report);
   const duplicate = state.incidentReports.find(item => item.id !== id && item.reportNumber === reportNumber);
@@ -3671,8 +3704,21 @@ async function saveIncidentReportEdit(id) {
     updatedAt: Date.now(),
     updatedBy: currentUser.name
   };
-  await update(ref(db, `${PATHS.incidentReports}/${id}`), payload);
-  showToast('報告内容を保存しました');
+  incidentEditSaving.add(id);
+  restoreIncidentEdits();
+  try {
+    await update(ref(db, `${PATHS.incidentReports}/${id}`), payload);
+    incidentEditDrafts.delete(id);
+    showToast('報告内容を保存しました');
+  } catch (error) {
+    const denied = /permission.denied/i.test(String(error.code || error.message || error));
+    showToast(denied ? '保存する権限がありません。入力内容はこの画面に保持しています。管理者に確認してください。' : '保存できませんでした。入力内容はこの画面に保持しています。接続を確認して再度保存してください。');
+  } finally {
+    incidentEditSaving.delete(id);
+    const button = document.querySelector(`[data-action="save-incident-report"][data-id="${cssEscape(id)}"]`);
+    if (button) button.disabled = false;
+    restoreIncidentEdits();
+  }
 }
 
 async function saveIncidentFollowup(id) {
