@@ -946,6 +946,7 @@
   window._fb = { db, ref, set, get, onValue, push, remove, query, orderByChild, equalTo, authenticatedProfile, runTransaction };
   window._fb.shiftConnected=false;
   window._fb.readMembersFromServer=()=>readServerMembers({databaseURL:firebaseConfig.databaseURL,user:window.portalAuth?.auth.currentUser});
+  window._fb.readLifecycleFromServer=()=>readServerMembers({databaseURL:firebaseConfig.databaseURL,user:window.portalAuth?.auth.currentUser,path:"staffLifecycle"});
   onValue(ref(db,'.info/connected'),snapshot=>{window._fb.shiftConnected=snapshot.val()===true;});
   window.dispatchEvent(new Event('firebaseReady'));
   // 初期表示
@@ -5171,6 +5172,7 @@ let requestData = [];
 // Firebase準備完了後にリアルタイム同期を開始
 window.addEventListener('firebaseReady', ()=>{
   const { db, ref, onValue, query, orderByChild, equalTo, authenticatedProfile } = window._fb;
+  if(authenticatedProfile.portalRole==='admin'){onValue(ref(db,'staffLifecycle'),snap=>{shiftLifecycle=snap.val()||{};shiftLifecycleLoaded=true;shiftMembersVersion++;redrawShiftMemberViews();},()=>{shiftLifecycleLoaded=false;shiftMembersLoaded=false;shiftMembersVersion++;redrawShiftMemberViews();});}
   if(authenticatedProfile.portalRole==='admin')onValue(ref(db,'portalAccess/users'),snapshot=>{
     receiveShiftMembers(snapshot.val());
     redrawShiftMemberViews();

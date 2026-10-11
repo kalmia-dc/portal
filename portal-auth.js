@@ -1,3 +1,4 @@
+import {effectiveMember,lifecycleApplies} from './portal-lifecycle-model.mjs';
 import {
   getAuth,
   GoogleAuthProvider,
@@ -168,7 +169,8 @@ async function recordAccessRequest(db, user, pageName) {
 
 async function loadApprovedProfile(db, user) {
   const snapshot = await get(ref(db, `portalAccess/users/${user.uid}`));
-  return normalizeAccessProfile(user.uid, user, snapshot.val());
+  const raw=snapshot.val();const state=lifecycleApplies(raw)?(await get(ref(db,'staffLifecycle/'+raw.staffId))).val():null;
+  return normalizeAccessProfile(user.uid,user,effectiveMember(raw,state));
 }
 
 export async function startPortalAuth(app, { pageName = document.title } = {}) {
@@ -245,12 +247,12 @@ export async function startPortalAuth(app, { pageName = document.title } = {}) {
   watchPortalSession({
     userId:user.uid, initial:profile,
     normalize:raw => normalizeAccessProfile(user.uid, user, raw),
-    subscribe:(next, error) => onValue(ref(db, `portalAccess/users/${user.uid}`), snap => next(snap.val()), error),
+    subscribe:(next,error)=>{let raw=null,state=null,gotRaw=false,gotState=!['staff','trainingAdmin'].includes(profile.portalRole);const emit=()=>{if(gotRaw&&gotState)next(effectiveMember(raw,state));};const off=onValue(ref(db,`portalAccess/users/${user.uid}`),snap=>{raw=snap.val();gotRaw=true;emit();},error);const offState=gotState?()=>{}:onValue(ref(db,'staffLifecycle/'+profile.staffId),snap=>{state=snap.val();gotState=true;emit();},error);return ()=>{off();offState();};},
     subscribeAuth:next => onAuthStateChanged(auth, next),
     subscribeConnection:next => onValue(ref(db, '.info/connected'), snap => next(snap.val() === true)),
     suspend:lockForConnection,
     verifying:() => showCard('利用許可を再確認しています','<p>サーバーに接続しています。確認が完了するまで入力内容を保持してお待ちください。</p>'),
-    verify:() => readServerProfile({databaseURL:app.options.databaseURL,user}),
+    verify:async()=>{const raw=await readServerProfile({databaseURL:app.options.databaseURL,user});const state=lifecycleApplies(raw)?await readServerProfile({databaseURL:app.options.databaseURL,user,path:'staffLifecycle/'+raw.staffId}):null;return effectiveMember(raw,state);},
     resume:() => {
       for(const [child,previous] of lockedElements){child.inert=previous.inert;child.style.visibility=previous.visibility;}
       lockedElements.clear();

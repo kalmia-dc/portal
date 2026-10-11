@@ -1,11 +1,15 @@
 let shiftMembers={},shiftMembersLoaded=false,shiftMembersVersion=0;
+let shiftLifecycle={},shiftLifecycleLoaded=false;
 function staffAccessIssue(sid,users=shiftMembers){
+  if(shiftLifecycle[sid]?.state==='stopped')return '退職・利用停止中のスタッフです。履歴は保持されています。';
+  // Explicit staff-level restoration does not reactivate individually revoked logins.
+  if(shiftLifecycle[sid]?.state==='active')return '';
   const linked=Object.values(users).filter(u=>u?.staffId===sid&&['staff','trainingAdmin','admin'].includes(u.role));
   // No login mapping is not a revocation. Mixed mappings fail closed until reviewed.
   const revoked=linked.some(u=>u.active!==true),active=linked.some(u=>u.active===true);
   return revoked?(active?'メンバーの許可状態が混在しています。メンバー管理で確認してください。':'メンバー管理で解除済みのスタッフです。新規登録・編集・復元はできません。'):'';
 }
-function canRegisterShiftStaff(sid){return shiftMembersLoaded&&!staffAccessIssue(sid);}
+function canRegisterShiftStaff(sid){return (!window._fb?.readLifecycleFromServer||shiftLifecycleLoaded)&&shiftMembersLoaded&&!staffAccessIssue(sid);}
 function receiveShiftMembers(users){
   shiftMembers=users||{};shiftMembersLoaded=true;shiftMembersVersion++;
 }
@@ -13,9 +17,10 @@ async function refreshShiftMembers(){
   if(!window._fb?.shiftConnected||!window._fb.readMembersFromServer)throw Error('メンバーの最新状態を確認できません。接続を確認してください。');
   try{
     const data=await window._fb.readMembersFromServer();
+    if(window._fb.readLifecycleFromServer){shiftLifecycle=await window._fb.readLifecycleFromServer();shiftLifecycleLoaded=true;}
     if(!window._fb.shiftConnected)throw Error('offline');
     receiveShiftMembers(data);redrawShiftMemberViews();
-  }catch(e){shiftMembersLoaded=false;shiftMembersVersion++;redrawShiftMemberViews();throw e;}
+  }catch(e){shiftLifecycleLoaded=false;shiftMembersLoaded=false;shiftMembersVersion++;redrawShiftMemberViews();throw e;}
   return shiftMembersVersion;
 }
 async function assertShiftStaffCanRegister(sid){

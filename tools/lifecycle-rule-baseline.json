@@ -1,0 +1,419 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "portalAccess": {
+      "users": {
+        "$uid": {
+          ".read": "(auth != null && auth.uid === $uid) && (auth != null && auth.uid !== root.child('serviceAccess/notifications').child('uid').val())",
+          ".write": "(((auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin' && auth.uid !== $uid && newData.exists() && ((!data.exists() && newData.child('role').val() === 'staff' && newData.child('active').val() === true && root.child('portalAccessRequests').child($uid).child('uid').val() === $uid && root.child('portalAccessRequests').child($uid).child('email').isString() && newData.child('email').val() === root.child('portalAccessRequests').child($uid).child('email').val()) || (data.exists() && (data.child('role').val() === 'staff' || data.child('role').val() === 'trainingAdmin') && newData.child('active').val() !== data.child('active').val() && newData.child('staffId').val() === data.child('staffId').val() && newData.child('name').val() === data.child('name').val() && newData.child('staffRole').val() === data.child('staffRole').val() && newData.child('role').val() === data.child('role').val() && newData.child('email').val() === data.child('email').val() && newData.child('terminalId').val() === data.child('terminalId').val()))) && (auth != null && auth.uid !== root.child('serviceAccess/notifications').child('uid').val()) && $uid !== root.child('serviceAccess/notifications').child('uid').val()) && (!root.child('portalJoinRequests').child($uid).exists() || data.exists())) || (auth != null && auth.uid !== root.child('serviceAccess/notifications').child('uid').val() && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin' && $uid !== root.child('serviceAccess/notifications').child('uid').val() && auth.uid !== $uid && !data.exists() && root.child('portalJoinRequests').child($uid).child('state').val() === 'pending' && newData.parent().parent().parent().child('portalJoinRequests').child($uid).child('state').val() === 'approved' && newData.child('role').val() === 'staff' && newData.child('active').val() === true && newData.child('email').val() === root.child('portalJoinRequests').child($uid).child('email').val() && newData.child('staffId').val() === newData.parent().parent().parent().child('portalJoinRequests').child($uid).child('approval').child('staffId').val() && newData.child('name').val() === newData.parent().parent().parent().child('portalJoinRequests').child($uid).child('approval').child('name').val() && newData.child('staffRole').val() === newData.parent().parent().parent().child('portalJoinRequests').child($uid).child('approval').child('role').val())",
+          ".validate": "newData.hasChildren(['staffId','name','role','active','updatedBy','updatedAt']) && newData.child('staffId').isString() && newData.child('staffId').val().length > 0 && newData.child('name').isString() && newData.child('name').val().length > 0 && newData.child('active').isBoolean() && newData.child('updatedBy').val() === auth.uid && newData.child('updatedAt').isNumber() && newData.child('updatedAt').val() === now",
+          "staffId": {
+            ".validate": true
+          },
+          "name": {
+            ".validate": true
+          },
+          "role": {
+            ".validate": true
+          },
+          "active": {
+            ".validate": true
+          },
+          "email": {
+            ".validate": true
+          },
+          "staffRole": {
+            ".validate": true
+          },
+          "updatedBy": {
+            ".validate": true
+          },
+          "updatedAt": {
+            ".validate": true
+          },
+          "$other": {
+            ".validate": "data.exists() && newData.val() === data.val()"
+          }
+        },
+        ".read": "(auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin') && (auth != null && auth.uid !== root.child('serviceAccess/notifications').child('uid').val())"
+      }
+    },
+    "portalAccessRequests": {
+      "$uid": {
+        ".read": "(auth != null && auth.uid === $uid) && (auth != null && auth.uid !== root.child('serviceAccess/notifications').child('uid').val())",
+        ".write": "(auth != null && ((auth.uid === $uid && auth.token.email != null && newData.child('uid').val() === auth.uid && newData.child('email').val() === auth.token.email) || (root.child('portalAccess/users').child(auth.uid).child('active').val() === true && root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin'))) && (auth != null && auth.uid !== root.child('serviceAccess/notifications').child('uid').val()) && $uid !== root.child('serviceAccess/notifications').child('uid').val()"
+      },
+      ".read": "(auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin') && (auth != null && auth.uid !== root.child('serviceAccess/notifications').child('uid').val())"
+    },
+    "passwords": {
+      ".read": false,
+      ".write": false
+    },
+    "custom_holidays": {
+      ".read": "(auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true) || (auth != null && auth.uid === root.child('serviceAccess/notifications').child('uid').val() && root.child('serviceAccess/notifications').child('active').val() === true && !root.child('portalAccess/users').child(auth.uid).exists())",
+      ".write": "auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin'"
+    },
+    "extra_staff": {
+      ".read": "auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true",
+      ".write": "auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin'"
+    },
+    "shifts": {
+      ".read": "auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true",
+      ".write": "auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin'"
+    },
+    "shift_locks": {
+      ".read": "auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true",
+      ".write": "auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin'"
+    },
+    "paid": {
+      ".read": "auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true",
+      ".write": "auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin'"
+    },
+    "requests": {
+      ".read": "auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && (root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin' || (query.orderByChild === 'staffId' && query.equalTo === root.child('portalAccess/users').child(auth.uid).child('staffId').val()))",
+      "$requestId": {
+        ".write": "auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && (root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin' || (newData.child('staffId').val() === root.child('portalAccess/users').child(auth.uid).child('staffId').val() && (!data.exists() || data.child('staffId').val() === root.child('portalAccess/users').child(auth.uid).child('staffId').val())))",
+        ".validate": "!newData.exists() || (newData.child('staffId').isString() && newData.child('staffId').val().length > 0)"
+      },
+      ".indexOn": [
+        "staffId"
+      ]
+    },
+    "skills": {
+      "$staffId": {
+        ".read": "auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && ($staffId === root.child('portalAccess/users').child(auth.uid).child('staffId').val() || root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin' || root.child('portalAccess/users').child(auth.uid).child('role').val() === 'trainingAdmin')",
+        ".write": "auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && ($staffId === root.child('portalAccess/users').child(auth.uid).child('staffId').val() || root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin' || root.child('portalAccess/users').child(auth.uid).child('role').val() === 'trainingAdmin')"
+      }
+    },
+    "trainingMaterialCategories": {
+      ".read": "auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true",
+      ".write": "auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && (root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin' || root.child('portalAccess/users').child(auth.uid).child('role').val() === 'trainingAdmin')"
+    },
+    "trainingMaterials": {
+      ".read": "auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true",
+      ".write": "auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && (root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin' || root.child('portalAccess/users').child(auth.uid).child('role').val() === 'trainingAdmin')"
+    },
+    "notices": {
+      ".read": "auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true",
+      ".write": "auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin'"
+    },
+    "tasks": {
+      ".read": "(auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true) || (auth != null && auth.uid === root.child('serviceAccess/notifications').child('uid').val() && root.child('serviceAccess/notifications').child('active').val() === true && !root.child('portalAccess/users').child(auth.uid).exists())",
+      ".write": "auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && root.child('portalAccess/users').child(auth.uid).child('role').val() !== 'terminal'"
+    },
+    "scheduling": {
+      ".read": "auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true",
+      ".write": "auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && root.child('portalAccess/users').child(auth.uid).child('role').val() !== 'terminal'"
+    },
+    "meetingManagement": {
+      "tasks": {
+        ".read": "(auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true) || (auth != null && auth.uid === root.child('serviceAccess/notifications').child('uid').val() && root.child('serviceAccess/notifications').child('active').val() === true && !root.child('portalAccess/users').child(auth.uid).exists())",
+        ".write": "auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && root.child('portalAccess/users').child(auth.uid).child('role').val() !== 'terminal'"
+      },
+      "notices": {
+        ".read": "(auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true) || (auth != null && auth.uid === root.child('serviceAccess/notifications').child('uid').val() && root.child('serviceAccess/notifications').child('active').val() === true && !root.child('portalAccess/users').child(auth.uid).exists())",
+        ".write": "auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && root.child('portalAccess/users').child(auth.uid).child('role').val() !== 'terminal' && (root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin' || root.child('portalAccess/users').child(auth.uid).child('staffId').val() === 'momo' || root.child('portalAccess/users').child(auth.uid).child('staffId').val() === 'yamada')",
+        "$noticeId": {
+          "readBy": {
+            "$staffId": {
+              ".write": "auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && root.child('portalAccess/users').child(auth.uid).child('role').val() !== 'terminal' && root.child('portalAccess/users').child(auth.uid).child('staffId').val() === $staffId && root.child('meetingManagement/notices').child($noticeId).exists() && !data.exists() && newData.exists() && ($staffId === 'shimanaka' || $staffId === 'tsuruta' || $staffId === 'yoshida' || $staffId === 'takagi' || $staffId === 'matsumoto' || $staffId === 'yamada' || $staffId === 'tamiya' || $staffId === 'tanaka' || $staffId === 'momo')",
+              ".validate": "newData.hasChildren(['staffId','name','role','readAt']) && newData.child('staffId').val() === $staffId",
+              "staffId": {
+                ".validate": "newData.isString()"
+              },
+              "name": {
+                ".validate": "newData.isString()"
+              },
+              "role": {
+                ".validate": "newData.isString()"
+              },
+              "readAt": {
+                ".validate": "newData.isNumber() && newData.val() <= now"
+              },
+              "$other": {
+                ".validate": false
+              }
+            }
+          }
+        }
+      },
+      "opinions": {
+        ".read": "auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true",
+        ".write": "auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && root.child('portalAccess/users').child(auth.uid).child('role').val() !== 'terminal'"
+      },
+      "incidentReports": {
+        ".read": "auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true",
+        "$reportId": {
+          ".write": "auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && root.child('portalAccess/users').child(auth.uid).child('role').val() !== 'terminal' && ((root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin' || root.child('portalAccess/users').child(auth.uid).child('staffId').val() === 'momo' || root.child('portalAccess/users').child(auth.uid).child('staffId').val() === 'yamada') || (!data.exists() && newData.child('reporterId').val() === root.child('portalAccess/users').child(auth.uid).child('staffId').val()))",
+          "type": {
+            ".write": "(auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && root.child('portalAccess/users').child(auth.uid).child('role').val() !== 'terminal' && root.child('portalAccess/users').child(auth.uid).child('staffId').isString() && root.child('meetingManagement/incidentReports').child($reportId).exists() && root.child('meetingManagement/incidentReports').child($reportId).child('createdById').val() === root.child('portalAccess/users').child(auth.uid).child('staffId').val() && root.child('meetingManagement/incidentReports').child($reportId).child('reporterId').val() === root.child('portalAccess/users').child(auth.uid).child('staffId').val()) && (newData.isString() && (newData.val() === root.child('meetingManagement/incidentReports').child($reportId).child('type').val() || (root.child('meetingManagement/incidentReports').child($reportId).child('type').val() !== 'review_required' && (newData.val() === 'near_miss' || newData.val() === 'accident'))))"
+          },
+          "occurredDate": {
+            ".write": "(auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && root.child('portalAccess/users').child(auth.uid).child('role').val() !== 'terminal' && root.child('portalAccess/users').child(auth.uid).child('staffId').isString() && root.child('meetingManagement/incidentReports').child($reportId).exists() && root.child('meetingManagement/incidentReports').child($reportId).child('createdById').val() === root.child('portalAccess/users').child(auth.uid).child('staffId').val() && root.child('meetingManagement/incidentReports').child($reportId).child('reporterId').val() === root.child('portalAccess/users').child(auth.uid).child('staffId').val()) && (newData.isString() && newData.val().length > 0)"
+          },
+          "occurredTime": {
+            ".write": "(auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && root.child('portalAccess/users').child(auth.uid).child('role').val() !== 'terminal' && root.child('portalAccess/users').child(auth.uid).child('staffId').isString() && root.child('meetingManagement/incidentReports').child($reportId).exists() && root.child('meetingManagement/incidentReports').child($reportId).child('createdById').val() === root.child('portalAccess/users').child(auth.uid).child('staffId').val() && root.child('meetingManagement/incidentReports').child($reportId).child('reporterId').val() === root.child('portalAccess/users').child(auth.uid).child('staffId').val()) && ((!newData.exists() || newData.isString()))"
+          },
+          "occurredAtText": {
+            ".write": "(auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && root.child('portalAccess/users').child(auth.uid).child('role').val() !== 'terminal' && root.child('portalAccess/users').child(auth.uid).child('staffId').isString() && root.child('meetingManagement/incidentReports').child($reportId).exists() && root.child('meetingManagement/incidentReports').child($reportId).child('createdById').val() === root.child('portalAccess/users').child(auth.uid).child('staffId').val() && root.child('meetingManagement/incidentReports').child($reportId).child('reporterId').val() === root.child('portalAccess/users').child(auth.uid).child('staffId').val()) && ((!newData.exists() || newData.isString()))"
+          },
+          "entryDate": {
+            ".write": "(auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && root.child('portalAccess/users').child(auth.uid).child('role').val() !== 'terminal' && root.child('portalAccess/users').child(auth.uid).child('staffId').isString() && root.child('meetingManagement/incidentReports').child($reportId).exists() && root.child('meetingManagement/incidentReports').child($reportId).child('createdById').val() === root.child('portalAccess/users').child(auth.uid).child('staffId').val() && root.child('meetingManagement/incidentReports').child($reportId).child('reporterId').val() === root.child('portalAccess/users').child(auth.uid).child('staffId').val()) && ((!newData.exists() || newData.isString()))"
+          },
+          "discovererName": {
+            ".write": "(auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && root.child('portalAccess/users').child(auth.uid).child('role').val() !== 'terminal' && root.child('portalAccess/users').child(auth.uid).child('staffId').isString() && root.child('meetingManagement/incidentReports').child($reportId).exists() && root.child('meetingManagement/incidentReports').child($reportId).child('createdById').val() === root.child('portalAccess/users').child(auth.uid).child('staffId').val() && root.child('meetingManagement/incidentReports').child($reportId).child('reporterId').val() === root.child('portalAccess/users').child(auth.uid).child('staffId').val()) && ((!newData.exists() || newData.isString()))"
+          },
+          "verifierName": {
+            ".write": "(auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && root.child('portalAccess/users').child(auth.uid).child('role').val() !== 'terminal' && root.child('portalAccess/users').child(auth.uid).child('staffId').isString() && root.child('meetingManagement/incidentReports').child($reportId).exists() && root.child('meetingManagement/incidentReports').child($reportId).child('createdById').val() === root.child('portalAccess/users').child(auth.uid).child('staffId').val() && root.child('meetingManagement/incidentReports').child($reportId).child('reporterId').val() === root.child('portalAccess/users').child(auth.uid).child('staffId').val()) && ((!newData.exists() || newData.isString()))"
+          },
+          "occurredPlace": {
+            ".write": "(auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && root.child('portalAccess/users').child(auth.uid).child('role').val() !== 'terminal' && root.child('portalAccess/users').child(auth.uid).child('staffId').isString() && root.child('meetingManagement/incidentReports').child($reportId).exists() && root.child('meetingManagement/incidentReports').child($reportId).child('createdById').val() === root.child('portalAccess/users').child(auth.uid).child('staffId').val() && root.child('meetingManagement/incidentReports').child($reportId).child('reporterId').val() === root.child('portalAccess/users').child(auth.uid).child('staffId').val()) && ((!newData.exists() || newData.isString()))"
+          },
+          "workContent": {
+            ".write": "(auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && root.child('portalAccess/users').child(auth.uid).child('role').val() !== 'terminal' && root.child('portalAccess/users').child(auth.uid).child('staffId').isString() && root.child('meetingManagement/incidentReports').child($reportId).exists() && root.child('meetingManagement/incidentReports').child($reportId).child('createdById').val() === root.child('portalAccess/users').child(auth.uid).child('staffId').val() && root.child('meetingManagement/incidentReports').child($reportId).child('reporterId').val() === root.child('portalAccess/users').child(auth.uid).child('staffId').val()) && ((!newData.exists() || newData.isString()))"
+          },
+          "categoryText": {
+            ".write": "(auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && root.child('portalAccess/users').child(auth.uid).child('role').val() !== 'terminal' && root.child('portalAccess/users').child(auth.uid).child('staffId').isString() && root.child('meetingManagement/incidentReports').child($reportId).exists() && root.child('meetingManagement/incidentReports').child($reportId).child('createdById').val() === root.child('portalAccess/users').child(auth.uid).child('staffId').val() && root.child('meetingManagement/incidentReports').child($reportId).child('reporterId').val() === root.child('portalAccess/users').child(auth.uid).child('staffId').val()) && ((!newData.exists() || newData.isString()))"
+          },
+          "category": {
+            ".write": "(auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && root.child('portalAccess/users').child(auth.uid).child('role').val() !== 'terminal' && root.child('portalAccess/users').child(auth.uid).child('staffId').isString() && root.child('meetingManagement/incidentReports').child($reportId).exists() && root.child('meetingManagement/incidentReports').child($reportId).child('createdById').val() === root.child('portalAccess/users').child(auth.uid).child('staffId').val() && root.child('meetingManagement/incidentReports').child($reportId).child('reporterId').val() === root.child('portalAccess/users').child(auth.uid).child('staffId').val()) && ((!newData.exists() || newData.hasChildren()))"
+          },
+          "level": {
+            ".write": "(auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && root.child('portalAccess/users').child(auth.uid).child('role').val() !== 'terminal' && root.child('portalAccess/users').child(auth.uid).child('staffId').isString() && root.child('meetingManagement/incidentReports').child($reportId).exists() && root.child('meetingManagement/incidentReports').child($reportId).child('createdById').val() === root.child('portalAccess/users').child(auth.uid).child('staffId').val() && root.child('meetingManagement/incidentReports').child($reportId).child('reporterId').val() === root.child('portalAccess/users').child(auth.uid).child('staffId').val()) && ((!newData.exists() || newData.isString()))"
+          },
+          "overview": {
+            ".write": "(auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && root.child('portalAccess/users').child(auth.uid).child('role').val() !== 'terminal' && root.child('portalAccess/users').child(auth.uid).child('staffId').isString() && root.child('meetingManagement/incidentReports').child($reportId).exists() && root.child('meetingManagement/incidentReports').child($reportId).child('createdById').val() === root.child('portalAccess/users').child(auth.uid).child('staffId').val() && root.child('meetingManagement/incidentReports').child($reportId).child('reporterId').val() === root.child('portalAccess/users').child(auth.uid).child('staffId').val()) && (!newData.exists())"
+          },
+          "scene": {
+            ".write": "(auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && root.child('portalAccess/users').child(auth.uid).child('role').val() !== 'terminal' && root.child('portalAccess/users').child(auth.uid).child('staffId').isString() && root.child('meetingManagement/incidentReports').child($reportId).exists() && root.child('meetingManagement/incidentReports').child($reportId).child('createdById').val() === root.child('portalAccess/users').child(auth.uid).child('staffId').val() && root.child('meetingManagement/incidentReports').child($reportId).child('reporterId').val() === root.child('portalAccess/users').child(auth.uid).child('staffId').val()) && ((!newData.exists() || newData.isString()))"
+          },
+          "eventImpact": {
+            ".write": "(auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && root.child('portalAccess/users').child(auth.uid).child('role').val() !== 'terminal' && root.child('portalAccess/users').child(auth.uid).child('staffId').isString() && root.child('meetingManagement/incidentReports').child($reportId).exists() && root.child('meetingManagement/incidentReports').child($reportId).child('createdById').val() === root.child('portalAccess/users').child(auth.uid).child('staffId').val() && root.child('meetingManagement/incidentReports').child($reportId).child('reporterId').val() === root.child('portalAccess/users').child(auth.uid).child('staffId').val()) && ((!newData.exists() || newData.isString()))"
+          },
+          "details": {
+            ".write": "(auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && root.child('portalAccess/users').child(auth.uid).child('role').val() !== 'terminal' && root.child('portalAccess/users').child(auth.uid).child('staffId').isString() && root.child('meetingManagement/incidentReports').child($reportId).exists() && root.child('meetingManagement/incidentReports').child($reportId).child('createdById').val() === root.child('portalAccess/users').child(auth.uid).child('staffId').val() && root.child('meetingManagement/incidentReports').child($reportId).child('reporterId').val() === root.child('portalAccess/users').child(auth.uid).child('staffId').val()) && (newData.isString() && newData.val().length > 0)"
+          },
+          "goodPoint": {
+            ".write": "(auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && root.child('portalAccess/users').child(auth.uid).child('role').val() !== 'terminal' && root.child('portalAccess/users').child(auth.uid).child('staffId').isString() && root.child('meetingManagement/incidentReports').child($reportId).exists() && root.child('meetingManagement/incidentReports').child($reportId).child('createdById').val() === root.child('portalAccess/users').child(auth.uid).child('staffId').val() && root.child('meetingManagement/incidentReports').child($reportId).child('reporterId').val() === root.child('portalAccess/users').child(auth.uid).child('staffId').val()) && ((!newData.exists() || newData.isString()))"
+          },
+          "causeHuman": {
+            ".write": "(auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && root.child('portalAccess/users').child(auth.uid).child('role').val() !== 'terminal' && root.child('portalAccess/users').child(auth.uid).child('staffId').isString() && root.child('meetingManagement/incidentReports').child($reportId).exists() && root.child('meetingManagement/incidentReports').child($reportId).child('createdById').val() === root.child('portalAccess/users').child(auth.uid).child('staffId').val() && root.child('meetingManagement/incidentReports').child($reportId).child('reporterId').val() === root.child('portalAccess/users').child(auth.uid).child('staffId').val()) && ((!newData.exists() || newData.isString()))"
+          },
+          "causeEnvironment": {
+            ".write": "(auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && root.child('portalAccess/users').child(auth.uid).child('role').val() !== 'terminal' && root.child('portalAccess/users').child(auth.uid).child('staffId').isString() && root.child('meetingManagement/incidentReports').child($reportId).exists() && root.child('meetingManagement/incidentReports').child($reportId).child('createdById').val() === root.child('portalAccess/users').child(auth.uid).child('staffId').val() && root.child('meetingManagement/incidentReports').child($reportId).child('reporterId').val() === root.child('portalAccess/users').child(auth.uid).child('staffId').val()) && ((!newData.exists() || newData.isString()))"
+          },
+          "handoff": {
+            ".write": "(auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && root.child('portalAccess/users').child(auth.uid).child('role').val() !== 'terminal' && root.child('portalAccess/users').child(auth.uid).child('staffId').isString() && root.child('meetingManagement/incidentReports').child($reportId).exists() && root.child('meetingManagement/incidentReports').child($reportId).child('createdById').val() === root.child('portalAccess/users').child(auth.uid).child('staffId').val() && root.child('meetingManagement/incidentReports').child($reportId).child('reporterId').val() === root.child('portalAccess/users').child(auth.uid).child('staffId').val()) && ((!newData.exists() || newData.isString()))"
+          },
+          "updatedAt": {
+            ".write": "(auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && root.child('portalAccess/users').child(auth.uid).child('role').val() !== 'terminal' && root.child('portalAccess/users').child(auth.uid).child('staffId').isString() && root.child('meetingManagement/incidentReports').child($reportId).exists() && root.child('meetingManagement/incidentReports').child($reportId).child('createdById').val() === root.child('portalAccess/users').child(auth.uid).child('staffId').val() && root.child('meetingManagement/incidentReports').child($reportId).child('reporterId').val() === root.child('portalAccess/users').child(auth.uid).child('staffId').val()) && (newData.isNumber() && newData.val() <= now)"
+          },
+          "updatedBy": {
+            ".write": "(auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && root.child('portalAccess/users').child(auth.uid).child('role').val() !== 'terminal' && root.child('portalAccess/users').child(auth.uid).child('staffId').isString() && root.child('meetingManagement/incidentReports').child($reportId).exists() && root.child('meetingManagement/incidentReports').child($reportId).child('createdById').val() === root.child('portalAccess/users').child(auth.uid).child('staffId').val() && root.child('meetingManagement/incidentReports').child($reportId).child('reporterId').val() === root.child('portalAccess/users').child(auth.uid).child('staffId').val()) && (newData.isString() && newData.val() === root.child('portalAccess/users').child(auth.uid).child('name').val())"
+          }
+        }
+      },
+      "$other": {
+        ".read": "auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin'",
+        ".write": "auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin'"
+      }
+    },
+    "attendance": {
+      "settings": {
+        ".read": "auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true",
+        ".write": "auth != null && root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin'"
+      },
+      "cards": {
+        ".read": "auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && (root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin' || root.child('portalAccess/users').child(auth.uid).child('role').val() === 'terminal')",
+        ".write": "auth != null && root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin'"
+      },
+      "terminals": {
+        "$terminalId": {
+          ".read": "auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && (root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin' || root.child('portalAccess/users').child(auth.uid).child('role').val() === 'terminal')",
+          ".write": "auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && (root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin' || (root.child('portalAccess/users').child(auth.uid).child('role').val() === 'terminal' && root.child('portalAccess/users').child(auth.uid).child('terminalId').val() === $terminalId))"
+        }
+      },
+      "punches": {
+        ".read": "auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && (root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin' || root.child('portalAccess/users').child(auth.uid).child('role').val() === 'terminal')",
+        "$date": {
+          "$staffId": {
+            ".read": "auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && ($staffId === root.child('portalAccess/users').child(auth.uid).child('staffId').val() || root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin' || root.child('portalAccess/users').child(auth.uid).child('role').val() === 'terminal')",
+            ".write": "auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && ($staffId === root.child('portalAccess/users').child(auth.uid).child('staffId').val() || root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin' || root.child('portalAccess/users').child(auth.uid).child('role').val() === 'terminal')"
+          }
+        }
+      },
+      "profiles": {
+        ".read": "auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin'",
+        "$staffId": {
+          ".read": "auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && ($staffId === root.child('portalAccess/users').child(auth.uid).child('staffId').val() || root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin')",
+          ".write": "auth != null && root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin'"
+        }
+      },
+      "corrections": {
+        ".read": "auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && (root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin' || (query.orderByChild === 'staffId' && query.equalTo === root.child('portalAccess/users').child(auth.uid).child('staffId').val()))",
+        "$id": {
+          ".write": "auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && (root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin' || (newData.child('staffId').val() === root.child('portalAccess/users').child(auth.uid).child('staffId').val() && (!data.exists() || data.child('staffId').val() === root.child('portalAccess/users').child(auth.uid).child('staffId').val())))"
+        },
+        ".indexOn": [
+          "staffId"
+        ]
+      },
+      "leaveTransactions": {
+        ".read": "auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && (root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin' || (query.orderByChild === 'staffId' && query.equalTo === root.child('portalAccess/users').child(auth.uid).child('staffId').val()))",
+        ".write": "auth != null && root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin'",
+        ".indexOn": [
+          "staffId"
+        ]
+      },
+      "monthLocks": {
+        ".read": "auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true",
+        ".write": "auth != null && root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin'"
+      },
+      "audit": {
+        ".read": "auth != null && root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin'",
+        ".write": "auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true"
+      },
+      "notificationClaims": {
+        ".read": "auth != null && root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin'",
+        ".write": "auth != null && root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin'"
+      }
+    },
+    "attendanceTest": {
+      ".read": "auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin'",
+      ".write": "auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin'",
+      "v1": {
+        "deviceTerminals": {
+          "$terminalId": {
+            ".read": "auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && root.child('portalAccess/users').child(auth.uid).child('role').val() === 'terminal' && root.child('portalAccess/users').child(auth.uid).child('terminalId').val() === $terminalId",
+            ".write": "auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && root.child('portalAccess/users').child(auth.uid).child('role').val() === 'terminal' && root.child('portalAccess/users').child(auth.uid).child('terminalId').val() === $terminalId"
+          }
+        },
+        "devicePunches": {
+          "$terminalId": {
+            ".read": "auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && root.child('portalAccess/users').child(auth.uid).child('role').val() === 'terminal' && root.child('portalAccess/users').child(auth.uid).child('terminalId').val() === $terminalId",
+            "$eventId": {
+              ".write": "auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && root.child('portalAccess/users').child(auth.uid).child('role').val() === 'terminal' && root.child('portalAccess/users').child(auth.uid).child('terminalId').val() === $terminalId",
+              ".validate": "newData.hasChildren(['eventId', 'uid', 'type', 'occurredAt', 'terminalId', 'source', 'status']) && newData.child('eventId').val() === $eventId && newData.child('terminalId').val() === $terminalId && newData.child('status').val() === 'test-pending' && (newData.child('type').val() === 'in' || newData.child('type').val() === 'breakStart' || newData.child('type').val() === 'breakEnd' || newData.child('type').val() === 'out')"
+            }
+          }
+        }
+      }
+    },
+    "monthlyGoals": {
+      ".read": "auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true",
+      ".write": "auth != null && root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin'"
+    },
+    "halfYearGoalTargets": {
+      ".read": "auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true",
+      ".write": "auth != null && root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin'"
+    },
+    "monthlyGoalImportHistory": {
+      ".read": "auth != null && root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin'",
+      ".write": "auth != null && root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin'"
+    },
+    "privateMetrics": {
+      ".read": "auth != null && root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin'",
+      ".write": "auth != null && root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin'"
+    },
+    "privateMetricImportHistory": {
+      ".read": "auth != null && root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin'",
+      ".write": "auth != null && root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin'"
+    },
+    "loanAgreements": {
+      ".read": "auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && (root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin' || (query.orderByChild === 'staffId' && query.equalTo === root.child('portalAccess/users').child(auth.uid).child('staffId').val()))",
+      "$loanId": {
+        ".write": "auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && (root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin' || (data.exists() && data.child('staffId').val() === root.child('portalAccess/users').child(auth.uid).child('staffId').val() && newData.child('staffId').val() === data.child('staffId').val() && data.child('status').val() === 'pending_agreement' && newData.child('status').val() === 'agreed' && newData.child('amount').val() === data.child('amount').val() && newData.child('description').val() === data.child('description').val() && newData.child('loanDate').val() === data.child('loanDate').val() && newData.child('exemptionDate').val() === data.child('exemptionDate').val()))"
+      },
+      ".indexOn": [
+        "staffId"
+      ]
+    },
+    "portalDailySummaryNotifications": {
+      ".read": "auth != null && root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin'",
+      ".write": "auth != null && root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin'",
+      "$date": {
+        ".read": "(auth != null && auth.uid === root.child('serviceAccess/notifications').child('uid').val() && root.child('serviceAccess/notifications').child('active').val() === true && !root.child('portalAccess/users').child(auth.uid).exists()) && $date.matches(/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/)",
+        ".write": "(auth != null && auth.uid === root.child('serviceAccess/notifications').child('uid').val() && root.child('serviceAccess/notifications').child('active').val() === true && !root.child('portalAccess/users').child(auth.uid).exists()) && $date.matches(/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/) && newData.exists()"
+      }
+    },
+    "portalJoinRequests": {
+      ".read": "auth != null && auth.uid !== root.child('serviceAccess/notifications').child('uid').val() && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin'",
+      "$uid": {
+        ".read": "auth != null && auth.uid !== root.child('serviceAccess/notifications').child('uid').val() && $uid !== root.child('serviceAccess/notifications').child('uid').val() && auth.uid === $uid",
+        ".write": "newData.exists() && ((auth != null && auth.uid !== root.child('serviceAccess/notifications').child('uid').val() && $uid !== root.child('serviceAccess/notifications').child('uid').val() && auth.uid === $uid && auth.token.email_verified === true && auth.token.firebase.sign_in_provider === 'google.com' && !root.child('portalAccess/users').child($uid).exists() && newData.child('uid').val() === auth.uid && newData.child('email').val() === auth.token.email && newData.child('state').val() === 'pending' && !newData.child('approval').exists() && (!data.exists() || data.child('state').val() === 'pending') && ((newData.child('uid').val() === data.child('uid').val() && newData.child('email').val() === data.child('email').val() && newData.child('name').val() === data.child('name').val() && newData.child('jobRole').val() === data.child('jobRole').val() && newData.child('revision').val() === data.child('revision').val() && newData.child('submittedAt').val() === data.child('submittedAt').val()) || (newData.child('submittedAt').val() === now && newData.child('revision').val() === (data.exists() ? data.child('revision').val() + 1 : 1)))) || (auth != null && auth.uid !== root.child('serviceAccess/notifications').child('uid').val() && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin' && $uid !== root.child('serviceAccess/notifications').child('uid').val() && auth.uid !== $uid && data.child('state').val() === 'pending' && newData.child('state').val() === 'approved' && newData.child('uid').val() === data.child('uid').val() && newData.child('email').val() === data.child('email').val() && newData.child('name').val() === data.child('name').val() && newData.child('jobRole').val() === data.child('jobRole').val() && newData.child('revision').val() === data.child('revision').val() && newData.child('submittedAt').val() === data.child('submittedAt').val() && !root.child('portalAccess/users').child($uid).exists() && newData.child('approval').child('by').val() === auth.uid && newData.child('approval').child('at').val() === now && newData.parent().parent().child('portalAccess/users').child($uid).child('staffId').val() === newData.child('approval').child('staffId').val() && newData.parent().parent().child('portalAccess/users').child($uid).child('name').val() === newData.child('approval').child('name').val() && newData.parent().parent().child('portalAccess/users').child($uid).child('staffRole').val() === newData.child('approval').child('role').val() && newData.parent().parent().child('portalAccess/users').child($uid).child('email').val() === data.child('email').val() && newData.parent().parent().child('portalAccess/users').child($uid).child('role').val() === 'staff' && newData.parent().parent().child('portalAccess/users').child($uid).child('active').val() === true && ((newData.child('approval').child('mode').val() === 'new' && !root.child('extra_staff').child(newData.child('approval').child('staffId').val()).exists() && newData.parent().parent().child('extra_staff').child(newData.child('approval').child('staffId').val()).child('id').val() === newData.child('approval').child('staffId').val() && newData.parent().parent().child('extra_staff').child(newData.child('approval').child('staffId').val()).child('name').val() === newData.child('approval').child('name').val() && newData.parent().parent().child('extra_staff').child(newData.child('approval').child('staffId').val()).child('role').val() === newData.child('approval').child('role').val() && newData.parent().parent().child('extra_staff').child(newData.child('approval').child('staffId').val()).child('type').val() === newData.child('approval').child('type').val() && newData.parent().parent().child('portalJoinNames').child(newData.child('approval').child('nameKey').val()).child('uid').val() === $uid && newData.parent().parent().child('portalJoinNames').child(newData.child('approval').child('nameKey').val()).child('staffId').val() === newData.child('approval').child('staffId').val()) || (newData.child('approval').child('mode').val() === 'existing' && ((root.child('extra_staff').child(newData.child('approval').child('staffId').val()).child('id').val() === newData.child('approval').child('staffId').val() && root.child('extra_staff').child(newData.child('approval').child('staffId').val()).child('name').val() === newData.child('approval').child('name').val() && root.child('extra_staff').child(newData.child('approval').child('staffId').val()).child('role').val() === newData.child('approval').child('role').val()) || (!root.child('extra_staff').child(newData.child('approval').child('staffId').val()).exists() && ((newData.child('approval').child('staffId').val() === 'sugihira' && newData.child('approval').child('name').val() === '杉平' && newData.child('approval').child('role').val() === 'DR') || (newData.child('approval').child('staffId').val() === 'shimanaka' && newData.child('approval').child('name').val() === '嶋中' && newData.child('approval').child('role').val() === 'DR') || (newData.child('approval').child('staffId').val() === 'hokari' && newData.child('approval').child('name').val() === '保刈' && newData.child('approval').child('role').val() === 'DR') || (newData.child('approval').child('staffId').val() === 'shinoda' && newData.child('approval').child('name').val() === '篠田' && newData.child('approval').child('role').val() === 'DR') || (newData.child('approval').child('staffId').val() === 'kyosei' && newData.child('approval').child('name').val() === '矯正医' && newData.child('approval').child('role').val() === 'DR') || (newData.child('approval').child('staffId').val() === 'tsuruta' && newData.child('approval').child('name').val() === '鶴田' && newData.child('approval').child('role').val() === 'DH') || (newData.child('approval').child('staffId').val() === 'yoshida' && newData.child('approval').child('name').val() === '吉田' && newData.child('approval').child('role').val() === 'DH') || (newData.child('approval').child('staffId').val() === 'takagi' && newData.child('approval').child('name').val() === '高木' && newData.child('approval').child('role').val() === 'DH') || (newData.child('approval').child('staffId').val() === 'matsumoto' && newData.child('approval').child('name').val() === '松本' && newData.child('approval').child('role').val() === 'DH') || (newData.child('approval').child('staffId').val() === 'yamada' && newData.child('approval').child('name').val() === '山田' && newData.child('approval').child('role').val() === 'DH') || (newData.child('approval').child('staffId').val() === 'hanowa' && newData.child('approval').child('name').val() === 'ハノワ' && newData.child('approval').child('role').val() === 'DH') || (newData.child('approval').child('staffId').val() === 'tamiya' && newData.child('approval').child('name').val() === '田宮' && newData.child('approval').child('role').val() === 'DA') || (newData.child('approval').child('staffId').val() === 'tanaka' && newData.child('approval').child('name').val() === '田中' && newData.child('approval').child('role').val() === 'DA') || (newData.child('approval').child('staffId').val() === 'momo' && newData.child('approval').child('name').val() === '百々' && newData.child('approval').child('role').val() === 'DA'))))))))",
+        ".validate": "newData.hasChildren(['uid','email','name','jobRole','revision','submittedAt','state'])",
+        "uid": {
+          ".validate": "newData.val() === $uid"
+        },
+        "email": {
+          ".validate": "newData.isString() && newData.val().length <= 254"
+        },
+        "name": {
+          ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 60"
+        },
+        "jobRole": {
+          ".validate": "(newData.val() === 'DR' || newData.val() === 'DH' || newData.val() === 'DA')"
+        },
+        "revision": {
+          ".validate": "newData.isNumber() && newData.val() >= 1"
+        },
+        "submittedAt": {
+          ".validate": "newData.isNumber()"
+        },
+        "state": {
+          ".validate": "newData.val() === 'pending' || newData.val() === 'approved'"
+        },
+        "approval": {
+          ".validate": "newData.hasChildren(['mode','staffId','name','role','type','nameKey','by','at']) && (newData.child('role').val() === 'DR' || newData.child('role').val() === 'DH' || newData.child('role').val() === 'DA') && (((newData.child('type').val() === 'full' || newData.child('type').val() === 'part' || newData.child('type').val() === 'spot') && newData.child('mode').val() === 'new') || (newData.child('type').val() === 'unchanged' && newData.child('mode').val() === 'existing')) && newData.child('staffId').isString() && newData.child('staffId').val().length > 0 && newData.child('name').isString() && newData.child('name').val().length > 0 && newData.child('name').val().length <= 60",
+          "mode": {
+            ".validate": true
+          },
+          "staffId": {
+            ".validate": true
+          },
+          "name": {
+            ".validate": true
+          },
+          "role": {
+            ".validate": true
+          },
+          "type": {
+            ".validate": true
+          },
+          "nameKey": {
+            ".validate": true
+          },
+          "by": {
+            ".validate": true
+          },
+          "at": {
+            ".validate": true
+          },
+          "$other": {
+            ".validate": false
+          }
+        },
+        "$other": {
+          ".validate": false
+        }
+      }
+    },
+    "portalJoinNames": {
+      ".read": "auth != null && auth.uid !== root.child('serviceAccess/notifications').child('uid').val() && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin'",
+      "$key": {
+        ".write": "auth != null && auth.uid !== root.child('serviceAccess/notifications').child('uid').val() && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin' && !data.exists() && newData.exists()",
+        ".validate": "newData.hasChildren(['uid','staffId']) && newData.child('uid').isString() && newData.child('staffId').isString() && newData.parent().parent().child('portalJoinRequests').child(newData.child('uid').val()).child('state').val() === 'approved' && newData.parent().parent().child('portalJoinRequests').child(newData.child('uid').val()).child('approval/nameKey').val() === $key && newData.parent().parent().child('portalJoinRequests').child(newData.child('uid').val()).child('approval/staffId').val() === newData.child('staffId').val()",
+        "uid": {
+          ".validate": true
+        },
+        "staffId": {
+          ".validate": true
+        },
+        "$other": {
+          ".validate": false
+        }
+      }
+    }
+  }
+}

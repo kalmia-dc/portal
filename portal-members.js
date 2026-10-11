@@ -5,6 +5,7 @@ import { performMemberChange } from './portal-members-model.mjs';
 import { performRosterAdd } from './portal-roster-model.mjs';
 
 const firebaseConfig={apiKey:'AIzaSyDdMe7feUF6CKPHH0YIx7Suk-WnXtOYUu8',authDomain:'kalmia-shift.firebaseapp.com',databaseURL:'https://kalmia-shift-default-rtdb.asia-southeast1.firebasedatabase.app',projectId:'kalmia-shift',storageBucket:'kalmia-shift.firebasestorage.app',messagingSenderId:'714175473480',appId:'1:714175473480:web:7d6626a46e4a9dcb1fb57d'};
+import { setupLifecycleAdmin } from './portal-lifecycle-admin.js';
 import { setupJoinAdmin } from './portal-join-admin.js';
 import { defaultStaff } from './portal-default-staff.mjs';
 const app = initializeApp(firebaseConfig);
@@ -13,6 +14,7 @@ const $ = id => document.getElementById(id);
 const actor = await startPortalAuth(app,{pageName:'ログインメンバー管理'});
 let busy = false;
 const joinAdmin=setupJoinAdmin({actor,db,api:{get,ref,update,serverTimestamp},lock,isBusy:()=>busy,message,reloadManagement:()=>load('承認が完了しました。').catch(()=>{})});
+const lifecycleAdmin=setupLifecycleAdmin({actor,db,api:{get,ref,onValue,runTransaction,serverTimestamp},lock,isBusy:()=>busy,reload:()=>load(),defaultStaff});
 let draftId='staff_'+crypto.randomUUID(), rosterReady=false;
 function message(text, error = false) { $('status').textContent=text; $('status').classList.toggle('error',error); }
 function lock(value) {
@@ -109,7 +111,9 @@ async function load(success='一覧を読み込みました。') {
     for(const staff of Object.values(s.val()||{})) if(staff?.id && staff.name && ['DR','DH','DA'].includes(staff.role)) roster.set(staff.id,{...staff});
     rosterReady=true;$('rosterList').replaceChildren();
     for(const staff of roster.values()) text($('rosterList'),`${staff.name} (${staff.role})`);
-    const joinIds=await joinAdmin.load([...roster.values()]);
+    const lifecycle=await lifecycleAdmin.load([...roster.values()],users);
+    const renderRoster=()=>{ $('currentRoster').replaceChildren();for(const staff of roster.values())if($('showAllRoster').checked||!lifecycleAdmin.isStopped(staff.id))text($('currentRoster'),`${staff.name} (${staff.role})${lifecycleAdmin.isStopped(staff.id)?'・利用停止中':''}`);};$('showAllRoster').onchange=renderRoster;renderRoster();
+    const joinIds=await joinAdmin.load([...roster.values()].filter(s=>!lifecycleAdmin.isStopped(s.id)));
     for(const [uid,request] of Object.entries(requests)) {
       if(users[uid] || joinIds.has(uid)) continue;
       const node=row($('requests'),uid,request);
@@ -118,7 +122,7 @@ async function load(success='一覧を読み込みました。') {
       const select=document.createElement('select');select.setAttribute('aria-label',`${request.email || uid} に対応するスタッフ`);
       select.dataset.uid=uid;
       select.add(new Option('スタッフを選択してください',''));
-      for(const staff of roster.values()) select.add(new Option(`${staff.name} (${staff.role} / ${staff.id})`,staff.id));
+      for(const staff of roster.values()) if(!lifecycleAdmin.isStopped(staff.id)) select.add(new Option(`${staff.name} (${staff.role} / ${staff.id})`,staff.id));
       // Preserve explicit choices; never automatically bind a new name to an account.
       if(roster.has(selections.get(uid))) select.value=selections.get(uid);
       actions.append(select);
@@ -127,8 +131,8 @@ async function load(success='一覧を読み込みました。') {
     if(!$('requests').children.length) text($('requests'),'未登録の申請はありません。');
     for(const [uid,member] of Object.entries(users)) {
       const node=row($('members'),uid,member);
-      text(node,`${member.active === true ? '許可中' : '解除済み'} / ${member.role} / スタッフID: ${member.staffId}`);
-      const protectedAccount=uid===actor.uid || !['staff','trainingAdmin'].includes(member.role);
+      text(node,`${lifecycleAdmin.isStopped(member.staffId)?'スタッフ単位で利用停止中':member.active === true ? '個別許可あり' : '個別解除済み'} / ${member.role} / スタッフID: ${member.staffId}`);
+      const protectedAccount=lifecycleAdmin.isStopped(member.staffId)||uid===actor.uid || !['staff','trainingAdmin'].includes(member.role);
       const label=protectedAccount?'保護されたアカウント':member.active===true?'許可解除':'再許可';
       const b=button(node,label,()=>change(uid,member,member.active===true?'revoke':'restore'),protectedAccount);
       if(!protectedAccount && member.active===true) b.className='danger';
@@ -137,6 +141,7 @@ async function load(success='一覧を読み込みました。') {
     message(success);
   } catch(error) {
     rosterReady=false;
+    lifecycleAdmin.unavailable();
     $('requests').replaceChildren();$('members').replaceChildren();
     message('一覧を取得できませんでした。通信状況と管理者権限、DBルールの適用状況を確認して再読み込みしてください。',true);
     throw error;

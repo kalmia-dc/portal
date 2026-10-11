@@ -2,8 +2,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 import test from 'node:test';
+import * as lifecycle from '../portal-lifecycle-model.mjs';
 
-test('real auth entry clears cached identity and visible data on revoked permission',async()=>{
+for(const stopBy of ['member','lifecycle'])test('real auth clears cached identity and visible data on '+stopBy+' stop',async()=>{
   const store=new Map(),listeners=new Map();let signouts=0,cleared=0;
   const raw={staffId:'tanaka',name:'田中',role:'staff',active:true};
   const user={uid:'u',email:'test@example.test',providerData:[{providerId:'google.com'}],getIdToken:async()=>'test-token'};
@@ -16,26 +17,29 @@ test('real auth entry clears cached identity and visible data on revoked permiss
   const context=vm.createContext({document,sessionStorage:storage,localStorage:storage,window:{dispatchEvent(){}},CustomEvent:class{},location:{reload(){throw Error('Unexpected reload')},assign(){}},console,setTimeout,clearTimeout,URL,AbortController,fetch:()=>new Promise(resolve=>{serverResolve=resolve})});
   const auth={getAuth:()=>({}),GoogleAuthProvider:class{},browserLocalPersistence:'local',getRedirectResult:async()=>null,
     onAuthStateChanged:(a,fn)=>{queueMicrotask(()=>fn(user));return()=>{}},setPersistence:async()=>{},signInWithPopup:async()=>{},signInWithRedirect:async()=>{},signOut:async()=>{signouts++}};
-  const database={getDatabase:()=>({}),get:async()=>({val:()=>raw}),ref:(db,path)=>path,serverTimestamp:()=>123,update:async()=>{},onValue:(path,next,error)=>{listeners.set(path,{next,error});return()=>{}}};
+  const database={getDatabase:()=>({}),get:async path=>({val:()=>path.startsWith('staffLifecycle')?null:raw}),ref:(db,path)=>path,serverTimestamp:()=>123,update:async()=>{},onValue:(path,next,error)=>{listeners.set(path,{next,error});return()=>{}}};
   const synthetic=exports=>new vm.SyntheticModule(Object.keys(exports),function(){for(const [key,value] of Object.entries(exports))this.setExport(key,value)},{context});
-  const authModule=synthetic(auth),dbModule=synthetic(database);
+  const authModule=synthetic(auth),dbModule=synthetic(database),lifecycleModule=synthetic(lifecycle);
   const watcher=new vm.SourceTextModule(fs.readFileSync(new URL('../portal-session-watch.mjs',import.meta.url),'utf8'),{context});
   await watcher.link(()=>{});
   const server=new vm.SourceTextModule(fs.readFileSync(new URL('../portal-server-profile.mjs',import.meta.url),'utf8'),{context});
   await server.link(()=>{});
   const entry=new vm.SourceTextModule(fs.readFileSync(new URL('../portal-auth.js',import.meta.url),'utf8'),{context});
-  await entry.link(id=>id.endsWith('firebase-auth.js')?authModule:id.endsWith('firebase-database.js')?dbModule:id.endsWith('portal-server-profile.mjs')?server:watcher);
+  await entry.link(id=>id.endsWith('firebase-auth.js')?authModule:id.endsWith('firebase-database.js')?dbModule:id.endsWith('portal-server-profile.mjs')?server:id.endsWith('portal-lifecycle-model.mjs')?lifecycleModule:watcher);
   await entry.evaluate();
   const profile=await entry.namespace.startPortalAuth({options:{databaseURL:'https://demo.firebasedatabase.app'}},{});
   assert.equal(profile.staffId,'tanaka');assert.ok(store.has('portalUser'));
+  listeners.get('portalAccess/users/u').next({val:()=>raw});listeners.get('staffLifecycle/tanaka').next({val:()=>null});
   listeners.get('.info/connected').next({val:()=>false});
   assert.equal(signouts,0);assert.equal(page.inert,true);assert.equal(page.style.visibility,'hidden');
   listeners.get('.info/connected').next({val:()=>true});
   assert.equal(signouts,0);assert.equal(page.inert,true);
   await new Promise(setImmediate);
   serverResolve({status:200,ok:true,json:async()=>raw});await new Promise(setImmediate);
+  serverResolve({status:200,ok:true,json:async()=>null});await new Promise(setImmediate);
   assert.equal(signouts,0);assert.equal(page.inert,false);assert.equal(page.style.visibility,'');assert.equal(page.value,'未保存の入力');
-  listeners.get('portalAccess/users/u').next({val:()=>({...raw,active:false})});
+  if(stopBy==='member')listeners.get('portalAccess/users/u').next({val:()=>({...raw,active:false})});
+  else listeners.get('staffLifecycle/tanaka').next({val:()=>({state:'stopped'})});
   assert.equal(store.has('portalUser'),false);assert.equal(context.window.portalAuth,undefined);
   assert.equal(cleared,1);assert.equal(signouts,1);assert.ok(elements.has('portal-auth-overlay'));
 });

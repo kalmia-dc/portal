@@ -15,6 +15,7 @@
     .row p{margin:5px 0}.details{font-size:.85rem;color:#52655d}.actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px}
     #status{padding:12px 0;min-height:48px;font-weight:bold}#status.error{color:#a43131}[hidden]{display:none!important}
     .staff-form{display:grid;grid-template-columns:1fr 1fr;gap:14px}.staff-form label{display:grid;gap:6px}.staff-form input,.staff-form select{width:100%;min-width:0}.staff-form .check{display:flex;align-items:center}.check input{width:auto}.wide{grid-column:1/-1}.actions select{max-width:100%;min-width:0}a{color:#176b4b}@media(max-width:560px){.staff-form{grid-template-columns:1fr}body{padding:12px}section,.intro{padding:16px}.actions>*{width:100%}}
+    .flow-choices{display:grid;grid-template-columns:1fr 1fr;gap:16px}.flow-choices button{padding:26px;text-align:left}.flow-choices strong{display:block;font-size:1.3rem}.flow-choices span{display:block;margin-top:12px;font-size:.9rem}@media(max-width:560px){.flow-choices{grid-template-columns:1fr}}
     dialog{max-width:min(500px,90vw);border:1px solid #aec8bb;border-radius:16px;padding:24px;color:#20352c}dialog::backdrop{background:#152e2590}#confirmText,#joinApplicant{white-space:pre-line;overflow-wrap:anywhere}
   </style>
 </head>
@@ -24,15 +25,11 @@
   <h1>ログインメンバー管理</h1>
   <p id="status" role="status" aria-live="polite">ログインを確認しています。</p>
   <div id="management" hidden>
-    <div class="intro">
-      <p>Googleアカウントの申請内容を本人と照合し、スタッフを選んで利用を許可します。新規登録の権限は「一般スタッフ」です。</p>
-      <p>「許可解除」はログイン利用を止める操作です。スタッフ名簿・勤務・勤怠・履歴は削除しません。管理者と共用端末のアカウントは保護されています。</p>
-      <p>申請がない方には下の登録URLを渡し、SafariまたはChromeで本人のGoogleアカウントから申請してもらってください。メールアドレスだけを入力して登録することはできません。</p>
-      <p>登録URLを本人へ渡してください。入力された申請をこの画面で確認し、承認すると名簿追加とログイン許可が完了します。</p><label for="registrationUrl">本人用の登録URL</label><div class="actions"><input id="registrationUrl" readonly aria-label="本人用の登録URL" style="flex:1;min-width:0"><button id="copyRegistrationUrl" type="button">登録URLをコピー</button></div><p id="copyRegistrationStatus" role="status"></p>
-      <button id="reload" class="secondary" type="button">一覧を再読み込み</button>
-    </div>
-    <section><h2>本人からの登録申請</h2><p id="joinStatus" role="status"></p><div id="joinRequests"></div></section>
-    <section aria-labelledby="newStaffTitle"><details><summary>名簿だけ先に追加する（任意）</summary><h2 id="newStaffTitle">1. 新入社員を名簿に追加</h2>
+    <div id="flowHome" class="intro"><h2>何をしますか？</h2><p>必要な手順は、押した先で順番に案内します。</p><div class="flow-choices"><button type="button" id="startRegistration"><strong>新入社員を登録</strong><span>URLを渡す → 申請を確認 → 承認</span></button><button type="button" id="startRetirement" class="secondary"><strong>退職者を利用停止</strong><span>対象を選ぶ → 内容を確認 → 停止</span></button></div></div>
+    <div data-flow="register" hidden><button type="button" class="secondary" data-flow-back>← 操作を選び直す</button><h2 tabindex="-1">新入社員を登録</h2>
+    <section><h3>1. 登録URLを本人へ渡す</h3><p>下のボタンでコピーして本人へ渡してください。本人がSafariまたはChromeでGoogleログインし、氏名・職種を入力します。</p><div class="actions"><input id="registrationUrl" readonly aria-label="本人用の登録URL" style="flex:1;min-width:0"><button id="copyRegistrationUrl" type="button">登録URLをコピー</button></div><p id="copyRegistrationStatus" role="status"></p></section>
+    <section><h3>2. 届いた申請を確認して承認</h3><p>本人のメールアドレスを確認し、「確認して承認」から登録内容を確定します。承認すると登録完了です。</p><p id="joinStatus" role="status"></p><div id="joinRequests"></div></section>
+    <details><summary>以前の申請・名簿の個別操作</summary><section aria-labelledby="newStaffTitle"><details><summary>名簿だけ先に追加する（任意）</summary><h2 id="newStaffTitle">1. 新入社員を名簿に追加</h2>
       <p>名簿にない方だけ追加してください。追加後は、下の申請一覧で本人のGoogleアカウントと紐付けます。</p>
       <form id="rosterForm" class="staff-form">
         <label class="wide">名前<input id="staffName" required maxlength="60" autocomplete="off" placeholder="同姓の方はフルネームで区別"></label>
@@ -44,10 +41,13 @@
         <div class="actions wide"><button type="submit">名簿に追加する</button></div>
         <p id="rosterStatus" class="wide" role="status" aria-live="polite"></p>
       </form>
-      <details><summary>登録済みのスタッフ名簿を確認</summary><div id="rosterList"></div></details>
+      <details><summary>全スタッフ名簿を確認（停止済みを含む）</summary><div id="rosterList"></div></details>
     </details></section>
     <section><h2>以前のログイン申請</h2><p class="details">申請者が入力した名前だけで判断せず、メールアドレスを本人に確認してください。</p><div id="requests"></div></section>
-    <section><h2>登録済みメンバー</h2><div id="members"></div></section>
+    </details></div>
+    <div data-flow="retire" hidden><button type="button" class="secondary" data-flow-back>← 操作を選び直す</button><h2 tabindex="-1">退職者を利用停止</h2><p>ログイン停止・通常一覧から非表示をまとめて行います。勤務・勤怠の履歴は残します。</p><section><p id="lifecycleLoadStatus" role="status"></p><label><input type="checkbox" id="showStoppedMembers">利用停止済みを表示・復帰する</label><div id="lifecycleList"></div></section></div>
+    <details class="intro"><summary>名簿・ログインの詳細を確認</summary><p>個別アカウントの許可解除は退職操作とは別です。退職には上の「退職者を利用停止」を使ってください。</p><label><input id="showAllRoster" type="checkbox">停止済みの名簿も表示</label><div id="currentRoster"></div><section><h2>Googleログインの個別許可</h2><div id="members"></div></section></details>
+    <button id="reload" class="secondary" type="button">一覧を再読み込み</button>
   </div>
 </main>
 <dialog id="confirmation" aria-labelledby="confirmTitle">
@@ -68,6 +68,6 @@
 <p id="joinApprovalStatus" class="wide" role="status" aria-live="polite"></p>
 <div class="actions wide"><button id="cancelJoinApproval" class="secondary" type="button">取り消す</button><button id="submitJoinApproval" type="submit">承認して登録</button></div>
 </form></dialog>
-<script type="module" src="./portal-members.js"></script>
+<dialog id="lifecycleDialog" aria-labelledby="lifecycleTitle"><h2 id="lifecycleTitle"></h2><h3 id="lifecycleTarget"></h3><p id="lifecycleEffects"></p><ul id="lifecycleAccounts"></ul><form id="lifecycleForm"><label><input type="checkbox" id="lifecycleChecked" required>対象者と変更内容を確認しました</label><p id="lifecycleStatus" role="status" aria-live="polite"></p><div class="actions"><button type="button" id="lifecycleClose" class="secondary">取り消す</button><button type="submit" id="lifecycleSubmit" class="danger">利用停止を確定</button></div></form></dialog><script type="module" src="./portal-members.js"></script>
 </body>
 </html>
