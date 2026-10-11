@@ -1,5 +1,14 @@
 [
   {
+    "id": "2026-10-11-self-registration",
+    "type": "change",
+    "audience": "member-admin",
+    "text": "登録URLを本人へ渡し、氏名・職種を入力してもらう方式になりました。メンバー管理で申請内容を確認して承認すると、名簿追加とログイン許可が完了します。",
+    "createdAt": "2026-10-11T09:47:54.783Z",
+    "linkUrl": "portal-members.html",
+    "linkLabel": "ログインメンバー管理を開く"
+  },
+  {
     "id": "2026-10-11-member-onboarding",
     "type": "change",
     "audience": "member-admin",

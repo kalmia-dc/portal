@@ -11,7 +11,7 @@ let env;
 const active={staffId:'tanaka',name:'田中',role:'staff',active:true,email:'staff@example.test'};
 const admin={staffId:'sugihira',name:'管理者',role:'admin',active:true};
 const request={uid:'pending',email:'pending@example.test'};
-before(async()=>{env=await initializeTestEnvironment({projectId:'demo-portal-members',database:{host:'127.0.0.1',port:9015,rules:fs.readFileSync(new URL('../database.rules.json',import.meta.url),'utf8')}})});
+before(async()=>{env=await initializeTestEnvironment({projectId:'demo-portal-members',database:{host:'127.0.0.1',port:9015,rules:fs.readFileSync(process.env.PORTAL_RULES_FILE || new URL('../database.rules.json',import.meta.url),'utf8')}})});
 after(async()=>{await env?.cleanup()});
 beforeEach(async()=>{await env.withSecurityRulesDisabled(async c=>set(ref(c.database()),{
   portalAccess:{users:{admin,admin2:{...admin,staffId:'momo'},staff:active,training:{...active,role:'trainingAdmin'},terminal:{...active,role:'terminal'},inactive:{...admin,active:false}}},
