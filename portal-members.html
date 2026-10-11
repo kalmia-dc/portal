@@ -29,21 +29,7 @@
     <div data-flow="register" hidden><button type="button" class="secondary" data-flow-back>← 操作を選び直す</button><h2 tabindex="-1">新入社員を登録</h2>
     <section><h3>1. 登録URLを本人へ渡す</h3><p>下のボタンでコピーして本人へ渡してください。本人がSafariまたはChromeでGoogleログインし、氏名・職種を入力します。</p><div class="actions"><input id="registrationUrl" readonly aria-label="本人用の登録URL" style="flex:1;min-width:0"><button id="copyRegistrationUrl" type="button">登録URLをコピー</button></div><p id="copyRegistrationStatus" role="status"></p></section>
     <section><h3>2. 届いた申請を確認して承認</h3><p>本人のメールアドレスを確認し、「確認して承認」から登録内容を確定します。承認すると登録完了です。</p><p id="joinStatus" role="status"></p><div id="joinRequests"></div></section>
-    <details><summary>以前の申請・名簿の個別操作</summary><section aria-labelledby="newStaffTitle"><details><summary>名簿だけ先に追加する（任意）</summary><h2 id="newStaffTitle">1. 新入社員を名簿に追加</h2>
-      <p>名簿にない方だけ追加してください。追加後は、下の申請一覧で本人のGoogleアカウントと紐付けます。</p>
-      <form id="rosterForm" class="staff-form">
-        <label class="wide">名前<input id="staffName" required maxlength="60" autocomplete="off" placeholder="同姓の方はフルネームで区別"></label>
-        <label for="staffRole">役職<select id="staffRole"><option value="DH">DH（歯科衛生士）</option><option value="DR">DR（歯科医師）</option><option value="DA">DA（歯科助手）</option></select></label>
-        <label for="staffType">雇用形態<select id="staffType"><option value="full">常勤（160h）</option><option value="part">非常勤</option><option value="spot">スポット</option></select></label>
-        <label class="check"><input id="staffSaturday" type="checkbox">土曜固定</label>
-        <label class="check"><input id="staffReception" type="checkbox">受付対応可</label>
-        <p class="details wide">Googleのパスワード入力は不要です。名簿への追加だけではログイン許可されません。</p>
-        <div class="actions wide"><button type="submit">名簿に追加する</button></div>
-        <p id="rosterStatus" class="wide" role="status" aria-live="polite"></p>
-      </form>
-      <details><summary>全スタッフ名簿を確認（停止済みを含む）</summary><div id="rosterList"></div></details>
-    </details></section>
-    <section><h2>以前のログイン申請</h2><p class="details">申請者が入力した名前だけで判断せず、メールアドレスを本人に確認してください。</p><div id="requests"></div></section>
+    <details><summary>以前のログイン申請を確認</summary>    <section><h2>以前のログイン申請</h2><p class="details">申請者が入力した名前だけで判断せず、メールアドレスを本人に確認してください。</p><div id="requests"></div></section>
     </details></div>
     <div data-flow="retire" hidden><button type="button" class="secondary" data-flow-back>← 操作を選び直す</button><h2 tabindex="-1">退職者を利用停止</h2><p>ログイン停止・通常一覧から非表示をまとめて行います。勤務・勤怠の履歴は残します。</p><section><p id="lifecycleLoadStatus" role="status"></p><label><input type="checkbox" id="showStoppedMembers">利用停止済みを表示・復帰する</label><div id="lifecycleList"></div></section></div>
     <details class="intro"><summary>名簿・ログインの詳細を確認</summary><p>個別アカウントの許可解除は退職操作とは別です。退職には上の「退職者を利用停止」を使ってください。</p><label><input id="showAllRoster" type="checkbox">停止済みの名簿も表示</label><div id="currentRoster"></div><section><h2>Googleログインの個別許可</h2><div id="members"></div></section></details>

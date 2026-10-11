@@ -2,7 +2,6 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/fireba
 import { getDatabase, ref, get, onValue, runTransaction, serverTimestamp, update } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 import { startPortalAuth } from './portal-auth.js';
 import { performMemberChange } from './portal-members-model.mjs';
-import { performRosterAdd } from './portal-roster-model.mjs';
 
 const firebaseConfig={apiKey:'AIzaSyDdMe7feUF6CKPHH0YIx7Suk-WnXtOYUu8',authDomain:'kalmia-shift.firebaseapp.com',databaseURL:'https://kalmia-shift-default-rtdb.asia-southeast1.firebasedatabase.app',projectId:'kalmia-shift',storageBucket:'kalmia-shift.firebasestorage.app',messagingSenderId:'714175473480',appId:'1:714175473480:web:7d6626a46e4a9dcb1fb57d'};
 import { setupLifecycleAdmin } from './portal-lifecycle-admin.js';
@@ -15,11 +14,10 @@ const actor = await startPortalAuth(app,{pageName:'ログインメンバー管�
 let busy = false;
 const joinAdmin=setupJoinAdmin({actor,db,api:{get,ref,update,serverTimestamp},lock,isBusy:()=>busy,message,reloadManagement:()=>load('承認が完了しました。').catch(()=>{})});
 const lifecycleAdmin=setupLifecycleAdmin({actor,db,api:{get,ref,onValue,runTransaction,serverTimestamp},lock,isBusy:()=>busy,reload:()=>load(),defaultStaff});
-let draftId='staff_'+crypto.randomUUID(), rosterReady=false;
 function message(text, error = false) { $('status').textContent=text; $('status').classList.toggle('error',error); }
 function lock(value) {
   busy=value;
-  document.querySelectorAll('#management button,#management select,#management input').forEach(el => {el.disabled=value || el.dataset.protected === 'true' || (el.closest('#rosterForm') && !rosterReady);});
+  document.querySelectorAll('#management button,#management select,#management input').forEach(el => {el.disabled=value || el.dataset.protected === 'true';});
 }
 function text(parent, value, className='') { const p=document.createElement('p'); p.textContent=value; p.className=className; parent.append(p); }
 function row(parent, uid, data) {
@@ -32,34 +30,6 @@ function confirmChange(description,label) {
   const dialog=$('confirmation');dialog.returnValue='cancel';
   $('confirmText').textContent=description;$('confirmApply').textContent=`${label}する`;
   return new Promise(resolve=>{dialog.addEventListener('close',()=>resolve(dialog.returnValue==='apply'),{once:true});dialog.showModal();});
-}
-async function transaction(path, transform) {
-  const target=ref(db,path);let off;
-  try {
-    await new Promise((resolve,reject)=>{off=onValue(target,resolve,reject);});
-    await get(target);
-    return await runTransaction(target,transform,{applyLocally:false});
-  } finally {off?.();}
-}
-async function addStaff(event) {
-  event.preventDefault();if(busy || !rosterReady) return;
-  lock(true);
-  const draft={id:draftId,name:$('staffName').value,role:$('staffRole').value,type:$('staffType').value,
-    satFixed:$('staffSaturday').checked,uketsuke:$('staffReception').checked};
-  try {
-    const result=await performRosterAdd({actor,draft,defaults:defaultStaff,
-      confirm:staff=>confirmChange(`${staff.name}\n${staff.role} / ${$('staffType').selectedOptions[0].textContent}\n${staff.satFixed?'土曜固定あり':'土曜固定なし'} / ${staff.uketsuke?'受付対応可':'受付対応なし'}\n名簿に追加しますか？\nGoogleログインの許可は、本人の申請を確認してから行います。`,'追加'),
-      transact:transform=>{
-        $('rosterStatus').textContent='名簿を保存しています。通信が切れた場合は、接続復帰を待ってください。';
-        return transaction('extra_staff',transform);
-      }});
-    if(result.cancelled){$('rosterStatus').textContent='追加を取り消しました。入力は残っています。';return;}
-    draftId='staff_'+crypto.randomUUID();$('rosterForm').reset();
-    $('rosterStatus').textContent=`${result.staff.name} を名簿に追加しました。次に下の申請一覧で本人のメールアドレスを確認し、スタッフを選んでください。`;
-    await load('名簿を更新しました。本人の申請がなければ、Googleログインを依頼してください。').catch(()=>{});
-  } catch(error) {
-    $('rosterStatus').textContent=`${error.message} 入力は残っています。通信状況と権限を確認して再試行してください。`;
-  } finally {lock(false);}
 }
 async function change(uid, expected, action, staff, accountEmail='') {
   if(busy) return;
@@ -109,8 +79,6 @@ async function load(success='一覧を読み込みました。') {
     const users=u.val()||{}, requests=r.val()||{};
     const roster=new Map(defaultStaff.map(staff=>[staff.id,staff]));
     for(const staff of Object.values(s.val()||{})) if(staff?.id && staff.name && ['DR','DH','DA'].includes(staff.role)) roster.set(staff.id,{...staff});
-    rosterReady=true;$('rosterList').replaceChildren();
-    for(const staff of roster.values()) text($('rosterList'),`${staff.name} (${staff.role})`);
     const lifecycle=await lifecycleAdmin.load([...roster.values()],users);
     const renderRoster=()=>{ $('currentRoster').replaceChildren();for(const staff of roster.values())if($('showAllRoster').checked||!lifecycleAdmin.isStopped(staff.id))text($('currentRoster'),`${staff.name} (${staff.role})${lifecycleAdmin.isStopped(staff.id)?'・利用停止中':''}`);};$('showAllRoster').onchange=renderRoster;renderRoster();
     const joinIds=await joinAdmin.load([...roster.values()].filter(s=>!lifecycleAdmin.isStopped(s.id)));
@@ -140,7 +108,6 @@ async function load(success='一覧を読み込みました。') {
     if(!$('members').children.length) text($('members'),'登録済みメンバーはありません。');
     message(success);
   } catch(error) {
-    rosterReady=false;
     lifecycleAdmin.unavailable();
     $('requests').replaceChildren();$('members').replaceChildren();
     message('一覧を取得できませんでした。通信状況と管理者権限、DBルールの適用状況を確認して再読み込みしてください。',true);
@@ -150,7 +117,6 @@ async function load(success='一覧を読み込みました。') {
 if(actor.portalRole!=='admin') message('管理者専用です。ポータルへ戻ってください。',true);
 else {
   $('management').hidden=false;
-  $('rosterForm').addEventListener('submit',addStaff);
   $('reload').addEventListener('click',()=>{if(!busy) void load().catch(()=>{});});
   await load().catch(()=>{});
 }

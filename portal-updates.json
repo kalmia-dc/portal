@@ -1,5 +1,14 @@
 [
   {
+    "id": "2026-10-12-guided-member-lifecycle",
+    "type": "change",
+    "audience": "member-admin",
+    "text": "メンバー管理を「新入社員を登録」「退職者を利用停止」の2つの入口に整理しました。新規登録は登録URLから本人申請・管理者承認で行います。利用停止・復帰は画面の案内に沿って進められ、勤務・勤怠の履歴は残ります。",
+    "createdAt": "2026-10-12T05:15:46.867+09:00",
+    "linkUrl": "portal-members.html",
+    "linkLabel": "メンバー管理を開く"
+  },
+  {
     "id": "2026-10-11-self-registration",
     "type": "change",
     "audience": "member-admin",
