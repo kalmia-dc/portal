@@ -1,20 +1,18 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getDatabase, ref, get, onValue, runTransaction, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
+import { getDatabase, ref, get, onValue, runTransaction, serverTimestamp, update } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 import { startPortalAuth } from './portal-auth.js';
 import { performMemberChange } from './portal-members-model.mjs';
 import { performRosterAdd } from './portal-roster-model.mjs';
 
 const firebaseConfig={apiKey:'AIzaSyDdMe7feUF6CKPHH0YIx7Suk-WnXtOYUu8',authDomain:'kalmia-shift.firebaseapp.com',databaseURL:'https://kalmia-shift-default-rtdb.asia-southeast1.firebasedatabase.app',projectId:'kalmia-shift',storageBucket:'kalmia-shift.firebasestorage.app',messagingSenderId:'714175473480',appId:'1:714175473480:web:7d6626a46e4a9dcb1fb57d'};
-const defaultStaff = [
-  ['sugihira','杉平','DR'],['shimanaka','嶋中','DR'],['hokari','保刈','DR'],['shinoda','篠田','DR'],['kyosei','矯正医','DR'],
-  ['tsuruta','鶴田','DH'],['yoshida','吉田','DH'],['takagi','高木','DH'],['matsumoto','松本','DH'],['yamada','山田','DH'],['hanowa','ハノワ','DH'],
-  ['tamiya','田宮','DA'],['tanaka','田中','DA'],['momo','百々','DA'],
-].map(([id,name,role]) => ({id,name,role}));
+import { setupJoinAdmin } from './portal-join-admin.js';
+import { defaultStaff } from './portal-default-staff.mjs';
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 const $ = id => document.getElementById(id);
 const actor = await startPortalAuth(app,{pageName:'ログインメンバー管理'});
 let busy = false;
+const joinAdmin=setupJoinAdmin({actor,db,api:{get,ref,update,serverTimestamp},lock,isBusy:()=>busy,message,reloadManagement:()=>load('承認が完了しました。').catch(()=>{})});
 let draftId='staff_'+crypto.randomUUID(), rosterReady=false;
 function message(text, error = false) { $('status').textContent=text; $('status').classList.toggle('error',error); }
 function lock(value) {
@@ -108,11 +106,12 @@ async function load(success='一覧を読み込みました。') {
     const [u,r,s]=await Promise.all(['portalAccess/users','portalAccessRequests','extra_staff'].map(path=>get(ref(db,path))));
     const users=u.val()||{}, requests=r.val()||{};
     const roster=new Map(defaultStaff.map(staff=>[staff.id,staff]));
-    for(const staff of Object.values(s.val()||{})) if(staff?.id && staff.name && ['DR','DH','DA'].includes(staff.role)) roster.set(staff.id,{id:staff.id,name:staff.name,role:staff.role});
+    for(const staff of Object.values(s.val()||{})) if(staff?.id && staff.name && ['DR','DH','DA'].includes(staff.role)) roster.set(staff.id,{...staff});
     rosterReady=true;$('rosterList').replaceChildren();
     for(const staff of roster.values()) text($('rosterList'),`${staff.name} (${staff.role})`);
+    const joinIds=await joinAdmin.load([...roster.values()]);
     for(const [uid,request] of Object.entries(requests)) {
-      if(users[uid]) continue;
+      if(users[uid] || joinIds.has(uid)) continue;
       const node=row($('requests'),uid,request);
       text(node,`申請されたスタッフ: ${request.requestedName || request.requestedStaffId || '指定なし'}`,'details');
       const actions=document.createElement('div');actions.className='actions';node.append(actions);

@@ -3,12 +3,18 @@
 <title>Googleアカウントの利用申請 | カルミアDC</title>
 <link rel="stylesheet" href="./portal-common.css?v=20261005"><script defer src="./portal-common.js?v=20261005"></script>
 <style>*{box-sizing:border-box}body{font-family:"Yu Gothic UI",Meiryo,sans-serif;background:#f4f8f6;color:#20352c;margin:0;padding:24px 16px}main{max-width:620px;margin:auto;background:white;border:1px solid #cfe0d8;border-radius:20px;padding:28px}h1{font-size:1.5rem;color:#176b4b}p,li{line-height:1.8}a{color:#176b4b;overflow-wrap:anywhere}.button{display:block;padding:16px;border-radius:10px;background:#176b4b;color:white;text-align:center;text-decoration:none}</style>
-</head><body><main><h1>Googleアカウントの利用申請</h1>
-<p>利用申請は、ポータルのGoogleログインから受け付けています。名前を選ぶ旧事前登録フォームは不要です。</p>
-<ol><li>SafariまたはChromeで下のポータルを開きます。</li><li>本人のGoogleアカウントでログインします。</li><li>「登録確認中です」と表示されたら、管理者へ氏名と表示されたメールアドレスを伝えてください。</li><li>管理者の許可後、ポータルを再読み込みします。</li></ol>
-<p>LINE WORKS内で開いている場合は、次のリンクをコピーしてSafariまたはChromeに貼り付けてください。</p>
-<p><a href="https://kalmia-dc.github.io/portal/">https://kalmia-dc.github.io/portal/</a></p>
-<a class="button" href="./index.html">ポータルでGoogleログインする</a>
-<p>Googleアカウントのパスワードを医院へ伝える必要はありません。</p>
-<p>管理者の方は<a href="./portal-members.html">ログインメンバー管理</a>で名簿追加と申請の確認を行ってください。</p>
-</main></body></html>
+<style>button,input,select{font:inherit;padding:12px;border:1px solid #aec8bb;border-radius:8px;max-width:100%;width:100%}button{background:#176b4b;color:white;cursor:pointer;margin-top:12px}button:disabled{opacity:.5}label{display:block;margin-top:18px}label input,label select{margin-top:6px}#status{white-space:pre-line;overflow-wrap:anywhere}.secondary{background:#e8f1ed;color:#174f3c}[hidden]{display:none!important}</style>
+</head><body><main><h1>スタッフ登録の申請</h1>
+<p>Googleアカウントで本人確認し、氏名と職種を入力してください。管理者の承認後にポータルを利用できます。</p>
+<p>SafariまたはChromeで開いてください。Googleのパスワードを医院へ伝える必要はありません。</p>
+<p id="status" role="status" aria-live="polite">ログイン状態を確認しています。</p>
+<button id="login" hidden>Googleアカウントでログイン</button>
+<div id="account" hidden><p>申請するアカウント：<strong id="email"></strong></p>
+<form id="application" hidden><label for="applicantName">氏名<input id="applicantName" required maxlength="60" autocomplete="name"></label>
+<label for="applicantRole">職種<select id="applicantRole" required><option value="">選んでください</option><option value="DR">DR（歯科医師）</option><option value="DH">DH（歯科衛生士）</option><option value="DA">DA（歯科助手）</option></select></label>
+<p>職種・雇用形態・利用許可は管理者が確認します。承認前は医院の業務データを閲覧できません。</p>
+<button id="submitApplication" type="submit">この内容で申請する</button></form>
+<button id="reloadApplication" type="button" class="secondary">申請状況を再読み込み</button>
+<button id="changeAccount" type="button" class="secondary">別のGoogleアカウントを使う</button></div>
+<p><a href="./index.html">ポータルへ</a></p>
+</main><script type="module" src="./portal-join.js"></script></body></html>

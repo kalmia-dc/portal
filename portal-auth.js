@@ -218,7 +218,8 @@ export async function startPortalAuth(app, { pageName = document.title } = {}) {
   if (!profile) {
     clearPortalProfile();
     await recordAccessRequest(db, user, pageName);
-    showCard('登録確認中です', `<p><strong>${escapeHtml(user.email || user.displayName || 'このGoogleアカウント')}</strong> は、まだポータル利用許可に登録されていません。</p><p>ログイン申請を受け付けました。管理者へ、この画面のメールアドレスと氏名を伝えてください。管理者がメンバー管理でスタッフ名簿と照合し、利用を許可します。</p><p class="portal-auth-note">許可された後、このページを再読み込みしてください。登録済みの場合は、管理者へ表示内容をご連絡ください。</p>`, [
+    showCard('登録確認中です', `<p><strong>${escapeHtml(user.email || user.displayName || 'このGoogleアカウント')}</strong> は、まだポータル利用許可に登録されていません。</p><p>初めて利用する方は、下の登録申請フォームで氏名と職種を入力してください。管理者が本人のメールアドレスと登録内容を確認して承認します。申請済みの方は承認をお待ちください。</p><p class="portal-auth-note">許可された後、このページを再読み込みしてください。登録済みの場合は、管理者へ表示内容をご連絡ください。</p>`, [
+      { label:'登録申請フォームを開く', onClick:() => location.assign('./google-account-register.html') },
       { label:'別のGoogleアカウントを使う', className:'secondary', onClick:async() => { await signOut(auth); location.reload(); } },
     ]);
     return new Promise(() => {});

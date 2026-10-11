@@ -15,7 +15,7 @@
     .row p{margin:5px 0}.details{font-size:.85rem;color:#52655d}.actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px}
     #status{padding:12px 0;min-height:48px;font-weight:bold}#status.error{color:#a43131}[hidden]{display:none!important}
     .staff-form{display:grid;grid-template-columns:1fr 1fr;gap:14px}.staff-form label{display:grid;gap:6px}.staff-form input,.staff-form select{width:100%;min-width:0}.staff-form .check{display:flex;align-items:center}.check input{width:auto}.wide{grid-column:1/-1}.actions select{max-width:100%;min-width:0}a{color:#176b4b}@media(max-width:560px){.staff-form{grid-template-columns:1fr}body{padding:12px}section,.intro{padding:16px}.actions>*{width:100%}}
-    dialog{max-width:min(500px,90vw);border:1px solid #aec8bb;border-radius:16px;padding:24px;color:#20352c}dialog::backdrop{background:#152e2590}#confirmText{white-space:pre-line;overflow-wrap:anywhere}
+    dialog{max-width:min(500px,90vw);border:1px solid #aec8bb;border-radius:16px;padding:24px;color:#20352c}dialog::backdrop{background:#152e2590}#confirmText,#joinApplicant{white-space:pre-line;overflow-wrap:anywhere}
   </style>
 </head>
 <body>
@@ -27,10 +27,12 @@
     <div class="intro">
       <p>Googleアカウントの申請内容を本人と照合し、スタッフを選んで利用を許可します。新規登録の権限は「一般スタッフ」です。</p>
       <p>「許可解除」はログイン利用を止める操作です。スタッフ名簿・勤務・勤怠・履歴は削除しません。管理者と共用端末のアカウントは保護されています。</p>
-      <p>申請がない方には <a href="./index.html">ポータル</a> をSafariまたはChromeで開き、本人のGoogleアカウントでログインしてもらってください。「登録確認中です」と表示されると申請が届きます。メールアドレスだけを入力して登録することはできません。</p>
+      <p>申請がない方には下の登録URLを渡し、SafariまたはChromeで本人のGoogleアカウントから申請してもらってください。メールアドレスだけを入力して登録することはできません。</p>
+      <p>登録URLを本人へ渡してください。入力された申請をこの画面で確認し、承認すると名簿追加とログイン許可が完了します。</p><label for="registrationUrl">本人用の登録URL</label><div class="actions"><input id="registrationUrl" readonly aria-label="本人用の登録URL" style="flex:1;min-width:0"><button id="copyRegistrationUrl" type="button">登録URLをコピー</button></div><p id="copyRegistrationStatus" role="status"></p>
       <button id="reload" class="secondary" type="button">一覧を再読み込み</button>
     </div>
-    <section aria-labelledby="newStaffTitle"><h2 id="newStaffTitle">1. 新入社員を名簿に追加</h2>
+    <section><h2>本人からの登録申請</h2><p id="joinStatus" role="status"></p><div id="joinRequests"></div></section>
+    <section aria-labelledby="newStaffTitle"><details><summary>名簿だけ先に追加する（任意）</summary><h2 id="newStaffTitle">1. 新入社員を名簿に追加</h2>
       <p>名簿にない方だけ追加してください。追加後は、下の申請一覧で本人のGoogleアカウントと紐付けます。</p>
       <form id="rosterForm" class="staff-form">
         <label class="wide">名前<input id="staffName" required maxlength="60" autocomplete="off" placeholder="同姓の方はフルネームで区別"></label>
@@ -43,8 +45,8 @@
         <p id="rosterStatus" class="wide" role="status" aria-live="polite"></p>
       </form>
       <details><summary>登録済みのスタッフ名簿を確認</summary><div id="rosterList"></div></details>
-    </section>
-    <section><h2>2. 未登録の申請を確認してログイン許可</h2><p class="details">申請者が入力した名前だけで判断せず、メールアドレスを本人に確認してください。</p><div id="requests"></div></section>
+    </details></section>
+    <section><h2>以前のログイン申請</h2><p class="details">申請者が入力した名前だけで判断せず、メールアドレスを本人に確認してください。</p><div id="requests"></div></section>
     <section><h2>登録済みメンバー</h2><div id="members"></div></section>
   </div>
 </main>
@@ -54,6 +56,18 @@
     <div class="actions"><button value="cancel" class="secondary" autofocus>取り消す</button><button value="apply" id="confirmApply">実行する</button></div>
   </form>
 </dialog>
+<dialog id="joinApproval" aria-labelledby="joinApprovalTitle"><h2 id="joinApprovalTitle">申請内容を確認して承認</h2><p id="joinApplicant"></p><form id="joinApprovalForm" class="staff-form">
+<label class="wide">登録方法<select id="joinMode"><option value="new">新しいスタッフとして登録</option><option value="existing">既存の名簿と紐付け</option></select></label>
+<label class="wide" id="joinExistingLabel" hidden>既存スタッフ<select id="joinExisting"></select></label>
+<label class="wide">登録する氏名<input id="joinName" required maxlength="60"></label>
+<label>職種<select id="joinRole"><option value="DR">DR（歯科医師）</option><option value="DH">DH（歯科衛生士）</option><option value="DA">DA（歯科助手）</option></select></label>
+<label id="joinTypeLabel">雇用形態<select id="joinType"><option value="full">常勤（160h）</option><option value="part">非常勤</option><option value="spot">スポット</option></select></label>
+<p id="joinApprovalHint" class="details wide"></p>
+<label class="check wide"><input id="joinIdentityChecked" type="checkbox" required>本人のメールアドレスと登録内容を確認しました</label>
+<p class="details wide">ログイン権限は一般スタッフです。既存の勤務・勤怠・履歴は変更しません。</p>
+<p id="joinApprovalStatus" class="wide" role="status" aria-live="polite"></p>
+<div class="actions wide"><button id="cancelJoinApproval" class="secondary" type="button">取り消す</button><button id="submitJoinApproval" type="submit">承認して登録</button></div>
+</form></dialog>
 <script type="module" src="./portal-members.js"></script>
 </body>
 </html>

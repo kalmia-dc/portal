@@ -18,6 +18,7 @@ export async function runTransaction(p,fn){
  if(mode==='lost-ack' && attempt===1)throw Error('保存応答が途切れました（架空テスト）');
  return {committed:true};
 }
+export async function update(p,values){for(const [key,value] of Object.entries(values)){const path=p?p+'/'+key:key;const split=path.lastIndexOf('/');const parent=path.slice(0,split);data[parent]??={};data[parent][path.slice(split+1)]=value;}}
 export async function startPortalAuth(){return {uid:mode==='staff'?'staff':'admin',portalRole:mode==='staff'?'staff':'admin'};}
 `;
 http.createServer((req,res)=>{

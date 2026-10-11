@@ -1,0 +1,32 @@
+{
+  ".read": "(auth != null && auth.uid === $uid) && (auth != null && auth.uid !== root.child('serviceAccess/notifications').child('uid').val())",
+  ".write": "(auth != null && root.child('portalAccess/users').child(auth.uid).child('active').val() === true && root.child('portalAccess/users').child(auth.uid).child('role').val() === 'admin' && auth.uid !== $uid && newData.exists() && ((!data.exists() && newData.child('role').val() === 'staff' && newData.child('active').val() === true && root.child('portalAccessRequests').child($uid).child('uid').val() === $uid && root.child('portalAccessRequests').child($uid).child('email').isString() && newData.child('email').val() === root.child('portalAccessRequests').child($uid).child('email').val()) || (data.exists() && (data.child('role').val() === 'staff' || data.child('role').val() === 'trainingAdmin') && newData.child('active').val() !== data.child('active').val() && newData.child('staffId').val() === data.child('staffId').val() && newData.child('name').val() === data.child('name').val() && newData.child('staffRole').val() === data.child('staffRole').val() && newData.child('role').val() === data.child('role').val() && newData.child('email').val() === data.child('email').val() && newData.child('terminalId').val() === data.child('terminalId').val()))) && (auth != null && auth.uid !== root.child('serviceAccess/notifications').child('uid').val()) && $uid !== root.child('serviceAccess/notifications').child('uid').val()",
+  ".validate": "newData.hasChildren(['staffId','name','role','active','updatedBy','updatedAt']) && newData.child('staffId').isString() && newData.child('staffId').val().length > 0 && newData.child('name').isString() && newData.child('name').val().length > 0 && newData.child('active').isBoolean() && newData.child('updatedBy').val() === auth.uid && newData.child('updatedAt').isNumber() && newData.child('updatedAt').val() === now",
+  "staffId": {
+    ".validate": true
+  },
+  "name": {
+    ".validate": true
+  },
+  "role": {
+    ".validate": true
+  },
+  "active": {
+    ".validate": true
+  },
+  "email": {
+    ".validate": true
+  },
+  "staffRole": {
+    ".validate": true
+  },
+  "updatedBy": {
+    ".validate": true
+  },
+  "updatedAt": {
+    ".validate": true
+  },
+  "$other": {
+    ".validate": "data.exists() && newData.val() === data.val()"
+  }
+}
