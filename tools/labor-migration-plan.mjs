@@ -7,6 +7,13 @@ export function planLaborMigration(snapshot,ownerUid){
   for(const [uid,m]of Object.entries(users))if(!roster.has(m.staffId)&&m.role!=='terminal')issues.push({kind:'名簿にないアカウント',uid,staffId:m.staffId||''});
   const protectedStaff=Object.fromEntries(Object.entries(users).filter(([uid,m])=>uid===ownerUid||!['staff','trainingAdmin'].includes(m.role)).filter(([,m])=>m.staffId).map(([,m])=>[m.staffId,true]));
   const service=users[snapshot.serviceAccess?.notifications?.uid];if(service?.staffId)protectedStaff[service.staffId]=true;
-  return {mode:'DRY_RUN_ONLY',issues,existingCount:roster.size,draftsToImport:[...roster.keys()].filter(id=>!snapshot.laborRecords?.[id]),configCandidate:{enabled:false,uploadsEnabled:false,owners:{[ownerUid]:true},protectedStaff,maxFileBytes:5242880,maxEncodedBytes:52428800},requiredChecks:['百々さんの実UID照合','適用中ルールと候補の差分','無料プラン・残容量と通信量','既存書類の保存根拠・起算日','バックアップと復旧','本番変更の個別承認']};
+  const files=Object.values(snapshot.laborFiles||{}),used=files.reduce((sum,f)=>sum+(typeof f.base64==='string'?f.base64.length:0),0);
+  const existingBudget=snapshot.laborFileBudget;
+  let fileBudgetCandidate=null;
+  if(existingBudget){if(existingBudget.used!==used||!Number.isInteger(existingBudget.revision)||existingBudget.revision<0)issues.push({kind:'書類容量台帳の不整合'});}
+  else if(files.length)issues.push({kind:'既存書類があるが容量台帳がない'});
+  else fileBudgetCandidate={used:0,revision:0};
+  const budgetPreparation={path:'laborFileBudget',action:fileBudgetCandidate?'CREATE_IF_ABSENT':'PRESERVE_AND_VERIFY',candidate:fileBudgetCandidate,measuredEncodedBytes:used};
+  return {mode:'DRY_RUN_ONLY',issues,budgetPreparation,existingCount:roster.size,draftsToImport:[...roster.keys()].filter(id=>!snapshot.laborRecords?.[id]),configCandidate:{enabled:false,uploadsEnabled:false,owners:{[ownerUid]:true},protectedStaff,maxFileBytes:5242880,maxEncodedBytes:52428800},requiredChecks:['百々さんの実UID照合','適用中ルールと候補の差分','無料プラン・残容量と通信量','既存書類の保存根拠・起算日','バックアップと復旧','本番変更の個別承認']};
 }
 if(process.argv[1]===fileURLToPath(import.meta.url)){const [,,input,ownerUid,output]=process.argv;if(!input||!output)throw Error('入力スナップショット、確認済みUID、.labor-local内出力先を指定してください。');const privateRoot=path.resolve('.labor-local')+path.sep,target=path.resolve(output);if(!target.startsWith(privateRoot))throw Error('出力はGit対象外の.labor-local内に限定します。');fs.mkdirSync(path.dirname(target),{recursive:true});fs.writeFileSync(target,JSON.stringify(planLaborMigration(JSON.parse(fs.readFileSync(input,'utf8')),ownerUid),null,2));console.log('Dry-run plan saved locally. No database writes.');}
