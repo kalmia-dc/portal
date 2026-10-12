@@ -75,7 +75,8 @@ async function cancelOrRestoreShift(restore=false){
   try{
     if(!window._fb||window._fb.shiftConnected!==true)throw Error('接続を確認して、もう一度操作してください。');
     setShiftEntryPending(true);error.textContent='サーバー確認中です。通信が切れた場合は再接続までお待ちください。';
-    const memberVersion=restore?await assertShiftStaffCanRegister(sid):null;
+    const memberVersion=restore?await assertShiftStaffCanRegister(sid,ds):null;
+    if(restore&&staffAccessIssue(sid,shiftMembers,ds))throw Error(staffAccessIssue(sid,shiftMembers,ds));
     const {db,ref,get,runTransaction}=window._fb;
     if((await get(ref(db,'shift_locks/'+firebaseSafeKey(month)))).val())throw Error('確定済みのシフトは変更できません。');
     const cancelledAt=new Date().toISOString();
@@ -92,7 +93,7 @@ async function cancelOrRestoreShift(restore=false){
         delete next[sid][ds];
         if(next.__manualTimes?.[sid])delete next.__manualTimes[sid][ds];
       }
-      return next;
+      if(restore)attachLaborShiftPeriods(next);return next;
     },{applyLocally:false});
     if(!result.committed)throw Error('別の更新または権限・確定状態の変更があります。閉じて開き直してください。');
     allShiftData[month]=result.snapshot.val()||{};

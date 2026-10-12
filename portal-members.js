@@ -33,6 +33,7 @@ function confirmChange(description,label) {
 }
 async function change(uid, expected, action, staff, accountEmail='') {
   if(busy) return;
+  if(await get(ref(db,'laborConfig/enabled')).then(s=>s.val()===true).catch(()=>false)){message('入退社・アカウントの変更は労務管理で行ってください。');location.assign('./labor-management.html');return;}
   lock(true);
   try {
     const labels={register:'登録',revoke:'許可解除',restore:'再許可'};

@@ -38,7 +38,7 @@ function mutateStaffMonth(data,op){
   }
   if(op.restore)delete next.__staffMonthUndo[sid];
   else (next.__staffMonthUndo??={})[sid]={id:op.id,createdAt:op.createdAt,dates:Object.fromEntries(dates.map(ds=>[ds,true]))};
-  return next;
+  if(op.restore){try{assertMonthRegistrationAllowed(next,data||{});attachLaborShiftPeriods(next);}catch{return;}}return next;
 }
 function renderStaffMonthActions(){
   document.getElementById('staffMonthLabel').textContent=`対象：表示中の ${currentYear}年${currentMonth+1}月（勤務日入力とは別です）`;

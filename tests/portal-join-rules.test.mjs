@@ -9,11 +9,11 @@ import {defaultStaff} from '../portal-default-staff.mjs';
 const require=createRequire(process.env.PORTAL_TEST_DEPS?path.join(process.env.PORTAL_TEST_DEPS,'package.json'):import.meta.url);
 const {initializeTestEnvironment,assertFails,assertSucceeds}=require('@firebase/rules-unit-testing');
 const {ref,get,set,update,remove,serverTimestamp,onValue,runTransaction,goOffline,goOnline}=require('firebase/database');
-const base=JSON.parse(fs.readFileSync(process.env.PORTAL_RULES_FILE||'../incident-postdeploy.rules.json','utf8'));
+const base=JSON.parse(fs.readFileSync(process.env.PORTAL_RULES_FILE||new URL('../tools/lifecycle-rule-baseline.json',import.meta.url),'utf8'));
 const rules=buildJoinRuleCandidate(base);let env;
 const actor={uid:'admin',portalRole:'admin'},user={uid:'applicant',email:'applicant@example.test',emailVerified:true,providerData:[{providerId:'google.com'}]};
 const db=(uid,claims={})=>uid?env.authenticatedContext(uid,{email:`${uid}@example.test`,email_verified:true,firebase:{sign_in_provider:'google.com'},...claims}).database():env.unauthenticatedContext().database();
-before(async()=>env=await initializeTestEnvironment({projectId:'demo-portal-join',database:{host:'127.0.0.1',port:9015,rules:JSON.stringify(rules)}}));
+before(async()=>env=await initializeTestEnvironment({projectId:'demo-portal-join',database:{host:'127.0.0.1',port:Number(process.env.PORTAL_TEST_PORT||9015),rules:JSON.stringify(rules)}}));
 after(async()=>env?.cleanup());
 beforeEach(async()=>env.withSecurityRulesDisabled(c=>set(ref(c.database()),{portalAccess:{users:{admin:{role:'admin',staffId:'sugihira',name:'管理者',active:true},staff:{role:'staff',staffId:'old',name:'旧職員',active:true},inactive:{role:'staff',staffId:'inactive',name:'停止',active:false}}},extra_staff:{old:{id:'old',name:'旧職員',role:'DH',type:'part'}},serviceAccess:{notifications:{uid:'notification-service',active:false}},shifts:{keep:1},attendance:{punches:{keep:1}},tasks:{keep:1},meetingManagement:{tasks:{keep:1}},portalAccessRequests:{legacy:{uid:'legacy',email:'legacy@example.test',requestedStaffId:'tanaka'}}})));
 async function submit(uid='applicant',name='架空 新人') {await set(ref(db(uid),`portalJoinRequests/${uid}`),applicationChange({user:{...user,uid,email:`${uid}@example.test`},current:null,name,jobRole:'DR',timestamp:serverTimestamp()}));return (await get(ref(db(uid),`portalJoinRequests/${uid}`))).val();}

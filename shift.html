@@ -1599,7 +1599,7 @@ async function saveCurrentShift(){
   try{
     if(currentUser?.role!=='admin')throw Error('シフト保存は管理者専用です。');
     const version=await refreshShiftMembers();
-    assertMonthRegistrationAllowed(candidate,expected);
+    assertMonthRegistrationAllowed(candidate,expected);attachLaborShiftPeriods(candidate);
     const {db,ref,get,runTransaction}=window._fb;
     if((await get(ref(db,'shift_locks/'+firebaseSafeKey(key)))).val())throw Error('確定済みの月は変更できません。');
     const result=await runTransaction(ref(db,'shifts/'+key),data=>{
@@ -2631,7 +2631,7 @@ function generateShift(){
   txt.innerHTML='<span class="spinner"></span> 生成中...';
 
   setTimeout(()=>{
-    const revokedShiftSnapshot=snapshotRevokedShiftData();
+    const revokedShiftSnapshot=snapshotRevokedShiftData(),laborOutsideSnapshot=snapshotLaborOutsidePeriods();
     delete shiftData.__manualTimes; // Regeneration creates a new schedule; manual edits follow generation.
     const clinicPreserved = snapshotClinicShifts(y, m);
     STAFF.forEach(s=>{ if(!shiftData[s.id]) shiftData[s.id]={}; });
@@ -4181,7 +4181,7 @@ function generateShift(){
     syncHanowaCoverage(y, m, workDays, true);
 
     balanceRoleStaffing(y, m, days, wds);
-    restoreRevokedShiftData(revokedShiftSnapshot);
+    restoreRevokedShiftData(revokedShiftSnapshot);restoreLaborOutsidePeriods(laborOutsideSnapshot);
 
     const checked=new Set();
     for(const d of workDays){
@@ -4653,7 +4653,8 @@ async function applyModal(){
     if(isTimedShift(key)&&document.getElementById('manualTimeEnabled').checked) time=readManualTimeInput();
     if(!window._fb || window._fb.shiftConnected!==true) throw Error('接続を確認して、もう一度保存してください。');
     setShiftEntryPending(true);error.textContent='サーバー確認中です。通信が切れた場合は再接続までお待ちください。';
-    const memberVersion=await assertShiftStaffCanRegister(sid);
+    const memberVersion=await assertShiftStaffCanRegister(sid,ds);
+    if(staffAccessIssue(sid,shiftMembers,ds))throw Error(staffAccessIssue(sid,shiftMembers,ds));
     const {db,ref,runTransaction,get}=window._fb;
     const lock=await get(ref(db,'shift_locks/'+firebaseSafeKey(month)));
     if(lock.val()) throw Error('確定済みのシフトは編集できません。確定を解除してください。');
@@ -4664,7 +4665,7 @@ async function applyModal(){
       if(time) ((next.__manualTimes??={})[sid]??={})[ds]=time;
       else if(next.__manualTimes?.[sid]) delete next.__manualTimes[sid][ds];
       if(next.__cancelledShifts?.[sid])delete next.__cancelledShifts[sid][ds];
-      return next;
+      attachLaborShiftPeriods(next);return next;
     },{applyLocally:false});
     if(!result.committed) throw Error('別の更新または権限・確定状態の変更があります。閉じて開き直してください。');
     allShiftData[month]=result.snapshot.val()||{};
@@ -5083,7 +5084,7 @@ async function approveReq(id){
   if(!r||r.status!=='pending') return;
   if(currentUser?.role!=='admin'||manualSavePending)return;
   manualSavePending=true;
-  try{await assertShiftStaffCanRegister(r.staffId);}catch(e){alert(e.message);return;}
+  try{await assertShiftStaffCanRegister(r.staffId,r.date);}catch(e){alert(e.message);return;}
   finally{manualSavePending=false;}
   r.status = 'approved';
   if(!shiftData[r.staffId]) shiftData[r.staffId]={};

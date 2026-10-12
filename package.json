@@ -1,0 +1,12 @@
+{
+  "name": "kalmia-portal-local-validation",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test:labor": "node --test tests/labor-*.test.mjs",
+    "labor:serve": "node tools/labor-local-server.mjs",
+    "labor:rules": "node tools/build-labor-rule-candidate.mjs --local"
+  },
+  "dependencies": {"pdfjs-dist": "6.4.299", "tesseract.js": "7.0.0", "@tesseract.js-data/jpn": "1.0.0"},
+  "devDependencies": {"@firebase/rules-unit-testing": "5.0.2", "firebase": "12.18.0", "firebase-tools": "15.28.1"}
+}

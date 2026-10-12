@@ -1,0 +1,4 @@
+node_modules/
+.labor-local/
+*-debug.log
+outputs/labor/

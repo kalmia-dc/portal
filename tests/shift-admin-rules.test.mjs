@@ -10,7 +10,7 @@ const {ref,set,get,onValue,runTransaction}=require('firebase/database');
 let env;
 const users={admin:{active:true,role:'admin',staffId:'manager'},staff:{active:true,role:'staff',staffId:'b'},revoked:{active:false,role:'staff',staffId:'a'}};
 const month={a:{'2026-10-05':'early','2026-10-06':'paid'},b:{'2026-10-05':'late'},__manualTimes:{a:{'2026-10-05':{key:'early',start:'09:00',end:'17:00',breakMinutes:60}}}};
-before(async()=>{env=await initializeTestEnvironment({projectId:'demo-shift-admin-enhancements',database:{host:'127.0.0.1',port:9015,rules:fs.readFileSync('database.rules.json','utf8')}})});
+before(async()=>{env=await initializeTestEnvironment({projectId:'demo-shift-admin-enhancements',database:{host:'127.0.0.1',port:Number(process.env.PORTAL_TEST_PORT||9015),rules:fs.readFileSync('database.rules.json','utf8')}})});
 after(async()=>{await env?.cleanup()});
 beforeEach(async()=>{await env.withSecurityRulesDisabled(async c=>set(ref(c.database()),{portalAccess:{users},shifts:{'2026-10':month},attendance:{punches:{keep:true}}}))});
 test('real month transaction cancels only selected staff and refuses revoked restore; order uses existing admin scope',async()=>{

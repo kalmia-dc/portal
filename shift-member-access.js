@@ -1,6 +1,8 @@
 let shiftMembers={},shiftMembersLoaded=false,shiftMembersVersion=0;
 let shiftLifecycle={},shiftLifecycleLoaded=false;
-function staffAccessIssue(sid,users=shiftMembers){
+function laborShiftPeriod(sid,date){const life=shiftLifecycle[sid];if(!life?.hrManaged)return null;return Object.entries(life.periods||{}).find(([,p])=>!p.cancelled&&p.startDate<=date&&date<=p.endDate)?.[0]||null;}
+function staffAccessIssue(sid,users=shiftMembers,date=null){
+  if(shiftLifecycle[sid]?.hrManaged){if(date)return laborShiftPeriod(sid,date)?'':'勤務日が在籍期間外です。';const month=typeof currentYear!=='undefined'?String(currentYear)+'-'+String(currentMonth+1).padStart(2,'0'):'';return Object.values(shiftLifecycle[sid].periods||{}).some(p=>!p.cancelled&&(!month||p.startDate<=month+'-31'&&p.endDate>=month+'-01'))?'':'表示月に在籍期間がありません。';}
   if(shiftLifecycle[sid]?.state==='stopped')return '退職・利用停止中のスタッフです。履歴は保持されています。';
   // Explicit staff-level restoration does not reactivate individually revoked logins.
   if(shiftLifecycle[sid]?.state==='active')return '';
@@ -23,9 +25,9 @@ async function refreshShiftMembers(){
   }catch(e){shiftLifecycleLoaded=false;shiftMembersLoaded=false;shiftMembersVersion++;redrawShiftMemberViews();throw e;}
   return shiftMembersVersion;
 }
-async function assertShiftStaffCanRegister(sid){
+async function assertShiftStaffCanRegister(sid,date=null){
   if(!STAFF.some(s=>s.id===sid))throw Error('登録済みスタッフを確認できません。');
-  const version=await refreshShiftMembers();const issue=staffAccessIssue(sid);
+  const version=await refreshShiftMembers();const issue=staffAccessIssue(sid,shiftMembers,date);
   if(!STAFF.some(s=>s.id===sid))throw Error('スタッフ構成が変わりました。再読込してください。');
   if(issue)throw Error(issue);
   return version;
@@ -35,13 +37,14 @@ function shiftRegistrationStillAllowed(sid,version){
 }
 function assertMonthRegistrationAllowed(next,current){
   for(const sid of new Set([...Object.keys(next||{}),...Object.keys(current||{})])){
-    if(sid.startsWith('__')||!staffAccessIssue(sid))continue;
+    if(sid.startsWith('__'))continue;
     for(const [ds,key]of Object.entries(next?.[sid]||{})){
-      if(key&&(key!==current?.[sid]?.[ds]||!sameStaffMonthState(next?.__manualTimes?.[sid]?.[ds]??null,current?.__manualTimes?.[sid]?.[ds]??null)))
-        throw Error((STAFF.find(s=>s.id===sid)?.name||sid)+'：'+staffAccessIssue(sid));
+      if(key&&staffAccessIssue(sid,shiftMembers,ds)&&(key!==current?.[sid]?.[ds]||!sameStaffMonthState(next?.__manualTimes?.[sid]?.[ds]??null,current?.__manualTimes?.[sid]?.[ds]??null)))
+        throw Error((STAFF.find(s=>s.id===sid)?.name||sid)+'：'+staffAccessIssue(sid,shiftMembers,ds));
     }
   }
 }
+function attachLaborShiftPeriods(next){for(const [sid,days]of Object.entries(next||{})){if(sid.startsWith('__')||!shiftLifecycle[sid]?.hrManaged)continue;for(const date of Object.keys(days||{})){const p=laborShiftPeriod(sid,date);if(p)((next.__laborPeriods??={})[sid]??={})[date]=p;}}return next;}
 function snapshotRevokedShiftData(){
   const snapshot={};
   for(const staff of STAFF)if(staffAccessIssue(staff.id))snapshot[staff.id]={shifts:structuredClone(shiftData[staff.id]??null),times:structuredClone(shiftData.__manualTimes?.[staff.id]??null)};
@@ -69,3 +72,6 @@ function renderShiftStaffVisibility(){
     showRevokedShiftStaff?'解除・要確認のスタッフ '+count+'人を含めて表示中です。':'解除・要確認のスタッフ '+count+'人を非表示にしています。';
 }
 function redrawShiftMemberViews(){if(currentUser?.role==='admin')render();}
+
+function snapshotLaborOutsidePeriods(){const saved={};for(const staff of STAFF){if(!shiftLifecycle[staff.id]?.hrManaged)continue;for(let d=1;d<=daysInMonth(currentYear,currentMonth);d++){const ds=dateStr(currentYear,currentMonth,d);if(!laborShiftPeriod(staff.id,ds))(saved[staff.id]??={})[ds]={key:shiftData[staff.id]?.[ds]??null,time:structuredClone(shiftData.__manualTimes?.[staff.id]?.[ds]??null)};}}return saved;}
+function restoreLaborOutsidePeriods(saved){for(const [sid,dates]of Object.entries(saved))for(const [ds,e]of Object.entries(dates)){if(e.key)(shiftData[sid]??={})[ds]=e.key;else if(shiftData[sid])delete shiftData[sid][ds];if(e.time)((shiftData.__manualTimes??={})[sid]??={})[ds]=e.time;else if(shiftData.__manualTimes?.[sid])delete shiftData.__manualTimes[sid][ds];}}

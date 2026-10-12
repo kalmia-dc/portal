@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 import test from 'node:test';
 import * as lifecycle from '../portal-lifecycle-model.mjs';
+import {watchLaborBoundary} from '../labor-access-watch.mjs';
 
 for(const stopBy of ['member','lifecycle'])test('real auth clears cached identity and visible data on '+stopBy+' stop',async()=>{
   const store=new Map(),listeners=new Map();let signouts=0,cleared=0;
@@ -12,9 +13,9 @@ for(const stopBy of ['member','lifecycle'])test('real auth clears cached identit
   const el=()=>({append(){},replaceChildren(){},setAttribute(){},addEventListener(){},remove(){elements.delete('portal-auth-overlay')},set id(value){elements.set(value,this)}});
   const storage={setItem:(k,v)=>store.set(k,v),removeItem:k=>store.delete(k)};
   const page={style:{visibility:''},inert:false,value:'未保存の入力'};
-  const document={title:'test',head:el(),body:{children:[page],append(){},replaceChildren(){cleared++}},createElement:el,getElementById:id=>elements.get(id),querySelectorAll:()=>[]};
+  const document={addEventListener(){},removeEventListener(){},title:'test',head:el(),body:{children:[page],append(){},replaceChildren(){cleared++}},createElement:el,getElementById:id=>elements.get(id),querySelectorAll:()=>[]};
   let serverResolve;
-  const context=vm.createContext({document,sessionStorage:storage,localStorage:storage,window:{dispatchEvent(){}},CustomEvent:class{},location:{reload(){throw Error('Unexpected reload')},assign(){}},console,setTimeout,clearTimeout,URL,AbortController,fetch:()=>new Promise(resolve=>{serverResolve=resolve})});
+  const context=vm.createContext({document,sessionStorage:storage,localStorage:storage,window:{addEventListener(){},removeEventListener(){},dispatchEvent(){}},CustomEvent:class{},location:{reload(){throw Error('Unexpected reload')},assign(){}},console,setTimeout,clearTimeout,URL,AbortController,fetch:()=>new Promise(resolve=>{serverResolve=resolve})});
   const auth={getAuth:()=>({}),GoogleAuthProvider:class{},browserLocalPersistence:'local',getRedirectResult:async()=>null,
     onAuthStateChanged:(a,fn)=>{queueMicrotask(()=>fn(user));return()=>{}},setPersistence:async()=>{},signInWithPopup:async()=>{},signInWithRedirect:async()=>{},signOut:async()=>{signouts++}};
   const database={getDatabase:()=>({}),get:async path=>({val:()=>path.startsWith('staffLifecycle')?null:raw}),ref:(db,path)=>path,serverTimestamp:()=>123,update:async()=>{},onValue:(path,next,error)=>{listeners.set(path,{next,error});return()=>{}}};
@@ -25,7 +26,8 @@ for(const stopBy of ['member','lifecycle'])test('real auth clears cached identit
   const server=new vm.SourceTextModule(fs.readFileSync(new URL('../portal-server-profile.mjs',import.meta.url),'utf8'),{context});
   await server.link(()=>{});
   const entry=new vm.SourceTextModule(fs.readFileSync(new URL('../portal-auth.js',import.meta.url),'utf8'),{context});
-  await entry.link(id=>id.endsWith('firebase-auth.js')?authModule:id.endsWith('firebase-database.js')?dbModule:id.endsWith('portal-server-profile.mjs')?server:id.endsWith('portal-lifecycle-model.mjs')?lifecycleModule:watcher);
+  const boundary=synthetic({watchLaborBoundary:options=>watchLaborBoundary({...options,schedule:(fn,ms)=>{const timer=setTimeout(fn,ms);timer.unref();return timer;}})});
+  await entry.link(id=>id.endsWith('labor-access-watch.mjs')?boundary:id.endsWith('firebase-auth.js')?authModule:id.endsWith('firebase-database.js')?dbModule:id.endsWith('portal-server-profile.mjs')?server:id.endsWith('portal-lifecycle-model.mjs')?lifecycleModule:watcher);
   await entry.evaluate();
   const profile=await entry.namespace.startPortalAuth({options:{databaseURL:'https://demo.firebasedatabase.app'}},{});
   assert.equal(profile.staffId,'tanaka');assert.ok(store.has('portalUser'));

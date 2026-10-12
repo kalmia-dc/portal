@@ -1,3 +1,4 @@
+import {watchLaborBoundary} from './labor-access-watch.mjs';
 import {effectiveMember,lifecycleApplies} from './portal-lifecycle-model.mjs';
 import {
   getAuth,
@@ -167,10 +168,13 @@ async function recordAccessRequest(db, user, pageName) {
   });
 }
 
+let laborServerOffset=0,laborTimeAnchor=Date.now(),laborMonoAnchor=globalThis.performance?.now()||0;
+const laborSetTime=ms=>{laborTimeAnchor=ms;laborMonoAnchor=globalThis.performance?.now()||0;};
+const laborServerNow=()=>laborTimeAnchor+((globalThis.performance?.now()||0)-laborMonoAnchor);
 async function loadApprovedProfile(db, user) {
   const snapshot = await get(ref(db, `portalAccess/users/${user.uid}`));
   const raw=snapshot.val();const state=lifecycleApplies(raw)?(await get(ref(db,'staffLifecycle/'+raw.staffId))).val():null;
-  return normalizeAccessProfile(user.uid,user,effectiveMember(raw,state));
+  return normalizeAccessProfile(user.uid,user,effectiveMember(raw,state,laborServerNow()));
 }
 
 export async function startPortalAuth(app, { pageName = document.title } = {}) {
@@ -207,6 +211,8 @@ export async function startPortalAuth(app, { pageName = document.title } = {}) {
     throw new Error('Googleアカウントでのログインが必要です。');
   }
 
+  laborServerOffset=(await get(ref(db,'.info/serverTimeOffset'))).val()||0;laborSetTime(Date.now()+(typeof laborServerOffset==='number'?laborServerOffset:0));
+  onValue(ref(db,'.info/serverTimeOffset'),s=>{laborServerOffset=s.val()||0;laborSetTime(Date.now()+(typeof laborServerOffset==='number'?laborServerOffset:0));});
   let profile;
   try {
     profile = await loadApprovedProfile(db, user);
@@ -247,12 +253,13 @@ export async function startPortalAuth(app, { pageName = document.title } = {}) {
   watchPortalSession({
     userId:user.uid, initial:profile,
     normalize:raw => normalizeAccessProfile(user.uid, user, raw),
-    subscribe:(next,error)=>{let raw=null,state=null,gotRaw=false,gotState=!['staff','trainingAdmin'].includes(profile.portalRole);const emit=()=>{if(gotRaw&&gotState)next(effectiveMember(raw,state));};const off=onValue(ref(db,`portalAccess/users/${user.uid}`),snap=>{raw=snap.val();gotRaw=true;emit();},error);const offState=gotState?()=>{}:onValue(ref(db,'staffLifecycle/'+profile.staffId),snap=>{state=snap.val();gotState=true;emit();},error);return ()=>{off();offState();};},
+    subscribe:(next,error)=>{let raw=null,state=null,gotRaw=false,gotState=!['staff','trainingAdmin'].includes(profile.portalRole);const emit=()=>{if(gotRaw&&gotState)next(effectiveMember(raw,state,laborServerNow()));};const off=onValue(ref(db,`portalAccess/users/${user.uid}`),snap=>{raw=snap.val();gotRaw=true;emit();},error);const offState=gotState?()=>{}:onValue(ref(db,'staffLifecycle/'+profile.staffId),snap=>{state=snap.val();gotState=true;emit();},error);const offClock=watchLaborBoundary({readState:()=>state,emit,clock:laborServerNow,listenResume:cb=>{document.addEventListener('visibilitychange',cb);window.addEventListener('pageshow',cb);return ()=>{document.removeEventListener('visibilitychange',cb);window.removeEventListener('pageshow',cb);};}});return ()=>{off();offState();offClock();};},
     subscribeAuth:next => onAuthStateChanged(auth, next),
     subscribeConnection:next => onValue(ref(db, '.info/connected'), snap => next(snap.val() === true)),
+    subscribeResume:next=>{const wake=()=>{if(document.visibilityState!=='hidden')next();};document.addEventListener('visibilitychange',wake);window.addEventListener('pageshow',wake);return ()=>{document.removeEventListener('visibilitychange',wake);window.removeEventListener('pageshow',wake);};},
     suspend:lockForConnection,
     verifying:() => showCard('利用許可を再確認しています','<p>サーバーに接続しています。確認が完了するまで入力内容を保持してお待ちください。</p>'),
-    verify:async()=>{const raw=await readServerProfile({databaseURL:app.options.databaseURL,user});const state=lifecycleApplies(raw)?await readServerProfile({databaseURL:app.options.databaseURL,user,path:'staffLifecycle/'+raw.staffId}):null;return effectiveMember(raw,state);},
+    verify:async()=>{const raw=await readServerProfile({databaseURL:app.options.databaseURL,user,onServerTime:laborSetTime});const state=lifecycleApplies(raw)?await readServerProfile({databaseURL:app.options.databaseURL,user,path:'staffLifecycle/'+raw.staffId,onServerTime:laborSetTime}):null;return effectiveMember(raw,state,laborServerNow());},
     resume:() => {
       for(const [child,previous] of lockedElements){child.inert=previous.inert;child.style.visibility=previous.visibility;}
       lockedElements.clear();
@@ -260,6 +267,7 @@ export async function startPortalAuth(app, { pageName = document.title } = {}) {
       document.getElementById(OVERLAY_ID)?.remove();
     },
     invalidate:() => {
+      window.dispatchEvent(new CustomEvent('portalAccessLost'));
       clearPortalProfile();
       window.portalAuth = undefined;
       document.body.replaceChildren();

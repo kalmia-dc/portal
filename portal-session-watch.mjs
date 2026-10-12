@@ -1,6 +1,6 @@
 // Only a current server response can unlock a suspended page. Cached SDK
 // notifications may invalidate access, but can never resume it.
-export function watchPortalSession({ subscribe, subscribeAuth, subscribeConnection, userId, initial, normalize, invalidate, suspend, verify, resume, verifying=()=>{}, retryLater=setTimeout, cancelRetry=clearTimeout }) {
+export function watchPortalSession({ subscribe, subscribeAuth, subscribeConnection, subscribeResume=()=>()=>{}, userId, initial, normalize, invalidate, suspend, verify, resume, verifying=()=>{}, retryLater=setTimeout, cancelRetry=clearTimeout }) {
   let stopped=false,suspended=false,connected,epoch=0,retry,attempt=0;
   const same=raw=>{const next=normalize(raw);return next && JSON.stringify(next)===JSON.stringify(initial);};
   const stop=reason=>{if(!stopped){stopped=true;epoch++;cancelRetry(retry);invalidate(reason);}};
@@ -26,5 +26,6 @@ export function watchPortalSession({ subscribe, subscribeAuth, subscribeConnecti
     if(!connected){suspended=true;suspend();}
     else if(suspended){attempt=0;void check(epoch);}
   });
-  return ()=>{stopped=true;epoch++;cancelRetry(retry);offProfile();offAuth();offConnection();};
+  const offResume=subscribeResume(()=>{if(stopped)return;epoch++;cancelRetry(retry);suspended=true;suspend();if(connected)void check(epoch);});
+  return ()=>{stopped=true;epoch++;cancelRetry(retry);offProfile();offAuth();offConnection();offResume();};
 }

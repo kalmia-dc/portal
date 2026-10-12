@@ -2,7 +2,7 @@ import {isLifecycleStopped,linkedAccounts,lifecycleProtection,performLifecycleCh
 export function setupLifecycleAdmin({actor,db,api,lock,isBusy,reload,defaultStaff}){
   const $=id=>document.getElementById(id),{get,ref,onValue,runTransaction,serverTimestamp}=api;
   let users={},roster=[],states={},ready=false,saving=false,selection=null,operationId='',completed=false;
-  const route=mode=>{if(isBusy())return;for(const el of document.querySelectorAll('[data-flow]'))el.hidden=el.dataset.flow!==mode;$('flowHome').hidden=!!mode;document.querySelector(`[data-flow="${mode}"] h2`)?.focus();};
+  const route=async mode=>{if(isBusy())return;if(await get(ref(db,'laborConfig/enabled')).then(s=>s.val()===true).catch(()=>false)){location.assign('./labor-management.html');return;}for(const el of document.querySelectorAll('[data-flow]'))el.hidden=el.dataset.flow!==mode;$('flowHome').hidden=!!mode;document.querySelector(`[data-flow="${mode}"] h2`)?.focus();};
   $('startRegistration').onclick=()=>route('register');$('startRetirement').onclick=()=>route('retire');
   for(const b of document.querySelectorAll('[data-flow-back]'))b.onclick=()=>route('');
   function render(){

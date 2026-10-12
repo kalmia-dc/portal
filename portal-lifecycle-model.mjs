@@ -1,7 +1,7 @@
 import {assertAdmin,checkUid} from './portal-members-model.mjs';
-export const isLifecycleStopped=record=>record?.state==='stopped';
+export const isLifecycleStopped=(record,now=Date.now())=>record?.state==='stopped'||(record?.hrManaged===true&&!((!record.currentCancelled&&record.startAt<=now&&now<record.endAt)||(record.previousStartAt<=now&&now<record.previousEndAt)));
 export const lifecycleApplies=member=>['staff','trainingAdmin'].includes(member?.role);
-export const effectiveMember=(member,lifecycle)=>member && lifecycleApplies(member) && isLifecycleStopped(lifecycle)?{...member,active:false}:member;
+export const effectiveMember=(member,lifecycle,now=Date.now())=>member && lifecycleApplies(member) && isLifecycleStopped(lifecycle,now)?{...member,active:false}:member;
 export function linkedAccounts(users,staffId){return Object.entries(users||{}).filter(([,m])=>m?.staffId===staffId).map(([uid,m])=>({uid,...m}));}
 export function lifecycleProtection(actor,staff,users){
   if(!staff?.id)return 'スタッフを選んでください。';

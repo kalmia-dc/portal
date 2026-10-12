@@ -1,6 +1,6 @@
 // Direct REST read: no SDK cache fallback. The existing ID token is used only
 // for this HTTPS request. Never log tokens, raw URLs or underlying fetch errors.
-export async function readServerProfile({ databaseURL, user, fetchImpl=fetch, timeoutMs=10000, path }) {
+export async function readServerProfile({ databaseURL, user, fetchImpl=fetch, timeoutMs=10000, path, onServerTime }) {
   const controller=new AbortController();
   let timer;
   const timeout=new Promise((_,reject)=>{timer=setTimeout(()=>{controller.abort();reject(Error('timeout'));},timeoutMs);});
@@ -13,6 +13,7 @@ export async function readServerProfile({ databaseURL, user, fetchImpl=fetch, ti
     const response=await fetchImpl(url.toString(),{method:'GET',cache:'no-store',credentials:'omit',redirect:'error',referrerPolicy:'no-referrer',signal:controller.signal});
     if(response.status===401 || response.status===403) throw Object.assign(Error('Access denied'),{code:'access-denied'});
     if(!response.ok) throw Error('unavailable');
+    const serverDate=Date.parse(response.headers?.get('date')||'');if(Number.isFinite(serverDate))onServerTime?.(serverDate);
     return await response.json();
     };
     return await Promise.race([request(),timeout]);

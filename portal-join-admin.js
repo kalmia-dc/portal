@@ -22,7 +22,8 @@ export function setupJoinAdmin({actor,db,api,lock,isBusy,message,reloadManagemen
     }
     $('joinIdentityChecked').checked=false;
   }
-  function open(request) {
+  async function open(request) {
+    if(await get(ref(db,'laborConfig/enabled')).then(s=>s.val()===true).catch(()=>false)){location.assign('./labor-management.html');return;}
     if(isBusy()||actor.portalRole!=='admin')return;
     // Auth reconnect can close a pending dialog. Preserve that draft and its ID
     // when the same revision is opened again, but require a fresh identity check.

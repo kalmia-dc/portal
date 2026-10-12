@@ -10,7 +10,7 @@ const {initializeTestEnvironment,assertFails}=require('@firebase/rules-unit-test
 const {ref,get,set,onValue,runTransaction,serverTimestamp}=require('firebase/database');
 let env;
 const actor={uid:'admin',portalRole:'admin'},draft={id:'staff_new',name:'架空新人',role:'DR',type:'part'};
-before(async()=>{env=await initializeTestEnvironment({projectId:'demo-roster-add',database:{host:'127.0.0.1',port:9015,rules:fs.readFileSync(process.env.PORTAL_RULES_FILE || 'database.rules.json','utf8')}})});
+before(async()=>{env=await initializeTestEnvironment({projectId:'demo-roster-add',database:{host:'127.0.0.1',port:Number(process.env.PORTAL_TEST_PORT||9015),rules:fs.readFileSync(process.env.PORTAL_RULES_FILE || 'database.rules.json','utf8')}})});
 after(async()=>env?.cleanup());
 beforeEach(async()=>env.withSecurityRulesDisabled(c=>set(ref(c.database()),{
  portalAccess:{users:{admin:{role:'admin',active:true,staffId:'sugihira',name:'管理者'},staff:{role:'staff',active:true,staffId:'old',name:'既存'},inactive:{role:'admin',active:false,staffId:'x',name:'停止'}}},
