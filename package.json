@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test:labor": "node --test tests/labor-*.test.mjs",
+    "test:labor": "node --experimental-vm-modules --test tests/labor-*.test.mjs",
     "labor:serve": "node tools/labor-local-server.mjs",
     "labor:rules": "node tools/build-labor-rule-candidate.mjs --local"
   },

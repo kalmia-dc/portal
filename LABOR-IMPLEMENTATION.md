@@ -16,7 +16,7 @@
 2. `node tools/build-labor-assets.mjs`
 3. `node tools/build-labor-rule-candidate.mjs --local`
 4. `node node_modules/firebase-tools/lib/bin/firebase.js emulators:start --only database --project demo-labor --config firebase.labor.json`
-5. 別端末で `node --test tests/labor-*.test.mjs`
+5. 別端末で `npm run test:labor`
 6. `node tools/labor-local-server.mjs` → `http://127.0.0.1:8873/labor-management.html`
 
 画面はサーバーが `labor-runtime.js` を架空データ専用の実装へ差し替える。通常画面の保存ロジックは共通だが、ブラウザの保存先はメモリで、ルール検証は別途エミュレータで行う。CSPで外部解析・本番Firebaseへの通信を遮断。再読み込みで架空データを消去する。検証画面に実書類を投入しない。
@@ -105,3 +105,7 @@ HTML候補の準備はFirebaseに依存しないため続行した。公開用�
 | ルール配備・初期化・公開・取込・機能切替 | 上記結果に基づく具体的な本番変更承認 | Q052はローカルのみ。本番操作は未承認であり、今の段階では承認質問を捏造しない |
 
 現時点で必要な新しい業務判断は特定されていない。Q051の保留が解除できる時のユーザーログインと、表示確認の結果が次の入力。ログインを今要求することはせず、継続指示を保持する。
+
+### 本番用接続処理の追加ローカル試験
+
+架空データ画面では置換されていた `labor-runtime.js` 自体をVMで実行する試験を追加。本物のFirebase通信はスタブに置換し、通信切断時の書き込み拒否、接続後の保存経路、認証利用者を使うREST読取、担当許可取消／権限読取エラー時の画面消去とlaborAccessLost通知を確認。追加1件合格。本番通信や実UIDでの受入が完了したことは意味しない。再現コマンドは `node --experimental-vm-modules --test tests/labor-runtime.test.mjs`。
