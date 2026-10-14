@@ -211,7 +211,7 @@ export async function startPortalAuth(app, { pageName = document.title } = {}) {
     throw new Error('Googleアカウントでのログインが必要です。');
   }
 
-  laborServerOffset=(await get(ref(db,'.info/serverTimeOffset'))).val()||0;laborSetTime(Date.now()+(typeof laborServerOffset==='number'?laborServerOffset:0));
+  laborServerOffset=await new Promise((resolve,reject)=>onValue(ref(db,'.info/serverTimeOffset'),s=>resolve(s.val()||0),reject,{onlyOnce:true}));laborSetTime(Date.now()+(typeof laborServerOffset==='number'?laborServerOffset:0));
   onValue(ref(db,'.info/serverTimeOffset'),s=>{laborServerOffset=s.val()||0;laborSetTime(Date.now()+(typeof laborServerOffset==='number'?laborServerOffset:0));});
   let profile;
   try {
