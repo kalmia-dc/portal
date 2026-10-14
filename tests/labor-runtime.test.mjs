@@ -20,7 +20,7 @@ test('production adapter blocks disconnected writes, uses authenticated REST, an
     './portal-server-profile.mjs':{readServerProfile:async args=>{reads.push(args);return {synthetic:true};}}
   };
   const source=new vm.SourceTextModule(fs.readFileSync(new URL('../labor-runtime.js',import.meta.url),'utf8'),{context});
-  await source.link(spec=>{const exports=modules[spec]||modules[spec.split('/').at(-1)];assert.ok(exports,spec);return new vm.SyntheticModule(Object.keys(exports),function(){for(const [k,v]of Object.entries(exports))this.setExport(k,v);},{context});});
+  await source.link(spec=>{spec=spec.split('?')[0];const exports=modules[spec]||modules[spec.split('/').at(-1)];assert.ok(exports,spec);return new vm.SyntheticModule(Object.keys(exports),function(){for(const [k,v]of Object.entries(exports))this.setExport(k,v);},{context});});
   await source.evaluate();await source.namespace.connectLabor();assert.equal(authorized,1);
   assert.throws(()=>port.update({a:1}),/通信/);assert.equal(writes.length,0);
   listeners.get('.info/connected').next({val:()=>true});await port.update({a:1});assert.equal(writes.length,1);

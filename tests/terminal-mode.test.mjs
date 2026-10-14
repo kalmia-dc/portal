@@ -53,7 +53,7 @@ for (const key of ['tasks', 'opinions']) {
   assert.match(meetingRules[key]['.write'], /role'\)\.val\(\) !== 'terminal'/);
 }
 assert.match(meetingRules.incidentReports['.read'], /child\('active'\)\.val\(\) === true/);
-assert.doesNotMatch(meetingRules.incidentReports['.read'], /child\('role'\)/);
+assert.match(meetingRules.incidentReports['.read'], /child\('role'\)\.val\(\) === 'terminal'/);
 assert.match(meetingRules.incidentReports.$reportId['.write'], /role'\)\.val\(\) !== 'terminal'/);
 
 console.log('terminalModeValidation=ok scripts=4 routing=ok meetingReadOnly=ok rules=ok');
