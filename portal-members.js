@@ -1,6 +1,6 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import { getDatabase, ref, get, onValue, runTransaction, serverTimestamp, update } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
-import { startPortalAuth } from './portal-auth.js';
+import { startPortalAuth } from './portal-auth.js?v=labor-20261014-2';
 import { performMemberChange } from './portal-members-model.mjs';
 
 const firebaseConfig={apiKey:'AIzaSyDdMe7feUF6CKPHH0YIx7Suk-WnXtOYUu8',authDomain:'kalmia-shift.firebaseapp.com',databaseURL:'https://kalmia-shift-default-rtdb.asia-southeast1.firebasedatabase.app',projectId:'kalmia-shift',storageBucket:'kalmia-shift.firebasestorage.app',messagingSenderId:'714175473480',appId:'1:714175473480:web:7d6626a46e4a9dcb1fb57d'};

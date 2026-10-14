@@ -1,6 +1,6 @@
 import {initializeApp} from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import {getDatabase,ref,get,update,runTransaction,onValue,serverTimestamp} from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
-import {startPortalAuth} from './portal-auth.js';
+import {startPortalAuth} from './portal-auth.js?v=labor-20261014-2';
 import {createLaborStore} from './labor-store.mjs';
 import {defaultStaff} from './portal-default-staff.mjs';
 import {readServerProfile} from './portal-server-profile.mjs';
