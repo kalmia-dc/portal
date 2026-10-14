@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>ログインメンバー管理 | カルミアDC</title>
+  <title>ログインアカウント一覧 | カルミアDC</title>
   <link rel="stylesheet" href="./portal-common.css?v=20261005">
   <script defer src="./portal-common.js?v=20261005"></script>
   <style>
@@ -22,9 +22,11 @@
 <body>
 <main>
   <a href="./index.html">← ポータルへ戻る</a>
-  <h1>ログインメンバー管理</h1>
+  <h1 id="pageTitle">ログインアカウント一覧</h1>
   <p id="status" role="status" aria-live="polite">ログインを確認しています。</p>
   <div id="management" hidden>
+    <section id="accountReview" hidden><h2>登録済みアカウントの確認</h2><p>この画面は確認専用です。新入社員の登録・Googleアカウントの紐付け・退職手続きは、院長または百々さんが労務管理で行います。</p><p><a href="./labor-management.html">労務管理（入退社・利用登録）へ</a></p><div id="accountReviewRows"></div></section>
+    <div id="legacyManagement" hidden>
     <div id="flowHome" class="intro"><h2>何をしますか？</h2><p>必要な手順は、押した先で順番に案内します。</p><div class="flow-choices"><button type="button" id="startRegistration"><strong>新入社員を登録</strong><span>URLを渡す → 申請を確認 → 承認</span></button><button type="button" id="startRetirement" class="secondary"><strong>退職者を利用停止</strong><span>対象を選ぶ → 内容を確認 → 停止</span></button></div></div>
     <div data-flow="register" hidden><button type="button" class="secondary" data-flow-back>← 操作を選び直す</button><h2 tabindex="-1">新入社員を登録</h2>
     <section><h3>1. 登録URLを本人へ渡す</h3><p>下のボタンでコピーして本人へ渡してください。本人がSafariまたはChromeでGoogleログインし、氏名・職種を入力します。</p><div class="actions"><input id="registrationUrl" readonly aria-label="本人用の登録URL" style="flex:1;min-width:0"><button id="copyRegistrationUrl" type="button">登録URLをコピー</button></div><p id="copyRegistrationStatus" role="status"></p></section>
@@ -33,7 +35,7 @@
     </details></div>
     <div data-flow="retire" hidden><button type="button" class="secondary" data-flow-back>← 操作を選び直す</button><h2 tabindex="-1">退職者を利用停止</h2><p>ログイン停止・通常一覧から非表示をまとめて行います。勤務・勤怠の履歴は残します。</p><section><p id="lifecycleLoadStatus" role="status"></p><label><input type="checkbox" id="showStoppedMembers">利用停止済みを表示・復帰する</label><div id="lifecycleList"></div></section></div>
     <details class="intro"><summary>名簿・ログインの詳細を確認</summary><p>個別アカウントの許可解除は退職操作とは別です。退職には上の「退職者を利用停止」を使ってください。</p><label><input id="showAllRoster" type="checkbox">停止済みの名簿も表示</label><div id="currentRoster"></div><section><h2>Googleログインの個別許可</h2><div id="members"></div></section></details>
-    <button id="reload" class="secondary" type="button">一覧を再読み込み</button>
+    </div><button id="reload" class="secondary" type="button">一覧を再読み込み</button>
   </div>
 </main>
 <dialog id="confirmation" aria-labelledby="confirmTitle">
@@ -54,6 +56,6 @@
 <p id="joinApprovalStatus" class="wide" role="status" aria-live="polite"></p>
 <div class="actions wide"><button id="cancelJoinApproval" class="secondary" type="button">取り消す</button><button id="submitJoinApproval" type="submit">承認して登録</button></div>
 </form></dialog>
-<dialog id="lifecycleDialog" aria-labelledby="lifecycleTitle"><h2 id="lifecycleTitle"></h2><h3 id="lifecycleTarget"></h3><p id="lifecycleEffects"></p><ul id="lifecycleAccounts"></ul><form id="lifecycleForm"><label><input type="checkbox" id="lifecycleChecked" required>対象者と変更内容を確認しました</label><p id="lifecycleStatus" role="status" aria-live="polite"></p><div class="actions"><button type="button" id="lifecycleClose" class="secondary">取り消す</button><button type="submit" id="lifecycleSubmit" class="danger">利用停止を確定</button></div></form></dialog><script type="module" src="./portal-members.js"></script>
+<dialog id="lifecycleDialog" aria-labelledby="lifecycleTitle"><h2 id="lifecycleTitle"></h2><h3 id="lifecycleTarget"></h3><p id="lifecycleEffects"></p><ul id="lifecycleAccounts"></ul><form id="lifecycleForm"><label><input type="checkbox" id="lifecycleChecked" required>対象者と変更内容を確認しました</label><p id="lifecycleStatus" role="status" aria-live="polite"></p><div class="actions"><button type="button" id="lifecycleClose" class="secondary">取り消す</button><button type="submit" id="lifecycleSubmit" class="danger">利用停止を確定</button></div></form></dialog><script type="module" src="./portal-members.js?v=20261014-flow"></script>
 </body>
 </html>

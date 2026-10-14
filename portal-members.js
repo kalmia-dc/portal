@@ -10,7 +10,7 @@ import { defaultStaff } from './portal-default-staff.mjs';
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 const $ = id => document.getElementById(id);
-const actor = await startPortalAuth(app,{pageName:'ログインメンバー管理'});
+const actor = await startPortalAuth(app,{pageName:'ログインアカウント一覧'});
 let busy = false;
 const joinAdmin=setupJoinAdmin({actor,db,api:{get,ref,update,serverTimestamp},lock,isBusy:()=>busy,message,reloadManagement:()=>load('承認が完了しました。').catch(()=>{})});
 const lifecycleAdmin=setupLifecycleAdmin({actor,db,api:{get,ref,onValue,runTransaction,serverTimestamp},lock,isBusy:()=>busy,reload:()=>load(),defaultStaff});
@@ -76,6 +76,22 @@ async function load(success='一覧を読み込みました。') {
   const selections=new Map([...document.querySelectorAll('#requests select')].map(el=>[el.dataset.uid,el.value]));
   lock(true); $('requests').replaceChildren(); $('members').replaceChildren();message('一覧を読み込んでいます。');
   try {
+    // Resolve the current mode before exposing any legacy mutation controls.
+    $('legacyManagement').hidden=true;$('accountReview').hidden=true;
+    const laborEnabled=(await get(ref(db,'laborConfig/enabled'))).val()===true;
+    if(laborEnabled){
+      document.title='ログインアカウント一覧 | カルミアDC';$('pageTitle').textContent='ログインアカウント一覧';
+      const [accounts,lifecycle]=await Promise.all(['portalAccess/users','staffLifecycle'].map(path=>get(ref(db,path))));
+      const users=accounts.val()||{},states=lifecycle.val()||{};$('accountReviewRows').replaceChildren();
+      for(const [uid,member] of Object.entries(users)){
+        const node=row($('accountReviewRows'),uid,member);
+        text(node,`${states[member.staffId]?.state==='stopped'?'スタッフ単位で利用停止中':member.active===true?'個別許可あり':'個別解除済み'} / ${member.role} / スタッフID: ${member.staffId}`);
+      }
+      if(!Object.keys(users).length)text($('accountReviewRows'),'登録済みアカウントはありません。');
+      $('accountReview').hidden=false;message('アカウント一覧を読み込みました。変更は労務管理で行ってください。');return;
+    }
+    document.title='ログインメンバー管理 | カルミアDC';$('pageTitle').textContent='ログインメンバー管理';
+    $('legacyManagement').hidden=false;
     const [u,r,s]=await Promise.all(['portalAccess/users','portalAccessRequests','extra_staff'].map(path=>get(ref(db,path))));
     const users=u.val()||{}, requests=r.val()||{};
     const roster=new Map(defaultStaff.map(staff=>[staff.id,staff]));

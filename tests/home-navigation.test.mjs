@@ -7,7 +7,7 @@ function setup(profile={portalRole:'admin',isAdmin:true},sid='allowed'){
  const nodes=new Map();const node=()=>({hidden:false,style:{},attrs:{},classList:{add(){},remove(){},toggle(){}},setAttribute(k,v){this.attrs[k]=v},scrollIntoView(){this.scrolled=true},focus(){this.focused=true}});
  const field=id=>{if(!nodes.has(id))nodes.set(id,node());return nodes.get(id)};
  const groups=['staff','staff','staff','admin','both'].map(scope=>({dataset:{homeScope:scope},style:{},querySelectorAll:()=>scope==='admin'?['adminToolBtn','privateMetricsToolBtn','memberManagementToolBtn','terminalSetupToolBtn'].map(field):[node()]}));
- const c=vm.createContext({console,Date,URL,URLSearchParams,authenticatedProfile:profile,currentUser:{staffId:sid,name:'架空'},ADMIN_STAFF:['allowed'],isGuestUser:()=>false,window:{location:{href:'https://kalmia-dc.github.io/portal/index.html',origin:'https://kalmia-dc.github.io'}},document:{getElementById:field,body:node(),querySelectorAll:s=>s==='[data-menu-section]'?groups:[]}});
+ const c=vm.createContext({console,Date,URL,URLSearchParams,laborManagementEnabled:false,authenticatedProfile:profile,currentUser:{staffId:sid,name:'架空'},ADMIN_STAFF:['allowed'],isGuestUser:()=>false,window:{location:{href:'https://kalmia-dc.github.io/portal/index.html',origin:'https://kalmia-dc.github.io'}},document:{getElementById:field,body:node(),querySelectorAll:s=>s==='[data-menu-section]'?groups:[]}});
  const run=s=>vm.runInContext(s,c);
  run(html.slice(html.indexOf('let homeViewMode'),html.indexOf('// Firebaseからシフトデータを読む')));
  run(html.slice(html.indexOf('let noticeHistoryExpanded'),html.indexOf('async function deleteNotice')));
@@ -52,4 +52,9 @@ test('existing function routes retained, duplicate labels unified, updates prece
  assert(!html.includes('院内研修<br>資料'));
  for(const page of ['task-manager','meeting-management','training-materials','attendance','shift','loan-management','goal-manager','schedule','skill','private-metrics','portal-members','terminal-setup'])assert(html.includes(page+'.html'),page);
  assert(html.includes('https://ssl.jobcan.jp/employee'));assert(html.includes('https://apo-toolboxes.stransa.co.jp/calendar/'));assert(html.includes('https://kalmia-dc.doctor-hr.com/'));
+});
+
+test('labor enabled or unknown hides legacy registration entrance; disabled preserves it',()=>{
+ const h=setup();
+ for(const enabled of [true,null,false]){h.c.laborManagementEnabled=enabled;h.run('updateMenuVisibility()');assert.equal(h.field('memberManagementToolBtn').style.display,enabled===false?'block':'none');}
 });

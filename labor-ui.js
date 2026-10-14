@@ -3,6 +3,8 @@ import {draftEmployee,transition,period,salaryEntry,retirementShifts,retention,d
 import {prepareFile,readDocument,extractCandidates} from './labor-documents.mjs';
 const $=id=>document.getElementById(id),form=$('editor'),field=name=>form.elements.namedItem(name),id=()=>crypto.randomUUID();
 let readerController;let store,records={},current=null,data=null,busy=false,templates={onboard:ONBOARD,offboard:OFFBOARD};const urls=new Set();
+$('registrationUrl').value=new URL('./google-account-register.html',location.href).href.split('?')[0];
+$('copyRegistrationUrl').onclick=async()=>{try{await navigator.clipboard.writeText($('registrationUrl').value);$('copyRegistrationStatus').textContent='申請URLをコピーしました。本人へ渡してください。';}catch{$('registrationUrl').focus();$('registrationUrl').select();$('copyRegistrationStatus').textContent='申請URLを選択しました。コピーして本人へ渡してください。';}};
 const status={draft:'下書き',confirmed:'入社確定',retiring:'退職日設定済み',cancelled:'入社取消'};
 function el(tag,text,cls){const e=document.createElement(tag);if(text!=null)e.textContent=text;if(cls)e.className=cls;return e;}
 function message(text,error=false){const box=$('message');if(!box)return;box.textContent=text;box.classList.toggle('error',error);}
