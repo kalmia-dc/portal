@@ -3,6 +3,7 @@ import {approvalUpdates} from './portal-join-model.mjs';
 import {joinNameKey} from './portal-join-model.mjs';
 import {lifecycleProtection} from './portal-lifecycle-model.mjs';
 import {staffNameKey} from './portal-roster-model.mjs';
+import {canImportStaff} from './labor-import-policy.mjs';
 export function hydrate(record) {if(!record)return null;const data=record.data;for(const k of ['periods','salaries','insurance','tasks','documents'])data[k]??={};return record;}
 export function createLaborStore(port, actor, defaults=[]) {
   const read=async path=>await port.read(path);
@@ -42,7 +43,7 @@ export function createLaborStore(port, actor, defaults=[]) {
     }
     const saved=await read(path);if(saved?.operationId!==operationId)throw Error('保存結果を確認できません。再読み込みしてください。');return hydrate(saved);
   }
-  async function importStaff(){await authorize();const existing=await list();let count=0;for(const s of await roster()){if(existing[s.id])continue;const data=draftEmployee({...s,imported:true});await save(data,0,'import-'+s.id);count++;}return count;}
+  async function importStaff(){await authorize();const existing=await list();let count=0;for(const s of await roster()){if(!canImportStaff(s)||existing[s.id])continue;const data=draftEmployee({...s,imported:true});await save(data,0,'import-'+s.id);count++;}return count;}
   async function matchAccount(data, request) {
     await authorize();const stored=hydrate(await read('laborRecords/'+data.staffId));
     if(!stored||stored.data.status==='draft'||stored.data.status==='cancelled')throw Error('入社確定後に照合してください。');
