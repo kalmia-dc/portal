@@ -861,6 +861,34 @@
     .print-table thead .print-sunday { color:#9f2020 !important; }
     .print-table thead .print-saturday { color:#145f99 !important; }
   }
+  @media print {
+    .one-sheet { font-size:9pt; color:#202633; }
+    .one-heading { display:flex; align-items:baseline; justify-content:space-between; margin-bottom:2mm; }
+    .one-heading h1 { font-size:14pt; margin:0; }
+    .one-heading span { font-size:9pt; }
+    .one-table { width:100%; border-collapse:collapse; table-layout:fixed; }
+    .one-table th,.one-table td { border:.2mm solid #a4abb3; text-align:center; padding:.25mm .1mm; line-height:1.1; font-size:10pt; }
+    .one-table thead th,.one-table tfoot th { height:8mm; background:#f0f2f5 !important; font-size:9pt; color:#202633; }
+    .one-table thead small,.one-table tfoot small { font-size:8pt; }
+    .one-table .one-name { text-align:left; padding:.5mm 1mm; font-size:9pt; overflow-wrap:anywhere; }
+    .one-staff .one-name small { display:block; font-size:7.5pt; font-weight:400; line-height:1.15; }
+    .one-staff { height:var(--one-row-height); break-inside:avoid; }
+    .one-DR td { color:#542d83; background:#f0e8f7 !important; }
+    .one-DH td { color:#174a83; background:#e7f1fb !important; }
+    .one-DA td { color:#205c56; background:#e9f3ef !important; }
+    .one-table td.one-rest { color:#525a63; background:#f3f4f6 !important; }
+    .one-table td.one-time { font-family:Arial,sans-serif; font-size:8pt; font-variant-numeric:tabular-nums; font-weight:500; }
+    .one-time span { display:block; white-space:nowrap; line-height:1.1; }
+    .one-table td.one-marked { font-size:7.5pt; letter-spacing:-.1px; }
+    .one-time sup { font-size:5.5pt; line-height:0; }
+    .one-count { height:4.5mm; background:#edf0f4 !important; }
+    .one-count td,.one-count th { font-size:8.5pt; font-weight:600; }
+    .one-table th.one-sun { color:#b02727; }
+    .one-table th.one-sat { color:#1d61a6; }
+    .one-note { margin-top:2mm; font-size:8pt; line-height:1.3; }
+    .one-note p { margin:0 0 .5mm; }
+  }
+
   #editModal .modal { max-width:calc(100vw - 24px); max-height:90vh; overflow-y:auto; }
   #editModal .modal-actions { flex-wrap:wrap; }
   @media screen and (max-width:700px) {
@@ -1215,7 +1243,8 @@
       <button class="btn btn-secondary btn-full" onclick="openApprovalModal()">📋 申請確認</button>
       <button class="btn btn-amber btn-full" onclick="exportCSV()">📥 CSVエクスポート</button>
       <button class="btn btn-full" style="background:#e8f5e9;color:#2e7d32;font-weight:700;" onclick="confirmShift()">🔒 シフト確定</button>
-      <button class="btn btn-full" style="background:#E3F2FD;color:#1565C0;" onclick="printShift()">🖨️ 印刷</button>
+      <button class="btn btn-full" style="background:#E3F2FD;color:#1565C0;" onclick="printShiftOnePage()">🖨️ 印刷（A4横1枚）</button>
+      <button class="btn btn-full" style="background:#E3F2FD;color:#1565C0;" onclick="printShift()">🖨️ 印刷（詳細・分割）</button>
       <button class="btn btn-full" style="background:#E8F5E9;color:#2E7D32;" onclick="openStaffMgr()">👥 スタッフ管理</button>
       <button class="btn btn-full" style="background:#FCE4EC;color:#880E4F;" onclick="openHolidayMgr()">🏥 休業日管理</button>
       <button class="btn btn-danger btn-full" onclick="clearShift()">🗑 月全体をクリア</button>
@@ -4184,6 +4213,55 @@ function generateShift(){
     render();
     saveCurrentShift(); // 生成したシフトを月別に保存
   }, 600);
+}
+
+function printShiftOnePage(){
+  const y=currentYear,m=currentMonth,days=daysInMonth(y,m),all=orderedShiftStaff();
+  const staff=[...all.filter(s=>s.role==='DR'&&['full','director','part'].includes(s.type)),...all.filter(s=>s.role==='DH'),...all.filter(s=>s.role==='DA'&&['full','part'].includes(s.type))];
+  const rowUnits=staff.reduce((n,s)=>n+Math.max(1,Math.ceil(Array.from(s.name).length/7)),0);
+  if(rowUnits>16){alert('A4横1枚は短い氏名で16名までが目安です。長い氏名も含めると読める文字サイズを保てないため、「印刷（詳細・分割）」をご利用ください。');return;}
+  const esc=v=>String(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const symbols={early:'○',late:'遅',fixed:'固',admin:'事',hanowa:'HW',off:'休',paid:'有',wish:'希',clinic:'規',none:'診'};
+  const breaks=new Map();
+  for(const s of staff)for(let d=1;d<=days;d++){
+    const ds=dateStr(y,m,d),key=shiftData[s.id]?.[ds]||'',t=manualTimeFor(s.id,ds);
+    if(key&&!symbols[key]){alert('未対応の勤務区分があるため、A4横1枚には印刷できません。勤務区分を確認してください。');return;}
+    if(t&&Number(t.breakMinutes)!==90&&!breaks.has(Number(t.breakMinutes)))breaks.set(Number(t.breakMinutes),String.fromCharCode(97+breaks.size));
+  }
+  if(breaks.size>4){alert('個別休憩の種類が多く注記が読みにくくなるため、「印刷（詳細・分割）」をご利用ください。');return;}
+  const header=()=>{
+    let h='<tr><th class="one-name">氏名・月計</th>';
+    for(let d=1;d<=days;d++){
+      const dd=dow(y,m,d),ds=dateStr(y,m,d);
+      h+=`<th class="${HOLIDAYS[ds]||dd===0?'one-sun':dd===6?'one-sat':''}">${d}<br><small>${['日','月','火','水','木','金','土'][dd]}</small></th>`;
+    }
+    return h+'</tr>';
+  };
+  let html=`<section class="one-sheet" style="--one-row-height:${rowUnits<=14?'8':'6.2'}mm"><div class="one-heading"><h1>${y}年${m+1}月 シフト表</h1><span>カルミアデンタルクリニック</span></div>`;
+  html+=`<table class="one-table"><colgroup><col style="width:25mm">${'<col>'.repeat(days)}</colgroup><thead>${header()}</thead><tbody>`;
+  for(const s of staff){
+    html+=`<tr class="one-staff one-${esc(s.role)}"><th class="one-name">${esc(s.name)}<small>${esc(s.role)} ・ ${getHours(s.id,y,m)}h</small></th>`;
+    for(let d=1;d<=days;d++){
+      const ds=dateStr(y,m,d),key=shiftData[s.id]?.[ds]||'',t=manualTimeFor(s.id,ds);
+      const rest=['off','paid','wish','clinic','none'].includes(key),closed=!key&&isOffDay(y,m,d)&&!isClinicDay(ds);
+      if(t){
+        const mark=breaks.get(Number(t.breakMinutes))||'';
+        const workMark={late:'L',fixed:'F',admin:'A',hanowa:'H'}[key]||'';
+        html+=`<td class="one-time${mark||workMark?' one-marked':''}"><span>${esc(t.start)}${workMark?`<sup>${workMark}</sup>`:''}</span><span>${esc(t.end)}${mark?`<sup>${mark}</sup>`:''}</span></td>`;
+      }else html+=`<td class="${rest||closed?'one-rest':''}">${esc(key?symbols[key]:closed?'診':'—')}</td>`;
+    }
+    html+='</tr>';
+  }
+  for(const role of ['DR','DH','DA']){
+    html+=`<tr class="one-count"><th class="one-name">${role}人数</th>`;
+    for(let d=1;d<=days;d++)html+=`<td>${isOffDay(y,m,d)?'—':countRoleStaffing(role,dateStr(y,m,d))}</td>`;
+    html+='</tr>';
+  }
+  html+=`</tbody><tfoot>${header()}</tfoot></table><div class="one-note"><p>○ 通常8:30〜18:30 ／ 遅(L) 9:00〜18:30 ／ 固(F) 9:00〜17:00 ／ 事(A) 事務8:30〜18:30 ／ HW(H) 午後15:00〜18:30。標準休憩：○遅事90分、固60分、HWなし。</p>`;
+  html+=`<p>時刻のあるセル：上段＝出勤、下段＝退勤。休憩は無印90分${Array.from(breaks,([minutes,mark])=>`、${mark}＝${minutes}分`).join('')}（常勤DRの90分は13:30〜15:00の運用）。</p>`;
+  html+='<p>休＝公休／有＝有給／希＝希望休／規＝規定休／診＝休診／—＝未設定。公休・希望休・未設定は欠勤を意味しません。</p><p>人数は配置数（DHは午後勤務を含む、DAは事務を除く）。同時勤務人数ではありません。月計は既存の集計値です。</p></div></section>';
+  const area=document.getElementById('printArea');area.innerHTML=html;area.style.display='block';
+  shiftDelay(()=>{window.print();area.style.display='none';},150);
 }
 
 function printShift(){
