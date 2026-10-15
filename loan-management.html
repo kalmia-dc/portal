@@ -262,8 +262,10 @@ input:focus,select:focus,textarea:focus{border-color:var(--mint)}
 
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getDatabase, ref, push, set, update, onValue, get, query, orderByChild, equalTo }
+import { getDatabase, ref, push, set, update, onValue as firebaseOnValue, get, query, orderByChild, equalTo }
   from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
+import {createPageLifecycle} from './portal-page-lifecycle.mjs';
+import {loadBusinessRoster} from './portal-business-roster.mjs';
 import { startPortalAuth } from './portal-auth.js?v=labor-20261014-2';
 
 const firebaseConfig = {
@@ -278,7 +280,22 @@ const firebaseConfig = {
 
 const fbApp = initializeApp(firebaseConfig);
 const db = getDatabase(fbApp);
+const pageLifecycle = createPageLifecycle();
+function onValue(target, success, failure) {
+  if (!pageLifecycle.active) return () => {};
+  return pageLifecycle.add(firebaseOnValue(target, pageLifecycle.guard(success), pageLifecycle.guard(failure || (error => console.error(error)))));
+}
 const authenticatedProfile = await startPortalAuth(fbApp, { pageName:'貸与品管理' });
+pageLifecycle.assertActive();
+const businessRoster = await loadBusinessRoster({read:path => get(ref(db,path)).then(snapshot => snapshot.val()), profile:authenticatedProfile});
+pageLifecycle.assertActive();
+if (!businessRoster.complete) {
+  const warning = document.createElement('p');
+  warning.setAttribute('role','alert');
+  warning.textContent = '職員名簿の一部を確認できません。再読み込みしてください。新規対象者の保存は停止しています。';
+  document.body.prepend(warning);
+}
+
 const DB_PATH = 'loanAgreements';
 const PORTAL_USER_STORAGE_KEY = 'portalUser';
 const AGREEMENT_VERSION = 'loan-agreement-v1-2026-07-03';
@@ -295,6 +312,8 @@ const STAFF_ROLES = {
   tsuruta:'DH', yoshida:'DH', takagi:'DH', matsumoto:'DH', yamada:'DH', hanowa:'DH',
   tamiya:'DA', tanaka:'DA', momo:'DA', guest:'ゲスト'
 };
+Object.assign(STAFF_NAMES,Object.fromEntries(businessRoster.members.map(member => [member.id,member.name])));
+Object.assign(STAFF_ROLES,Object.fromEntries(businessRoster.members.map(member => [member.id,member.role])));
 const CATEGORY_LABELS = {
   uniform:'制服・名札',
   equipment:'使用器材等',
@@ -346,6 +365,7 @@ function init() {
       autoSyncDone = true;
       syncEligibleStatuses();
     }
+    renderStaffOptions();
     renderLoans();
   }, error => {
     document.getElementById('loanList').innerHTML = `<div class="empty">貸付案件を読み込めませんでした: ${esc(error.message)}</div>`;
@@ -393,14 +413,17 @@ function readLocalPasswords() {
   try {
     return JSON.parse(localStorage.getItem('carmia_passwords') || '{}') || {};
   } catch(e) {
+    if (!pageLifecycle.active) return;
     return {};
   }
 }
 
 async function ensurePasswordsLoaded() {
+  if (!pageLifecycle.active) return;
   if (passwordsReady) return;
   try {
     const snap = await get(ref(db, 'passwords'));
+    if (!pageLifecycle.active) return;
     syncedPasswords = { ...readLocalPasswords(), ...(snap.val() || {}) };
     localStorage.setItem('carmia_passwords', JSON.stringify(syncedPasswords));
   } catch(e) {
@@ -426,15 +449,24 @@ function renderAdminState() {
 function renderStaffOptions() {
   const loanStaff = document.getElementById('loanStaff');
   const staffFilter = document.getElementById('staffFilter');
-  const staffEntries = Object.entries(STAFF_NAMES).filter(([id]) => id !== 'guest');
+  const priorSelection = loanStaff?.value || '';
+  const previousFilter = staffFilter?.value || '';
+  const editing = loans.find(loan => loan.id === editingId);
+  const candidates = businessRoster.members.filter(member => member.id !== 'guest' && member.availability !== 'stopped');
+  if (editing?.staffId && !candidates.some(member => member.id === editing.staffId)) candidates.push({id:editing.staffId,label:editing.staffName || editing.staffId});
+  const staffEntries = candidates.map(member => [member.id,member.label || member.name]);
+  const historical = new Map(businessRoster.members.map(member => [member.id,member.label]));
+  for (const loan of loans) if (loan.staffId && !historical.has(loan.staffId)) historical.set(loan.staffId,loan.staffName || loan.staffId);
   if (loanStaff) {
     loanStaff.innerHTML = staffEntries.map(([id, name]) => `<option value="${escAttr(id)}">${esc(name)}（${esc(STAFF_ROLES[id] || '')}）</option>`).join('');
   }
   if (staffFilter) {
-    staffFilter.innerHTML = '<option value="">全スタッフ</option>' + staffEntries
+    staffFilter.innerHTML = '<option value="">全スタッフ</option>' + [...historical]
       .map(([id, name]) => `<option value="${escAttr(id)}">${esc(name)}</option>`)
       .join('');
   }
+  if (loanStaff && priorSelection) loanStaff.value = priorSelection;
+  if (staffFilter) staffFilter.value = previousFilter;
 }
 
 function renderStatusOptions() {
@@ -462,7 +494,9 @@ function updateComputedFields() {
 }
 
 function startNewLoan() {
+  if (!pageLifecycle.active) return;
   editingId = '';
+  renderStaffOptions();
   document.getElementById('formTitle').textContent = '貸付案件を作成';
   document.getElementById('loanForm').reset();
   document.getElementById('initialStatus').value = 'pending_agreement';
@@ -481,9 +515,13 @@ function cancelEdit() {
 }
 
 async function saveLoan(event) {
+  if (!pageLifecycle.active) return;
   event.preventDefault();
   if (!isAdmin()) return setFormStatus('管理者のみ保存できます。', 'err');
   const staffId = document.getElementById('loanStaff').value;
+  if (!businessRoster.complete && (!editingId || staffId !== loans.find(loan => loan.id === editingId)?.staffId)) return setFormStatus('職員名簿を再読み込みしてください', 'err');
+  const originalLoan = loans.find(loan => loan.id === editingId);
+  if (staffId !== originalLoan?.staffId && !businessRoster.members.some(member => member.id === staffId && member.availability !== 'stopped')) return setFormStatus('対象職員を確認してください', 'err');
   const category = document.getElementById('loanCategory').value;
   const amount = Number(document.getElementById('loanAmount').value || 0);
   const originDate = document.getElementById('originDate').value;
@@ -501,7 +539,7 @@ async function saveLoan(event) {
   const now = Date.now();
   const payload = {
     staffId,
-    staffName: STAFF_NAMES[staffId] || staffId,
+    staffName: originalLoan?.staffId === staffId ? (originalLoan.staffName || STAFF_NAMES[staffId] || staffId) : (STAFF_NAMES[staffId] || staffId),
     category,
     categoryLabel: CATEGORY_LABELS[category],
     description,
@@ -524,6 +562,7 @@ async function saveLoan(event) {
       const current = loans.find(loan => loan.id === editingId);
       if (!current || !canEditLoan(current)) throw new Error('この案件は編集できません。');
       await update(ref(db, `${DB_PATH}/${editingId}`), payload);
+      if (!pageLifecycle.active) return;
       setFormStatus('更新しました。', 'ok');
     } else {
       const itemRef = push(ref(db, DB_PATH));
@@ -535,20 +574,24 @@ async function saveLoan(event) {
         createdByName: currentUser.name || STAFF_NAMES[currentUser.staffId] || currentUser.staffId,
         agreementVersion: AGREEMENT_VERSION
       });
+      if (!pageLifecycle.active) return;
       setFormStatus('保存しました。', 'ok');
       document.getElementById('loanForm').reset();
       updateComputedFields();
     }
     editingId = '';
-    setTimeout(() => document.getElementById('loanFormPanel').classList.add('hidden'), 700);
+    pageLifecycle.timeout(() => document.getElementById('loanFormPanel').classList.add('hidden'), 700);
   } catch(error) {
+    if (!pageLifecycle.active) return;
     setFormStatus(`保存できませんでした: ${error.message}`, 'err');
   } finally {
+    if (!pageLifecycle.active) return;
     saveBtn.disabled = false;
   }
 }
 
 function setFormStatus(text, type = '') {
+  if (!pageLifecycle.active) return;
   const el = document.getElementById('formStatus');
   el.textContent = text || '';
   el.className = `status-line ${type}`.trim();
@@ -665,6 +708,7 @@ function editLoan(id) {
   const loan = loans.find(item => item.id === id);
   if (!loan || !canEditLoan(loan)) return;
   editingId = id;
+  renderStaffOptions();
   document.getElementById('formTitle').textContent = '貸付案件を編集';
   document.getElementById('loanStaff').value = loan.staffId || '';
   document.getElementById('loanCategory').value = loan.category || 'uniform';
@@ -680,6 +724,7 @@ function editLoan(id) {
 }
 
 async function setLoanStatus(id, status) {
+  if (!pageLifecycle.active) return;
   if (!isAdmin()) return;
   const loan = loans.find(item => item.id === id);
   if (!loan) return;
@@ -698,6 +743,7 @@ async function setLoanStatus(id, status) {
   if (status === 'repaid') payload.repaidAt = now;
   if (status === 'cancelled') payload.cancelledAt = now;
   await update(ref(db, `${DB_PATH}/${id}`), payload);
+  if (!pageLifecycle.active) return;
 }
 
 function openLoan(id) {
@@ -736,6 +782,7 @@ function closeModalIfBg(event) {
 }
 
 async function agreeLoan() {
+  if (!pageLifecycle.active) return;
   const loan = loans.find(item => item.id === activeLoanId);
   if (!loan || loan.staffId !== currentUser.staffId) return setAgreeStatus('対象案件を確認できません。', 'err');
   if (effectiveStatus(loan) !== 'pending_agreement') return setAgreeStatus('この案件は同意できる状態ではありません。', 'err');
@@ -770,11 +817,14 @@ async function agreeLoan() {
       updatedById: currentUser.staffId,
       updatedByName: currentUser.name || STAFF_NAMES[currentUser.staffId] || currentUser.staffId
     });
+    if (!pageLifecycle.active) return;
     setAgreeStatus('同意を記録しました。', 'ok');
-    setTimeout(closeModal, 900);
+    pageLifecycle.timeout(closeModal, 900);
   } catch(error) {
+    if (!pageLifecycle.active) return;
     setAgreeStatus(`同意を記録できませんでした: ${error.message}`, 'err');
   } finally {
+    if (!pageLifecycle.active) return;
     agreeBtn.disabled = false;
   }
 }
@@ -824,6 +874,7 @@ function effectiveStatus(loan) {
 }
 
 async function syncEligibleStatuses() {
+  if (!pageLifecycle.active) return;
   const targets = loans.filter(loan => loan.status === 'funded' && isDue(loan.exemptionDate));
   for (const loan of targets) {
     try {
@@ -834,7 +885,9 @@ async function syncEligibleStatuses() {
         updatedById: 'portal-auto',
         updatedByName: 'ポータル自動判定'
       });
+      if (!pageLifecycle.active) return;
     } catch(e) {
+    if (!pageLifecycle.active) return;
       console.warn('免除対象の自動更新に失敗しました:', loan.id, e);
     }
   }

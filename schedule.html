@@ -141,6 +141,8 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getDatabase, ref, get, set, update, remove } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+import {loadBusinessRoster} from './portal-business-roster.mjs';
+import {createPageLifecycle} from './portal-page-lifecycle.mjs';
 import { startPortalAuth } from "./portal-auth.js?v=labor-20261014-2";
 
 const firebaseConfig = {
@@ -155,26 +157,21 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
+const rosterPage = createPageLifecycle();
 const authenticatedProfile = await startPortalAuth(app, { pageName:'日程調整' });
+rosterPage.assertActive();
+const businessRoster = await loadBusinessRoster({read:path=>get(ref(db,path)).then(s=>s.val()),profile:authenticatedProfile});
+rosterPage.assertActive();
+if(businessRoster.issues.length) {
+  const warning=document.createElement('p'); warning.setAttribute('role','alert');
+  warning.textContent='名簿の一部が未確認です。表示・候補が最新でない可能性があります。再読み込みしてください。';
+  document.body.prepend(warning);
+}
 
 // ─── スタッフデータ（ポータルと共通） ───────────────────────
-const STAFF = [
-  {id:'sugihira', name:'院長',  role:'DR'},
-  {id:'shimanaka',name:'嶋中',  role:'DR'},
-  {id:'hokari',   name:'保刈',  role:'DR'},
-  {id:'shinoda',  name:'篠田',  role:'DR'},
-  {id:'tsuruta',  name:'鶴田',  role:'DH'},
-  {id:'yoshida',  name:'吉田',  role:'DH'},
-  {id:'takagi',   name:'高木',  role:'DH'},
-  {id:'matsumoto',name:'松本',  role:'DH'},
-  {id:'yamada',   name:'山田',  role:'DH'},
-  {id:'hanowa',   name:'ハノワ',role:'DH'},
-  {id:'tamiya',   name:'田宮',  role:'DA'},
-  {id:'tanaka',   name:'田中',  role:'DA'},
-  {id:'momo',     name:'百々',  role:'DA'},
-];
+const STAFF = businessRoster.members.filter(s=>!['kyosei','guest'].includes(s.id));
 const ADMINS = ['sugihira','momo'];
-const EVENT_STAFF = STAFF.filter(s => s.id !== 'guest');
+const EVENT_STAFF = businessRoster.complete ? STAFF.filter(s => s.availability !== 'stopped') : [];
 
 // ─── State ────────────────────────────────────────────────
 let state = {
@@ -204,6 +201,7 @@ const DB_PATH = 'scheduling/events';
 
 async function loadEvents() {
   const snap = await get(ref(db, DB_PATH));
+  if (!rosterPage.active) return;
   state.events = snap.val() || {};
 }
 
@@ -212,6 +210,7 @@ async function loadEvents() {
 const NOTIFY_URL = 'https://kalmia-notify.chibakenmin-sugihey.workers.dev';
 
 async function sendNotify(text) {
+  if (!rosterPage.active) return;
   try {
     const response = await fetch(NOTIFY_URL, {
       method: 'POST',
@@ -222,8 +221,9 @@ async function sendNotify(text) {
       console.warn('通知失敗');
       return false;
     }
-    return true;
-  } catch(e) { console.warn('通知失敗'); return false; }
+    return rosterPage.active;
+  } catch(e) {
+    if (!rosterPage.active) return; console.warn('通知失敗'); return false; }
 }
 
 
@@ -238,6 +238,7 @@ function scheduleDateKey(now = new Date()) {
 }
 
 async function checkScheduleDeadlines() {
+  if (!rosterPage.active) return;
   if (scheduleDeadlineCheckRunning) return;
   scheduleDeadlineCheckRunning = true;
   try {
@@ -268,18 +269,22 @@ async function checkScheduleDeadlines() {
 
 async function saveEvent(id, ev) {
   await set(ref(db, `${DB_PATH}/${id}`), ev);
+  if (!rosterPage.active) return;
 }
 
 async function saveResponse(eventId, staffId, resMap) {
   await update(ref(db, `${DB_PATH}/${eventId}/responses/${staffId}`), resMap);
+  if (!rosterPage.active) return;
 }
 
 async function deleteEvent(id) {
   await remove(ref(db, `${DB_PATH}/${id}`));
+  if (!rosterPage.active) return;
 }
 
 // ─── 期限切れ未回答を自動で×に ───────────────────────────
 async function autoFillExpired(staffId) {
+  if (!rosterPage.active) return;
   const today = new Date().toISOString().split('T')[0];
   const tasks = [];
 
@@ -298,6 +303,7 @@ async function autoFillExpired(staffId) {
     missing.forEach(d => { patch[d] = 'x'; });
     tasks.push(
       saveResponse(evId, staffId, patch).then(() => {
+        if(!rosterPage.active)return;
         if (!state.events[evId].responses) state.events[evId].responses = {};
         if (!state.events[evId].responses[staffId]) state.events[evId].responses[staffId] = {};
         Object.assign(state.events[evId].responses[staffId], patch);
@@ -306,14 +312,17 @@ async function autoFillExpired(staffId) {
   }
 
   if (tasks.length > 0) await Promise.all(tasks);
+
+  if (!rosterPage.active) return;
 }
 
 
 function toast(msg) {
+  if (!rosterPage.active) return;
   const el = document.getElementById('toast');
   el.textContent = msg;
   el.classList.add('show');
-  setTimeout(() => el.classList.remove('show'), 2000);
+  rosterPage.timeout(() => el.classList.remove('show'), 2000);
 }
 
 // ─── Helpers ──────────────────────────────────────────────
@@ -338,6 +347,7 @@ function fmtDateFull(d) {
   return `${dt.getFullYear()}年${dt.getMonth()+1}月${dt.getDate()}日(${w})`;
 }
 
+function esc(value) {return String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function getStaff(id) { return STAFF.find(s => s.id === id); }
 function isGuestUser() { return state.user?.id === 'guest'; }
 function canManageCurrentEvent() {
@@ -345,7 +355,7 @@ function canManageCurrentEvent() {
   const myId = state.user?.id;
   return !!ev && !isGuestUser() && ((myId === ev.createdBy) || ADMINS.includes(myId));
 }
-function initials(name) { return name.slice(0, 2); }
+function initials(name) { return esc(String(name).slice(0, 2)); }
 
 // 期限の状態を返す: { label, style }
 function deadlineStatus(deadline) {
@@ -361,6 +371,8 @@ function deadlineStatus(deadline) {
 
 // ─── スタッフ選択UI ────────────────────────────────────────
 function renderMemberSelect(selectedSet, prefix) {
+  if(!businessRoster.complete) return '<p>名簿未確認のため対象者の変更はできません。再読み込みしてください。</p>';
+  if (!rosterPage.active) return;
   const roles = { DR: 'DR', DH: 'DH', DA: 'DA' };
   const allSelected = selectedSet.size === 0;
   return `
@@ -370,11 +382,11 @@ function renderMemberSelect(selectedSet, prefix) {
         ${EVENT_STAFF.map(s => {
           const isSel = selectedSet.has(s.id);
           const dotCol = s.role==='DR'?'var(--purple-dark)':s.role==='DH'?'var(--green)':'var(--amber)';
-          return `<div data-mid="${s.id}" data-prefix="${prefix}" class="member-chip ${isSel?'member-chip-sel':''}" style="
+          return `<div data-mid="${esc(s.id)}" data-prefix="${prefix}" class="member-chip ${isSel?'member-chip-sel':''}" style="
             display:flex;align-items:center;gap:5px;padding:5px 10px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;border:1.5px solid ${isSel?'var(--green)':'var(--border)'};background:${isSel?'var(--green-light)':'#fff'};
             -webkit-tap-highlight-color:transparent;">
             <span style="width:7px;height:7px;border-radius:50%;background:${dotCol};display:inline-block;flex-shrink:0"></span>
-            ${s.name}
+            ${esc(s.label || s.name)}
           </div>`;
         }).join('')}
       </div>
@@ -386,10 +398,11 @@ function renderMemberSelect(selectedSet, prefix) {
 
 
 function render() {
+  if (!rosterPage.active) return;
   document.getElementById('header-info').innerHTML = state.user
     ? `<div class="row gap-sm">
         <div class="avatar" style="width:30px;height:30px;font-size:11px;${getAvatarStyle(state.user.role)}">${initials(state.user.name)}</div>
-        <span style="font-size:13px;font-weight:500">${state.user.name}</span>
+        <span style="font-size:13px;font-weight:500">${esc(state.user.label || state.user.name)}</span>
         <span class="badge badge-${state.user.role}">${state.user.role}</span>
       </div>`
     : '';
@@ -410,15 +423,16 @@ function render() {
 
 // ── Staff select ──────────────────────────────────────────
 function renderStaffSelect() {
+  if (!rosterPage.active) return;
   return `
     <div class="card" style="margin-top:8px">
       <div class="card-header"><span style="font-weight:600;font-size:15px">スタッフを選択</span></div>
       <div>
         ${STAFF.map(s => `
-          <div class="staff-item" onclick="selectStaff('${s.id}')">
+          <div class="staff-item" onclick="selectStaff(${esc(JSON.stringify(s.id))})">
             <div class="avatar" style="width:38px;height:38px;font-size:13px;${getAvatarStyle(s.role)}">${initials(s.name)}</div>
             <div style="flex:1">
-              <p style="font-weight:600">${s.name}</p>
+              <p style="font-weight:600">${esc(s.label || s.name)}</p>
             </div>
             <span class="badge badge-${s.role}">${s.role}</span>
           </div>
@@ -429,12 +443,13 @@ function renderStaffSelect() {
 
 // ── PIN entry ─────────────────────────────────────────────
 function renderPinEntry() {
+  if (!rosterPage.active) return;
   const s = state.selectedStaff;
   const f = state.pinInput.length;
   return `
     <div class="pin-wrap">
       <div class="avatar" style="width:60px;height:60px;font-size:20px;${getAvatarStyle(s.role)};margin:0 auto 10px">${initials(s.name)}</div>
-      <p style="font-weight:700;font-size:17px">${s.name}</p>
+      <p style="font-weight:700;font-size:17px">${esc(s.label || s.name)}</p>
       <p style="font-size:12px;color:var(--text-sub);margin-top:4px">${s.role}</p>
       <div class="pin-dots" id="pin-dots">
         ${[0,1,2,3].map(i=>`<div class="pin-dot ${i<f?'filled':''}"></div>`).join('')}
@@ -451,6 +466,7 @@ function renderPinEntry() {
 
 // ── Main view ─────────────────────────────────────────────
 function renderMainView() {
+  if (!rosterPage.active) return;
   const evList = Object.entries(state.events).sort((a,b) => b[1].createdAt - a[1].createdAt);
   const myId = state.user.id;
   const guest = isGuestUser();
@@ -468,7 +484,7 @@ function renderMainView() {
           <div class="event-item" onclick="openEvent('${id}')">
             <div style="flex:1;min-width:0">
               <p style="font-weight:600;font-size:14px;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${ev.name}</p>
-              <p style="font-size:11px;color:var(--text-hint)">${dates.length}件の候補日　作成: ${creator?.name || ev.createdBy}</p>
+              <p style="font-size:11px;color:var(--text-hint)">${dates.length}件の候補日　作成: ${esc(creator?.label || ev.createdBy)}</p>
             </div>
             <div style="text-align:right;flex-shrink:0;margin-left:10px">
               <span class="pill ${guest || answered ? 'pill-done' : 'pill-pending'}">${guest ? '閲覧' : (answered ? '回答済' : '未回答')}</span>
@@ -491,6 +507,7 @@ function renderMainView() {
 
 // ── New event form（カレンダー選択UI） ────────────────────
 function renderNewEventForm() {
+  if (!rosterPage.active) return;
   const today = new Date();
   const y = state.calYear  || today.getFullYear();
   const m = state.calMonth || (today.getMonth() + 1);
@@ -538,6 +555,8 @@ function renderNewEventForm() {
 }
 
 function renderMemberSelector(membersSet, prefix) {
+  if(!businessRoster.complete) return '<p>名簿未確認のため対象者の変更はできません。再読み込みしてください。</p>';
+  if (!rosterPage.active) return;
   const roles = { DR: 'DR', DH: 'DH', DA: 'DA' };
   const groups = { DR: [], DH: [], DA: [] };
   EVENT_STAFF.forEach(s => groups[s.role]?.push(s));
@@ -548,7 +567,7 @@ function renderMemberSelector(membersSet, prefix) {
         ${EVENT_STAFF.map(s => {
           const sel = membersSet.size === 0 || membersSet.has(s.id);
           const bg = s.role==='DR' ? (sel?'var(--purple-dark)':'#ddd') : s.role==='DH' ? (sel?'var(--green)':'#ddd') : (sel?'var(--amber)':'#ddd');
-          return `<div data-mid="${s.id}" style="padding:4px 10px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;background:${bg};color:${sel?'#fff':'#888'};transition:.15s">${s.name}</div>`;
+          return `<div data-mid="${esc(s.id)}" style="padding:4px 10px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;background:${bg};color:${sel?'#fff':'#888'};transition:.15s">${esc(s.label || s.name)}</div>`;
         }).join('')}
       </div>
       <div style="display:flex;gap:8px;margin-top:6px">
@@ -611,6 +630,7 @@ function attachMemberHandlers(membersSet, prefix) {
 
 // ── Event detail ──────────────────────────────────────────
 function renderEventDetail() {
+  if (!rosterPage.active) return;
   const ev = state.events[state.currentEventId];
   if (!ev) return '';
   const myId = state.user.id;
@@ -621,8 +641,8 @@ function renderEventDetail() {
   const creator = getStaff(ev.createdBy);
 
   // 対象メンバー（未設定なら全員）
-  const evMembers = ev.members ? EVENT_STAFF.filter(s => ev.members.includes(s.id)) : EVENT_STAFF;
-  const memberLabel = ev.members ? `対象: ${evMembers.map(s=>s.name).join('・')}` : '対象: 全員';
+  const evMembers = ev.members ? ev.members.map(id => getStaff(id) || {id,name:id,label:id,role:''}) : STAFF;
+  const memberLabel = ev.members ? `対象: ${evMembers.map(s=>esc(s.label || s.name)).join('・')}` : '対象: 全員';
 
   // Summary calc（対象メンバーのみ）
   const summary = dates.map(d => {
@@ -645,7 +665,7 @@ function renderEventDetail() {
     <div class="row flex-between mb12">
       <div>
         <h2 style="font-size:17px;font-weight:700">${ev.name}</h2>
-        <p style="font-size:11px;color:var(--text-hint);margin-top:3px">作成: ${creator?.name||ev.createdBy} ／ ${new Date(ev.createdAt).toLocaleDateString('ja-JP')}</p>
+        <p style="font-size:11px;color:var(--text-hint);margin-top:3px">作成: ${esc(creator?.label || ev.createdBy)} ／ ${new Date(ev.createdAt).toLocaleDateString('ja-JP')}</p>
         <p style="font-size:11px;color:var(--text-hint);margin-top:2px">👥 ${memberLabel}</p>
         ${(() => { const dl = deadlineStatus(ev.deadline); return dl ? `<div style="display:inline-block;margin-top:5px;font-size:11px;font-weight:600;padding:3px 10px;border-radius:10px;${dl.style}">⏰ 回答期限 ${dl.label}</div>` : ''; })()}
       </div>
@@ -748,7 +768,7 @@ function renderEventDetail() {
               const r = responses[s.id] || {};
               return `<tr>
                 <td class="name-col">
-                  <span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${s.role==='DR'?'var(--purple-dark)':s.role==='DH'?'var(--green)':'var(--amber)'};margin-right:5px;vertical-align:middle"></span>${s.name}
+                  <span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${s.role==='DR'?'var(--purple-dark)':s.role==='DH'?'var(--green)':'var(--amber)'};margin-right:5px;vertical-align:middle"></span>${esc(s.label || s.name)}
                 </td>
                 ${dates.map(d => {
                   const v = r[d];
@@ -787,7 +807,7 @@ window.pinKey = (k) => {
   state.pinInput += k;
   render();
   if (state.pinInput.length === 4) {
-    setTimeout(async () => {
+    rosterPage.timeout(async () => {
       // ポータルと同じ: localStorageの変更分を優先
     const storedPasswords = JSON.parse(localStorage.getItem('carmia_passwords') || '{}');
     const correctPin = storedPasswords[state.selectedStaff.id] || state.selectedStaff.pin;
@@ -797,12 +817,13 @@ window.pinKey = (k) => {
         state.tab = 'list';
         state.pinInput = '';
         await loadEvents();
+        if (!rosterPage.active) return;
         render();
       } else {
         state.pinInput = '';
         document.getElementById('pin-err').textContent = 'PINコードが違います';
         document.getElementById('pin-dots')?.classList.add('shake');
-        setTimeout(() => {
+        rosterPage.timeout(() => {
           render();
         }, 600);
       }
@@ -936,6 +957,7 @@ function attachNewEventHandlers() {
   // 作成
   const create = document.getElementById('btn-create-ev');
   if (create) create.addEventListener('click', async () => {
+    if(!rosterPage.active || !businessRoster.complete) {toast('名簿を確認してから再度お試しください');return;}
     if (isGuestUser()) {
       toast('ゲストは閲覧専用です');
       return;
@@ -954,6 +976,7 @@ function attachNewEventHandlers() {
     const members = state.newMembers.size > 0 ? [...state.newMembers] : null;
     const ev = { name, dates, deadline, createdBy: state.user.id, createdAt: Date.now(), responses: {}, ...(members ? {members} : {}) };
     await saveEvent(id, ev);
+    if (!rosterPage.active) return;
     state.events[id] = ev;
     state.tab         = 'list';
     state.newName     = '';
@@ -965,10 +988,12 @@ function attachNewEventHandlers() {
     // LINEワークス通知
     const dateList = dates.slice(0,3).map(d => d.replace(/-/g,'/')).join('・') + (dates.length > 3 ? `他${dates.length-3}件` : '');
     await sendNotify(`🎉 日程調整が作成されました\nイベント：${name}\n候補日：${dateList}\n回答期限：${deadline.replace(/-/g,'/')}\nポータルから回答してください。`);
+    if (!rosterPage.active) return;
   });
 }
 
 window.openEvent = async (id) => {
+  if (!rosterPage.active) return;
   state.currentEventId = id;
   state.pendingRes = {};
   state.view = 'eventDetail';
@@ -1012,6 +1037,7 @@ window.setRes = (date, val) => {
 };
 
 window.doSaveResponse = async () => {
+  if (!rosterPage.active) return;
   if (isGuestUser()) {
     toast('ゲストは閲覧専用です');
     return;
@@ -1021,12 +1047,14 @@ window.doSaveResponse = async () => {
   render();
   try {
     await saveResponse(state.currentEventId, state.user.id, state.pendingRes);
+    if (!rosterPage.active) return;
     if (!state.events[state.currentEventId].responses) state.events[state.currentEventId].responses = {};
     if (!state.events[state.currentEventId].responses[state.user.id]) state.events[state.currentEventId].responses[state.user.id] = {};
     Object.assign(state.events[state.currentEventId].responses[state.user.id], state.pendingRes);
     state.pendingRes = {};
     toast('回答を保存しました');
   } catch(e) {
+    if (!rosterPage.active) return;
     toast('保存に失敗しました');
   }
   state.saving = false;
@@ -1034,6 +1062,7 @@ window.doSaveResponse = async () => {
 };
 
 window.toggleDecide = async (date) => {
+  if (!rosterPage.active) return;
   const ev = state.events[state.currentEventId];
   if (!canManageCurrentEvent()) {
     toast('操作できません');
@@ -1049,6 +1078,7 @@ window.toggleDecide = async (date) => {
   }
   const val = next.length === 0 ? null : next;
   await update(ref(db, `${DB_PATH}/${state.currentEventId}`), { decided: val });
+  if (!rosterPage.active) return;
   state.events[state.currentEventId].decided = val;
   render();
   toast(next.includes(date) ? `${fmtDate(date)}を決定に追加しました` : `${fmtDate(date)}の決定を取り消しました`);
@@ -1056,16 +1086,19 @@ window.toggleDecide = async (date) => {
   if (next.includes(date)) {
     const evName = state.events[state.currentEventId]?.name || '';
     await sendNotify(`✅ 日程が決定しました\nイベント：${evName}\n開催日：${fmtDate(date)}`);
+    if (!rosterPage.active) return;
   }
 };
 
 window.doUndecide = async () => {
+  if (!rosterPage.active) return;
   if (!canManageCurrentEvent()) {
     toast('操作できません');
     return;
   }
   if (!confirm('全ての決定を取り消しますか？')) return;
   await update(ref(db, `${DB_PATH}/${state.currentEventId}`), { decided: null });
+  if (!rosterPage.active) return;
   state.events[state.currentEventId].decided = null;
   render();
   toast('決定を取り消しました');
@@ -1092,6 +1125,7 @@ window.openEditEvent = () => {
 };
 
 function renderEditEventForm() {
+  if (!rosterPage.active) return;
   const y = state.calYear;
   const m = state.calMonth;
   return `
@@ -1183,6 +1217,7 @@ function attachEditEventHandlers() {
 
   const save = document.getElementById('edit-save-btn');
   if (save) save.addEventListener('click', async () => {
+    if(!rosterPage.active || !businessRoster.complete) {toast('名簿を確認してから再度お試しください');return;}
     const nameEl = document.getElementById('edit-ev-name');
     const dlEl   = document.getElementById('edit-deadline');
     const name     = nameEl ? nameEl.value.trim() : '';
@@ -1195,6 +1230,7 @@ function attachEditEventHandlers() {
     const members = state.editMembers.size > 0 ? [...state.editMembers] : null;
     const patch = { name, dates, deadline, ...(members ? {members} : {members: null}) };
     await update(ref(db, `${DB_PATH}/${state.currentEventId}`), patch);
+    if (!rosterPage.active) return;
     Object.assign(state.events[state.currentEventId], patch);
     state.view = 'eventDetail';
     render();
@@ -1208,12 +1244,14 @@ window.cancelEditEvent = () => {
 };
 
 window.doDeleteEvent = async () => {
+  if (!rosterPage.active) return;
   if (isGuestUser() || !ADMINS.includes(state.user?.id)) {
     toast('操作できません');
     return;
   }
   if (!confirm(`「${state.events[state.currentEventId]?.name}」を削除しますか？`)) return;
   await deleteEvent(state.currentEventId);
+  if (!rosterPage.active) return;
   delete state.events[state.currentEventId];
   state.view = 'main';
   state.currentEventId = null;
@@ -1234,9 +1272,11 @@ window.doDeleteEvent = async () => {
         document.body.classList.toggle('guest-readonly', isGuestUser());
         render();
         await loadEvents();
+        if (!rosterPage.active) return;
 
         // 期限切れ未回答を自動で×に
         if (!isGuestUser()) await autoFillExpired(staff.id);
+        if (!rosterPage.active) return;
 
         // 回答期限前日通知チェック
         if (!isGuestUser()) checkScheduleDeadlines();

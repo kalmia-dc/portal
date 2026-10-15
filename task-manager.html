@@ -927,10 +927,17 @@
 
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getDatabase, ref, push, set, remove, onValue, get }
+import { getDatabase, ref, push as firebasePush, set as firebaseSet, remove as firebaseRemove, onValue as firebaseOnValue, get as firebaseGet }
   from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 import { startPortalAuth } from './portal-auth.js?v=labor-20261014-2';
 
+import { createPageLifecycle } from './portal-page-lifecycle.mjs';
+import { loadBusinessRoster } from './portal-business-roster.mjs';
+const pageLifecycle = createPageLifecycle();
+const activeCall = fn => async (...args) => { pageLifecycle.assertActive(); const value=await fn(...args); pageLifecycle.assertActive(); return value; };
+const fetch=activeCall(globalThis.fetch.bind(globalThis));
+const get=activeCall(firebaseGet), set=activeCall(firebaseSet), push=activeCall(firebasePush), remove=activeCall(firebaseRemove);
+const onValue = (query, next, error) => pageLifecycle.add(firebaseOnValue(query, pageLifecycle.guard(next), pageLifecycle.guard(error || (() => {}))));
 // ===== FIREBASE =====
 const firebaseConfig = {
   apiKey:            'AIzaSyDdMe7feUF6CKPHH0YIx7Suk-WnXtOYUu8',
@@ -944,6 +951,9 @@ const firebaseConfig = {
 const fbApp = initializeApp(firebaseConfig);
 const db    = getDatabase(fbApp);
 const authenticatedProfile = await startPortalAuth(fbApp, { pageName:'タスク管理' });
+pageLifecycle.assertActive();
+const businessRoster = await loadBusinessRoster({read: path => get(ref(db, path)).then(s => s.val()), profile: authenticatedProfile});
+pageLifecycle.assertActive();
 
 // ===== GOOGLE TASKS =====
 const GCLIENT_ID = '218253038073-v3nrmbet629g11ljjd1t0rqbn6t4evpr.apps.googleusercontent.com';
@@ -953,16 +963,14 @@ let tokenClient  = null;
 let gsiReady     = false;
 
 // ===== STAFF =====
-const STAFF = {
-  DR: ['院長','嶋中','保刈','篠田'],
-  DH: ['鶴田','吉田','高木','松本','山田','ハノワ'],
-  DA: ['田宮','田中','百々']
-};
+const STAFF = {};
+for (const member of businessRoster.members.filter(m => m.availability !== 'stopped')) (STAFF[member.role] ||= []).push(member.name);
 const ROLE_OF = {};
 Object.entries(STAFF).forEach(([role, names]) => names.forEach(n => ROLE_OF[n] = role));
 
 // ===== ユーザー特定 =====
 function resolveUser() {
+  if (authenticatedProfile?.staffId) return authenticatedProfile;
   try {
     const saved = sessionStorage.getItem('portalUser');
     if (saved) { const u = JSON.parse(saved); if (u.name) return u; }
@@ -1050,6 +1058,7 @@ function setupGoogleForUser() {
       client_id: GCLIENT_ID,
       scope: GSCOPE,
       callback: async (resp) => {
+        if (!pageLifecycle.active) return;
         if (resp.error) { showToast('Googleサインインに失敗しました'); return; }
         gAccessToken = resp.access_token;
         sessionStorage.setItem('gAccessTokenOwner', googleTokenOwnerKey());
@@ -1084,7 +1093,7 @@ function setupGoogleForUser() {
 function waitForGsi() {
   return new Promise(resolve => {
     if (typeof google !== 'undefined' && google.accounts) { resolve(); return; }
-    const interval = setInterval(() => {
+    const interval = pageLifecycle.interval(() => {
       if (typeof google !== 'undefined' && google.accounts) { clearInterval(interval); resolve(); }
     }, 200);
   });
@@ -1164,6 +1173,7 @@ window.syncGoogleTasks = async function() {
         priority:     'med',
         status:       gt.status === 'completed' ? '完了' : '未着手',
         assignees:    [taskAssigneeName()],
+        assigneeRefs: [{staffId:currentUser.staffId || "",name:taskAssigneeName()}],
         tags:         [`Gタスク`, gt._listTitle].filter(Boolean),
         googleTaskId: gt.id,
         googleListId: gt._listId,
@@ -1184,7 +1194,7 @@ window.syncGoogleTasks = async function() {
     const msg = imported > 0 ? `${imported}件のGoogleタスクを取り込みました` : 'Googleタスクと同期済み';
     banner.textContent = `✅ ${msg}`;
     showToast(msg);
-    setTimeout(() => { banner.textContent = 'Googleタスクと連携中'; }, 3000);
+    pageLifecycle.timeout(() => { banner.textContent = 'Googleタスクと連携中'; }, 3000);
 
   } catch(e) {
     console.error(e);
@@ -1445,7 +1455,7 @@ function getFiltered() {
     const isRelated = currentUser && (() => {
       const name = currentUser.name;
       // ① 自分が担当
-      if ((t.assignees||[]).includes(name)) return true;
+      if (taskAssignedTo(t)) return true;
       // ② 自分が作成（通常 or Google取込）
       if (t.createdBy === name) return true;
       if (t.createdBy === `${name}（Google）`) return true;
@@ -1454,7 +1464,7 @@ function getFiltered() {
     if (!isRelated) return false;
 
     if (currentFilter === 'all')     return true;
-    if (currentFilter === 'mine')    return (t.assignees||[]).includes(currentUser.name);
+    if (currentFilter === 'mine')    return taskAssignedTo(t);
     if (currentFilter === 'overdue') return isOverdue(t.date) && t.status !== '完了';
     if (currentFilter === 'high')    return t.priority === 'high';
     if (BOARD_STATUSES.includes(currentFilter)) return normalizeStatus(t.status) === currentFilter;
@@ -1471,7 +1481,8 @@ function getFiltered() {
 }
 
 // ===== RENDER =====
-function render() { renderStats(); currentView==='board' ? renderBoard() : renderList(); }
+function render() {
+  if (!pageLifecycle.active) return; renderStats(); currentView==='board' ? renderBoard() : renderList(); }
 
 function renderStats() {
   const all = Object.values(tasks);
@@ -1479,11 +1490,11 @@ function renderStats() {
 
   const related = isEveryone ? all : (currentUser ? all.filter(t => {
     const name = currentUser.name;
-    return (t.assignees||[]).includes(name) ||
+    return taskAssignedTo(t) ||
            t.createdBy === name ||
            t.createdBy === `${name}（Google）`;
   }) : []);
-  const mine      = currentUser ? related.filter(t => (t.assignees||[]).includes(currentUser.name)) : [];
+  const mine      = currentUser ? related.filter(t => taskAssignedTo(t)) : [];
   const incomplete = related.filter(t => t.status !== '完了').length;
   const overdue    = related.filter(t => isOverdue(t.date) && t.status !== '完了').length;
 
@@ -1518,7 +1529,7 @@ function taskCardHtml(t) {
   const priCls={high:'badge-high',med:'badge-med',low:'badge-low'};
   const priLbl={high:'高',med:'中',low:'低'};
   const tags  = (t.tags||[]).map(g=>`<span class="tag">${esc(g)}</span>`).join('');
-  const chips = assigneeChips(t.assignees);
+  const chips = assigneeChips(t.assignees) + (taskAssigneeRows(t).some(r => !r.staffId) ? '<span class="assignee-chip">未紐付けの履歴</span>' : '');
   const isDone = status === '完了';
   const gIcon  = t.googleTaskId ? `<span style="font-size:10px;color:#4285f4;margin-left:2px;">G</span>` : '';
   const latestLog = latestProgress(t.progressLogs);
@@ -1528,7 +1539,7 @@ function taskCardHtml(t) {
   // タスク種別ラベル
   const myName = currentUser?.name || '';
   const isMeCreated  = t.createdBy === myName || t.createdBy === `${myName}（Google）`;
-  const isMeAssigned = (t.assignees||[]).includes(myName);
+  const isMeAssigned = taskAssignedTo(t);
   const assigneesWithoutMe = (t.assignees||[]).filter(n => n !== myName);
   let typeLabel = '';
   if (isMeCreated && isMeAssigned && assigneesWithoutMe.length === 0) {
@@ -1597,7 +1608,7 @@ function renderList() {
     const dl = daysLeft(t.date);
     let ds = '';
     if (t.date) ds = od?`⚠ ${fmtDate(t.date)} 期限切れ`:isToday(t.date)?'今日':dl!==null&&dl<=3?`あと${dl}日`:fmtDate(t.date)+'期限';
-    const chips = assigneeChips(t.assignees);
+    const chips = assigneeChips(t.assignees) + (taskAssigneeRows(t).some(r => !r.staffId) ? '<span class="assignee-chip">未紐付けの履歴</span>' : '');
     const latestLog = latestProgress(t.progressLogs);
     const repeatBadge = recurrenceBadge(t.recurrence);
     return `<div class="list-item pri-${t.priority} ${od?'overdue':''}" onclick="window._openTask('${t.id}')">
@@ -1619,18 +1630,34 @@ function renderList() {
 }
 
 // ===== ASSIGNEE GRID =====
-function buildAssigneeGrid() {
-  let html = '';
-  for (const [role, names] of Object.entries(STAFF)) {
-    html += `<div class="assignee-role-group role-${role.toLowerCase()}">
-      <div class="assignee-role-label">${role}</div><div class="assignee-grid">`;
-    for (const name of names) {
-      html += `<input type="checkbox" class="assignee-checkbox" id="asgn_${name}" value="${name}">
-               <label for="asgn_${name}" class="assignee-label">${name}</label>`;
-    }
-    html += '</div></div>';
+function taskAssignedTo(task, user = currentUser) {
+  if (!user) return false;
+  // Unlinked legacy names retain display-filter compatibility only; no ID is inferred or saved.
+  if (Array.isArray(task.assigneeRefs)) return task.assigneeRefs.some(r => r.staffId ? r.staffId === user.staffId : r.name === user.name);
+  return (task.assignees || []).includes(user.name); // legacy display/filter compatibility only
+}
+function taskAssigneeRows(task = {}) {
+  // Explicit references only. Never infer an ID from an old name.
+  if (Array.isArray(task.assigneeRefs)) return task.assigneeRefs.map(r => ({staffId:r.staffId || '', name:r.name || ''}));
+  return (task.assignees || []).map(name => ({staffId:'', name}));
+}
+function buildAssigneeGrid(task = {}) {
+  const selected = taskAssigneeRows(task);
+  const rows = businessRoster.members.filter(m => m.availability !== 'stopped').map(m => ({staffId:m.id,name:m.name,label:m.label}));
+  for (const saved of selected) {
+    const index = saved.staffId ? rows.findIndex(r => r.staffId === saved.staffId) : -1;
+    if (index >= 0) rows[index] = {...rows[index], name:saved.name}; // preserve historical snapshot
+    else rows.push({...saved,label:saved.name + (saved.staffId ? '（履歴）' : '（未紐付け）')});
   }
-  document.getElementById('assigneeGrid').innerHTML = html;
+  const grid = document.getElementById('assigneeGrid');
+  grid.replaceChildren();
+  rows.forEach((row, index) => {
+    const cb = document.createElement('input'); cb.type='checkbox'; cb.className='assignee-checkbox'; cb.id='asgn_'+index;
+    cb.value=row.name; cb.dataset.staffId=row.staffId;
+    cb.checked=selected.some(r => row.staffId ? r.staffId===row.staffId : !r.staffId && r.name===row.name);
+    const label=document.createElement('label'); label.htmlFor=cb.id; label.className='assignee-label'; label.textContent=row.label;
+    grid.append(cb,label);
+  });
 }
 
 // ===== MODAL =====
@@ -1640,6 +1667,7 @@ function openModal(id = null) {
     return;
   }
   editingId = id;
+  buildAssigneeGrid(id ? tasks[id] : {});
   if (id && tasks[id]) {
     const t = tasks[id];
     document.getElementById('modalTitle').textContent = 'タスクを編集';
@@ -1653,7 +1681,7 @@ function openModal(id = null) {
     const normalizedStatus = normalizeStatus(t.status);
     const formStatus = ACTIVE_STATUSES.includes(normalizedStatus) || normalizedStatus === '完了' ? normalizedStatus : '未着手';
     document.querySelector(`input[name="status"][value="${formStatus}"]`).checked = true;
-    document.querySelectorAll('.assignee-checkbox').forEach(cb => { cb.checked = (t.assignees||[]).includes(cb.value); });
+
     document.getElementById('progressLogList').innerHTML = renderProgressLogs(t.progressLogs);
     document.getElementById('fProgress').value = '';
     document.getElementById('btnDelete').style.display = '';
@@ -1703,7 +1731,7 @@ function openModal(id = null) {
   }
   setModalReadonly(isGuestUser());
   document.getElementById('overlay').classList.add('open');
-  if (!isGuestUser()) setTimeout(() => document.getElementById('fTitle').focus(), 300);
+  if (!isGuestUser()) pageLifecycle.timeout(() => document.getElementById('fTitle').focus(), 300);
 }
 
 function closeModal() { document.getElementById('overlay').classList.remove('open'); editingId = null; }
@@ -1875,6 +1903,7 @@ async function flushNotifyQueue() {
     }
     saveNotifyQueue(remaining);
   } finally {
+    if (!pageLifecycle.active) return;
     releaseLocalStorageLock(NOTIFY_FLUSH_LOCK_KEY, flushToken);
   }
 }
@@ -1903,6 +1932,7 @@ async function sendNotify(text, id = '') {
     console.warn('通知失敗:', e);
     return false;
   } finally {
+    if (!pageLifecycle.active) return;
     releaseLocalStorageLock(sendLockKey, sendToken);
   }
 }
@@ -1916,7 +1946,7 @@ function scheduleDeadlineCheck() {
     ? 1500
     : msUntilNextNotifyWindow(now, isNotifyWindow(now));
 
-  deadlineCheckTimer = setTimeout(async () => {
+  deadlineCheckTimer = pageLifecycle.timeout(async () => {
     await flushNotifyQueue();
     await checkTaskDeadlines();
     scheduleDeadlineCheck();
@@ -1926,7 +1956,7 @@ function scheduleDeadlineCheck() {
 function startTaskMaintenance() {
   if (taskMaintenanceStarted || !currentUser) return;
   taskMaintenanceStarted = true;
-  setTimeout(async () => { await cleanupCompletedExpired(); }, 1500);
+  pageLifecycle.timeout(async () => { await cleanupCompletedExpired(); }, 1500);
 }
 
 // タスク期限通知（8:00〜19:00内で1日1回。期限切れは完了まで毎日）
@@ -1968,7 +1998,7 @@ async function checkTaskDeadlines() {
 
   for (const [tid, t] of Object.entries(tasks)) {
     if (t.status === '完了') continue;
-    if (!(t.assignees||[]).includes(userName)) continue;
+    if (!taskAssignedTo(t)) continue;
     if (notified.has(tid)) continue; // 今日すでに通知済み
 
     const assigneeStr = (t.assignees||[]).join('・') || '未設定';
@@ -1994,7 +2024,8 @@ async function saveTask() {
   if (!dateVal && !editingId) { showToast('期限を入力してください'); return; }
   const recurrence = normalizeRecurrence(document.getElementById('fRecurrence').value);
   if (recurrence !== 'none' && !dateVal) { showToast('繰り返しタスクには期限が必要です'); return; }
-  const assignees = [...document.querySelectorAll('.assignee-checkbox:checked')].map(cb => cb.value);
+  const assigneeRefs = [...document.querySelectorAll('.assignee-checkbox:checked')].map(cb => ({staffId:cb.dataset.staffId || '', name:cb.value}));
+  const assignees = assigneeRefs.map(r => r.name);
   if (!assignees.length) { showToast('担当者を1人以上選択してください'); return; }
   const newStatus = document.querySelector('input[name="status"]:checked').value;
   const now = Date.now();
@@ -2008,9 +2039,11 @@ async function saveTask() {
     priority:  document.querySelector('input[name="priority"]:checked').value,
     status:    newStatus,
     assignees,
+    assigneeRefs,
     tags:      document.getElementById('fTags').value.split(',').map(t=>t.trim()).filter(Boolean),
     updatedAt: now,
     updatedBy: currentUser?.name||'不明',
+    updatedByStaffId: currentUser?.staffId || '',
   };
   saving = true;
   document.getElementById('btnSave').disabled = true;
@@ -2063,6 +2096,7 @@ async function saveTask() {
     } else {
       data.createdAt = now;
       data.createdBy = currentUser?.name||'不明';
+      data.createdByStaffId = currentUser?.staffId || '';
       if (recurrence !== 'none') {
         const dateParts = parseDateParts(dateVal);
         data.recurrenceAnchorDay = dateParts.day;
@@ -2078,7 +2112,7 @@ async function saveTask() {
     }
     closeModal();
   } catch(e) { showToast('保存に失敗しました'); }
-  finally { saving = false; document.getElementById('btnSave').disabled = false; }
+  finally { saving = false; if (pageLifecycle.active) document.getElementById('btnSave').disabled = false; }
 }
 
 async function deleteTask() {
@@ -2103,9 +2137,10 @@ function setView(v) {
 }
 
 function showToast(msg) {
+  if (!pageLifecycle.active) return;
   const t = document.getElementById('toast');
   t.textContent = msg; t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 2800);
+  pageLifecycle.timeout(() => t.classList.remove('show'), 2800);
 }
 
 function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
@@ -2138,6 +2173,7 @@ async function createNextRecurringTask(taskId, task, now = Date.now()) {
     priority: freshTask.priority || 'med',
     status: '未着手',
     assignees: Array.isArray(freshTask.assignees) ? freshTask.assignees : [],
+    assigneeRefs: taskAssigneeRows(freshTask),
     tags: Array.isArray(freshTask.tags) ? freshTask.tags : [],
     recurrence,
     recurrenceAnchorDay: Number(freshTask.recurrenceAnchorDay) || parseDateParts(freshTask.date).day,
@@ -2181,6 +2217,7 @@ async function toggleTaskCompletion(taskId) {
   } catch(e) {
     showToast('更新に失敗しました');
   } finally {
+    if (!pageLifecycle.active) return;
     taskStatusUpdateInFlight.delete(taskId);
   }
 }

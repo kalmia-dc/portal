@@ -19,7 +19,9 @@ async function refreshShiftMembers(){
   if(!window._fb?.shiftConnected||!window._fb.readMembersFromServer)throw Error('メンバーの最新状態を確認できません。接続を確認してください。');
   try{
     const data=await window._fb.readMembersFromServer();
+    window.shiftPageLifecycle?.assertActive();
     if(window._fb.readLifecycleFromServer){shiftLifecycle=await window._fb.readLifecycleFromServer();shiftLifecycleLoaded=true;}
+    window.shiftPageLifecycle?.assertActive();
     if(!window._fb.shiftConnected)throw Error('offline');
     receiveShiftMembers(data);redrawShiftMemberViews();
   }catch(e){shiftLifecycleLoaded=false;shiftMembersLoaded=false;shiftMembersVersion++;redrawShiftMemberViews();throw e;}
@@ -71,7 +73,7 @@ function renderShiftStaffVisibility(){
   status.textContent=!shiftMembersLoaded?'解除状態を確認できていないため、全員を表示しています。登録時は最新状態を確認します。':
     showRevokedShiftStaff?'解除・要確認のスタッフ '+count+'人を含めて表示中です。':'解除・要確認のスタッフ '+count+'人を非表示にしています。';
 }
-function redrawShiftMemberViews(){if(currentUser?.role==='admin')render();}
+function redrawShiftMemberViews(){if(window.portalAccessLost)return;if(currentUser?.role==='admin')render();}
 
 function snapshotLaborOutsidePeriods(){const saved={};for(const staff of STAFF){if(!shiftLifecycle[staff.id]?.hrManaged)continue;for(let d=1;d<=daysInMonth(currentYear,currentMonth);d++){const ds=dateStr(currentYear,currentMonth,d);if(!laborShiftPeriod(staff.id,ds))(saved[staff.id]??={})[ds]={key:shiftData[staff.id]?.[ds]??null,time:structuredClone(shiftData.__manualTimes?.[staff.id]?.[ds]??null)};}}return saved;}
 function restoreLaborOutsidePeriods(saved){for(const [sid,dates]of Object.entries(saved))for(const [ds,e]of Object.entries(dates)){if(e.key)(shiftData[sid]??={})[ds]=e.key;else if(shiftData[sid])delete shiftData[sid][ds];if(e.time)((shiftData.__manualTimes??={})[sid]??={})[ds]=e.time;else if(shiftData.__manualTimes?.[sid])delete shiftData.__manualTimes[sid][ds];}}

@@ -1,13 +1,13 @@
 import {approveApplication} from './portal-join-model.mjs';
 import {staffNameKey} from './portal-roster-model.mjs';
 import {defaultStaff} from './portal-default-staff.mjs';
-export function setupJoinAdmin({actor,db,api,lock,isBusy,message,reloadManagement}) {
+export function setupJoinAdmin({actor,db,page={active:true},api,lock,isBusy,message,reloadManagement}) {
   const {get,ref,update,serverTimestamp}=api,$=id=>document.getElementById(id);
   let roster=[],selected=null,saving=false,completed=false,newStaffId='';
   $('registrationUrl').value=new URL('./google-account-register.html',location.href).href.split('?')[0];
   $('copyRegistrationUrl').addEventListener('click',async()=>{
-    try{await navigator.clipboard.writeText($('registrationUrl').value);$('copyRegistrationStatus').textContent='登録URLをコピーしました。本人へ渡してください。';}
-    catch{$('registrationUrl').select();$('copyRegistrationStatus').textContent='URLを選択しました。コピーして本人へ渡してください。';}
+    try{await navigator.clipboard.writeText($('registrationUrl').value);if(!page.active)return;$('copyRegistrationStatus').textContent='登録URLをコピーしました。本人へ渡してください。';}
+    catch{if(!page.active)return;$('registrationUrl').select();$('copyRegistrationStatus').textContent='URLを選択しました。コピーして本人へ渡してください。';}
   });
   function modeChanged() {
     const existing=$('joinMode').value==='existing';$('joinExistingLabel').hidden=!existing;$('joinTypeLabel').hidden=existing;
@@ -70,14 +70,16 @@ export function setupJoinAdmin({actor,db,api,lock,isBusy,message,reloadManagemen
     }
   });
   return {async load(currentRoster) {
+    if(!page.active)return new Set();
     roster=currentRoster;$('joinRequests').replaceChildren();
     if(actor.portalRole!=='admin')return new Set();
     try {
       const requests=(await get(ref(db,'portalJoinRequests'))).val()||{};
+      if(!page.active)return new Set();
       const pending=Object.values(requests).filter(r=>r.state==='pending');
       $('joinStatus').textContent=pending.length?`${pending.length}件の申請があります。本人のメールアドレスを照合して承認してください。`:'承認待ちの申請はありません。';
       for(const request of pending){const row=document.createElement('div');row.className='row';const p=document.createElement('p');p.textContent=`${request.name}（${request.jobRole}） / ${request.email}`;const b=document.createElement('button');b.type='button';b.textContent='確認して承認';b.addEventListener('click',()=>{$('submitJoinApproval').hidden=false;open(request)});row.append(p,b);$('joinRequests').append(row);}
       return new Set(Object.keys(requests));
-    } catch{$('joinStatus').textContent='本人からの申請を読み込めません。通信状況・申請用DBルールを確認してください。以前のログイン申請は下で確認できます。';return new Set();}
+    } catch{if(!page.active)return new Set();$('joinStatus').textContent='本人からの申請を読み込めません。通信状況・申請用DBルールを確認してください。以前のログイン申請は下で確認できます。';return new Set();}
   }};
 }

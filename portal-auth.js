@@ -123,10 +123,13 @@ function authErrorMessage(error) {
 
 function waitForAuthUser(auth) {
   return new Promise((resolve, reject) => {
-    const unsubscribe = onAuthStateChanged(auth, user => {
-      unsubscribe();
+    let unsubscribe, received=false;
+    unsubscribe = onAuthStateChanged(auth, user => {
+      received=true;
+      unsubscribe?.();
       resolve(user);
     }, reject);
+    if(received)unsubscribe();
   });
 }
 
@@ -197,11 +200,14 @@ export async function startPortalAuth(app, { pageName = document.title } = {}) {
       { label:'Googleアカウントでログイン', onClick:() => requestGoogleSignIn(auth) },
     ]);
     user = await new Promise((resolve, reject) => {
-      const unsubscribe = onAuthStateChanged(auth, nextUser => {
+      let unsubscribe, received=false;
+      unsubscribe = onAuthStateChanged(auth, nextUser => {
         if (!nextUser) return;
-        unsubscribe();
+        received=true;
+        unsubscribe?.();
         resolve(nextUser);
       }, reject);
+      if(received)unsubscribe();
     });
   }
 
@@ -212,11 +218,12 @@ export async function startPortalAuth(app, { pageName = document.title } = {}) {
   }
 
   laborServerOffset=await new Promise((resolve,reject)=>onValue(ref(db,'.info/serverTimeOffset'),s=>resolve(s.val()||0),reject,{onlyOnce:true}));laborSetTime(Date.now()+(typeof laborServerOffset==='number'?laborServerOffset:0));
-  onValue(ref(db,'.info/serverTimeOffset'),s=>{laborServerOffset=s.val()||0;laborSetTime(Date.now()+(typeof laborServerOffset==='number'?laborServerOffset:0));});
+  const offServerClock=onValue(ref(db,'.info/serverTimeOffset'),s=>{laborServerOffset=s.val()||0;laborSetTime(Date.now()+(typeof laborServerOffset==='number'?laborServerOffset:0));});
   let profile;
   try {
     profile = await loadApprovedProfile(db, user);
   } catch (error) {
+    offServerClock();
     clearPortalProfile();
     showCard('利用許可を確認できません', '<p>通信状況を確認して、再読み込みしてください。</p>', [
       { label:'再読み込み', onClick:() => location.reload() },
@@ -224,6 +231,7 @@ export async function startPortalAuth(app, { pageName = document.title } = {}) {
     throw error;
   }
   if (!profile) {
+    offServerClock();
     clearPortalProfile();
     await recordAccessRequest(db, user, pageName);
     showCard('登録確認中です', `<p><strong>${escapeHtml(user.email || user.displayName || 'このGoogleアカウント')}</strong> は、まだポータル利用許可に登録されていません。</p><p>初めて利用する方は、下の登録申請フォームで氏名と職種を入力してください。管理者が本人のメールアドレスと登録内容を確認して承認します。申請済みの方は承認をお待ちください。</p><p class="portal-auth-note">許可された後、このページを再読み込みしてください。登録済みの場合は、管理者へ表示内容をご連絡ください。</p>`, [
@@ -237,7 +245,7 @@ export async function startPortalAuth(app, { pageName = document.title } = {}) {
   window.portalAuth = Object.freeze({ auth, user, profile });
   window.portalSignOut = signOutPortal;
   document.getElementById(OVERLAY_ID)?.remove();
-  window.dispatchEvent(new CustomEvent('portalAuthReady', { detail: profile }));
+
   const lockedElements = new Map();
   const lockForConnection = () => {
     document.querySelectorAll('dialog[open]').forEach(dialog => dialog.close('cancel'));
@@ -267,6 +275,8 @@ export async function startPortalAuth(app, { pageName = document.title } = {}) {
       document.getElementById(OVERLAY_ID)?.remove();
     },
     invalidate:() => {
+      window.portalAccessLost = true;
+      offServerClock();
       window.dispatchEvent(new CustomEvent('portalAccessLost'));
       clearPortalProfile();
       window.portalAuth = undefined;
@@ -277,6 +287,8 @@ export async function startPortalAuth(app, { pageName = document.title } = {}) {
       void signOut(auth).catch(() => {});
     },
   });
+  if(window.portalAccessLost)return new Promise(()=>{});
+  window.dispatchEvent(new CustomEvent('portalAuthReady', { detail: profile }));
   return profile;
 }
 

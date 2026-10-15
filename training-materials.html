@@ -254,8 +254,12 @@ body.viewer-open{overflow:hidden}
 </div>
 
 <script type="module">
+import {createPageLifecycle} from './portal-page-lifecycle.mjs';
+const pageLifecycle=createPageLifecycle();
+async function pageAwait(work){pageLifecycle.assertActive();let result;try{result=await work();}catch(error){pageLifecycle.assertActive();throw error;}pageLifecycle.assertActive();return result;}
+
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getDatabase, ref, push, set, update, remove, onValue, get }
+import { getDatabase, ref, push, set, update, remove, onValue as firebaseOnValue, get }
   from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 import { startPortalAuth } from './portal-auth.js?v=labor-20261014-2';
 import { getStorage, ref as storageRef, uploadBytes, uploadBytesResumable, getDownloadURL, deleteObject }
@@ -274,7 +278,7 @@ const firebaseConfig = {
 const fbApp = initializeApp(firebaseConfig);
 const db = getDatabase(fbApp);
 const storage = getStorage(fbApp);
-const authenticatedProfile = await startPortalAuth(fbApp, { pageName:'研修資料' });
+const authenticatedProfile = await pageAwait(async () => (startPortalAuth(fbApp, { pageName:'研修資料' })));
 const DB_PATH = 'trainingMaterials';
 const CATEGORY_DB_PATH = 'trainingMaterialCategories';
 const MEETING_SOURCE_PATHS = { task:'meetingManagement/tasks', notice:'meetingManagement/notices' };
@@ -313,7 +317,7 @@ document.querySelectorAll('input[name="materialMode"]').forEach(input => {
 });
 document.getElementById('materialFile')?.addEventListener('change', updateFileHint);
 document.addEventListener('keydown', event => {
-  if (event.key === 'Escape') window.closeMaterialViewer();
+  if (pageLifecycle.active && event.key === 'Escape') window.closeMaterialViewer();
 });
 document.getElementById('newMaterialCategory')?.addEventListener('keydown', event => {
   if (event.key !== 'Enter') return;
@@ -461,7 +465,7 @@ function renderCategoryControls(selectedMaterialCategory, selectedFilterCategory
   }
 }
 
-window.addMaterialCategory = async function() {
+window.addMaterialCategory = async function() {try{
   if (!isAdmin()) return setCategoryStatus('カテゴリ追加は管理者のみ可能です。', 'err');
 
   const input = document.getElementById('newMaterialCategory');
@@ -476,24 +480,25 @@ window.addMaterialCategory = async function() {
   try {
     const now = Date.now();
     const categoryRef = push(ref(db, CATEGORY_DB_PATH));
-    await set(categoryRef, {
+    await pageAwait(async () => (set(categoryRef, {
       name: category,
       createdAt: now,
       createdBy: currentUser?.name || '不明',
       createdById: currentStaffId()
-    });
+    })));
     input.value = '';
     materialCategories = normalizeMaterialCategories([...materialCategories, category]);
     renderCategoryControls(category, document.getElementById('categoryFilter')?.value);
     setCategoryStatus('追加しました。', 'ok');
-  } catch(error) {
+  } catch(error) {if (pageLifecycle.active) {
     setCategoryStatus(`追加できませんでした: ${error.message}`, 'err');
-  } finally {
+  }} finally {if (pageLifecycle.active) {
     button.disabled = false;
-  }
-};
+  }}
+}catch(error){if(error?.code!=='portal/access-lost')throw error;}};
 
 function setCategoryStatus(text, type = '') {
+  if(!pageLifecycle.active)return;
   const el = document.getElementById('categoryStatus');
   if (!el) return;
   el.textContent = text || '';
@@ -656,7 +661,7 @@ window.closeMaterialViewer = function(event) {
   document.body.classList.remove('viewer-open');
 };
 
-window.saveMaterial = async function(event) {
+window.saveMaterial = async function(event) {try{
   event.preventDefault();
   const saveAction = event.submitter?.value === 'draft' ? 'draft' : 'publish';
   const existingMaterial = editingId ? (editingMaterial || materials.find(material => material.id === editingId)) : null;
@@ -701,7 +706,7 @@ window.saveMaterial = async function(event) {
         ? textPayload()
         : sourcePayload(editingSource, 'file');
     if (mode === 'file' && file) {
-      filePayload = await uploadFile(file);
+      filePayload = await pageAwait(async () => (uploadFile(file)));
     }
 
     const now = Date.now();
@@ -718,62 +723,62 @@ window.saveMaterial = async function(event) {
     };
     if (saveAction === 'draft') {
       if (editingId && existingMaterial?.status !== 'draft') {
-        await update(ref(db, `${DB_PATH}/${editingId}`), { draft: content });
+        await pageAwait(async () => (update(ref(db, `${DB_PATH}/${editingId}`), { draft: content })));
       } else if (editingId) {
-        await update(ref(db, `${DB_PATH}/${editingId}`), { ...content, status:'draft' });
+        await pageAwait(async () => (update(ref(db, `${DB_PATH}/${editingId}`), { ...content, status:'draft' })));
       } else {
         const itemRef = push(ref(db, DB_PATH));
-        await set(itemRef, {
+        await pageAwait(async () => (set(itemRef, {
           ...content,
           ...meetingSourcePayload(),
           status:'draft',
           createdAt: now,
           createdBy: currentUser?.name || '不明',
           createdById: currentStaffId()
-        });
+        })));
       }
       const oldDraftPath = existingMaterial?.status === 'draft'
         ? existingMaterial.storagePath
         : existingMaterial?.draft?.storagePath;
       if ((mode !== 'file' || file) && oldDraftPath && oldDraftPath !== filePayload.storagePath && oldDraftPath !== existingMaterial?.storagePath) {
-        await deleteStorageFile(oldDraftPath, true);
+        await pageAwait(async () => (deleteStorageFile(oldDraftPath, true)));
       }
       setStatus('下書きを保存しました。', 'ok');
     } else if (editingId) {
-      await update(ref(db, `${DB_PATH}/${editingId}`), {
+      await pageAwait(async () => (update(ref(db, `${DB_PATH}/${editingId}`), {
         ...content,
         status:'published',
         draft:null
-      });
+      })));
       const oldPublishedPath = existingMaterial?.status === 'draft' ? '' : existingMaterial?.storagePath;
       const oldDraftPath = existingMaterial?.status === 'draft' ? existingMaterial?.storagePath : existingMaterial?.draft?.storagePath;
       for (const oldPath of [oldPublishedPath, oldDraftPath]) {
-        if (oldPath && oldPath !== filePayload.storagePath) await deleteStorageFile(oldPath, true);
+        if (oldPath && oldPath !== filePayload.storagePath) await pageAwait(async () => (deleteStorageFile(oldPath, true)));
       }
       setStatus('公開しました。', 'ok');
     } else {
       const itemRef = push(ref(db, DB_PATH));
-      await set(itemRef, {
+      await pageAwait(async () => (set(itemRef, {
         ...content,
         ...meetingSourcePayload(),
         status:'published',
         createdAt: now,
         createdBy: currentUser?.name || '不明',
         createdById: currentStaffId()
-      });
+      })));
       setStatus('公開しました。', 'ok');
     }
     resetForm();
-  } catch(error) {
+  } catch(error) {if (pageLifecycle.active) {
     setStatus(`保存できませんでした: ${uploadErrorMessage(error)}`, 'err');
-  } finally {
+  }} finally {if (pageLifecycle.active) {
     saveBtn.disabled = false;
     draftSaveBtn.disabled = false;
     setProgress(0, false);
-  }
-};
+  }}
+}catch(error){if(error?.code!=='portal/access-lost')throw error;}};
 
-async function uploadFile(file) {
+async function uploadFile(file) {try{
   const contentType = fileContentType(file);
   if (isImageFile(file, contentType)) {
     return inlineImagePayload(file, contentType);
@@ -784,17 +789,19 @@ async function uploadFile(file) {
   if (!shouldUseResumableUpload(file, contentType)) {
     setProgress(1, true);
     setStatus('アップロードしています。');
-    const snapshot = await uploadBytes(target, file, metadata);
+    const snapshot = await pageAwait(async () => (uploadBytes(target, file, metadata)));
     setProgress(100, true);
-    const url = await getDownloadURL(snapshot.ref);
+    const url = await pageAwait(async () => (getDownloadURL(snapshot.ref)));
     return filePayload(file, path, contentType, url);
   }
   return uploadResumableFile(file, target, path, contentType, metadata);
-}
+}catch(error){if(error?.code!=='portal/access-lost')throw error;}}
 
 function uploadResumableFile(file, target, path, contentType, metadata) {
   return new Promise((resolve, reject) => {
+    pageLifecycle.assertActive();
     const task = uploadBytesResumable(target, file, metadata);
+    pageLifecycle.add(()=>task.cancel());
     setProgress(1, true);
     task.on('state_changed',
       snapshot => {
@@ -803,14 +810,12 @@ function uploadResumableFile(file, target, path, contentType, metadata) {
         setStatus(`アップロード中です。${pct}%`);
       },
       error => reject(error),
-      async () => {
+      async () => {try{
         try {
-          const url = await getDownloadURL(task.snapshot.ref);
+          const url = await pageAwait(async () => (getDownloadURL(task.snapshot.ref)));
           resolve(filePayload(file, path, contentType, url));
-        } catch(error) {
-          reject(error);
-        }
-      }
+        } catch(error) { reject(error); }
+      }catch(error){if(error?.code!=='portal/access-lost')throw error;}}
     );
   });
 }
@@ -831,10 +836,10 @@ function filePayload(file, path, contentType, url) {
   };
 }
 
-async function inlineImagePayload(file, contentType) {
+async function inlineImagePayload(file, contentType) {try{
   setProgress(1, true);
   setStatus('画像を縮小しています。');
-  const image = await resizeInlineImage(file);
+  const image = await pageAwait(async () => (resizeInlineImage(file)));
   if (image.data.length > INLINE_IMAGE_MAX_DATA_URL_LENGTH) {
     throw new Error('画像のサイズが大きすぎます。画像を小さくしてから保存してください。');
   }
@@ -849,7 +854,7 @@ async function inlineImagePayload(file, contentType) {
     inlineImage: true,
     url: image.data
   };
-}
+}catch(error){if(error?.code!=='portal/access-lost')throw error;}}
 
 function resizeInlineImage(file) {
   return new Promise((resolve, reject) => {
@@ -911,48 +916,48 @@ window.startEdit = function(id) {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 };
 
-window.deleteDraft = async function(id) {
+window.deleteDraft = async function(id) {try{
   const item = materials.find(material => material.id === id);
   if (!item || !canManageMaterial(item)) return setStatus('この下書きを削除できません。', 'err');
   if (!confirm('保存中の下書きを削除しますか？')) return;
   try {
     const draftPath = item.status === 'draft' ? item.storagePath : item.draft?.storagePath;
     if (item.status === 'draft') {
-      await remove(ref(db, `${DB_PATH}/${id}`));
+      await pageAwait(async () => (remove(ref(db, `${DB_PATH}/${id}`))));
     } else {
-      await update(ref(db, `${DB_PATH}/${id}`), { draft:null });
+      await pageAwait(async () => (update(ref(db, `${DB_PATH}/${id}`), { draft:null })));
     }
     if (draftPath && (item.status === 'draft' || draftPath !== item.storagePath)) {
-      await deleteStorageFile(draftPath, true);
+      await pageAwait(async () => (deleteStorageFile(draftPath, true)));
     }
     if (editingId === id) resetForm();
     setStatus('下書きを削除しました。', 'ok');
-  } catch(error) {
+  } catch(error) {if (pageLifecycle.active) {
     setStatus(`下書きを削除できませんでした: ${error.message}`, 'err');
-  }
-};
+  }}
+}catch(error){if(error?.code!=='portal/access-lost')throw error;}};
 
 window.cancelEdit = function() {
   resetForm();
   setStatus('');
 };
 
-window.deleteMaterial = async function(id) {
+window.deleteMaterial = async function(id) {try{
   const item = materials.find(material => material.id === id);
   if (!item) return;
   if (!canManageMaterial(item)) return setStatus('このマニュアルを削除できません。', 'err');
   if (!confirm(`「${item.title || item.fileName || 'マニュアル'}」を削除しますか？`)) return;
   try {
-    if (item.storagePath) await deleteStorageFile(item.storagePath, false);
+    if (item.storagePath) await pageAwait(async () => (deleteStorageFile(item.storagePath, false)));
     if (item.draft?.storagePath && item.draft.storagePath !== item.storagePath) {
-      await deleteStorageFile(item.draft.storagePath, true);
+      await pageAwait(async () => (deleteStorageFile(item.draft.storagePath, true)));
     }
-    await remove(ref(db, `${DB_PATH}/${id}`));
+    await pageAwait(async () => (remove(ref(db, `${DB_PATH}/${id}`))));
     setStatus('削除しました。', 'ok');
-  } catch(error) {
+  } catch(error) {if (pageLifecycle.active) {
     setStatus(`削除できませんでした: ${error.message}`, 'err');
-  }
-};
+  }}
+}catch(error){if(error?.code!=='portal/access-lost')throw error;}};
 
 function renderCommentSection(item) {
   const comments = normalizeComments(item.comments);
@@ -1000,7 +1005,7 @@ function normalizeComments(rawComments) {
     .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
 }
 
-window.saveComment = async function(event, id) {
+window.saveComment = async function(event, id) {try{
   event.preventDefault();
   if (!currentStaffId()) return setCommentStatus(id, 'ポータルから開いてください。', 'err');
 
@@ -1019,20 +1024,20 @@ window.saveComment = async function(event, id) {
 
     const now = Date.now();
     const commentRef = push(ref(db, `${DB_PATH}/${id}/comments`));
-    await set(commentRef, {
+    await pageAwait(async () => (set(commentRef, {
       text,
       createdAt: now,
       createdBy: currentUser?.name || STAFF_NAMES[currentStaffId()] || '不明',
       createdById: currentStaffId()
-    });
+    })));
     textarea.value = '';
     setCommentStatus(id, '送信しました。', 'ok');
-  } catch(error) {
+  } catch(error) {if (pageLifecycle.active) {
     setCommentStatus(id, `送信できませんでした: ${error.message}`, 'err');
-  } finally {
+  }} finally {if (pageLifecycle.active) {
     button.disabled = false;
-  }
-};
+  }}
+}catch(error){if(error?.code!=='portal/access-lost')throw error;}};
 
 function setCommentStatus(id, text, type = '') {
   const el = document.getElementById(`commentStatus-${domId(id)}`);
@@ -1041,14 +1046,14 @@ function setCommentStatus(id, text, type = '') {
   el.className = `comment-status ${type}`.trim();
 }
 
-async function deleteStorageFile(path, silent) {
+async function deleteStorageFile(path, silent) {try{
   try {
-    await deleteObject(storageRef(storage, path));
-  } catch(error) {
+    await pageAwait(async () => (deleteObject(storageRef(storage, path))));
+  } catch(error) {if (pageLifecycle.active) {
     if (error?.code === 'storage/object-not-found') return;
     if (!silent) throw error;
-  }
-}
+  }}
+}catch(error){if(error?.code!=='portal/access-lost')throw error;}}
 
 function resetForm() {
   editingId = '';
@@ -1106,9 +1111,9 @@ function normalizeUrl(value) {
     const url = new URL(value);
     if (!['http:', 'https:'].includes(url.protocol)) return '';
     return url.toString();
-  } catch(e) {
+  } catch(e) {if (pageLifecycle.active) {
     return '';
-  }
+  }}
 }
 
 function linkPayload(value) {
@@ -1165,18 +1170,18 @@ function sourcePayload(item, sourceType) {
   };
 }
 
-async function loadSkillCatalog() {
+async function loadSkillCatalog() {try{
   const picker = document.getElementById('skillPicker');
   try {
-    const response = await fetch('./skill-catalog.json', { cache:'no-store' });
+    const response = await pageAwait(async () => (fetch('./skill-catalog.json', { cache:'no-store' })));
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    skillCatalog = await response.json();
+    skillCatalog = await pageAwait(async () => (response.json()));
     renderSkillPicker();
-    await prefillMeetingSource();
-  } catch(error) {
+    await pageAwait(async () => (prefillMeetingSource()));
+  } catch(error) {if (pageLifecycle.active) {
     if (picker) picker.innerHTML = `<div class="status err">スキル項目を読み込めませんでした: ${esc(error.message)}</div>`;
-  }
-}
+  }}
+}catch(error){if(error?.code!=='portal/access-lost')throw error;}}
 
 function manualSkillKey(sheet, category, item) {
   return `${sheet}::${category}__${item}`;
@@ -1225,7 +1230,7 @@ function meetingSourcePayload() {
   return source ? { sourceTypeOrigin:source.sourceType, sourceId:source.sourceId } : {};
 }
 
-async function prefillMeetingSource() {
+async function prefillMeetingSource() {try{
   const source = meetingSourceParams();
   if (!source) return;
   if (!isAdmin()) {
@@ -1233,7 +1238,7 @@ async function prefillMeetingSource() {
     return;
   }
   try {
-    const snapshot = await get(ref(db, `${MEETING_SOURCE_PATHS[source.sourceType]}/${source.sourceId}`));
+    const snapshot = await pageAwait(async () => (get(ref(db, `${MEETING_SOURCE_PATHS[source.sourceType]}/${source.sourceId}`))));
     const item = snapshot.val();
     if (!item) throw new Error('反映元が見つかりません');
     const body = source.sourceType === 'task'
@@ -1247,10 +1252,10 @@ async function prefillMeetingSource() {
       : 'お知らせからマニュアルを作成';
     setStatus('内容を確認・編集し、関連するスキル項目を選んで保存してください。', 'ok');
     document.querySelector('.admin-panel')?.scrollIntoView({ block:'start' });
-  } catch(error) {
+  } catch(error) {if (pageLifecycle.active) {
     setStatus(`反映元を読み込めませんでした: ${error.message}`, 'err');
-  }
-}
+  }}
+}catch(error){if(error?.code!=='portal/access-lost')throw error;}}
 
 function meetingProgressText(item) {
   const lines = [];
@@ -1269,9 +1274,9 @@ function isYouTubeUrl(value) {
   try {
     const host = new URL(value).hostname.replace(/^www\./, '').toLowerCase();
     return host === 'youtube.com' || host === 'youtu.be' || host.endsWith('.youtube.com');
-  } catch(e) {
+  } catch(e) {if (pageLifecycle.active) {
     return false;
-  }
+  }}
 }
 
 function youtubeVideoId(value) {
@@ -1289,9 +1294,9 @@ function youtubeVideoId(value) {
         return cleanYouTubeId(parts[1]);
       }
     }
-  } catch(e) {
+  } catch(e) {if (pageLifecycle.active) {
     return '';
-  }
+  }}
   return '';
 }
 
@@ -1305,6 +1310,7 @@ function youtubeThumbnailUrl(id) {
 }
 
 function setProgress(value, show) {
+  if(!pageLifecycle.active)return;
   const wrap = document.getElementById('uploadProgress');
   const bar = document.getElementById('uploadProgressBar');
   wrap.classList.toggle('show', Boolean(show));
@@ -1312,6 +1318,7 @@ function setProgress(value, show) {
 }
 
 function setStatus(text, type = '') {
+  if(!pageLifecycle.active)return;
   const el = document.getElementById('formStatus');
   el.textContent = text || '';
   el.className = `status ${type}`.trim();
@@ -1435,6 +1442,8 @@ function escAttr(value) {
 }
 
 Object.assign(window, { renderMaterials });
+
+function onValue(target,next,error,...options){pageLifecycle.assertActive();return pageLifecycle.add(firebaseOnValue(target,pageLifecycle.guard(next),pageLifecycle.guard(error),...options));}
 </script>
 </body>
 </html>

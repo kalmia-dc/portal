@@ -58,6 +58,7 @@ function openSelectedShift(){
 }
 function setShiftEntryPending(pending){
   manualSavePending=pending;
+  if(window.portalAccessLost)return;
   document.getElementById('editModal').querySelectorAll('button,input').forEach(el=>el.disabled=pending);
   if(!pending)refreshManualTimeEditor();
 }
@@ -95,6 +96,7 @@ async function cancelOrRestoreShift(restore=false){
       }
       if(restore)attachLaborShiftPeriods(next);return next;
     },{applyLocally:false});
+    if(window.portalAccessLost)return;
     if(!result.committed)throw Error('別の更新または権限・確定状態の変更があります。閉じて開き直してください。');
     allShiftData[month]=result.snapshot.val()||{};
     if(monthKey(currentYear,currentMonth)===month)loadShiftForMonth(currentYear,currentMonth);

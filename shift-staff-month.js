@@ -88,6 +88,7 @@ async function confirmStaffMonthOperation(){
       if(currentUser?.role!=='admin'||window._fb.shiftConnected!==true||(op.restore&&!shiftRegistrationStillAllowed(op.sid,memberVersion))||shiftLocks[op.month])return;
       return mutateStaffMonth(data,op);
     },{applyLocally:false});
+    if(window.portalAccessLost)return;
     if(!result.committed)throw Error('対象スタッフのシフトまたは権限・確定状態が変わりました。全件の処理を中止しました。閉じて確認し直してください。');
     allShiftData[op.month]=result.snapshot.val()||{};
     if(monthKey(currentYear,currentMonth)===op.month)loadShiftForMonth(currentYear,currentMonth);
@@ -95,5 +96,5 @@ async function confirmStaffMonthOperation(){
     manualSavePending=false;closeStaffMonthOperation();render();
     document.getElementById('staffMonthStatus').textContent=`${op.month} の対象スタッフ ${op.dates.length}件を${op.restore?'復元':'クリア'}しました。`;
   }catch(e){error.textContent='変更できません：'+e.message;}
-  finally{manualSavePending=false;document.getElementById('staffMonthModal').querySelectorAll('button').forEach(el=>el.disabled=false);}
+  finally{manualSavePending=false;document.getElementById('staffMonthModal')?.querySelectorAll('button').forEach(el=>el.disabled=false);}
 }

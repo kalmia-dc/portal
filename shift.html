@@ -923,8 +923,9 @@
 <!-- Firebase SDK -->
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-  import { getDatabase, ref, set, get, onValue, push, remove, query, orderByChild, equalTo, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+  import { getDatabase, ref, set, get, onValue as firebaseOnValue, push, remove, query, orderByChild, equalTo, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
   import { startPortalAuth } from "./portal-auth.js?v=labor-20261014-2";
+  import { createPageLifecycle } from './portal-page-lifecycle.mjs';
   import { readServerMembers } from "./portal-server-members.mjs";
 
   const firebaseConfig = {
@@ -939,10 +940,15 @@
 
   const app = initializeApp(firebaseConfig);
   const db = getDatabase(app);
+  const page = createPageLifecycle();
+  window.shiftPageLifecycle = page;
+  const onValue=(target,next,error,...rest)=>{if(!page.active)return ()=>{};return page.add(firebaseOnValue(target,page.guard(next),page.guard(error),...rest));};
+  page.add(()=>{if(window._fb)window._fb.shiftConnected=false;});
   window.portalAuthReady = startPortalAuth(app, { pageName:'シフト管理' });
   const authenticatedProfile = await window.portalAuthReady;
 
   // ── Firebase API をグローバルに公開 ──
+  if(page.active) {
   window._fb = { db, ref, set, get, onValue, push, remove, query, orderByChild, equalTo, authenticatedProfile, runTransaction };
   window._fb.shiftConnected=false;
   window._fb.readMembersFromServer=()=>readServerMembers({databaseURL:firebaseConfig.databaseURL,user:window.portalAuth?.auth.currentUser});
@@ -950,7 +956,8 @@
   onValue(ref(db,'.info/connected'),snapshot=>{window._fb.shiftConnected=snapshot.val()===true;});
   window.dispatchEvent(new Event('firebaseReady'));
   // 初期表示
-  setTimeout(renderLoginHint, 100);
+  page.timeout(renderLoginHint, 100);
+  }
 </script>
 <body>
 
@@ -1539,6 +1546,7 @@ async function loadSharedHolidayData(){
     });
     if(!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
+    if(window.portalAccessLost)return null;
     if(!data || typeof data.holidays !== 'object' || Array.isArray(data.holidays)){
       throw new Error('祝日データの形式が正しくありません');
     }
@@ -1573,7 +1581,7 @@ async function confirmShift() {
   if (!confirm(`${y}年${m}月のシフトを確定しますか？`)) return;
 
   // シフトを保存
-  if(await saveCurrentShift()===false)return;
+  if(await saveCurrentShift()===false||window.portalAccessLost)return;
 
   // シフト確定と同時にロックを設定する
   const key = monthKey(y, currentMonth);
@@ -1607,11 +1615,13 @@ async function saveCurrentShift(){
       try{assertMonthRegistrationAllowed(candidate,data||{});}catch{return;}
       return candidate;
     },{applyLocally:false});
+    if(window.portalAccessLost)return false;
     if(!result.committed)throw Error('シフトまたは許可状態が変わりました。再読込して確認してください。');
     allShiftData[key]=result.snapshot.val()||{};
     if(monthKey(currentYear,currentMonth)===key)loadShiftForMonth(currentYear,currentMonth);
     return true;
   }catch(e){
+    if(window.portalAccessLost)return false;
     if(monthKey(currentYear,currentMonth)===key){loadShiftForMonth(currentYear,currentMonth);render();}
     alert('シフトを保存できません：'+e.message);return false;
   }
@@ -2630,7 +2640,7 @@ function generateShift(){
   btn.disabled=true;
   txt.innerHTML='<span class="spinner"></span> 生成中...';
 
-  setTimeout(()=>{
+  shiftDelay(()=>{
     const revokedShiftSnapshot=snapshotRevokedShiftData(),laborOutsideSnapshot=snapshotLaborOutsidePeriods();
     delete shiftData.__manualTimes; // Regeneration creates a new schedule; manual edits follow generation.
     const clinicPreserved = snapshotClinicShifts(y, m);
@@ -4315,7 +4325,7 @@ function printShift(){
   const area=document.getElementById('printArea');
   area.innerHTML=html;
   area.style.display='block';
-  setTimeout(()=>{
+  shiftDelay(()=>{
     window.print();
     area.style.display='none';
   }, 150);
@@ -4326,7 +4336,9 @@ function adjustHours(){}  // 新ロジックでは不使用
 // ──────────────────────────────────────────────
 //  RENDER
 // ──────────────────────────────────────────────
+function shiftDelay(callback,ms){return window.shiftPageLifecycle?.timeout(callback,ms);}
 function render(){
+  if(window.portalAccessLost)return;
   const y = currentYear, m = currentMonth;
   document.getElementById('monthLabel').textContent =
     `${y}年 ${m+1}月`;
@@ -4604,6 +4616,7 @@ function openModal(staffId, ds){
 }
 
 function closeModal(){
+  if(window.portalAccessLost)return;
   if(manualSavePending) return;
   finishShiftEntryConfirmation(false);
   document.getElementById('editModal').classList.remove('open');
@@ -4667,6 +4680,7 @@ async function applyModal(){
       if(next.__cancelledShifts?.[sid])delete next.__cancelledShifts[sid][ds];
       attachLaborShiftPeriods(next);return next;
     },{applyLocally:false});
+    if(window.portalAccessLost)return false;
     if(!result.committed) throw Error('別の更新または権限・確定状態の変更があります。閉じて開き直してください。');
     allShiftData[month]=result.snapshot.val()||{};
     if(monthKey(currentYear,currentMonth)===month) loadShiftForMonth(currentYear,currentMonth);
@@ -4756,6 +4770,7 @@ function isCurrentMonthLocked(){
 }
 
 function updateLockUI(){
+  if(window.portalAccessLost)return;
   const locked = isCurrentMonthLocked();
   const genBtn = document.getElementById('genBtn');
   const lockBtn = document.getElementById('lockBtn');
@@ -4843,7 +4858,7 @@ function addHoliday(){
   result.style.color = 'var(--teal)';
   document.getElementById('newHolidayDate').value = '';
   document.getElementById('newHolidayLabel').value = '';
-  setTimeout(()=>{ result.textContent=''; }, 3000);
+  shiftDelay(()=>{ result.textContent=''; }, 3000);
   renderHolidayList();
   render();
 }
@@ -4905,7 +4920,7 @@ function resetPassword(id){
   const result = document.getElementById('staffMgrResult');
   result.textContent = `✅ ${s.name} のパスワードを ${initPass} にリセットしました`;
   result.style.color = 'var(--teal)';
-  setTimeout(()=>{ result.textContent=''; }, 4000);
+  shiftDelay(()=>{ result.textContent=''; }, 4000);
 }
 
 function renderLoginHint(){
@@ -5009,7 +5024,7 @@ function submitStaffForm(){
 
   result.textContent = `✅ ${name} を${editId?'更新':'登録'}しました`;
   result.style.color = 'var(--teal)';
-  setTimeout(()=>{ result.textContent=''; }, 3000);
+  shiftDelay(()=>{ result.textContent=''; }, 3000);
   resetStaffForm();
   renderStaffMgrList();
   renderStaffList();
@@ -5084,8 +5099,9 @@ async function approveReq(id){
   if(!r||r.status!=='pending') return;
   if(currentUser?.role!=='admin'||manualSavePending)return;
   manualSavePending=true;
-  try{await assertShiftStaffCanRegister(r.staffId,r.date);}catch(e){alert(e.message);return;}
+  try{await assertShiftStaffCanRegister(r.staffId,r.date);}catch(e){if(!window.portalAccessLost)alert(e.message);return;}
   finally{manualSavePending=false;}
+  if(window.portalAccessLost)return;
   r.status = 'approved';
   if(!shiftData[r.staffId]) shiftData[r.staffId]={};
   if(r.type==='paid'){
@@ -5165,7 +5181,8 @@ function changePassword(oldPass, newPass, newPass2){
 }
 
 let loginRole = 'staff'; // 'admin' | 'staff'
-let currentUser = null;  // { role, staffId, name }
+let currentUser = null;
+window.addEventListener('portalAccessLost',()=>{currentUser=null;shiftMembersLoaded=false;shiftLifecycleLoaded=false;shiftMembersVersion++;if(shiftEntryConfirmation){shiftEntryConfirmation(false);shiftEntryConfirmation=null;}});  // { role, staffId, name }
 
 // 申請データ（Firebaseからリアルタイム同期）
 let requestData = [];
@@ -5303,7 +5320,7 @@ function submitChangePassword(){
     document.getElementById('pwOld').value = '';
     document.getElementById('pwNew').value = '';
     document.getElementById('pwNew2').value = '';
-    setTimeout(()=>{ result.textContent=''; }, 4000);
+    shiftDelay(()=>{ result.textContent=''; }, 4000);
   }
 }
 
@@ -5327,6 +5344,7 @@ function goBackToPortal(){
 // URLパラメータ ?sid=staffId でスタッフ自動ログイン
 window.addEventListener('load', async ()=>{
   const authenticated = await window.portalAuthReady;
+  if(window.portalAccessLost)return;
   const params = new URLSearchParams(location.search);
   const fromPortal = params.get('sid') || location.search.includes('admin');
   if(fromPortal) document.body.classList.add('portal-return-visible');
@@ -5380,6 +5398,7 @@ function showStaffApp(){
 //  STAFF SCREEN
 // ══════════════════════════════════════════════
 function renderStaffScreen(){
+  if(window.portalAccessLost)return;
   if(!currentUser || currentUser.role !== 'staff') return;
   const sid = currentUser.staffId;
   const s   = STAFF.find(x=>x.id===sid);
@@ -5446,6 +5465,7 @@ function renderStaffScreen(){
 }
 
 function renderStaffMonthGrid(sid){
+  if(window.portalAccessLost)return;
   renderClinicHours();
   const y = currentYear, m = currentMonth;
   const days = daysInMonth(y, m);
@@ -5536,7 +5556,7 @@ function addReqDate(){
     if(d.getDay()===6){
       document.getElementById('reqResult').textContent = '土曜日は希望休を申請できません';
       document.getElementById('reqResult').style.color = 'var(--red)';
-      setTimeout(()=>{ document.getElementById('reqResult').textContent=''; }, 3000);
+      shiftDelay(()=>{ document.getElementById('reqResult').textContent=''; }, 3000);
       return;
     }
   }
@@ -5675,7 +5695,7 @@ function submitRequest(){
 
   renderRequestHistory(currentUser.staffId);
   renderStaffMonthGrid(currentUser.staffId);
-  setTimeout(()=>{ result.textContent=''; }, 4000);
+  shiftDelay(()=>{ result.textContent=''; }, 4000);
 }
 
 function cancelRequest(id){

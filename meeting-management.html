@@ -1087,7 +1087,9 @@ button{cursor:pointer}
 
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getDatabase, ref, push, set, update, remove, onValue, get } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
+import { getDatabase, ref, push, set, update, remove, onValue as firebaseOnValue, get } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
+import {createPageLifecycle} from './portal-page-lifecycle.mjs';
+import {loadBusinessRoster} from './portal-business-roster.mjs';
 import { startPortalAuth } from './portal-auth.js?v=labor-20261014-2';
 import { canEditOwnIncident, ownerPayload } from './incident-owner-policy.mjs';
 
@@ -1103,7 +1105,22 @@ const firebaseConfig = {
 
 const fbApp = initializeApp(firebaseConfig);
 const db = getDatabase(fbApp);
+const pageLifecycle = createPageLifecycle();
+function onValue(target, success, failure) {
+  if (!pageLifecycle.active) return () => {};
+  return pageLifecycle.add(firebaseOnValue(target, pageLifecycle.guard(success), pageLifecycle.guard(failure || (error => console.error(error)))));
+}
 const authenticatedProfile = await startPortalAuth(fbApp, { pageName:'会議・タスク管理' });
+pageLifecycle.assertActive();
+const businessRoster = await loadBusinessRoster({read:path => get(ref(db,path)).then(snapshot => snapshot.val()), profile:authenticatedProfile});
+pageLifecycle.assertActive();
+if (!businessRoster.complete) {
+  const warning = document.createElement('p');
+  warning.setAttribute('role','alert');
+  warning.textContent = '職員名簿の一部を確認できません。再読み込みしてください。新規対象者の保存は停止しています。';
+  document.body.prepend(warning);
+}
+
 if (authenticatedProfile.portalRole === 'terminal' && localStorage.getItem('portalTerminalMode') === 'attendance') {
   location.replace('./index.html');
   await new Promise(() => {});
@@ -1129,6 +1146,17 @@ const NOTICE_TARGETS = {
   momo:{ name:'百々', role:'DA' }
 };
 const NOTICE_TARGET_IDS = Object.keys(NOTICE_TARGETS);
+// Keep the legacy denominator for records created before target snapshots existed.
+const currentNoticeTargets = Object.fromEntries(businessRoster.members.filter(member => member.id !== DIRECTOR_ID && member.availability !== 'stopped').map(member => [member.id, {name:member.label || member.name, role:member.role}]));
+const currentNoticeTargetIds = Object.keys(currentNoticeTargets);
+function targetIdsFor(item) {
+  return Array.isArray(item?.targetStaffIds) ? item.targetStaffIds : NOTICE_TARGET_IDS;
+}
+function targetSnapshot() {
+  if (!businessRoster.complete || !currentNoticeTargetIds.length) throw new Error('職員名簿と確認対象者を再確認してください');
+  return {targetStaffIds:[...currentNoticeTargetIds], targetStaffNames:Object.fromEntries(currentNoticeTargetIds.map(id => [id,currentNoticeTargets[id].name]))};
+}
+Object.assign(STAFF_NAMES,Object.fromEntries(businessRoster.members.map(member => [member.id,member.name])));
 const STATUS_LABELS = {
   todo:'ミーティング未共有',
   all_read:'全員確認済み',
@@ -1356,7 +1384,7 @@ function roleKey() {
 function isDirector() { return roleKey() === 'director'; }
 function isLeader() { return roleKey() === 'leader'; }
 function isReadOnlyTerminal() { return roleKey() === 'terminal'; }
-function isNoticeTarget() { return Boolean(NOTICE_TARGETS[currentUser.staffId]); }
+function isNoticeTarget(item) { return item ? targetIdsFor(item).includes(currentUser.staffId) : Boolean(NOTICE_TARGETS[currentUser.staffId] || currentNoticeTargets[currentUser.staffId]); }
 function canSeeNotices() { return isReadOnlyTerminal() || isDirector() || isLeader() || isNoticeTarget(); }
 function canSeeOpinions() { return isDirector() || isLeader(); }
 function canCreateManagedItems() { return isDirector() || isLeader(); }
@@ -1625,6 +1653,7 @@ function sortIncidentReports(a, b) {
 }
 
 async function saveTask(event) {
+  if (!pageLifecycle.active) return;
   event.preventDefault();
   if (!canCreateManagedItems()) return;
   const title = valueOf('taskTitle');
@@ -1637,6 +1666,7 @@ async function saveTask(event) {
   if (editingTaskId && !canManageOwnItem(existing)) return;
   try {
     const images = await imagesFromInput('taskImages', existing?.images || []);
+    if (!pageLifecycle.active) return;
     const payload = {
       title, detail, completion, images,
       updatedAt: Date.now(),
@@ -1644,9 +1674,11 @@ async function saveTask(event) {
     };
     if (editingTaskId) {
       await update(ref(db, `${PATHS.tasks}/${editingTaskId}`), payload);
+      if (!pageLifecycle.active) return;
       showToast('取り組みを更新しました');
     } else {
       await set(push(ref(db, PATHS.tasks)), {
+        ...targetSnapshot(),
         ...payload,
         progress:'',
         status:'todo',
@@ -1654,10 +1686,12 @@ async function saveTask(event) {
         createdBy: currentUser.name,
         createdById: currentUser.staffId
       });
+      if (!pageLifecycle.active) return;
       showToast('取り組みを登録しました');
     }
     resetTaskForm();
   } catch (err) {
+    if (!pageLifecycle.active) return;
     showToast(err.message || '保存できませんでした');
   }
 }
@@ -1691,6 +1725,7 @@ function resetTaskCompletionOptions() {
 }
 
 async function saveNotice(event) {
+  if (!pageLifecycle.active) return;
   event.preventDefault();
   if (!canCreateManagedItems()) return;
   const title = valueOf('noticeTitle');
@@ -1702,6 +1737,7 @@ async function saveNotice(event) {
   if (editingNoticeId && !canManageOwnItem(existing)) return;
   try {
     const images = await imagesFromInput('noticeImages', existing?.images || []);
+    if (!pageLifecycle.active) return;
     const payload = {
       title, body, images,
       updatedAt: Date.now(),
@@ -1709,18 +1745,22 @@ async function saveNotice(event) {
     };
     if (editingNoticeId) {
       await update(ref(db, `${PATHS.notices}/${editingNoticeId}`), payload);
+      if (!pageLifecycle.active) return;
       showToast('お知らせを更新しました');
     } else {
       await set(push(ref(db, PATHS.notices)), {
+        ...targetSnapshot(),
         ...payload,
         createdAt: Date.now(),
         createdBy: currentUser.name,
         createdById: currentUser.staffId
       });
+      if (!pageLifecycle.active) return;
       showToast('お知らせを登録しました');
     }
     resetNoticeForm();
   } catch (err) {
+    if (!pageLifecycle.active) return;
     showToast(err.message || '保存できませんでした');
   }
 }
@@ -1735,6 +1775,7 @@ function resetNoticeForm() {
 }
 
 async function saveOpinion(event) {
+  if (!pageLifecycle.active) return;
   event.preventDefault();
   if (!isLeader()) return;
   const content = valueOf('opinionContent');
@@ -1742,6 +1783,7 @@ async function saveOpinion(event) {
   if (!content || !reason) return showToast('未入力の項目があります');
   try {
     const images = await imagesFromInput('opinionImages', []);
+    if (!pageLifecycle.active) return;
     await set(push(ref(db, PATHS.opinions)), {
       content,
       reason,
@@ -1754,9 +1796,11 @@ async function saveOpinion(event) {
       updatedAt: Date.now(),
       updatedBy: currentUser.name
     });
+    if (!pageLifecycle.active) return;
     document.getElementById('opinionForm').reset();
     showToast('登録しました');
   } catch (err) {
+    if (!pageLifecycle.active) return;
     showToast(err.message || '保存できませんでした');
   }
 }
@@ -1783,6 +1827,7 @@ function handleIncidentBack() {
 }
 
 async function handleIncidentNext(event) {
+  if (!pageLifecycle.active) return;
   event.preventDefault();
   const activeQuestions = activeIncidentQuestions();
   const question = activeQuestions[incidentStepIndex];
@@ -1921,6 +1966,7 @@ function incidentReviewHtml() {
 }
 
 async function saveIncidentReport() {
+  if (!pageLifecycle.active) return;
   const missing = activeIncidentQuestions().filter(question => {
     return question.type !== 'review' && question.required && isIncidentEmpty(incidentDraft[question.key]);
   });
@@ -1946,11 +1992,13 @@ async function saveIncidentReport() {
     updatedBy: currentUser.name
   };
   await set(push(ref(db, PATHS.incidentReports)), payload);
+  if (!pageLifecycle.active) return;
   resetIncidentWizard();
   showToast('報告を登録しました');
 }
 
 async function prepareIncidentImports() {
+  if (!pageLifecycle.active) return;
   const htmlFiles = Array.from(document.getElementById('incidentHtmlFiles').files || []);
   const imageFiles = Array.from(document.getElementById('incidentImageFiles').files || []);
   if (!htmlFiles.length && !imageFiles.length) return showToast('取り込むファイルを選択してください');
@@ -1965,21 +2013,25 @@ async function prepareIncidentImports() {
     for (const file of htmlFiles) {
       status.textContent = `${file.name} を読み取っています`;
       const html = await readFileAsText(file);
+      if (!pageLifecycle.active) return;
       incidentImportCandidates.push(normalizeIncidentImport(parseIncidentHtmlReport(html, file.name)));
     }
 
     if (imageFiles.length) {
       const ocrResults = await recognizeIncidentImageFiles(imageFiles, status);
+      if (!pageLifecycle.active) return;
       incidentImportCandidates.push(...buildIncidentImageImportCandidates(ocrResults));
     }
 
     status.textContent = `${incidentImportCandidates.length}件の候補を作成しました。内容を確認してから取り込んでください。`;
     renderIncidentImportPreview();
   } catch (err) {
+    if (!pageLifecycle.active) return;
     console.error(err);
     status.textContent = err.message || '取り込み候補を作成できませんでした';
     showToast(status.textContent);
   } finally {
+    if (!pageLifecycle.active) return;
     parseBtn.disabled = false;
   }
 }
@@ -2075,6 +2127,7 @@ function importSelectHtml(index, field, label, value, options) {
 }
 
 async function saveIncidentImports() {
+  if (!pageLifecycle.active) return;
   const candidates = incidentImportCandidates.map((candidate, index) => readIncidentImportCandidate(candidate, index));
   const missing = candidates.find(candidate => !candidate.reportNumber || !candidate.type || !candidate.occurredDate || !candidate.details);
   if (missing) return showToast('報告番号・種別・発生日・具体的な内容は必須です');
@@ -2104,6 +2157,7 @@ async function saveIncidentImports() {
       updatedAt: now,
       updatedBy: currentUser.name
     });
+    if (!pageLifecycle.active) return;
     existingNumbers.add(candidate.reportNumber);
     existingImportKeys.add(duplicateKey);
     saved += 1;
@@ -2186,27 +2240,35 @@ function readFileAsText(file) {
 }
 
 async function recognizeIncidentImageFiles(files, statusEl) {
+  if (!pageLifecycle.active) return;
   const Tesseract = await ensureTesseract();
+  if (!pageLifecycle.active) return;
   statusEl.textContent = 'OCRエンジンを準備しています';
   const worker = await Tesseract.createWorker('jpn+eng', 1, {
     logger: message => {
       if (!message?.status) return;
+  if (!pageLifecycle.active) return;
       const progress = Number.isFinite(message.progress) ? ` ${Math.round(message.progress * 100)}%` : '';
       statusEl.textContent = `写真OCR: ${message.status}${progress}`;
     }
   });
+  const releaseWorker = pageLifecycle.add(() => { void worker.terminate().catch(() => {}); });
+  if (!pageLifecycle.active) return;
   await worker.setParameters({
     tessedit_pageseg_mode: '11',
     preserve_interword_spaces: '1'
   });
+  if (!pageLifecycle.active) return;
   const results = [];
   try {
     for (let i = 0; i < files.length; i += 1) {
       const file = files[i];
       statusEl.textContent = `写真を補正中 ${i + 1}/${files.length}: ${file.name}`;
       const canvas = await incidentImageToOcrCanvas(file);
+      if (!pageLifecycle.active) return;
       statusEl.textContent = `写真OCR中 ${i + 1}/${files.length}: ${file.name}`;
       const result = await worker.recognize(canvas);
+      if (!pageLifecycle.active) return;
       results.push({ file, text: result?.data?.text || '' });
     }
     const frontIndex = results.findIndex(result => legacyIncidentPageKind(result.text) === 'front');
@@ -2216,9 +2278,13 @@ async function recognizeIncidentImageFiles(files, statusEl) {
         const file = results[backIndex].file;
         statusEl.textContent = `裏面の記入欄を拡大して再読み取り中: ${file.name}`;
         const croppedCanvas = await incidentImageToOcrCanvas(file, { topRatio:.42, sideTrimRatio:.08 });
+        if (!pageLifecycle.active) return;
         await worker.setParameters({ tessedit_pageseg_mode:'11', preserve_interword_spaces:'1' });
+        if (!pageLifecycle.active) return;
         const retry = await worker.recognize(croppedCanvas);
+        if (!pageLifecycle.active) return;
         await worker.setParameters({ tessedit_pageseg_mode:'11', preserve_interword_spaces:'1' });
+        if (!pageLifecycle.active) return;
         const retryText = retry?.data?.text || '';
         if (legacyBackTextScore(retryText) >= legacyBackTextScore(results[backIndex].text)) {
           results[backIndex].text = retryText;
@@ -2226,7 +2292,7 @@ async function recognizeIncidentImageFiles(files, statusEl) {
       }
     }
   } finally {
-    await worker.terminate();
+    releaseWorker();
   }
   return results;
 }
@@ -2647,6 +2713,7 @@ function parseIncidentOcrText(text, sourceFileName) {
 }
 
 async function handleActions(event) {
+  if (!pageLifecycle.active) return;
   const imageBtn = event.target.closest('.image-thumb');
   if (imageBtn) {
     const img = imageBtn.querySelector('img');
@@ -2728,13 +2795,16 @@ function fillNoticeForm(id) {
 }
 
 async function deleteItem(path, id, label, item) {
+  if (!pageLifecycle.active) return;
   if (!canManageOwnItem(item)) return;
   if (!confirm(`${label}を削除しますか？`)) return;
   await remove(ref(db, `${path}/${id}`));
+  if (!pageLifecycle.active) return;
   showToast(`${label}を削除しました`);
 }
 
 async function rejectTaskReview(id) {
+  if (!pageLifecycle.active) return;
   const item = state.tasks.find(task => task.id === id);
   if (!item || !isDirector() || item.status !== 'review') return;
   if (!confirm('定着確認依頼を却下して、取り組み中に戻しますか？')) return;
@@ -2742,6 +2812,7 @@ async function rejectTaskReview(id) {
 }
 
 async function updateTaskStatus(id, status, options = {}) {
+  if (!pageLifecycle.active) return;
   const item = state.tasks.find(task => task.id === id);
   if (!item) return;
   const currentStatus = taskStatus(item);
@@ -2796,11 +2867,13 @@ async function updateTaskStatus(id, status, options = {}) {
     updates[`${taskPath}/${key}`] = value;
   });
   await update(ref(db), updates);
+  if (!pageLifecycle.active) return;
   if (progressInputToClear) progressInputToClear.value = '';
   showToast('ステータスを更新しました');
 }
 
 async function saveProgress(id) {
+  if (!pageLifecycle.active) return;
   if (!canCreateManagedItems()) return;
   const input = document.querySelector(`[data-progress-id="${cssEscape(id)}"]`);
   const item = state.tasks.find(task => task.id === id);
@@ -2816,6 +2889,7 @@ async function saveProgress(id) {
     [`${taskPath}/updatedAt`]: now,
     [`${taskPath}/updatedBy`]: currentUser.name
   });
+  if (!pageLifecycle.active) return;
   input.value = '';
   showToast('対策を追加しました');
 }
@@ -2830,6 +2904,7 @@ function progressLog(text, createdAt = Date.now()) {
 }
 
 async function saveJudgment(id) {
+  if (!pageLifecycle.active) return;
   if (!isDirector()) return;
   const decision = document.querySelector(`[data-decision-id="${cssEscape(id)}"]`)?.value || 'pending';
   const decisionReasons = collectDecisionReasons(id);
@@ -2848,6 +2923,7 @@ async function saveJudgment(id) {
     updatedAt: Date.now(),
     updatedBy: currentUser.name
   });
+  if (!pageLifecycle.active) return;
   showToast('判断を保存しました');
 }
 
@@ -2878,9 +2954,9 @@ function updateDecisionReasonFields(id, decision) {
 }
 
 async function markTaskRead(id) {
-  if (!isNoticeTarget()) return;
+  if (!pageLifecycle.active) return;
   const task = state.tasks.find(item => item.id === id);
-  if (!task) return;
+  if (!task || !isNoticeTarget(task)) return;
   const currentRead = readByMap(task)[currentUser.staffId];
   if (currentRead) return showToast('確認済みです');
   const readAt = Date.now();
@@ -2901,13 +2977,14 @@ async function markTaskRead(id) {
     payload.updatedBy = currentUser.name;
   }
   await update(ref(db, `${PATHS.tasks}/${id}`), payload);
+  if (!pageLifecycle.active) return;
   showToast(fullyRead ? '全員確認済みになりました' : '確認済みにしました');
 }
 
 async function markNoticeRead(id) {
-  if (!isNoticeTarget()) return;
+  if (!pageLifecycle.active) return;
   const notice = state.notices.find(item => item.id === id);
-  if (!notice) return;
+  if (!notice || !isNoticeTarget(notice)) return;
   const currentRead = readByMap(notice)[currentUser.staffId];
   if (currentRead) return showToast('確認済みです');
   const readEntry = {
@@ -2917,6 +2994,7 @@ async function markNoticeRead(id) {
     readAt: Date.now()
   };
   await set(ref(db, `${PATHS.notices}/${id}/readBy/${currentUser.staffId}`), readEntry);
+  if (!pageLifecycle.active) return;
   showToast('確認済みにしました');
 }
 
@@ -3158,7 +3236,7 @@ function taskRejectionHtml(task) {
 }
 
 function taskReadButtonHtml(task) {
-  if (!isNoticeTarget()) return '';
+  if (!isNoticeTarget(task)) return '';
   const read = readByMap(task)[currentUser.staffId];
   if (read) {
     return `<div class="read-status">確認済み：${formatDate(read.readAt)}</div>`;
@@ -3217,7 +3295,7 @@ function renderNotices() {
 }
 
 function noticeReadButtonHtml(notice) {
-  if (!isNoticeTarget()) return '';
+  if (!isNoticeTarget(notice)) return '';
   const read = readByMap(notice)[currentUser.staffId];
   if (read) {
     return `<div class="read-status">確認済み：${formatDate(read.readAt)}</div>`;
@@ -3236,24 +3314,25 @@ function noticeReadSummaryHtml(notice) {
 
 function readSummaryHtml(item) {
   const readBy = readByMap(item);
-  const readIds = NOTICE_TARGET_IDS.filter(id => readBy[id]);
-  const unreadIds = NOTICE_TARGET_IDS.filter(id => !readBy[id]);
+  const targetIds = targetIdsFor(item);
+  const readIds = targetIds.filter(id => readBy[id]);
+  const unreadIds = targetIds.filter(id => !readBy[id]);
   return `
     <div class="read-summary">
       <div class="read-summary-head">
-        <span>確認済み ${readIds.length}/${NOTICE_TARGET_IDS.length}名</span>
+        <span>確認済み ${readIds.length}/${targetIds.length}名</span>
       </div>
       <div class="read-columns">
         <div>
           <div class="read-group-title">未確認</div>
           <div class="read-list">
-            ${unreadIds.length ? unreadIds.map(id => readChip(id, false)).join('') : '<span class="read-chip read">全員確認済み</span>'}
+            ${unreadIds.length ? unreadIds.map(id => readChip(id, false, null, item)).join('') : '<span class="read-chip read">全員確認済み</span>'}
           </div>
         </div>
         <div>
           <div class="read-group-title">確認済み</div>
           <div class="read-list">
-            ${readIds.length ? readIds.map(id => readChip(id, true, readBy[id])).join('') : '<span class="read-chip unread">まだありません</span>'}
+            ${readIds.length ? readIds.map(id => readChip(id, true, readBy[id], item)).join('') : '<span class="read-chip unread">まだありません</span>'}
           </div>
         </div>
       </div>
@@ -3273,11 +3352,12 @@ function taskStatus(task) {
 
 function isNoticeFullyRead(notice, extraReadBy = {}) {
   const readBy = { ...readByMap(notice), ...extraReadBy };
-  return NOTICE_TARGET_IDS.length > 0 && NOTICE_TARGET_IDS.every(id => readBy[id]);
+  const targetIds = targetIdsFor(notice);
+  return targetIds.length > 0 && targetIds.every(id => readBy[id]);
 }
 
-function readChip(id, isRead, read) {
-  const name = NOTICE_TARGETS[id]?.name || STAFF_NAMES[id] || id;
+function readChip(id, isRead, read, item) {
+  const name = item?.targetStaffNames?.[id] || read?.name || NOTICE_TARGETS[id]?.name || STAFF_NAMES[id] || id;
   const suffix = isRead && read?.readAt ? ` ${formatDate(read.readAt)}` : '';
   return `<span class="read-chip ${isRead ? 'read' : 'unread'}">${esc(name)}${esc(suffix)}</span>`;
 }
@@ -3662,6 +3742,7 @@ function incidentStatusOptionsHtml(currentStatus) {
 }
 
 async function saveIncidentReportEdit(id) {
+  if (!pageLifecycle.active) return;
   const report = state.incidentReports.find(item => item.id === id);
   if (!report || !canEditIncidentReport(report) || incidentEditSaving.has(id)) return;
   rememberIncidentEdits();
@@ -3706,12 +3787,15 @@ async function saveIncidentReportEdit(id) {
   restoreIncidentEdits();
   try {
     await update(ref(db, `${PATHS.incidentReports}/${id}`), canManageIncidentReport() ? payload : ownerPayload(payload));
+    if (!pageLifecycle.active) return;
     incidentEditDrafts.delete(id);
     showToast('報告内容を保存しました');
   } catch (error) {
+    if (!pageLifecycle.active) return;
     const denied = /permission.denied/i.test(String(error.code || error.message || error));
     showToast(denied ? '保存する権限がありません。入力内容はこの画面に保持しています。管理者に確認してください。' : '保存できませんでした。入力内容はこの画面に保持しています。接続を確認して再度保存してください。');
   } finally {
+    if (!pageLifecycle.active) return;
     incidentEditSaving.delete(id);
     const button = document.querySelector(`[data-action="save-incident-report"][data-id="${cssEscape(id)}"]`);
     if (button) button.disabled = false;
@@ -3720,6 +3804,7 @@ async function saveIncidentReportEdit(id) {
 }
 
 async function saveIncidentFollowup(id) {
+  if (!pageLifecycle.active) return;
   if (!canManageIncidentReport()) return;
   const report = state.incidentReports.find(item => item.id === id);
   if (!report || report.linkedTaskId || report.linkedNoticeId) return;
@@ -3745,6 +3830,7 @@ async function saveIncidentFollowup(id) {
     payload.confirmedBy = null;
   }
   await update(ref(db, `${PATHS.incidentReports}/${id}`), payload);
+  if (!pageLifecycle.active) return;
   showToast('ミーティング対応を保存しました');
 }
 
@@ -3873,6 +3959,7 @@ function startRoutingDraft(id, kind) {
 }
 
 async function saveRoutedDraft(kind) {
+  if (!pageLifecycle.active) return;
   if (!canManageIncidentReport() || routingBusy || !routingDraft[kind]) return;
   const reportId = routingDraft[kind];
   const prefix = kind === 'tasks' ? 'task' : 'notice';
@@ -3883,6 +3970,7 @@ async function saveRoutedDraft(kind) {
   cancel.disabled = true;
   try {
     const snapshot = await get(ref(db, `${PATHS.incidentReports}/${reportId}`));
+    if (!pageLifecycle.active) return;
     const report = snapshot.val();
     if (!report) throw new Error('元の報告が見つかりません。登録を中止しました');
     if (report.linkedTaskId || report.linkedNoticeId) throw new Error('この報告はすでに振り分け済みです');
@@ -3891,9 +3979,11 @@ async function saveRoutedDraft(kind) {
     const completion = kind === 'tasks' ? valueOf('taskCompletion') : '';
     if (!title || !body || (kind === 'tasks' && !completion)) throw new Error('未入力の項目があります');
     const images = await imagesFromInput(prefix + 'Images', []);
+    if (!pageLifecycle.active) return;
     const now = Date.now();
     const target = push(ref(db, PATHS[kind]));
     const item = {
+      ...targetSnapshot(),
       title, images, sourceIncidentId:reportId,
       sourceIncidentNumber:report.reportNumber || buildIncidentReportNumber(report),
       createdAt:now, createdBy:currentUser.name, createdById:currentUser.staffId,
@@ -3909,6 +3999,7 @@ async function saveRoutedDraft(kind) {
       [`${PATHS.incidentReports}/${reportId}/updatedAt`]:now,
       [`${PATHS.incidentReports}/${reportId}/updatedBy`]:currentUser.name
     });
+    if (!pageLifecycle.active) return;
     // Make navigation immediate even if the database listener has not delivered its echo yet.
     if (!state[kind].some(entry => entry.id === target.key)) state[kind].push({id:target.key, ...item});
     const original = state.incidentReports.find(entry => entry.id === reportId);
@@ -3917,8 +4008,10 @@ async function saveRoutedDraft(kind) {
     openRelatedCase(kind, target.key);
     showToast(kind === 'tasks' ? '取り組みに登録しました' : 'お知らせに登録しました');
   } catch (error) {
+    if (!pageLifecycle.active) return;
     showToast(error.message || '登録できませんでした。内容を確認して再試行してください');
   } finally {
+    if (!pageLifecycle.active) return;
     routingBusy = false;
     button.disabled = false;
     cancel.disabled = false;
@@ -3952,9 +4045,11 @@ function appendIncidentTaskDetail(lines, label, value) {
 }
 
 async function deleteIncidentReport(id) {
+  if (!pageLifecycle.active) return;
   if (!canManageIncidentReport()) return;
   if (!confirm('報告を削除しますか？')) return;
   await remove(ref(db, `${PATHS.incidentReports}/${id}`));
+  if (!pageLifecycle.active) return;
   showToast('報告を削除しました');
 }
 
@@ -4272,6 +4367,7 @@ function imagesHtml(images = []) {
 }
 
 async function imagesFromInput(inputId, existingImages) {
+  if (!pageLifecycle.active) return;
   const input = document.getElementById(inputId);
   const files = Array.from(input.files || []);
   if (!files.length) return existingImages || [];
@@ -4280,6 +4376,7 @@ async function imagesFromInput(inputId, existingImages) {
   for (const file of files) {
     if (!file.type.startsWith('image/')) throw new Error('画像ファイルを選択してください');
     images.push(await resizeImage(file));
+    if (!pageLifecycle.active) return;
   }
   return images;
 }
@@ -4387,11 +4484,12 @@ function escapeRegExp(value) {
 
 let toastTimer = null;
 function showToast(message) {
+  if (!pageLifecycle.active) return;
   const toast = document.getElementById('toast');
   toast.textContent = message;
   toast.classList.add('show');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => toast.classList.remove('show'), 2200);
+  toastTimer = pageLifecycle.timeout(() => toast.classList.remove('show'), 2200);
 }
 </script>
 </body>

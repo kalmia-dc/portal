@@ -1159,8 +1159,12 @@
 <div class="toast" id="toast"></div>
 
 <script type="module">
+import {createPageLifecycle} from './portal-page-lifecycle.mjs';
+const pageLifecycle=createPageLifecycle();
+async function pageAwait(work){pageLifecycle.assertActive();let result;try{result=await work();}catch(error){pageLifecycle.assertActive();throw error;}pageLifecycle.assertActive();return result;}
+
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getDatabase, ref, push, set, remove, onValue, get }
+import { getDatabase, ref, push, set, remove, onValue as firebaseOnValue, get }
   from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 import { startPortalAuth } from './portal-auth.js?v=labor-20261014-2';
 
@@ -1176,7 +1180,7 @@ const firebaseConfig = {
 
 const fbApp = initializeApp(firebaseConfig);
 const db = getDatabase(fbApp);
-const authenticatedProfile = await startPortalAuth(fbApp, { pageName:'個人指標' });
+const authenticatedProfile = await pageAwait(async () => (startPortalAuth(fbApp, { pageName:'個人指標' })));
 const DB_PATH = 'privateMetrics';
 const GOAL_DB_PATH = 'monthlyGoals';
 const IMPORT_HISTORY_PATH = 'privateMetricImportHistory';
@@ -1448,7 +1452,7 @@ function addAutoSelfPayRateCandidates(candidates) {
   return result;
 }
 
-async function savePrivateMetricData(data) {
+async function savePrivateMetricData(data) {try{
   const normalizedData = normalizedMetricData(data);
   const existing = findExistingMetric(normalizedData.month, normalizedData.item);
   const payload = {
@@ -1459,17 +1463,17 @@ async function savePrivateMetricData(data) {
   };
   delete payload.id;
   if (existing) {
-    await set(ref(db, `${DB_PATH}/${existing.id}`), payload);
+    await pageAwait(async () => (set(ref(db, `${DB_PATH}/${existing.id}`), payload)));
     return existing.id;
   }
   const newRef = push(ref(db, DB_PATH));
-  await set(newRef, {
+  await pageAwait(async () => (set(newRef, {
     ...payload,
     createdAt: Date.now(),
     createdBy: currentUser.name
-  });
+  })));
   return newRef.key;
-}
+}catch(error){if(error?.code!=='portal/access-lost')throw error;}}
 
 function addMonths(month, offset) {
   const [year, monthNumber] = month.split('-').map(Number);
@@ -1524,8 +1528,8 @@ function computedGoalAverage(goals, targetGoal, overrides = []) {
   };
 }
 
-async function syncGoalSelfPayRate(month, value) {
-  const snap = await get(ref(db, GOAL_DB_PATH));
+async function syncGoalSelfPayRate(month, value) {try{
+  const snap = await pageAwait(async () => (get(ref(db, GOAL_DB_PATH))));
   const goals = snap.val() || {};
   const entries = Object.entries(goals);
   const existing = entries.find(([, goal]) => goal.month === month && goal.item === '自費率');
@@ -1550,23 +1554,23 @@ async function syncGoalSelfPayRate(month, value) {
     updatedBy: currentUser.name
   };
   if (id) {
-    await set(ref(db, `${GOAL_DB_PATH}/${id}`), payload);
+    await pageAwait(async () => (set(ref(db, `${GOAL_DB_PATH}/${id}`), payload)));
   } else {
-    await push(ref(db, GOAL_DB_PATH), {
+    await pageAwait(async () => (push(ref(db, GOAL_DB_PATH), {
       ...payload,
       createdAt: Date.now(),
       createdBy: currentUser.name
-    });
+    })));
   }
-}
+}catch(error){if(error?.code!=='portal/access-lost')throw error;}}
 
-async function syncSelfPayRateForMonth(month, overrides = []) {
+async function syncSelfPayRateForMonth(month, overrides = []) {try{
   const data = selfPayRateMetricData(month, overrides);
   if (!data) return false;
-  await savePrivateMetricData(data);
-  await syncGoalSelfPayRate(month, data.value);
+  await pageAwait(async () => (savePrivateMetricData(data)));
+  await pageAwait(async () => (syncGoalSelfPayRate(month, data.value)));
   return true;
-}
+}catch(error){if(error?.code!=='portal/access-lost')throw error;}}
 
 function filteredMetrics() {
   const month = document.getElementById('monthFilter').value || currentMonth();
@@ -2048,6 +2052,7 @@ function categoryOptions(selectedCategory, item = '') {
 }
 
 function setImportStatus(message, type = '') {
+  if(!pageLifecycle.active)return;
   const el = document.getElementById('importStatus');
   if (!el) return;
   el.textContent = message;
@@ -2115,67 +2120,67 @@ function repairLegacyPdfText(text) {
     }
     const decoded = new TextDecoder('shift_jis').decode(new Uint8Array(bytes));
     return japaneseTextScore(decoded) > japaneseTextScore(source) + 2 ? decoded : source;
-  } catch (error) {
+  } catch (error) {if (pageLifecycle.active) {
     return source;
-  }
+  }}
 }
 
-async function readPdfText(file) {
-  const pdfjs = await loadPdfJs();
-  const pdf = await pdfjs.getDocument({ data: new Uint8Array(await file.arrayBuffer()) }).promise;
+async function readPdfText(file) {try{
+  const pdfjs = await pageAwait(async () => (loadPdfJs()));
+  const pdf = await pageAwait(async () => (pdfjs.getDocument({ data: new Uint8Array(await pageAwait(async () => (file.arrayBuffer()))) }).promise));
   const pages = [];
   for (let pageNo = 1; pageNo <= pdf.numPages; pageNo++) {
     setImportStatus(`PDF読み取り中 ${pageNo}/${pdf.numPages}`);
-    const page = await pdf.getPage(pageNo);
-    const content = await page.getTextContent();
+    const page = await pageAwait(async () => (pdf.getPage(pageNo)));
+    const content = await pageAwait(async () => (page.getTextContent()));
     pages.push(content.items.map(item => item.str).join('\n'));
   }
   const text = repairLegacyPdfText(pages.join('\n\n').trim());
   if (text.length >= 20) return text;
   setImportStatus('PDFに文字データが少ないためOCRに切り替えます');
   return readPdfByOcr(pdf);
-}
+}catch(error){if(error?.code!=='portal/access-lost')throw error;}}
 
-async function readPdfByOcr(pdf) {
-  const Tesseract = await loadTesseract();
+async function readPdfByOcr(pdf) {try{
+  const Tesseract = await pageAwait(async () => (loadTesseract()));
   const pages = [];
   const maxPages = Math.min(pdf.numPages, 5);
   for (let pageNo = 1; pageNo <= maxPages; pageNo++) {
     setImportStatus(`PDF画像OCR中 ${pageNo}/${maxPages}`);
-    const page = await pdf.getPage(pageNo);
+    const page = await pageAwait(async () => (pdf.getPage(pageNo)));
     const viewport = page.getViewport({ scale: 1.8 });
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
     canvas.width = Math.floor(viewport.width);
     canvas.height = Math.floor(viewport.height);
-    await page.render({ canvasContext: ctx, viewport }).promise;
-    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
-    const result = await Tesseract.recognize(blob, 'jpn+eng', {
+    await pageAwait(async () => (page.render({ canvasContext: ctx, viewport }).promise));
+    const blob = await pageAwait(async () => (new Promise(resolve => canvas.toBlob(resolve, 'image/png'))));
+    const result = await pageAwait(async () => (Tesseract.recognize(blob, 'jpn+eng', {
       logger: info => {
         if (info.status === 'recognizing text') {
           setImportStatus(`PDF画像OCR中 ${pageNo}/${maxPages} ${Math.round((info.progress || 0) * 100)}%`);
         }
       }
-    });
+    })));
     pages.push(result.data.text || '');
   }
   return pages.join('\n\n');
-}
+}catch(error){if(error?.code!=='portal/access-lost')throw error;}}
 
-async function readImageText(file) {
-  const Tesseract = await loadTesseract();
-  const result = await Tesseract.recognize(file, 'jpn+eng', {
+async function readImageText(file) {try{
+  const Tesseract = await pageAwait(async () => (loadTesseract()));
+  const result = await pageAwait(async () => (Tesseract.recognize(file, 'jpn+eng', {
     logger: info => {
       if (info.status) {
         const pct = typeof info.progress === 'number' ? ` ${Math.round(info.progress * 100)}%` : '';
         setImportStatus(`OCR中: ${info.status}${pct}`);
       }
     }
-  });
+  })));
   return result.data.text || '';
-}
+}catch(error){if(error?.code!=='portal/access-lost')throw error;}}
 
-async function extractTextFromFile(file) {
+async function extractTextFromFile(file) {try{
   if (!file) return '';
   if (file.size > 25 * 1024 * 1024) {
     throw new Error('25MB以下のファイルを選択してください');
@@ -2191,7 +2196,7 @@ async function extractTextFromFile(file) {
     return file.text();
   }
   throw new Error('PDF、画像、テキストファイルに対応しています');
-}
+}catch(error){if(error?.code!=='portal/access-lost')throw error;}}
 
 function normalizeImportText(text) {
   return String(text || '')
@@ -2493,7 +2498,7 @@ window.closeImportModal = function() {
   document.getElementById('importModal').classList.remove('open');
 };
 
-window.handleImportFile = async function(file) {
+window.handleImportFile = async function(file) {try{
   if (!file || !isAdmin()) return;
   importFileMeta = {
     name: file.name,
@@ -2508,16 +2513,16 @@ window.handleImportFile = async function(file) {
     document.getElementById('importRawText').value = '';
     importCandidates = [];
     renderImportCandidates();
-    const text = await extractTextFromFile(file);
+    const text = await pageAwait(async () => (extractTextFromFile(file)));
     document.getElementById('importRawText').value = text.trim();
     const inferredMonth = inferImportMonthFromText(text);
     if (inferredMonth) document.getElementById('importMonth').value = inferredMonth;
     setImportStatus(`読み取り完了: ${file.name}`, 'success');
     analyzeImportText();
-  } catch (error) {
+  } catch (error) {if (pageLifecycle.active) {
     setImportStatus(`読み取りに失敗しました: ${error.message}`, 'error');
-  }
-};
+  }}
+}catch(error){if(error?.code!=='portal/access-lost')throw error;}};
 
 window.analyzeImportText = function() {
   const rawText = document.getElementById('importRawText').value;
@@ -2541,7 +2546,7 @@ window.setAllImportCandidates = function(enabled) {
   renderImportCandidates();
 };
 
-window.saveImportCandidates = async function() {
+window.saveImportCandidates = async function() {try{
   if (!isAdmin() || saving) return;
   let selected = importCandidates
     .map(candidate => ({
@@ -2582,7 +2587,7 @@ window.saveImportCandidates = async function() {
         source: candidate.source || '',
         note: candidate.note || ''
       };
-      await savePrivateMetricData(data);
+      await pageAwait(async () => (savePrivateMetricData(data)));
       saved++;
       months.add(candidate.month);
     }
@@ -2591,11 +2596,11 @@ window.saveImportCandidates = async function() {
     for (const month of months) {
       const rateData = selfPayRateMetricData(month, selected);
       if (!rateData) continue;
-      await syncGoalSelfPayRate(month, rateData.value);
+      await pageAwait(async () => (syncGoalSelfPayRate(month, rateData.value)));
       syncedRates++;
     }
 
-    await push(ref(db, IMPORT_HISTORY_PATH), {
+    await pageAwait(async () => (push(ref(db, IMPORT_HISTORY_PATH), {
       fileName: importFileMeta?.name || '',
       fileType: importFileMeta?.type || '',
       fileSize: importFileMeta?.size || 0,
@@ -2604,20 +2609,20 @@ window.saveImportCandidates = async function() {
       importedRows: saved,
       months: Array.from(months).sort(),
       source: 'private-metrics-upload'
-    });
+    })));
 
     const firstMonth = Array.from(months).sort()[0];
     if (firstMonth) document.getElementById('monthFilter').value = firstMonth;
     closeImportModal();
     showToast(`${saved}件を取り込みました${syncedRates ? `（自費率${syncedRates}ヶ月分を自動計算）` : ''}`);
     render();
-  } catch (error) {
+  } catch (error) {if (pageLifecycle.active) {
     setImportStatus(`保存に失敗しました: ${error.message}`, 'error');
-  } finally {
+  }} finally {if (pageLifecycle.active) {
     saving = false;
     saveBtn.disabled = false;
-  }
-};
+  }}
+}catch(error){if(error?.code!=='portal/access-lost')throw error;}};
 
 window.openMetricModal = function(id = null) {
   if (!isAdmin()) return;
@@ -2653,7 +2658,7 @@ window.closeModalOnBackdrop = function(event) {
   if (event.target.id === 'importModal') closeImportModal();
 };
 
-window.saveMetric = async function() {
+window.saveMetric = async function() {try{
   if (!isAdmin() || saving) return;
   const month = document.getElementById('fMonth').value;
   const item = document.getElementById('fItem').value.trim();
@@ -2677,41 +2682,41 @@ window.saveMetric = async function() {
   try {
     if (editingId) {
       const existing = allMetrics[editingId] || {};
-      await set(ref(db, `${DB_PATH}/${editingId}`), { ...existing, ...data });
+      await pageAwait(async () => (set(ref(db, `${DB_PATH}/${editingId}`), { ...existing, ...data })));
       showToast('経営数値を更新しました');
     } else {
-      await push(ref(db, DB_PATH), {
+      await pageAwait(async () => (push(ref(db, DB_PATH), {
         ...data,
         createdAt: Date.now(),
         createdBy: currentUser.name
-      });
+      })));
       showToast('経営数値を登録しました');
     }
     if (['自費売上', '保険売上'].includes(canonicalMetricItem(item))) {
-      const synced = await syncSelfPayRateForMonth(month, [data]);
+      const synced = await pageAwait(async () => (syncSelfPayRateForMonth(month, [data])));
       if (synced) showToast('経営数値を保存し、自費率を自動計算しました');
     }
     document.getElementById('monthFilter').value = month;
     closeMetricModal();
-  } catch(e) {
+  } catch(e) {if (pageLifecycle.active) {
     showToast('保存に失敗しました: ' + e.message);
-  } finally {
+  }} finally {if (pageLifecycle.active) {
     saving = false;
     document.getElementById('saveBtn').disabled = false;
-  }
-};
+  }}
+}catch(error){if(error?.code!=='portal/access-lost')throw error;}};
 
-window.deleteMetric = async function() {
+window.deleteMetric = async function() {try{
   if (!isAdmin() || !editingId) return;
   if (!confirm('この経営数値を削除しますか？')) return;
   try {
-    await remove(ref(db, `${DB_PATH}/${editingId}`));
+    await pageAwait(async () => (remove(ref(db, `${DB_PATH}/${editingId}`))));
     closeMetricModal();
     showToast('削除しました');
-  } catch(e) {
+  } catch(e) {if (pageLifecycle.active) {
     showToast('削除に失敗しました: ' + e.message);
-  }
-};
+  }}
+}catch(error){if(error?.code!=='portal/access-lost')throw error;}};
 
 window.exportCSV = function() {
   if (!isAdmin()) return;
@@ -2742,17 +2747,20 @@ window.exportCSV = function() {
 };
 
 function showToast(message) {
+  if(!pageLifecycle.active)return;
   const toast = document.getElementById('toast');
   toast.textContent = message;
   toast.classList.add('show');
   clearTimeout(showToast.timer);
-  showToast.timer = setTimeout(() => toast.classList.remove('show'), 2800);
+  showToast.timer = pageLifecycle.timeout(() => toast.classList.remove('show'), 2800);
 }
 
 window.render = render;
 window.renderAnalysis = renderAnalysis;
 
 init();
+
+function onValue(target,next,error,...options){pageLifecycle.assertActive();return pageLifecycle.add(firebaseOnValue(target,pageLifecycle.guard(next),pageLifecycle.guard(error),...options));}
 </script>
 </body>
 </html>

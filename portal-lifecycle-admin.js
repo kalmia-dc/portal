@@ -1,8 +1,8 @@
 import {isLifecycleStopped,linkedAccounts,lifecycleProtection,performLifecycleChange} from './portal-lifecycle-model.mjs';
-export function setupLifecycleAdmin({actor,db,api,lock,isBusy,reload,defaultStaff}){
+export function setupLifecycleAdmin({actor,db,page={active:true},api,lock,isBusy,reload,defaultStaff}){
   const $=id=>document.getElementById(id),{get,ref,onValue,runTransaction,serverTimestamp}=api;
   let users={},roster=[],states={},ready=false,saving=false,selection=null,operationId='',completed=false;
-  const route=async mode=>{if(isBusy())return;if(await get(ref(db,'laborConfig/enabled')).then(s=>s.val()===true).catch(()=>false)){location.assign('./labor-management.html');return;}for(const el of document.querySelectorAll('[data-flow]'))el.hidden=el.dataset.flow!==mode;$('flowHome').hidden=!!mode;document.querySelector(`[data-flow="${mode}"] h2`)?.focus();};
+  const route=async mode=>{if(isBusy())return;if(await get(ref(db,'laborConfig/enabled')).then(s=>s.val()===true).catch(()=>false)){location.assign('./labor-management.html');return;}if(!page.active)return;for(const el of document.querySelectorAll('[data-flow]'))el.hidden=el.dataset.flow!==mode;$('flowHome').hidden=!!mode;document.querySelector(`[data-flow="${mode}"] h2`)?.focus();};
   $('startRegistration').onclick=()=>route('register');$('startRetirement').onclick=()=>route('retire');
   for(const b of document.querySelectorAll('[data-flow-back]'))b.onclick=()=>route('');
   function render(){
@@ -46,7 +46,7 @@ export function setupLifecycleAdmin({actor,db,api,lock,isBusy,reload,defaultStaf
     finally{saving=false;if($('lifecycleForm')){$('lifecycleForm').querySelectorAll('button,input').forEach(el=>el.disabled=false);if(!$('lifecycleDialog').open){lock(false);$('lifecycleLoadStatus').textContent=completed?'保存が完了しました。一覧を更新しました。':'保存結果を確認できません。同じ対象を選んで再試行するか、一覧を再読み込みしてください。';}}}
   };
   return {async load(currentRoster,currentUsers){roster=currentRoster;users=currentUsers;ready=false;
-    try{states=(await get(ref(db,'staffLifecycle'))).val()||{};ready=true;$('lifecycleLoadStatus').textContent='1. 対象のスタッフを選んでください。';}catch{$('lifecycleLoadStatus').textContent='状態を取得できないため停止操作はできません。通信・在籍状態用ルールを確認して再読み込みしてください。';}
+    try{states=(await get(ref(db,'staffLifecycle'))).val()||{};if(!page.active)return {states,ready:false};ready=true;$('lifecycleLoadStatus').textContent='1. 対象のスタッフを選んでください。';}catch{if(!page.active)return {states,ready:false};$('lifecycleLoadStatus').textContent='状態を取得できないため停止操作はできません。通信・在籍状態用ルールを確認して再読み込みしてください。';}
     render();return {states,ready};
-  },unavailable(){ready=false;$('lifecycleLoadStatus').textContent='状態を確認できません。一覧を再読み込みしてください。';render();},isStopped:sid=>isLifecycleStopped(states[sid])};
+  },unavailable(){if(!page.active)return;ready=false;$('lifecycleLoadStatus').textContent='状態を確認できません。一覧を再読み込みしてください。';render();},isStopped:sid=>isLifecycleStopped(states[sid])};
 }

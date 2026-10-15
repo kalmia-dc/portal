@@ -684,11 +684,7 @@ import {todayItems,localDay,noticeTargets} from "./portal-today.mjs?v=20261009-p
 // ─────────────────────────────────────────
 // スタッフ定義（シフトアプリと同じ）
 // ─────────────────────────────────────────
-const STAFF_ROLES = {
-  DR: ['杉平','嶋中','保刈','篠田'],
-  DH: ['鶴田','吉田','高木','松本','山田','ハノワ'],
-  DA: ['田宮','田中','百々']
-};
+
 
 const ROLE_LABELS = { DR:'歯科医師', DH:'歯科衛生士', DA:'受付・歯科助手' };
 
@@ -717,6 +713,7 @@ function readLocalPasswords() {
   try {
     return JSON.parse(localStorage.getItem('carmia_passwords') || '{}') || {};
   } catch(e) {
+    if (!rosterPage.active) return;
     return {};
   }
 }
@@ -737,8 +734,10 @@ async function ensurePasswordsLoaded() {
   if (passwordsReady) return;
   try {
     const snap = await get(ref(_db, 'passwords'));
+    if (!rosterPage.active) return;
     updatePasswordCache(snap.val() || {});
   } catch(e) {
+    if (!rosterPage.active) return;
     console.warn('パスワード同期に失敗しました:', e);
     passwordsReady = true;
   }
@@ -756,13 +755,7 @@ function isInvalidUserText(value) {
 }
 
 function roleFromStaffId(staffId) {
-  const roleMap = {
-    sugihira:'DR', shimanaka:'DR', hokari:'DR', shinoda:'DR',
-    tsuruta:'DH', yoshida:'DH', takagi:'DH', matsumoto:'DH', yamada:'DH', hanowa:'DH',
-    tamiya:'DA', tanaka:'DA', momo:'DA',
-    guest:'ゲスト'
-  };
-  return roleMap[staffId] || '';
+  return businessRoster.members.find(s=>s.id===staffId)?.role || '';
 }
 
 function normalizePortalUser(raw) {
@@ -800,7 +793,8 @@ function readStoredPortalUser() {
       if (!saved) continue;
       const user = normalizePortalUser(JSON.parse(saved));
       if (user) return savePortalUser(user);
-    } catch(e) {}
+    } catch(e) {
+    if (!rosterPage.active) return;}
   }
   return null;
 }
@@ -816,6 +810,7 @@ async function doLogin() {
   const err  = document.getElementById('loginError');
   if (!sel) { err.style.display='block'; err.textContent='スタッフを選択してください'; return; }
   await ensurePasswordsLoaded();
+  if (!rosterPage.active) return;
   // value形式: "名前|役職|初期PW|staffId"
   const [name, role, defaultPass, staffId] = sel.split('|');
   // パスワード照合：Firebase同期分 → localStorage変更分 → 初期値
@@ -868,6 +863,8 @@ async function submitPwChange() {
 
   await ensurePasswordsLoaded();
 
+  if (!rosterPage.active) return;
+
   // 現在パスワード取得（Firebase同期分 or localStorageの変更分 or 初期値）
   const stored   = readLocalPasswords();
   const sid      = currentUser.staffId;
@@ -892,7 +889,9 @@ async function submitPwChange() {
 
   try {
     await set(ref(_db, `passwords/${sid}`), newVal);
+    if (!rosterPage.active) return;
   } catch(e) {
+    if (!rosterPage.active) return;
     console.warn('パスワード保存に失敗しました:', e);
     msg.textContent = 'パスワード保存に失敗しました。通信状態を確認してください';
     msg.className = 'pw-msg err';
@@ -914,7 +913,7 @@ async function submitPwChange() {
   document.getElementById('pwNew').value  = '';
   document.getElementById('pwNew2').value = '';
 
-  setTimeout(closePwModal, 1500);
+  rosterPage.timeout(closePwModal, 1500);
 }
 
 // ─────────────────────────────────────────
@@ -925,12 +924,7 @@ const ADMIN_STAFF = ['sugihira', 'momo']; // 管理者アクセス可能なstaff
 
 function goToSkillApp() {
   if (!currentUser) return;
-  const roleMap = {
-    sugihira:'DR', shimanaka:'DR', hokari:'DR', shinoda:'DR',
-    tsuruta:'DH', yoshida:'DH', takagi:'DH', matsumoto:'DH', yamada:'DH',
-    tamiya:'DA受付', tanaka:'DA受付', momo:'DA助手'
-  };
-  const role = roleMap[currentUser.staffId] || 'DH';
+  const role = businessRoster.members.find(s=>s.id===currentUser.staffId)?.skillRole || currentUser.role;
   const SKILL_ADMINS = ['sugihira', 'momo', 'yamada'];
   const isAdmin = SKILL_ADMINS.includes(currentUser.staffId) ? '1' : '0';
   const params = new URLSearchParams({ sid: currentUser.staffId, name: currentUser.name, role, isAdmin });
@@ -1061,15 +1055,8 @@ function updateMenuVisibility() {
 // ─────────────────────────────────────────
 
 // staffId → staffName マップ
-const STAFF_ID_MAP = {
-  sugihira:'杉平', shimanaka:'嶋中', hokari:'保刈', shinoda:'篠田',
-  tsuruta:'鶴田',  yoshida:'吉田',  takagi:'高木', matsumoto:'松本',
-  yamada:'山田',   hanowa:'ハノワ',
-  tamiya:'田宮',   tanaka:'田中',   momo:'百々',
-  guest:'ゲスト'
-};
+let STAFF_ID_MAP = {};
 // staffName → staffId マップ（逆引き）
-const NAME_TO_ID = Object.fromEntries(Object.entries(STAFF_ID_MAP).map(([id,n])=>[n,id]));
 
 // シフトキー変換（シフトアプリ内部キー→表示名）
 const SHIFT_KEY_MAP = {
@@ -1084,15 +1071,17 @@ async function getMonthShifts(year, month) {
   if (_shiftCache[key] !== undefined) return _shiftCache[key];
   try {
     const snap = await get(ref(_db, `shifts/${key}`));
+    if (!rosterPage.active) return;
     _shiftCache[key] = snap.exists() ? snap.val() : null;
     return _shiftCache[key];
-  } catch(e) { return null; }
+  } catch(e) {
+    if (!rosterPage.active) return; return null; }
 }
 
-async function getShift(staffName, date) {
+async function getShift(sid, date) {
   const data = await getMonthShifts(date.getFullYear(), date.getMonth()+1);
+  if (!rosterPage.active) return;
   if (!data) return null;
-  const sid = NAME_TO_ID[staffName];
   if (!sid) return null;
   // Firebaseのキーは YYYY-MM-DD 形式
   const dateKey = `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
@@ -1160,11 +1149,13 @@ async function initApp() {
     timeEl.style.display = 'none';
     if (shiftGoBtn) shiftGoBtn.style.display = 'none';
   } else {
-    const s = await getShift(u.name, now);
+    const s = await getShift(u.staffId, now);
+    if (!rosterPage.active) return;
     if (shiftGoBtn) shiftGoBtn.style.display = '';
     if (s) {
       const info = {...(SHIFT_INFO[s] || { label:s, time:'', cls:'on' })};
       const ds=localDay(now),month=await getMonthShifts(now.getFullYear(),now.getMonth()+1);
+      if (!rosterPage.active) return;
       const manual=PortalShiftTime.manualTime(month,u.staffId,ds);
       if(manual)info.time=manual.start+'〜'+manual.end+' / 休憩'+manual.breakMinutes+'分 / 実働'+(Math.round(manual.workMinutes/60*100)/100)+'時間';
       timeEl.style.display='none';
@@ -1209,10 +1200,12 @@ async function initApp() {
   updateMenuVisibility();
 
   // 今週カレンダー
-  await buildWeek(now, u.name);
+  await buildWeek(now, u.staffId);
+  if (!rosterPage.active) return;
 
   // 本日出勤スタッフ
   await buildTodayStaff(now);
+  if (!rosterPage.active) return;
 
   // お知らせ（Firebase同期）
   applyUpdateDraftFromUrl();
@@ -1235,7 +1228,7 @@ async function initApp() {
   }
 }
 
-async function buildWeek(now, staffName) {
+async function buildWeek(now, staffId) {
   const el = document.getElementById('weekDays');
   el.innerHTML = '';
   const jsDay = now.getDay();
@@ -1250,7 +1243,8 @@ async function buildWeek(now, staffName) {
     const dt = new Date(mon); dt.setDate(mon.getDate()+i);
     const isToday = dt.toDateString()===now.toDateString();
     const isSat=i===5, isSun=i===6;
-    const s = await getShift(staffName, dt);
+    const s = await getShift(staffId, dt);
+    if (!rosterPage.active) return;
     let pill = '';
     if (s) {
       const info = SHIFT_INFO[s]||{label:s,cls:'on'};
@@ -1272,12 +1266,13 @@ async function buildWeek(now, staffName) {
 async function buildTodayStaff(now) {
   const sec = document.getElementById('todayStaffSection');
   const data = await getMonthShifts(now.getFullYear(), now.getMonth()+1);
+  if (!rosterPage.active) return;
   const ON_SHIFT_KEYS = ['early','late','fixed','admin']; // シフトアプリの出勤キー
   let html = '';
 
-  for (const [role, members] of Object.entries(STAFF_ROLES)) {
-    const attending = members.filter(name => {
-      const sid = NAME_TO_ID[name];
+  for (const role of ['DR','DH','DA']) {
+    const attending = businessRoster.members.filter(s=>s.role===role).filter(member => {
+      const sid = member.id;
       if (!sid) return false;
       const dateKey2 = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
       const raw = data?.[sid]?.[dateKey2];
@@ -1285,7 +1280,8 @@ async function buildTodayStaff(now) {
     });
     if (!attending.length) continue;
     html += `<div class="role-label">${role}（${ROLE_LABELS[role]}）</div><div class="staff-grid">`;
-    for (const name of attending) {
+    for (const member of attending) {
+      const name = escHtml(member.label);
       html += `<div class="staff-chip ${role.toLowerCase()}"><div class="staff-avatar-sm">${name[0]}</div>${name}</div>`;
     }
     html += `</div>`;
@@ -1299,6 +1295,8 @@ async function buildTodayStaff(now) {
 // ─────────────────────────────────────────
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import { getDatabase, ref, push, remove, onValue, get, set } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
+import {loadBusinessRoster} from './portal-business-roster.mjs';
+import {createPageLifecycle} from './portal-page-lifecycle.mjs';
 import { startPortalAuth } from './portal-auth.js?v=labor-20261014-2';
 
 const firebaseConfig = {
@@ -1314,9 +1312,25 @@ const firebaseConfig = {
 const _app = initializeApp(firebaseConfig);
 const _db  = getDatabase(_app);
 let laborManagementEnabled=null;
-const authenticatedProfile = await startPortalAuth(_app, { pageName:'院内ポータル' });
-try{const [enabled,owner]=await Promise.all([get(ref(_db,'laborConfig/enabled')),get(ref(_db,'laborConfig/owners/'+authenticatedProfile.uid))]);laborManagementEnabled=enabled.val()===true;if(laborManagementEnabled&&owner.val()===true)document.getElementById('laborManagementToolBtn').style.display='';document.getElementById('memberManagementToolBtn').style.display=authenticatedProfile.isAdmin&&!laborManagementEnabled?'block':'none';}catch{/* Not enabled on the existing portal yet. */}
+const rosterPage = createPageLifecycle();
+function watchPageValue(reference,next,error) {
+  if(!rosterPage.active)return ()=>{};
+  return rosterPage.add(onValue(reference,rosterPage.guard(next),rosterPage.guard(error || (()=>{}))));
+}
 
+const authenticatedProfile = await startPortalAuth(_app, { pageName:'院内ポータル' });
+rosterPage.assertActive();
+const businessRoster = await loadBusinessRoster({read:path=>get(ref(_db,path)).then(s=>s.val()),profile:authenticatedProfile});
+rosterPage.assertActive();
+STAFF_ID_MAP = Object.fromEntries(businessRoster.members.map(s=>[s.id,s.name]));
+if(businessRoster.issues.length) {
+  const warning=document.createElement('p'); warning.setAttribute('role','alert');
+  warning.textContent='名簿の一部が未確認です。表示・候補が最新でない可能性があります。再読み込みしてください。';
+  document.body.prepend(warning);
+}
+try{const [enabled,owner]=await Promise.all([get(ref(_db,'laborConfig/enabled')),get(ref(_db,'laborConfig/owners/'+authenticatedProfile.uid))]);rosterPage.assertActive();laborManagementEnabled=enabled.val()===true;if(laborManagementEnabled&&owner.val()===true)document.getElementById('laborManagementToolBtn').style.display='';document.getElementById('memberManagementToolBtn').style.display=authenticatedProfile.isAdmin&&!laborManagementEnabled?'block':'none';}catch{/* Not enabled on the existing portal yet. */}
+
+rosterPage.assertActive();
 updatePasswordCache({});
 
 // ─────────────────────────────────────────
@@ -1350,7 +1364,7 @@ const NOTICE_DEFAULT_DAYS = 30;
 function startNoticeSync() {
   loadPortalUpdateNotices();
   const noticesRef = ref(_db, 'notices');
-  onValue(noticesRef, snap => {
+  watchPageValue(noticesRef, snap => {
     _firebaseNotices = snap.val() || {};firebaseNoticeLoadState='ready';
     renderNotices();
   },()=>{_firebaseNotices={};firebaseNoticeLoadState='error';renderNotices();});
@@ -1363,6 +1377,7 @@ function goToAttendanceApp() {
 }
 
 function renderNotices() {
+  if (!rosterPage.active) return;
   const card    = document.getElementById('heroNoticeCard');
   const list    = document.getElementById('heroNoticeList');
   const postBtn = document.getElementById('noticePostBtn');
@@ -1432,6 +1447,7 @@ async function loadPortalUpdateNotices() {
   _portalUpdateNoticeLoadStarted = true;
   try {
     const res = await fetch(`${PORTAL_UPDATES_FILE}?v=${Date.now()}`, { cache: 'no-store' });
+    if (!rosterPage.active) return;
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     _portalUpdateNotices = normalizePortalUpdateNotices(await res.json());portalUpdateLoadState='ready';
   } catch (e) {
@@ -1575,6 +1591,7 @@ function buildNoticeLinkHref(url) {
     }
     return link.href;
   } catch(e) {
+    if (!rosterPage.active) return;
     return value;
   }
 }
@@ -1590,6 +1607,7 @@ function escAttr(str) {
 async function deleteNotice(key) {
   if (!confirm('この更新情報を削除しますか？')) return;
   await remove(ref(_db, `notices/${key}`));
+  if (!rosterPage.active) return;
 }
 
 function openNoticeModal(prefillText = '', options = {}) {
@@ -1674,10 +1692,12 @@ async function submitNotice() {
       author:    currentUser.name,
       createdAt: Date.now()
     });
+    if (!rosterPage.active) return;
     msg.textContent = '✅ 投稿しました';
     msg.className = 'pw-msg ok';
-    setTimeout(closeNoticeModal, 800);
+    rosterPage.timeout(closeNoticeModal, 800);
   } catch(e) {
+    if (!rosterPage.active) return;
     msg.textContent = '投稿に失敗しました';
     msg.className = 'pw-msg err';
   }
@@ -1705,8 +1725,11 @@ async function loadCalendar() {
       + `&singleEvents=true&orderBy=startTime&maxResults=20`;
 
     const res  = await fetch(url);
+
+    if (!rosterPage.active) return;
     if (!res.ok) throw new Error(`API error: ${res.status}`);
     const data = await res.json();
+    if (!rosterPage.active) return;
     const items = data.items || [];
 
     if (!items.length) {
@@ -1755,6 +1778,7 @@ async function loadCalendar() {
     board.innerHTML = html;
 
   } catch(e) {
+    if (!rosterPage.active) return;
     board.innerHTML = `<div class="no-data-msg" style="text-align:center;padding:16px 0;color:var(--coral);">予定の読み込みに失敗しました<br><span style="font-size:11px;">${e.message}</span></div>`;
   }
 }
@@ -1780,7 +1804,7 @@ function renderTodayActions(){
 }
 function watchToday(key,path,label){
  todayPending.add(label);renderTodayActions();
- onValue(ref(_db,path),snap=>{todayPending.delete(label);todaySources[key]=snap.val()||{};todayErrors.delete(label);renderTodayActions();},()=>{todayPending.delete(label);delete todaySources[key];todayErrors.add(label);renderTodayActions();});
+ watchPageValue(ref(_db,path),snap=>{todayPending.delete(label);todaySources[key]=snap.val()||{};todayErrors.delete(label);renderTodayActions();},()=>{todayPending.delete(label);delete todaySources[key];todayErrors.add(label);renderTodayActions();});
 }
 function loadMyTasks(staffName){
  if(todayExtraStarted)return;todayExtraStarted=true;
@@ -1807,6 +1831,7 @@ async function loadScheduleEvents(staffId) {
   todayPending.add('日程調整');renderTodayActions();
   try {
     const snap = await get(ref(_db, 'scheduling/events'));
+    if (!rosterPage.active) return;
     const all  = snap.val() || {};
     todaySources.schedule=all;todayPending.delete('日程調整');todayErrors.delete('日程調整');renderTodayActions();
     const today = localDay();
@@ -1857,6 +1882,7 @@ async function loadScheduleEvents(staffId) {
     }
 
   } catch(e) {
+    if (!rosterPage.active) return;
     todayPending.delete('日程調整');todayErrors.add('日程調整');renderTodayActions();
     console.warn('日程調整読み込みエラー:', e);
   }

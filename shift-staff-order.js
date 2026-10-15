@@ -59,12 +59,13 @@ async function saveStaffOrder(){
       if(currentUser?.role!=='admin'||!window._fb.shiftConnected||draft.roster!==staffRosterSignature()||!sameStaffMonthState(current,draft.expected))return;
       return record;
     },{applyLocally:false});
+    if(window.portalAccessLost)return;
     if(!result.committed)throw Error('他の管理者の変更またはスタッフ構成の変更があります。閉じて確認し直してください。');
     staffOrderRecord=result.snapshot.val();manualSavePending=false;closeStaffOrder();render();
     document.getElementById('staffMonthStatus').textContent='スタッフ表示順を保存しました。全管理者・全月で共通です。';
   }catch(e){error.textContent='保存できません：'+e.message;}
   finally{
-    manualSavePending=false;document.getElementById('staffOrderModal').querySelectorAll('button').forEach(el=>el.disabled=false);
-    if(staffOrderDraft)renderStaffOrderDraft();
+    manualSavePending=false;document.getElementById('staffOrderModal')?.querySelectorAll('button').forEach(el=>el.disabled=false);
+    if(!window.portalAccessLost&&staffOrderDraft)renderStaffOrderDraft();
   }
 }

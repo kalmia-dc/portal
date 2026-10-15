@@ -32,13 +32,17 @@
   <a class="secondary" href="./index.html">ポータルへ戻る</a>
 </main>
 <script type="module">
+import {createPageLifecycle} from './portal-page-lifecycle.mjs';
+const pageLifecycle=createPageLifecycle();
+async function pageAwait(work){pageLifecycle.assertActive();let result;try{result=await work();}catch(error){pageLifecycle.assertActive();throw error;}pageLifecycle.assertActive();return result;}
+
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import { startPortalAuth, signOutPortal } from './portal-auth.js?v=labor-20261014-2';
 
 const firebaseConfig={apiKey:'AIzaSyDdMe7feUF6CKPHH0YIx7Suk-WnXtOYUu8',authDomain:'kalmia-shift.firebaseapp.com',databaseURL:'https://kalmia-shift-default-rtdb.asia-southeast1.firebasedatabase.app',projectId:'kalmia-shift',storageBucket:'kalmia-shift.firebasestorage.app',messagingSenderId:'714175473480',appId:'1:714175473480:web:7d6626a46e4a9dcb1fb57d'};
 const MODE_KEY='portalTerminalMode';
 const app=initializeApp(firebaseConfig);
-const profile=await startPortalAuth(app,{pageName:'共用PC 端末設定'});
+const profile=await pageAwait(async () => (startPortalAuth(app,{pageName:'共用PC 端末設定'})));
 if(profile.portalRole!=='admin'){
   document.body.innerHTML='<main><h1>管理者専用です</h1><p>共用PCの用途設定は、管理者アカウントで行ってください。</p><button id="limitedSignOut" class="secondary" type="button">ログアウト</button></main>';
   document.getElementById('limitedSignOut').addEventListener('click',signOutPortal);
@@ -50,7 +54,7 @@ if(profile.portalRole!=='admin'){
     buttons.forEach(button=>button.classList.toggle('selected',button.dataset.mode===selected));
     status.textContent=selected==='attendance'?'現在の設定：打刻端末':selected==='meeting'?'現在の設定：ミーティング閲覧端末':'用途が未設定です';
   }
-  buttons.forEach(button=>button.addEventListener('click',()=>{localStorage.setItem(MODE_KEY,button.dataset.mode);render()}));
+  buttons.forEach(button=>button.addEventListener('click',()=>{if(!pageLifecycle.active)return;localStorage.setItem(MODE_KEY,button.dataset.mode);render()}));
   document.getElementById('signOutButton').addEventListener('click',signOutPortal);
   document.getElementById('app').hidden=false;
   render();

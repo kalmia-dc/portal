@@ -1574,6 +1574,7 @@
       <div class="field">
         <label for="fOwner">入力担当</label>
         <input type="text" id="fOwner" placeholder="例：百々">
+        <select id="fOwnerStaffId"><option value="">未紐付け・自由記入</option></select>
       </div>
       <div class="field full">
         <label for="fNote">メモ</label>
@@ -1672,10 +1673,16 @@
 
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getDatabase, ref, push, set, remove, onValue, get }
+import { getDatabase, ref, push as firebasePush, set as firebaseSet, remove as firebaseRemove, onValue as firebaseOnValue, get as firebaseGet }
   from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 import { startPortalAuth } from './portal-auth.js?v=labor-20261014-2';
 
+import { createPageLifecycle } from './portal-page-lifecycle.mjs';
+import { loadBusinessRoster } from './portal-business-roster.mjs';
+const pageLifecycle = createPageLifecycle();
+const activeCall = fn => async (...args) => { pageLifecycle.assertActive(); const value=await fn(...args); pageLifecycle.assertActive(); return value; };
+const get=activeCall(firebaseGet), set=activeCall(firebaseSet), push=activeCall(firebasePush), remove=activeCall(firebaseRemove);
+const onValue = (query, next, error) => pageLifecycle.add(firebaseOnValue(query, pageLifecycle.guard(next), pageLifecycle.guard(error || (() => {}))));
 const firebaseConfig = {
   apiKey:            'AIzaSyDdMe7feUF6CKPHH0YIx7Suk-WnXtOYUu8',
   authDomain:        'kalmia-shift.firebaseapp.com',
@@ -1689,6 +1696,9 @@ const firebaseConfig = {
 const fbApp = initializeApp(firebaseConfig);
 const db = getDatabase(fbApp);
 const authenticatedProfile = await startPortalAuth(fbApp, { pageName:'目標管理' });
+pageLifecycle.assertActive();
+const businessRoster = await loadBusinessRoster({read: path => get(ref(db, path)).then(s => s.val()), profile: authenticatedProfile});
+pageLifecycle.assertActive();
 const DB_PATH = 'monthlyGoals';
 const TARGET_DB_PATH = 'halfYearGoalTargets';
 const PRIVATE_METRICS_PATH = 'privateMetrics';
@@ -1702,21 +1712,7 @@ const PDFJS_CMAP_URL = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/cmaps/'
 const PDFJS_STANDARD_FONT_DATA_URL = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/standard_fonts/';
 const TESSERACT_URL = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
 const EXCLUDED_GOAL_ITEMS = new Set(['物販売上']);
-const STAFF_NAMES = {
-  sugihira: '杉平院長',
-  shimanaka: '嶋中',
-  hokari: '保刈',
-  shinoda: '篠田',
-  tsuruta: '鶴田',
-  yoshida: '吉田',
-  takagi: '高木',
-  matsumoto: '松本',
-  yamada: '山田',
-  hanowa: 'ハノワ',
-  tamiya: '田宮',
-  tanaka: '田中',
-  momo: '百々'
-};
+const STAFF_NAMES = Object.fromEntries(businessRoster.members.map(m => [m.id, m.name]));
 
 const TEMPLATE_ITEMS = [
   { department: '全体', item: '初診', unit: '人', direction: 'up', detail: '月計表の新患数から初診数を引き、再初診数を足して確認', currentValue: '', targetValue: '45', history: [{ label: '1月', value: '23' }, { label: '2月', value: '33' }, { label: '3月', value: '37' }] },
@@ -2375,6 +2371,7 @@ function periodGoalGroups(periodMonth) {
         detail: goal.detail || '',
         direction: goal.direction || 'up',
         owner: goal.owner || '',
+        ownerStaffId: goal.ownerStaffId || '',
         note: goal.note || '',
         rows: [],
         rowsByMonth: {}
@@ -2394,6 +2391,7 @@ function periodGoalGroups(periodMonth) {
     group.detail = latest.detail || group.detail;
     group.direction = latest.direction || group.direction;
     group.owner = latest.owner || group.owner;
+    group.ownerStaffId = latest.ownerStaffId || "";
     group.note = latest.note || group.note;
     group.targetRecord = halfYearTargetForGroup(group);
     group.targetValue = targetValueForGroup(group);
@@ -2454,6 +2452,7 @@ function filteredGoalGroups() {
 }
 
 function render() {
+  if (!pageLifecycle.active) return;
   populateEntryMonthFilter();
   const periodMonth = selectedPeriodMonth();
   const goalsForPeriod = periodGoals(periodMonth);
@@ -3479,6 +3478,7 @@ window.handleImportFile = async function(file) {
     importCandidates = [];
     renderImportCandidates();
     const text = await extractTextFromFile(file);
+    if (!pageLifecycle.active) return;
     document.getElementById('importRawText').value = text.trim();
     const inferredMonth = inferImportMonthFromText(text);
     if (inferredMonth) document.getElementById('importMonth').value = inferredMonth;
@@ -3607,6 +3607,7 @@ window.saveImportCandidates = async function() {
   } catch (error) {
     setImportStatus(`保存に失敗しました: ${error.message}`, 'error');
   } finally {
+    if (!pageLifecycle.active) return;
     saveBtn.disabled = false;
   }
 };
@@ -3619,7 +3620,8 @@ function defaultGoalForGroup(group, month) {
     detail: group.detail,
     direction: group.direction,
     targetValue: targetValueForGroup(group),
-    owner: currentUser.name,
+    owner: group.owner || currentUser.name,
+    ownerStaffId: group.owner ? (group.ownerStaffId || "") : currentUser.staffId,
     note: group.note || ''
   };
 }
@@ -3638,6 +3640,7 @@ async function saveHalfYearTarget(periodMonth, item, unit, targetValue, defaults
     detail: defaults.detail ?? existing?.detail ?? '',
     targetValue: value,
     owner: defaults.owner || existing?.owner || currentUser.name,
+    ownerStaffId: defaults.ownerStaffId ?? (defaults.owner && defaults.owner !== existing?.owner ? '' : (existing?.ownerStaffId || (!existing && !defaults.owner ? currentUser.staffId : ''))),
     note: defaults.note ?? existing?.note ?? '',
     updatedAt: Date.now(),
     updatedBy: currentUser.name
@@ -3660,6 +3663,7 @@ async function saveHalfYearTargetForGroup(group, targetValue) {
     direction: group.direction,
     detail: group.detail,
     owner: group.owner || currentUser.name,
+    ownerStaffId: group.owner ? (group.ownerStaffId || "") : currentUser.staffId,
     note: group.note || ''
   });
 }
@@ -3695,7 +3699,7 @@ window.openQuickGoalInput = function(groupKey, month, fieldKey) {
     : (row?.[quickFieldDataKey(fieldKey)] ?? '');
   document.getElementById('quickInputSaveBtn').disabled = false;
   document.getElementById('quickInputModal').classList.add('open');
-  window.setTimeout(() => {
+  pageLifecycle.timeout(() => {
     const input = document.getElementById('quickInputValue');
     input.focus();
     input.select();
@@ -3766,6 +3770,7 @@ window.saveQuickGoalInput = async function() {
     showToast('保存に失敗しました: ' + e.message);
     document.getElementById('quickInputSaveBtn').disabled = false;
   } finally {
+    if (!pageLifecycle.active) return;
     saving = false;
   }
 };
@@ -3803,6 +3808,13 @@ window.openGoalModal = function(id = null, defaults = {}) {
   setFormValue('fTarget', modalTargetValue);
   setFormValue('fActual', goal ? actualValueForGoal({ id, ...goal }) : '');
   setFormValue('fOwner', goal?.owner || defaults.owner || currentUser.name);
+  const ownerSelect=document.getElementById('fOwnerStaffId'); ownerSelect.replaceChildren(new Option('未紐付け・自由記入',''));
+  const savedId=goal?.ownerStaffId || defaults.ownerStaffId || (!goal && !defaults.owner ? currentUser.staffId : '');
+  for(const member of businessRoster.members.filter(m => m.availability !== 'stopped' || m.id===savedId)) ownerSelect.add(new Option(member.label,member.id));
+  if(savedId && ![...ownerSelect.options].some(o => o.value===savedId)) ownerSelect.add(new Option((goal?.owner || defaults.owner || savedId)+'（履歴）',savedId));
+  ownerSelect.value=savedId;
+  ownerSelect.onchange=() => {const member=businessRoster.members.find(m=>m.id===ownerSelect.value);if(member)setFormValue('fOwner',member.name);};
+  document.getElementById('fOwner').oninput=()=>{ownerSelect.value='';};
   setFormValue('fNote', goal?.note || defaults.note || '');
 
   const history = goal ? normalizeHistory(historyForDisplay({ id, ...goal })) : blankHistory();
@@ -3820,7 +3832,7 @@ window.openGoalModal = function(id = null, defaults = {}) {
 window.openGoalHistory = function(id) {
   if (!isEditor()) return;
   openGoalModal(id);
-  window.setTimeout(() => {
+  pageLifecycle.timeout(() => {
     const historySection = document.getElementById('historySection');
     historySection?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     for (let i = 1; i <= HISTORY_MONTH_COUNT; i++) {
@@ -3874,6 +3886,7 @@ window.saveGoal = async function() {
     currentValue: document.getElementById('fCurrent').value.trim(),
     actualValue: document.getElementById('fActual').value.trim(),
     owner: document.getElementById('fOwner').value.trim(),
+    ownerStaffId: document.getElementById('fOwnerStaffId').value,
     note: document.getElementById('fNote').value.trim(),
     history: Array.from({ length: HISTORY_MONTH_COUNT }, (_, index) => index + 1).map(i => ({
       label: document.getElementById(`fHistoryLabel${i}`).value.trim(),
@@ -3892,6 +3905,7 @@ window.saveGoal = async function() {
         direction: data.direction,
         detail: data.detail,
         owner: data.owner,
+        ownerStaffId: data.ownerStaffId,
         note: data.note
       });
     }
@@ -3917,6 +3931,7 @@ window.saveGoal = async function() {
   } catch(e) {
     showToast('保存に失敗しました: ' + e.message);
   } finally {
+    if (!pageLifecycle.active) return;
     saving = false;
     document.getElementById('saveBtn').disabled = false;
   }
@@ -3957,6 +3972,7 @@ window.seedTemplates = async function() {
         currentValue: templateRow.currentValue ?? '',
         actualValue: '',
         owner: currentUser.name,
+    ownerStaffId: currentUser.staffId,
         note: '',
         history: normalizeHistory(templateRow.history),
         createdAt: Date.now(),
@@ -4027,11 +4043,12 @@ function historyCsvValue(goal, index) {
 }
 
 function showToast(message) {
+  if (!pageLifecycle.active) return;
   const toast = document.getElementById('toast');
   toast.textContent = message;
   toast.classList.add('show');
   clearTimeout(showToast.timer);
-  showToast.timer = setTimeout(() => toast.classList.remove('show'), 2800);
+  showToast.timer = pageLifecycle.timeout(() => toast.classList.remove('show'), 2800);
 }
 
 window.render = render;
