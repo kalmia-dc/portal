@@ -4268,26 +4268,30 @@ function printShift(){
   const y=currentYear, m=currentMonth, days=daysInMonth(y,m);
   const dowNames=['日','月','火','水','木','金','土'];
   const escapePrint=(value)=>String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  // Preserve the existing print roster and role order. Pagination changes presentation only.
+  // Group presentation only; retain every staff member, including unknown roles/types.
   const staff=orderedShiftStaff();
-  const roster=[
-    ...staff.filter(s=>s.role==='DR'&&['full','director','part'].includes(s.type)),
-    ...staff.filter(s=>s.role==='DH'),
-    ...staff.filter(s=>s.role==='DA'&&['full','part'].includes(s.type))
+  const groups=[
+    {label:'DR',staff:staff.filter(s=>s.role==='DR')},
+    {label:'DH・DA',staff:staff.filter(s=>s.role==='DH'||s.role==='DA')},
+    {label:'その他・職種未設定',staff:staff.filter(s=>!['DR','DH','DA'].includes(s.role))}
   ];
   const ranges=[[1,15],[16,days]];
   const batches=[];
-  for(let i=0;i<roster.length;i+=7)batches.push(roster.slice(i,i+7));
-  if(!batches.length)batches.push([]);
+  for(const group of groups){
+    const total=Math.ceil(group.staff.length/7);
+    for(let i=0;i<group.staff.length;i+=7)batches.push({label:group.label,staff:group.staff.slice(i,i+7),index:i/7+1,total});
+  }
+  if(!batches.length){alert('印刷対象のスタッフがいません。');return;}
   const totalPages=ranges.length*batches.length;
   const labels={early:'通常',late:'遅出',off:'公休',paid:'有給',wish:'希望',fixed:'通常',admin:'事務',hanowa:'HW',none:'─',clinic:'規定休'};
   const classes={early:'early',late:'late',off:'off',paid:'paid',wish:'wish',fixed:'early',admin:'early',hanowa:'hanowa',none:'off-day'};
   let html='',page=0;
   for(const [first,last] of ranges){
     for(let batchIndex=0;batchIndex<batches.length;batchIndex++){
+      const batch=batches[batchIndex];
       page++;
       html+=`<section class="print-sheet"><div class="print-header"><h1>${y}年${m+1}月 シフト表</h1><span class="print-page">${page} / ${totalPages} ページ</span></div>`;
-      html+=`<p class="print-subtitle">カルミアデンタルクリニック　｜　${first}日〜${last}日　｜　スタッフ ${batchIndex+1} / ${batches.length}</p>`;
+      html+=`<p class="print-subtitle">カルミアデンタルクリニック　｜　${first}日〜${last}日　｜　${batch.label}　｜　スタッフ ${batch.index} / ${batch.total}</p>`;
       html+=`<div class="print-legend">通常・遅出・事務・HW＝勤務区分　／　公休・有給・希望・規定休＝休暇区分<br>個別設定の時間はセル内に出勤・退勤・休憩分を表示。氏名下は月全体の合計時間です。</div>`;
       html+=`<table class="print-table"><colgroup><col style="width:28mm">${'<col>'.repeat(last-first+1)}</colgroup><thead><tr><th class="staff-col" scope="col">スタッフ</th>`;
       for(let d=first;d<=last;d++){
@@ -4296,8 +4300,8 @@ function printShift(){
         html+=`<th class="${cls}" scope="col">${d}<br><small>${dowNames[dd]}</small></th>`;
       }
       html+='</tr></thead><tbody>';
-      for(const s of batches[batchIndex]){
-        html+=`<tr class="print-staff-row"><th class="staff-col" scope="row"><span class="staff-name">${escapePrint(s.name)}</span><span class="staff-meta">${escapePrint(s.role)} ・ ${getHours(s.id,y,m)}h/月</span></th>`;
+      for(const s of batch.staff){
+        html+=`<tr class="print-staff-row"><th class="staff-col" scope="row"><span class="staff-name">${escapePrint(s.name)}</span><span class="staff-meta">${escapePrint(s.role||'職種未設定')} ・ ${getHours(s.id,y,m)}h/月</span></th>`;
         for(let d=first;d<=last;d++){
           const ds=dateStr(y,m,d);
           if(isOffDay(y,m,d)&&!isClinicDay(ds)){html+='<td class="print-off-day">─</td>';continue;}
