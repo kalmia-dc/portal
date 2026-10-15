@@ -822,91 +822,44 @@
   .status-pill.ng { background: #FFEBEE; color: var(--red); }
   /* ── 印刷スタイル ── */
   @media print {
-    body { margin:0; padding:0; }
+    @page { size:A4 landscape; margin:10mm; }
+    body { margin:0; padding:0; background:#fff; }
     #loginScreen, #mainApp, #staffScreen, .modal-overlay { display:none !important; }
-    #printArea {
-      display:block !important;
-      width:100%;
-      font-family:'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif;
-    }
-    .print-header {
-      font-size:15pt; font-weight:800;
-      margin-bottom:6px; text-align:center;
-      letter-spacing:.08em; color:#1a2e44;
-    }
-    .print-legend {
-      display:flex; gap:12px; justify-content:center;
-      margin-bottom:6px; font-size:7.5pt;
-    }
-    .print-legend-item {
-      display:flex; align-items:center; gap:3px;
-    }
-    .print-legend-dot {
-      width:10px; height:10px; border-radius:2px; display:inline-block;
-    }
-    .print-table {
-      border-collapse:collapse; width:100%;
-      table-layout:fixed;
-    }
-    .print-table th {
-      background:#2C5F82 !important;
-      color:#fff !important;
-      font-size:8pt; font-weight:700;
-      padding:4px 1px; text-align:center;
-      border:1px solid #1a4060;
-      line-height:1.3;
-      -webkit-print-color-adjust:exact;
-      print-color-adjust:exact;
-    }
-    .print-table th.print-sunday,
-    .print-table th.print-holiday { background:#B71C1C !important; color:#fff !important; }
-    .print-table th.print-saturday { background:#1565C0 !important; color:#fff !important; }
-    .print-table th.print-off-day  { background:#78909C !important; color:#fff !important; }
-    .print-table td {
-      font-size:8.5pt; font-weight:600;
-      padding:5px 1px; text-align:center;
-      border:1px solid #ccc;
-      line-height:1.2;
-    }
-    .print-table .staff-col {
-      text-align:left; font-weight:700;
-      font-size:9pt; padding:5px 5px;
-      width:48px; background:#F0F4F8 !important;
-      color:#1a2e44;
-      border-right:2px solid #2C5F82;
-      -webkit-print-color-adjust:exact;
-      print-color-adjust:exact;
-    }
-    /* シフト種別カラー */
-    .print-early {
-      background:#FFFFFF !important; color:#1a2e44 !important;
-      -webkit-print-color-adjust:exact; print-color-adjust:exact;
-    }
-    .print-late {
-      background:#FFF3CD !important; color:#7B4F00 !important;
-      -webkit-print-color-adjust:exact; print-color-adjust:exact;
-    }
-    .print-paid {
-      background:#E2D9F3 !important; color:#4A148C !important;
-      -webkit-print-color-adjust:exact; print-color-adjust:exact;
-    }
-    .print-wish {
-      background:#FFE5CC !important; color:#7B3100 !important;
-      -webkit-print-color-adjust:exact; print-color-adjust:exact;
-    }
-    .print-hanowa {
-      background:#FCE4EC !important; color:#880E4F !important;
-      -webkit-print-color-adjust:exact; print-color-adjust:exact;
-    }
-    .print-off {
-      background:#F8F9FA !important; color:#AAAAAA !important;
-      -webkit-print-color-adjust:exact; print-color-adjust:exact;
-    }
-    .print-off-day {
-      background:#ECEFF1 !important; color:#B0BEC5 !important;
-      -webkit-print-color-adjust:exact; print-color-adjust:exact;
-    }
-    @page { size:A4 landscape; margin:6mm 8mm; }
+    #printArea { display:block !important; width:100%; color:#172b3a;
+      font-family:'Noto Sans JP','Yu Gothic',sans-serif; }
+    #printArea * { box-sizing:border-box; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+    .print-sheet { break-after:page; page-break-after:always; }
+    .print-sheet:last-child { break-after:auto; page-break-after:auto; }
+    .print-header { display:flex; align-items:baseline; justify-content:space-between; margin:0 0 2mm; }
+    .print-header h1 { font-size:17pt; margin:0; }
+    .print-page { font-size:10pt; font-weight:700; }
+    .print-subtitle { font-size:10pt; margin:0 0 2mm; }
+    .print-legend { font-size:8.5pt; line-height:1.5; margin-bottom:3mm; }
+    .print-table { width:100%; table-layout:fixed; border-collapse:collapse; }
+    .print-table thead { display:table-header-group; }
+    .print-table tr { break-inside:avoid; page-break-inside:avoid; }
+    .print-table th,.print-table td { border:.25mm solid #9ba9b2; text-align:center; padding:1mm .4mm; font-size:9pt; line-height:1.15; }
+    .print-table thead th { height:10mm; font-size:11pt; background:#e5edf4 !important; color:#172b3a !important; }
+    .print-table thead small { font-size:9pt; }
+    .print-table .staff-col { width:28mm; text-align:left; padding:1.5mm; background:#f1f5f8 !important; border-right:.5mm solid #607788; overflow-wrap:anywhere; }
+    .print-staff-row { height:15mm; }
+    .print-table .staff-name { font-size:10pt; font-weight:700; }
+    .print-table .staff-meta { display:block; font-size:8.5pt; font-weight:400; margin-top:1mm; }
+    .print-shift-label { font-size:10pt; font-weight:700; }
+    .print-time { display:block; font-size:9pt; font-variant-numeric:tabular-nums; white-space:nowrap; }
+    .print-break { display:block; font-size:8.5pt; white-space:nowrap; }
+    .print-count-row { height:7mm; font-size:10pt; font-weight:700; background:#edf2f6 !important; }
+    .print-count-row .staff-col { font-size:9pt; }
+    .print-note { font-size:8.5pt; line-height:1.5; margin:2mm 0 0; }
+    .print-early { background:#fff !important; }
+    .print-late { background:#fff0bd !important; color:#634300 !important; }
+    .print-paid { background:#e8ddf6 !important; color:#46205e !important; }
+    .print-wish { background:#ffe5cc !important; color:#713500 !important; }
+    .print-hanowa { background:#fce4ec !important; color:#7c2547 !important; }
+    .print-off { background:#f7f8fa !important; color:#4b5660 !important; }
+    .print-off-day { background:#e6ebef !important; color:#4b5660 !important; }
+    .print-table thead .print-sunday { color:#9f2020 !important; }
+    .print-table thead .print-saturday { color:#145f99 !important; }
   }
   #editModal .modal { max-width:calc(100vw - 24px); max-height:90vh; overflow-y:auto; }
   #editModal .modal-actions { flex-wrap:wrap; }
@@ -1340,6 +1293,10 @@
   <div class="modal">
     <h2 id="modalTitle">シフト編集</h2>
     <div class="modal-grid" id="shiftChoices"></div>
+    <div id="drTimePreset" style="display:none;margin:12px 0">
+      <button type="button" class="btn btn-secondary" onclick="applyDrTimePreset()">常勤DR 9:00〜18:00・休憩90分</button>
+      <p style="font-size:.8rem;line-height:1.6;margin:6px 0">休憩13:30〜15:00・実働7時間30分。通常勤務の時間指定として入力します。保存するまで反映されません。</p>
+    </div>
     <div id="manualTimeEditor" style="margin:16px 0">
       <label><input type="checkbox" id="manualTimeEnabled" onchange="refreshManualTimeEditor()"> 時間を手動設定</label>
       <div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:12px">
@@ -4230,105 +4187,63 @@ function generateShift(){
 }
 
 function printShift(){
-  const y=currentYear, m=currentMonth;
-  const days=daysInMonth(y,m);
+  const y=currentYear, m=currentMonth, days=daysInMonth(y,m);
   const dowNames=['日','月','火','水','木','金','土'];
-  const monthStr=`${y}年${m+1}月 シフト表`;
-
-  // 印刷対象スタッフ（役職グループ別）
-  const drStaff=orderedShiftStaff().filter(s=>s.role==='DR'&&(s.type==='full'||s.type==='director'||s.type==='part'));
-  const dhStaff=orderedShiftStaff().filter(s=>s.role==='DH');
-  const daStaff=orderedShiftStaff().filter(s=>s.role==='DA'&&(s.type==='full'||s.type==='part'));
-
-  // ヘッダー行生成
-  const makeHeader=()=>{
-    let h=`<tr><th class="staff-col">スタッフ</th>`;
-    for(let d=1;d<=days;d++){
-      const dd=dow(y,m,d);
-      const ds=dateStr(y,m,d);
-      const off=isOffDay(y,m,d);
-      const cls=off?'print-off-day':HOLIDAYS[ds]||dd===0?'print-sunday':dd===6?'print-saturday':'';
-      h+=`<th class="${cls}">${d}<br><small>${dowNames[dd]}</small></th>`;
+  const escapePrint=(value)=>String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  // Preserve the existing print roster and role order. Pagination changes presentation only.
+  const staff=orderedShiftStaff();
+  const roster=[
+    ...staff.filter(s=>s.role==='DR'&&['full','director','part'].includes(s.type)),
+    ...staff.filter(s=>s.role==='DH'),
+    ...staff.filter(s=>s.role==='DA'&&['full','part'].includes(s.type))
+  ];
+  const ranges=[[1,15],[16,days]];
+  const batches=[];
+  for(let i=0;i<roster.length;i+=7)batches.push(roster.slice(i,i+7));
+  if(!batches.length)batches.push([]);
+  const totalPages=ranges.length*batches.length;
+  const labels={early:'通常',late:'遅出',off:'公休',paid:'有給',wish:'希望',fixed:'通常',admin:'事務',hanowa:'HW',none:'─',clinic:'規定休'};
+  const classes={early:'early',late:'late',off:'off',paid:'paid',wish:'wish',fixed:'early',admin:'early',hanowa:'hanowa',none:'off-day'};
+  let html='',page=0;
+  for(const [first,last] of ranges){
+    for(let batchIndex=0;batchIndex<batches.length;batchIndex++){
+      page++;
+      html+=`<section class="print-sheet"><div class="print-header"><h1>${y}年${m+1}月 シフト表</h1><span class="print-page">${page} / ${totalPages} ページ</span></div>`;
+      html+=`<p class="print-subtitle">カルミアデンタルクリニック　｜　${first}日〜${last}日　｜　スタッフ ${batchIndex+1} / ${batches.length}</p>`;
+      html+=`<div class="print-legend">通常・遅出・事務・HW＝勤務区分　／　公休・有給・希望・規定休＝休暇区分<br>個別設定の時間はセル内に出勤・退勤・休憩分を表示。氏名下は月全体の合計時間です。</div>`;
+      html+=`<table class="print-table"><colgroup><col style="width:28mm">${'<col>'.repeat(last-first+1)}</colgroup><thead><tr><th class="staff-col" scope="col">スタッフ</th>`;
+      for(let d=first;d<=last;d++){
+        const dd=dow(y,m,d),ds=dateStr(y,m,d),off=isOffDay(y,m,d);
+        const cls=off?'print-off-day':HOLIDAYS[ds]||dd===0?'print-sunday':dd===6?'print-saturday':'';
+        html+=`<th class="${cls}" scope="col">${d}<br><small>${dowNames[dd]}</small></th>`;
+      }
+      html+='</tr></thead><tbody>';
+      for(const s of batches[batchIndex]){
+        html+=`<tr class="print-staff-row"><th class="staff-col" scope="row"><span class="staff-name">${escapePrint(s.name)}</span><span class="staff-meta">${escapePrint(s.role)} ・ ${getHours(s.id,y,m)}h/月</span></th>`;
+        for(let d=first;d<=last;d++){
+          const ds=dateStr(y,m,d);
+          if(isOffDay(y,m,d)&&!isClinicDay(ds)){html+='<td class="print-off-day">─</td>';continue;}
+          const k=shiftData[s.id]?.[ds]||'',time=manualTimeFor(s.id,ds);
+          const detail=time?`<span class="print-time">${escapePrint(time.start)}〜<br>${escapePrint(time.end)}</span><span class="print-break">休${Number(time.breakMinutes)}分</span>`:'';
+          html+=`<td class="print-${classes[k]||'off'}"><span class="print-shift-label">${labels[k]||'─'}</span>${detail}</td>`;
+        }
+        html+='</tr>';
+      }
+      for(const role of ['DR','DH','DA']){
+        html+=`<tr class="print-count-row"><th class="staff-col" scope="row">${role}人数</th>`;
+        for(let d=first;d<=last;d++)html+=isOffDay(y,m,d)?'<td class="print-off-day">─</td>':`<td>${countRoleStaffing(role,dateStr(y,m,d))}</td>`;
+        html+='</tr>';
+      }
+      html+='</tbody></table><p class="print-note">人数は全スタッフの配置数（各ページ共通）。DHは午後勤務を含み、DAは事務勤務を除きます。全時間帯の同時勤務人数ではありません。</p></section>';
     }
-    return h+`</tr>`;
-  };
-
-  // スタッフ行生成
-  const makeRow=(s)=>{
-    let r=`<tr><td class="staff-col">${s.name}<br><small>${getHours(s.id,y,m)}h</small></td>`;
-    for(let d=1;d<=days;d++){
-      const ds=dateStr(y,m,d);
-      const off=isOffDay(y,m,d);
-      if(off && !isClinicDay(ds)){ r+=`<td class="print-off-day">─</td>`; continue; }
-      const k=shiftData[s.id]?.[ds]||'';
-      const label={
-        'early':'通常','late':'遅出','off':'公休',
-        'paid':'有給','wish':'希望','fixed':'通常',
-        'admin':'事務','hanowa':'HW','none':'─','clinic':'規定休'
-      }[k]||'─';
-      const cls2={
-        'early':'print-early','late':'print-late','off':'print-off',
-        'paid':'print-paid','wish':'print-wish','fixed':'print-early',
-        'admin':'print-early','hanowa':'print-hanowa','none':'print-off-day'
-      }[k]||'print-off';
-      r+=`<td class="${cls2}">${label}${manualTimeMarkup(s.id,ds)}</td>`;
-    }
-    return r+`</tr>`;
-  };
-
-  // グループ区切り行
-  const makeGroupRow=(label)=>
-    `<tr><td class="staff-col" style="background:#2C5F82!important;color:#fff!important;font-size:7.5pt;padding:2px 4px;" colspan="${days+1}">${label}</td></tr>`;
-
-  // 凡例
-  const legend=`
-    <div class="print-legend">
-      <div class="print-legend-item"><div class="print-legend-dot" style="background:#FFFFFF;border:1px solid #ccc"></div>通常</div>
-      <div class="print-legend-item"><div class="print-legend-dot" style="background:#FFF3CD;border:1px solid #7B4F00"></div>遅出</div>
-      <div class="print-legend-item"><div class="print-legend-dot" style="background:#E2D9F3;border:1px solid #4A148C"></div>有給</div>
-      <div class="print-legend-item"><div class="print-legend-dot" style="background:#FFE5CC;border:1px solid #7B3100"></div>希望休</div>
-      <div class="print-legend-item"><div class="print-legend-dot" style="background:#FCE4EC;border:1px solid #880E4F"></div>HW</div>
-      <div class="print-legend-item"><div class="print-legend-dot" style="background:#F8F9FA;border:1px solid #ccc"></div>公休</div>
-    </div>`;
-
-  // DH・DA人数集計行の生成
-  const makeCountRow=(label, roleIds)=>{
-    let r=`<tr><td class="staff-col" style="font-size:7.5pt;font-weight:700;background:#EEF2F7!important;color:#2C5F82!important;">${label}</td>`;
-    for(let d=1;d<=days;d++){
-      const ds=dateStr(y,m,d);
-      const off=isOffDay(y,m,d);
-      if(off){ r+=`<td class="print-off-day" style="font-size:8pt;">─</td>`; continue; }
-      const count=countRoleStaffing(label.slice(0,2), ds);
-      const color=count>=5?'#155724':count>=3?'#004085':'#7B3100';
-      r+=`<td style="font-size:9pt;font-weight:800;color:${color};background:#EEF2F7!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;">${count}</td>`;
-    }
-    return r+`</tr>`;
-  };
-
-  const dhIds=dhStaff.map(s=>s.id);
-  const daIds=daStaff.map(s=>s.id);
-
-  let html=`<div class="print-header">🦷 ${monthStr}</div>${legend}`;
-  html+=`<table class="print-table"><thead>${makeHeader()}</thead><tbody>`;
-  html+=makeGroupRow('DR（歯科医師）');
-  drStaff.forEach(s=>{ html+=makeRow(s); });
-  html+=makeGroupRow('DH（歯科衛生士）');
-  dhStaff.forEach(s=>{ html+=makeRow(s); });
-  html+=makeGroupRow('DA（歯科助手/事務）');
-  daStaff.forEach(s=>{ html+=makeRow(s); });
-  html+=makeGroupRow('集計');
-  html+=makeCountRow('DR人数', drStaff.map(s=>s.id));
-  html+=makeCountRow('DH人数', dhIds);
-  html+=makeCountRow('DA人数', daIds);
-  html+=`</tbody></table><p style="font-size:7pt">職種別は配置人数（DHは午後勤務を含む、DAは事務勤務を除く）。全時間帯の同時勤務人数ではありません。</p>`;
-
+  }
   const area=document.getElementById('printArea');
   area.innerHTML=html;
   area.style.display='block';
   shiftDelay(()=>{
     window.print();
     area.style.display='none';
-  }, 150);
+  },150);
 }
 
 function adjustHours(){}  // 新ロジックでは不使用
@@ -4566,6 +4481,7 @@ function openModal(staffId, ds){
   modalDateStr = ds;
   const staff = STAFF.find(s=>s.id===staffId);
   const current = shiftData[staffId]?.[ds] || '';
+  document.getElementById('drTimePreset').style.display=staff.role==='DR'&&staff.type==='full'?'block':'none';
   modalEntrySnapshot=structuredClone(shiftEntrySnapshot(shiftData,staffId,ds));
   document.getElementById('deleteShiftButton').style.display=current?'':'none';
   document.getElementById('restoreShiftButton').style.display=!current&&modalEntrySnapshot.cancelled?'':'none';
@@ -4599,6 +4515,7 @@ function openModal(staffId, ds){
     };
     btn.style.cssText = `background:${(colors[sh.key]||'#eee').split(';')[0]};${colors[sh.key]?.split(';')[1]||''}`;
     btn.innerHTML = sh.label.replace('\n','<br>') + `<br><span style="font-size:.62rem;opacity:.7;">${sh.key==='clinic'?clinicCreditHours(staff.id):sh.hours}h</span>`;
+    btn.value=sh.key;
     if(sh.key===current) btn.classList.add('selected');
     btn.onclick = ()=>{
       choices.querySelectorAll('button').forEach(b=>b.classList.remove('selected'));
@@ -4634,6 +4551,20 @@ function fillManualTimeEditor(){
   document.getElementById('manualBreak').value=active?.breakMinutes??d[2];
   refreshManualTimeEditor();
 }
+function applyDrTimePreset(){
+  if(currentUser?.role!=='admin' || isCurrentMonthLocked() || manualSavePending || shiftEntryConfirmation || staffMonthOperation || staffOrderDraft) return;
+  const staff=STAFF.find(s=>s.id===modalStaffId);
+  if(!modalDateStr || staff?.role!=='DR' || staff.type!=='full') return;
+  modalSelected='early';
+  document.querySelectorAll('#shiftChoices button').forEach(btn=>btn.classList.toggle('selected',btn.value==='early'));
+  document.getElementById('manualTimeEnabled').checked=true;
+  document.getElementById('manualStart').value='09:00';
+  document.getElementById('manualEnd').value='18:00';
+  document.getElementById('manualBreak').value='90';
+  document.getElementById('manualTimeError').textContent='';
+  refreshManualTimeEditor();
+}
+
 function refreshManualTimeEditor(){
   const working=isTimedShift(modalSelected);
   document.getElementById('manualTimeEditor').style.display=working?'block':'none';
