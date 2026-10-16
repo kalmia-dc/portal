@@ -1,0 +1,13 @@
+<!doctype html><html lang="ja"><meta charset="utf-8"><title>HTML往復検証</title><h1>HTML往復・不正入力検証</h1><pre id="results"></pre><script type="module">
+import {newReport,toHTML,parseHTML,normalizeReport,fromLegacy} from '../incident-report-core.mjs';
+const lines=[];let failed=0;
+function test(name,fn){try{fn();lines.push('PASS '+name);}catch(e){failed++;lines.push('FAIL '+name+': '+e.message);}}
+const r={...newReport('fixture-report-001'),details:'架空事例 <img src=x onerror=alert(1)> & 日本語',reporterName:'架空担当',impact:'0'};
+test('HTML round trip',()=>{if(JSON.stringify(parseHTML(toHTML(r)))!==JSON.stringify(normalizeReport(r)))throw Error('mismatch');});
+test('display tampering rejected',()=>{try{parseHTML(toHTML(r).replace('架空事例','改変'));}catch{return;}throw Error('accepted');});
+test('legacy HTML detected without script execution',()=>{if(parseHTML('<script>throw Error("must not run")<\/script><p>旧報告</p>')!==null)throw Error('not legacy');});
+test('privilege fields discarded',()=>{if('reviewer' in normalizeReport({...r,reviewer:'admin'}))throw Error('retained');});
+test('legacy context stays explicitly unclassified',()=>{const v=fromLegacy({details:'架空旧本文',eventImpact:'潜在的な被害',level:'A',causeHuman:'旧欄'});if(v.impact!=='unknown'||!v.supplement.includes('未確認'))throw Error('invented');});
+for(const field of ['occurredDate','occurredTime'])test('invalid '+field+' rejected',()=>{try{normalizeReport({...r,[field]:field==='occurredDate'?'2026-02-30':'25:80'});}catch{return;}throw Error('accepted');});
+document.getElementById('results').textContent=lines.join('\n')+'\nFailures: '+failed;
+</script></html>

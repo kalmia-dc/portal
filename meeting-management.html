@@ -834,6 +834,7 @@ button{cursor:pointer}
 </style>
 <link rel="stylesheet" href="./portal-common.css?v=20261005">
 <script defer src="./portal-common.js?v=20261005"></script>
+<link rel="stylesheet" href="./incident-report.css?v=2">
 </head>
 <body>
 <div id="app" class="app-shell" hidden>
@@ -1087,10 +1088,12 @@ button{cursor:pointer}
 
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getDatabase, ref, push, set, update, remove, onValue as firebaseOnValue, get } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
+import { getDatabase, ref, push, set, update, remove, onValue as firebaseOnValue, get, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 import {createPageLifecycle} from './portal-page-lifecycle.mjs';
 import {loadBusinessRoster} from './portal-business-roster.mjs';
 import { startPortalAuth } from './portal-auth.js?v=labor-20261014-2';
+import {mountIncidentReports} from './incident-report-ui.mjs';
+import {classification} from './incident-report-core.mjs';
 import { canEditOwnIncident, ownerPayload } from './incident-owner-policy.mjs';
 
 const firebaseConfig = {
@@ -1302,6 +1305,7 @@ const PATHS = {
   incidentReports:'meetingManagement/incidentReports'
 };
 
+let incidentApp = null;
 let currentUser = readUser();
 let editingTaskId = null;
 const routingDraft = { tasks:null, notices:null };
@@ -1317,6 +1321,8 @@ const state = {
   notices:[],
   opinions:[],
   incidentReports:[],
+  legacyIncidentReports:[],
+  v2IncidentReports:[],
   searchQuery:'',
   taskStatusFilter:'all',
   showArchivedIncidents:false,
@@ -1342,8 +1348,35 @@ function boot() {
   setupForms();
   setupViewer();
   setupNoticeHistory();
+  initializeIncidentV2();
   attachDataListeners();
   document.getElementById('app').hidden = false;
+}
+
+
+function initializeIncidentV2() {
+  incidentApp = mountIncidentReports(document.getElementById('incidentsSection'),{
+    db,api:{ref,get,set,update,remove,onValue,serverTimestamp},user:currentUser,
+    manager:isDirector()||isLeader(),terminal:isReadOnlyTerminal(),roster:businessRoster.members,
+    legacy:()=>state.legacyIncidentReports,
+    parseLegacy:html=>{ const r=parseIncidentHtmlReport(html,'旧HTML'); return r?[r]:[]; },
+    ocr:async(files,status)=>buildIncidentImageImportCandidates(await recognizeIncidentImageFiles(files,status)),
+    destinations:kind=>state[kind],
+    legacyWorkflow:r=>relatedDestinationHtml(r)+(r.linkedTaskId||r.linkedNoticeId?'':incidentFollowupHtml(r)),
+    workflow:(record,id,value)=>{
+      const report=state.v2IncidentReports.find(r=>r.id===id);
+      return report?relatedDestinationHtml(report):'';
+    },
+    route:(id,kind)=>startRoutingDraft(id,kind),
+    onReports:rows=>{
+      state.v2IncidentReports=rows.map(({id,value, ...r})=>({id,v2:true,...value,reporterId:r.owner,createdById:r.owner,createdBy:value.reporterName,
+        type:classification(value)==='医療事故'?'accident':classification(value)==='ヒヤリ・ハット'?'near_miss':'review_required',
+        linkedTaskId:r.linkedTaskId,linkedNoticeId:r.linkedNoticeId,createdAt:r.submittedAt,counterStatus:r.counterStatus,countermeasure:r.countermeasure,handoff:value.handoff}));
+      state.incidentReports=[...state.legacyIncidentReports,...state.v2IncidentReports];
+      renderTasks();if(canSeeNotices())renderNotices();
+    }
+  });
+  pageLifecycle.add(()=>incidentApp?.dispose());
 }
 
 function readUser() {
@@ -1621,7 +1654,8 @@ function attachDataListeners() {
     });
   }
   onValue(ref(db, PATHS.incidentReports), snap => {
-    state.incidentReports = toList(snap.val()).sort(sortIncidentReports);
+    state.legacyIncidentReports = toList(snap.val()).sort(sortIncidentReports);
+    state.incidentReports = [...state.legacyIncidentReports,...state.v2IncidentReports];
     renderIncidentReports();
     renderTasks();
     if (canSeeNotices()) renderNotices();
@@ -3386,6 +3420,7 @@ function restoreIncidentEdits() {
 }
 
 function renderIncidentReports() {
+  if (incidentApp) { incidentApp.render(); return; }
   rememberIncidentEdits();
   const summaryReports = filterBySearch(
     filterIncidentReportsByPeriod(state.incidentReports),
@@ -3839,7 +3874,7 @@ function incidentFollowupField(id, field) {
 }
 
 function isIncidentTaskReady(report) {
-  if (incidentTypeKey(report) === INCIDENT_REVIEW_REQUIRED_TYPE) return false;
+
   return Boolean(String(report?.countermeasure || '').trim())
     && INCIDENT_TASK_READY_STATUSES.has(report?.counterStatus || 'pending');
 }
@@ -3869,6 +3904,7 @@ function sourceReportHtml(item, kind) {
   const report = state.incidentReports.find(report => report.id === item.sourceIncidentId ||
     (kind === 'tasks' ? report.linkedTaskId === item.id : report.linkedNoticeId === item.id));
   const id = report?.id || item.sourceIncidentId;
+  if (item.sourceIncidentWithdrawn) return '<span class="badge">元報告は取り下げ済み</span>';
   if (!id) return '';
   return `<div class="linked-case">元の報告：${esc(report?.reportNumber || item.sourceIncidentNumber || '報告')}
     <div class="item-actions">${relatedButton('incidents', id, '元の報告を開く')}</div></div>`;
@@ -3931,7 +3967,7 @@ function startRoutingDraft(id, kind) {
   const report = state.incidentReports.find(item => item.id === id);
   if (!report) return;
   if (report.linkedTaskId || report.linkedNoticeId) return showToast('振り分け済みです。関連する案件を開いてください');
-  if (kind === 'tasks' && incidentTypeKey(report) === INCIDENT_REVIEW_REQUIRED_TYPE) return showToast('報告の種別を確認してから取り組みにしてください');
+
   const prefix = kind === 'tasks' ? 'task' : 'notice';
   const detailField = kind === 'tasks' ? 'taskDetail' : 'noticeBody';
   if (valueOf(prefix + 'Title') || valueOf(detailField)) {
@@ -3969,9 +4005,10 @@ async function saveRoutedDraft(kind) {
   const cancel = document.getElementById(prefix + 'CancelBtn');
   cancel.disabled = true;
   try {
-    const snapshot = await get(ref(db, `${PATHS.incidentReports}/${reportId}`));
+    const v2Report = state.v2IncidentReports.find(r=>r.id===reportId);
+    const snapshot = v2Report ? null : await get(ref(db, `${PATHS.incidentReports}/${reportId}`));
     if (!pageLifecycle.active) return;
-    const report = snapshot.val();
+    const report = v2Report || snapshot.val();
     if (!report) throw new Error('元の報告が見つかりません。登録を中止しました');
     if (report.linkedTaskId || report.linkedNoticeId) throw new Error('この報告はすでに振り分け済みです');
     const title = valueOf(prefix + 'Title');
@@ -3991,7 +4028,8 @@ async function saveRoutedDraft(kind) {
       ...(kind === 'tasks' ? {detail:body, completion, progress:'', status:'todo'} : {body})
     };
     const linkKey = kind === 'tasks' ? 'linkedTaskId' : 'linkedNoticeId';
-    await update(ref(db), {
+    if (report.v2) await incidentApp.link(reportId,kind,target.key,item);
+    else await update(ref(db), {
       [`${PATHS[kind]}/${target.key}`]:item,
       [`${PATHS.incidentReports}/${reportId}/${linkKey}`]:target.key,
       [`${PATHS.incidentReports}/${reportId}/routedAt`]:now,
@@ -4026,6 +4064,7 @@ function buildIncidentTaskTitle(report) {
 }
 
 function buildIncidentTaskDetail(report) {
+  if (report.v2) return report.handoff || '共有する対策・取り組み内容を記入してください（元報告本文は別管理）。';
   const lines = [];
   appendIncidentTaskDetail(lines, '報告番号', report.reportNumber || buildIncidentReportNumber(report));
   appendIncidentTaskDetail(lines, '種別', INCIDENT_TYPE_LABELS[incidentTypeKey(report)]);

@@ -1,0 +1,20 @@
+import fs from 'node:fs';
+const html=fs.readFileSync('meeting-management.html','utf8');
+const source=html.match(/<script type="module">([\s\S]*?)<\/script>/)[1];
+const preview=fs.readFileSync('tests/incident-preview.html','utf8');
+const adapter=preview.slice(preview.indexOf('const data='),preview.indexOf('mountIncidentReports(document'));
+const prefix=`import {mountIncidentReports} from './incident-report-ui.mjs';
+import {classification} from './incident-report-core.mjs';
+import {canEditOwnIncident,ownerPayload} from './incident-owner-policy.mjs';
+import {createPageLifecycle} from './portal-page-lifecycle.mjs';
+${adapter}
+const {ref,get,set,update,remove,onValue,serverTimestamp}=api,db={};
+const push=()=>({key:crypto.randomUUID()});
+const pageLifecycle=createPageLifecycle();
+const authenticatedProfile={staffId:'sugihira',name:'院長（架空）',portalRole:'admin'};
+const businessRoster={complete:true,members:[{id:'sugihira',name:'院長（架空）',role:'院長'},{id:'fixture_staff',name:'職員（架空）',role:'スタッフ'}]};
+`;
+const code=prefix+source.slice(source.indexOf('const DIRECTOR_ID'));
+let result=html.replace(/<script\b[^>]*>[\s\S]*?<\/script>/g,'').replace('<head>','<head><base href="../"><meta http-equiv="Content-Security-Policy" content="default-src \'self\' data: blob:; script-src \'self\' \'unsafe-inline\'; style-src \'self\' \'unsafe-inline\'; connect-src \'none\'">').replace('</body>','<script type="module">'+code+'</script></body>');
+result=result.replace('<title>','<title>架空データ検証：');
+fs.writeFileSync('tests/incident-integration.html',result);

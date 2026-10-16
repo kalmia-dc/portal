@@ -2,3 +2,5 @@ node_modules/
 .labor-local/
 *-debug.log
 outputs/labor/
+.incident-inline-check.mjs
+tests/incident-integration.html

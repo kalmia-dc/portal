@@ -1,0 +1,10 @@
+<!doctype html><html lang="ja"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>インシデント報告・ローカル検証専用</title><link rel="stylesheet" href="../incident-report.css"><style>body{font-family:system-ui;background:#f4f7f7;margin:20px}header{background:#fff2ce;padding:15px}button{font:inherit}</style><header>架空データによる検証専用画面。本番には接続しません。</header><main id="preview"></main><script type="module">
+import {mountIncidentReports} from '../incident-report-ui.mjs';
+const data={},watchers=[];const pathGet=p=>p.split('/').filter(Boolean).reduce((v,k)=>v?.[k],data);
+const resolve=v=>v&&typeof v==='object'?(v['.sv']==='timestamp'?Date.now():Object.fromEntries(Object.entries(v).map(([k,x])=>[k,resolve(x)]))):v;
+function write(p,v){const bits=p.split('/').filter(Boolean),key=bits.pop();let o=data;for(const b of bits)o=o[b]??={};if(v===null)delete o[key];else o[key]=resolve(v);}
+const snapshot=p=>({val:()=>structuredClone(pathGet(p)),exists:()=>pathGet(p)!=null});
+const notify=()=>queueMicrotask(()=>watchers.forEach(w=>w.fn(snapshot(w.p))));
+const api={ref:(_,p='')=>p,get:async p=>snapshot(p),set:async(p,v)=>{write(p,v);notify();},remove:async p=>{write(p,null);notify();},update:async(p,values)=>{for(const [k,v]of Object.entries(values))write([p,k].filter(Boolean).join('/'),v);notify();},serverTimestamp:()=>({'.sv':'timestamp'}),onValue:(p,fn)=>{const w={p,fn};watchers.push(w);queueMicrotask(()=>fn(snapshot(p)));return()=>watchers.splice(watchers.indexOf(w),1);}};
+mountIncidentReports(document.getElementById('preview'),{db:{},api,user:{staffId:'sugihira',name:'院長（架空）'},manager:true,terminal:false,roster:[{id:'sugihira',name:'院長（架空）'},{id:'test_staff',name:'スタッフ（架空）'}],legacy:()=>[],onReports:()=>{},workflow:()=>'',legacyWorkflow:()=>'',destinations:()=>[],route:()=>{},parseLegacy:()=>[],ocr:async()=>[]});
+</script></html>

@@ -21,5 +21,5 @@ test('permission and network failures retain draft and permit retry; double save
 });
 test('existing leader edit remains allowed and draft state initializes before boot',async()=>{
  const h=harness('staff',true);await h.run("saveIncidentReportEdit('one')");assert.equal(h.writes(),1);assert(html.indexOf('const incidentEditDrafts')<html.indexOf('  boot();'));
- assert(html.includes('function renderIncidentReports() {\n  rememberIncidentEdits();')||html.includes('function renderIncidentReports() {\r\n  rememberIncidentEdits();'));
+ assert.match(html,/function renderIncidentReports\(\) \{\s*if \(incidentApp\)/);
 });
