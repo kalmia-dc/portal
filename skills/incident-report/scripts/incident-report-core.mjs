@@ -51,7 +51,7 @@ export function classification(r){
 }
 export function monthKey(timestamp){return Number.isFinite(timestamp)&&timestamp>0?new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Tokyo',year:'numeric',month:'2-digit'}).format(timestamp):'';}
 export function escapeHtml(value){return String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
-export function reportText(value){const r=normalizeReport(value);const line=(label,v)=>`${label}：${Array.isArray(v)?v.join('、')||'未確認':v||'未確認'}`;return [
+function reportBlocks(value){const r=normalizeReport(value);const line=(label,v)=>`${label}：${Array.isArray(v)?v.join('、')||'未確認':v||'未確認'}`;return [
   'カルミアデンタルクリニック インシデント報告書',
   line('報告番号',r.reportNumber||r.reportId),line('報告者',r.reporterName),line('代筆者',r.ghostwriter),line('発生日時',[r.occurredDate,r.occurredTime].filter(Boolean).join(' ')),
   line('場所',r.place),line('作業',r.work),line('場面',r.phase),line('事象の分野',r.domains),line('何が起きたか',r.details),
@@ -60,8 +60,18 @@ export function reportText(value){const r=normalizeReport(value);const line=(lab
   line('患者の状況（個人特定情報を除く）',r.patientContext),line('器具・薬剤',r.materials),line('関係者の役割',r.roles),line('時系列',r.timeline),line('補足',r.supplement),line('申し送り',r.handoff),
   '患者影響分類：国立病院機構 2020年3月27日改訂・別添1。法的認定・外部報告要否の判定ではありません。',
   'このファイルの作成だけではポータルに提出されません。取り込み後に内容を確認して提出してください。'
-].join('\n\n');}
-export function toHTML(value){const r=normalizeReport(value);return `<!doctype html><html lang="ja"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>インシデント報告書</title><style>body{font-family:system-ui,sans-serif;max-width:850px;margin:2rem auto;padding:1rem;color:#182f38}pre{font:inherit;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.7}@media print{body{margin:0}pre{font-size:11pt}}</style><body><pre id="incident-visible">${escapeHtml(reportText(r))}</pre><script type="application/json" id="kalmia-incident-data">${JSON.stringify(r).replace(/</g,'\\u003c')}</script></body></html>`;}
+];}
+export function reportText(value){return reportBlocks(value).join('\n\n');}
+export function toHTML(value){
+  const r=normalizeReport(value),blocks=reportBlocks(r);
+  const parts=text=>{const i=text.indexOf('：');return [escapeHtml(text.slice(0,i+1)),escapeHtml(text.slice(i+1))];};
+  const metadata=blocks.slice(1,8).map(text=>{const [label,value]=parts(text);return `<tr><th scope="row">${label}</th><td>${value}</td></tr>`;}).join('\n\n');
+  const fields=blocks.slice(8,24).map((text,index)=>{const [label,value]=parts(text),wide=[8,9,21,22,23].includes(index+8);return `<section class="field${wide?' wide':''}${index===1?' narrative':''}"><h2>${label}</h2><p>${value}</p></section>`;});
+  const visible=[`<h1>${escapeHtml(blocks[0])}</h1>`,`<table class="metadata"><tbody>${metadata}</tbody></table>`,...fields,...blocks.slice(24).map(text=>`<p class="footnote">${escapeHtml(text)}</p>`)].join('\n\n');
+  return `<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>インシデント報告書</title><style>
+*{box-sizing:border-box}body{margin:0;background:#edf2f3;color:#1d333a;font-family:"Yu Gothic","Meiryo",system-ui,sans-serif;font-size:14px;line-height:1.65}.sheet{max-width:860px;margin:28px auto;padding:36px 40px;background:#fff;box-shadow:0 8px 32px #203f4814;border-top:6px solid #32696c}#incident-visible{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px 16px}h1{grid-column:1/-1;margin:0 0 8px;padding-bottom:18px;border-bottom:2px solid #32696c;font-size:23px;line-height:1.5;letter-spacing:.03em}.metadata{grid-column:1/-1;width:100%;border-collapse:collapse;table-layout:fixed;margin-bottom:4px}.metadata th,.metadata td{border:1px solid #beced0;padding:7px 12px;text-align:left;vertical-align:top;white-space:pre-wrap;overflow-wrap:anywhere}.metadata th{width:24%;background:#f0f5f5;font-weight:600;font-size:13px}.field{min-width:0;border:1px solid #beced0;border-radius:5px;overflow:visible;break-inside:avoid}.field h2{font-size:13px;margin:0;padding:7px 12px;background:#edf4f3;border-bottom:1px solid #beced0;font-weight:700}.field p{margin:0;padding:11px 12px;white-space:pre-wrap;overflow-wrap:anywhere;min-height:44px}.wide,.footnote{grid-column:1/-1}.narrative{border-color:#568386}.narrative h2{background:#e4efee}.narrative p{min-height:85px}.footnote{margin:0;color:#53676b;font-size:11px;line-height:1.6}.footnote:last-child{border-top:1px solid #d8e1e2;padding-top:10px}@media(max-width:600px){.sheet{margin:0;padding:20px 16px;box-shadow:none}#incident-visible{grid-template-columns:1fr}h1{font-size:20px}.metadata th{width:31%}.field{grid-column:1}.metadata th,.metadata td{padding:7px 8px}}@page{size:A4;margin:13mm 14mm}@media print{body{background:#fff;font-size:10pt;line-height:1.5;print-color-adjust:exact;-webkit-print-color-adjust:exact}.sheet{max-width:none;margin:0;padding:0;border-top:3px solid #32696c;box-shadow:none}#incident-visible{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px 12px}h1{font-size:17pt;padding:10px 0;margin:0 0 4px}.metadata th,.field h2{font-size:9pt}.metadata th,.metadata td{padding:4px 8px}.field p{padding:7px 9px;min-height:30px}.field h2{padding:5px 9px}.field{grid-column:auto}.wide{grid-column:1/-1}.narrative p{min-height:60px}.footnote{font-size:8pt}tr{break-inside:avoid}h2{break-after:avoid}}
+</style></head><body><article class="sheet"><main id="incident-visible">${visible}</main></article><script type="application/json" id="kalmia-incident-data">${JSON.stringify(r).replace(/</g,'\\u003c')}</script></body></html>`;
+}
 export function parseHTML(html,Parser=globalThis.DOMParser){
   const doc=new Parser().parseFromString(html,'text/html');const node=doc.getElementById('kalmia-incident-data');if(!node)return null;
   const r=normalizeReport(JSON.parse(node.textContent));
