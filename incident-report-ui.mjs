@@ -1,6 +1,13 @@
 import {OPTIONS,IMPACT,SOURCE,newReport,normalizeReport,classification,reportText,toHTML,parseHTML,fromLegacy,escapeHtml as esc,monthKey} from './incident-report-core.mjs';
 import {createIncidentStore,decodeRecord} from './incident-report-store.mjs';
 
+export function reporterGroup(report, fallbackName=''){
+  const name=String(report.reporterName||fallbackName||'未記録').trim();
+  const id=String(report.reporterId||'').trim();
+  if(id==='sugihira'||(!id&&['院長','杉平'].includes(name)))return {key:'sugihira',name:'院長'};
+  return {key:id||`legacy-name:${name}`,name};
+}
+
 export function mountIncidentReports(root,ctx){
   const {user,manager,terminal,roster}=ctx;
   const store=createIncidentStore({...ctx,isActive:()=>active});
@@ -49,7 +56,7 @@ export function mountIncidentReports(root,ctx){
     const all=allItems();const unknown=all.filter(x=>!monthKey(x.when)).length;
     const items=all.filter(x=>(!month||monthKey(x.when)===month)&&(!search||JSON.stringify(x.value||x.old).toLowerCase().includes(search.toLowerCase()))).sort((a,b)=>b.when-a.when);
     const totals=new Map();let oldCount=0,newCount=0,pending=0;const buckets={};
-    for(const item of items){const r=item.value||item.old;const name=r.reporterName||item.old?.createdBy||'未記録';const key=r.reporterId||`legacy-name:${name}`;const current=totals.get(key)||{name,n:0};current.n++;totals.set(key,current);
+    for(const item of items){const r=item.value||item.old;const {key,name}=reporterGroup(r,item.old?.createdBy);const current=totals.get(key)||{name,n:0};current.n++;totals.set(key,current);
       const basis=item.record?.basis==='nho2020'?'新基準':'旧基準';basis==='新基準'?newCount++:oldCount++;
       const type=basis==='新基準'?classification(r):({'near_miss':'ヒヤリ・ハット','accident':'アクシデント'}[item.record?.legacyType||item.old?.type]||'判定保留');
       const review=item.record?.review==='confirmed'?'確定':'未確認';const label=`${basis}：${type}${basis==='新基準'?'／'+review:''}`;buckets[label]=(buckets[label]||0)+1;if(item.record?.review!=='confirmed')pending++;
