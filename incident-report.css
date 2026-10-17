@@ -1,1 +1,16 @@
 .incident-v2{max-width:1000px;margin:auto}.incident-v2 .iv-panel{padding:20px;margin:18px 0;background:#fff;border:1px solid #cad9da;border-radius:12px}.incident-v2 .iv-field{display:flex;flex-direction:column;gap:6px;margin:14px 0}.incident-v2 input:not([type=checkbox]),.incident-v2 select,.incident-v2 textarea{font:inherit;max-width:100%;padding:10px;border:1px solid #9caeb2;border-radius:6px}.incident-v2 textarea{width:100%;box-sizing:border-box}.incident-v2 button{font:inherit;padding:10px 15px;margin:5px;border:1px solid #adc0c3;background:#f0f7f6;border-radius:7px;cursor:pointer}.incident-v2 button:disabled{opacity:.5;cursor:wait}.incident-v2 .iv-actions{display:flex;flex-wrap:wrap;gap:5px;margin-top:16px}.incident-v2 .iv-options{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px}.incident-v2 fieldset{margin:16px 0;padding:14px;border:1px solid #cad9da;border-radius:8px}.incident-v2 input[type=checkbox]{width:20px;height:20px;vertical-align:middle;margin-right:8px}.incident-v2 pre{font:inherit;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.7}.incident-v2 dd{white-space:pre-wrap;overflow-wrap:anywhere;margin-bottom:12px}.incident-v2 dt{font-weight:600}.incident-v2 .iv-error{background:#fff0ed;color:#9c2916;padding:12px}.incident-v2 .iv-status:not(:empty){padding:12px;background:#e6f2ed}.incident-v2 table{width:100%;border-collapse:collapse}.incident-v2 td,.incident-v2 th{padding:8px;border-bottom:1px solid #ddd;text-align:left}.incident-v2 .muted{color:#53666d}@media(max-width:600px){.incident-v2 .iv-panel{padding:12px}.incident-v2 .iv-options{grid-template-columns:1fr}}@media print{.incident-v2 button,#iv-controls,#iv-editor,#iv-import,#iv-private,#iv-history{display:none!important}.incident-v2 .iv-panel{break-inside:avoid;border:0}}
+
+/* Shared disclosure treatment throughout meeting management, including nested history. */
+details{margin:14px 0;border:1px solid #adc0c3;border-radius:8px;background:#fff;overflow-wrap:anywhere}
+details>summary,.meeting-guide>summary{display:flex;align-items:center;justify-content:space-between;gap:16px;min-height:48px;padding:12px 16px;background:#eaf4f3;color:#173f42;font-weight:700;line-height:1.5;cursor:pointer;list-style:none;border-radius:7px}
+details>summary::-webkit-details-marker{display:none}
+details>summary::after{content:"▶ 開く";flex-shrink:0;padding:3px 9px;border:1px solid #88aaa9;border-radius:5px;background:#fff;font-size:13px;white-space:nowrap}
+details[open]>summary::after{content:"▼ 閉じる"}
+details[open]>summary{border-bottom:1px solid #adc0c3;border-radius:7px 7px 0 0}
+details>summary:hover{background:#dcecea}
+details>summary:focus-visible{outline:3px solid #247c8a;outline-offset:2px}
+details[open]>:not(summary){margin-left:16px;margin-right:16px}
+.incident-v2 .iv-import-panel{border:2px solid #4c8886;background:#f6fbfa}
+.iv-import-panel h3{margin-top:0}
+@media(max-width:600px){details>summary,.meeting-guide>summary{padding:12px;gap:10px}details[open]>:not(summary){margin-left:12px;margin-right:12px}}
+@media print{details>summary::after{display:none}}
