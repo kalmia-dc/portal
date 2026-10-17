@@ -5,6 +5,7 @@ export function reporterGroup(report, fallbackName=''){
   const name=String(report.reporterName||fallbackName||'未記録').trim();
   const id=String(report.reporterId||'').trim();
   if(id==='sugihira'||(!id&&['院長','杉平'].includes(name)))return {key:'sugihira',name:'院長'};
+  if(id==='tamiya'||(!id&&name==='田宮'))return {key:'tamiya',name:'田宮'};
   return {key:id||`legacy-name:${name}`,name};
 }
 
