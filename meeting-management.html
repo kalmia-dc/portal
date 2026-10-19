@@ -2841,8 +2841,38 @@ async function rejectTaskReview(id) {
   if (!pageLifecycle.active) return;
   const item = state.tasks.find(task => task.id === id);
   if (!item || !isDirector() || item.status !== 'review') return;
-  if (!confirm('定着確認依頼を却下して、取り組み中に戻しますか？')) return;
-  return updateTaskStatus(id, 'in_progress', { rejected: true });
+  if (document.getElementById('task-rejection-dialog')) return;
+  const dialog = document.createElement('dialog');
+  dialog.id = 'task-rejection-dialog';
+  dialog.style.cssText = 'width:min(540px,90vw);border:1px solid #ddd;border-radius:16px;padding:24px';
+  dialog.setAttribute('aria-labelledby', 'task-rejection-heading');
+  dialog.innerHTML = `<form><h2 id="task-rejection-heading">定着確認依頼を却下</h2><p>理由を添えて、取り組み中に戻します。</p><label for="task-rejection-reason">却下理由（必須）</label><textarea id="task-rejection-reason" required maxlength="2000" rows="5" style="width:100%;box-sizing:border-box" placeholder="見直してほしい点や、再申請までに必要な対応を入力してください"></textarea><p role="alert" data-error></p><div class="item-actions"><button type="button" data-cancel class="btn">キャンセル</button><button type="submit" class="btn danger">理由を添えて却下する</button></div></form>`;
+  document.body.append(dialog);
+  const reasonInput = dialog.querySelector('textarea');
+  const error = dialog.querySelector('[data-error]');
+  const submit = dialog.querySelector('[type="submit"]');
+  let saving = false;
+  dialog.addEventListener('cancel', event => { if (saving) event.preventDefault(); });
+  dialog.addEventListener('close', () => dialog.remove());
+  dialog.querySelector('[data-cancel]').onclick = () => { if (!saving) dialog.close(); };
+  dialog.querySelector('form').onsubmit = async event => {
+    event.preventDefault();
+    if (saving) return;
+    const reason = reasonInput.value.trim();
+    if (!reason) { error.textContent = '却下理由を入力してください。'; reasonInput.focus(); return; }
+    if (!pageLifecycle.active || !isDirector() || taskStatus(state.tasks.find(task => task.id === id) || {}) !== 'review') {
+      error.textContent = '却下できません。院長としてログインしていることと、現在の状態を確認してください。'; return;
+    }
+    saving = true; submit.disabled = true; error.textContent = '';
+    try {
+      await updateTaskStatus(id, 'in_progress', { rejected: true, reason });
+      dialog.close();
+    } catch {
+      error.textContent = '保存できませんでした。入力した理由は保持しています。再度お試しください。';
+    } finally { saving = false; submit.disabled = false; }
+  };
+  dialog.showModal();
+  reasonInput.focus();
 }
 
 async function updateTaskStatus(id, status, options = {}) {
@@ -2865,6 +2895,8 @@ async function updateTaskStatus(id, status, options = {}) {
     return showToast('院長へ定着確認を依頼できるのは取り組み中のみです');
   }
   if (options.rejected && (!isDirector() || currentStatus !== 'review')) return;
+  const rejectionReason = String(options.reason || '').trim();
+  if (options.rejected && (!rejectionReason || rejectionReason.length > 2000)) throw new Error('却下理由を1〜2000文字で入力してください');
   const now = Date.now();
   const taskPath = `${PATHS.tasks}/${id}`;
   const payload = {
@@ -2874,7 +2906,7 @@ async function updateTaskStatus(id, status, options = {}) {
   };
   const updates = {};
   let progressInputToClear = null;
-  if (status === 'in_progress') {
+  if (status === 'in_progress' && !options.rejected) {
     const progressInput = document.querySelector(`[data-progress-id="${cssEscape(id)}"]`);
     const progressText = progressInput?.value.trim() || '';
     if (progressText) {
@@ -2888,14 +2920,19 @@ async function updateTaskStatus(id, status, options = {}) {
     payload.confirmedBy = currentUser.name;
     payload.rejectedAt = null;
     payload.rejectedBy = null;
+    payload.rejectedReason = null;
   }
   if (status === 'review') {
     payload.rejectedAt = null;
     payload.rejectedBy = null;
+    payload.rejectedReason = null;
   }
   if (options.rejected) {
     payload.rejectedAt = now;
-    payload.rejectedBy = currentUser.name;
+    payload.rejectedBy = '院長';
+    payload.rejectedReason = rejectionReason;
+    const logRef = push(ref(db, `${taskPath}/rejectionLogs`));
+    updates[`${taskPath}/rejectionLogs/${logRef.key}`] = { reason: rejectionReason, rejectedAt: now, rejectedBy: '院長', rejectedById: currentUser.staffId };
   }
   Object.entries(payload).forEach(([key, value]) => {
     updates[`${taskPath}/${key}`] = value;
@@ -3264,9 +3301,13 @@ function taskActionsHtml(task) {
 }
 
 function taskRejectionHtml(task) {
-  if (!task.rejectedAt || task.status === 'review' || task.status === 'confirmed') return '';
-  const rejectedDate = formatDate(task.rejectedAt);
-  return `<div class="read-status reject-status">定着確認依頼却下：${esc(rejectedDate)} / ${esc(task.rejectedBy || '-')}</div>`;
+  const logs = Object.values(task.rejectionLogs || {}).filter(log => log && log.rejectedAt);
+  if (task.rejectedAt && !logs.some(log => log.rejectedAt === task.rejectedAt)) {
+    logs.push({rejectedAt:task.rejectedAt,rejectedBy:task.rejectedBy,reason:task.rejectedReason || '理由の記録なし（従来の却下）'});
+  }
+  if (!logs.length) return '';
+  logs.sort((a,b) => b.rejectedAt - a.rejectedAt);
+  return `<section class="read-status reject-status"><strong>定着確認依頼の却下履歴</strong>${logs.map(log => `<div style="margin-top:10px"><div>${esc(formatDate(log.rejectedAt))} / ${esc(log.rejectedById === DIRECTOR_ID || ['杉平','院長'].includes(log.rejectedBy) ? '院長' : log.rejectedBy || '-')}</div><div style="white-space:pre-wrap;overflow-wrap:anywhere">却下理由：${esc(log.reason || '理由の記録なし')}</div></div>`).join('')}</section>`;
 }
 
 function taskReadButtonHtml(task) {
