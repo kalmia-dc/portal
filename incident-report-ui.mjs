@@ -27,6 +27,26 @@ export function preservedChoices(value,choices){
   return value&&!Object.hasOwn(choices,value)?[[value,`${value}（取り込み値・要確認）`],...entries]:entries;
 }
 
+export function clinicCategory(item){
+  const r=item.value||item.old||{};
+  if((r.actual||[]).includes('情報の誤送付・漏えい'))return 'accident';
+  if(item.old||item.record?.basis==='legacy'){
+    const type=item.record?.legacyType||r.type;
+    return ['accident','near_miss'].includes(type)?type:'unknown';
+  }
+  const type=classification(r);
+  return type==='医療事故'?'accident':type==='ヒヤリ・ハット'?'near_miss':r.impact==='na'?'outside':'unknown';
+}
+export function comparisonHtml(items){
+  const counts={accident:0,near_miss:0,outside:0,unknown:0};
+  for(const item of items)counts[clinicCategory(item)]++;
+  const a=counts.accident,h=counts.near_miss,n=a+h;
+  const pct=(v,total)=>total?(v/total*100).toFixed(1):'0.0';
+  const bar=(left,right,total)=>total?`<div style="display:flex;height:20px;border-radius:6px;overflow:hidden" aria-hidden="true"><span style="background:#b45309;width:${left/total*100}%"></span><span style="background:#0369a1;width:${right/total*100}%"></span></div>`:'<p>比較できる報告がありません。</p>';
+  const ratio=a?`1：${(h/a).toFixed(2)}`:'換算できません（アクシデント0件）';
+  return `<section aria-label="アクシデントとヒヤリハットの比較"><h3>アクシデント：ヒヤリハット</h3><p><strong>当院 ${a}件：${h}件</strong> ／ 比較対象 ${n}件</p><p>アクシデント1件あたりのヒヤリハット：${ratio}</p><table><thead><tr><th>比較</th><th>アクシデント</th><th>ヒヤリハット</th></tr></thead><tbody><tr><th>当院</th><td>${a}件（${pct(a,n)}%）</td><td>${h}件（${pct(h,n)}%）</td></tr><tr><th>参考比率 29：300</th><td>${pct(29,329)}%</td><td>${pct(300,329)}%</td></tr></tbody></table><p>当院の割合（茶：アクシデント／青：ヒヤリハット）</p>${bar(a,h,n)}<p>参考の割合 29：300（約1：10.34）</p>${bar(29,300,329)}<p>${!n?'報告がないため比較できません。':!a?'アクシデントが0件のため、1件あたりの比較はできません。':h/a<300/29?'当院の報告では、アクシデント1件あたりのヒヤリハットが参考比率より少ない状態です。':h/a>300/29?'当院の報告では、アクシデント1件あたりのヒヤリハットが参考比率より多い状態です。':'参考比率と同じ割合です。'}</p><p>比較対象外：${counts.outside}件 ／ 分類要確認：${counts.unknown}件（割合の分母には含めません）</p><p>選択した提出月・検索条件の報告を集計しています。報告の割合であり、未報告の事象を含む発生率ではありません。</p><p>院内集計では実際の情報の誤送付・漏えいをアクシデントに含めます。それ以外は既存の分類を使用し、身体的な患者影響の分類は変更しません。</p><p>29：300は労働災害の軽傷と傷害のない事故の参考比率です。院内分類とは範囲が異なり、一致・不一致だけで安全性や報告不足を判定できません。<a href="https://anzeninfo.mhlw.go.jp/yougo/yougo24_1.html" target="_blank" rel="noopener">厚生労働省：ハインリッヒの法則</a></p></section>`;
+}
+
 export function reportHeading(value){
   return String(value.title||'').trim()||'タイトル未設定（詳細を確認）';
 }
@@ -92,7 +112,7 @@ export function mountIncidentReports(root,ctx){
       const type=basis==='新基準'?classification(r):({'near_miss':'ヒヤリ・ハット','accident':'アクシデント'}[item.record?.legacyType||item.old?.type]||'判定保留');
       const review=item.record?.review==='confirmed'?'確定':'未確認';const label=`${basis}：${type}${basis==='新基準'?'／'+review:''}`;buckets[label]=(buckets[label]||0)+1;if(item.record?.review!=='confirmed')pending++;
     }
-    q('#iv-summary').innerHTML=`<div class="iv-panel"><strong>合計 ${items.length}件（旧基準 ${oldCount}件・新基準 ${newCount}件）</strong>${manager?`<p>確認待ち ${pending}件</p>`:''}<p>初回提出日が不明：全期間で${unknown}件${month?'（この月の集計には含めていません）':''}</p><ul>${Object.entries(buckets).map(([k,n])=>`<li>${esc(k)} ${n}件</li>`).join('')}</ul><table><caption>報告者別の提出件数</caption><thead><tr><th>報告者</th><th>件数</th></tr></thead><tbody>${[...totals.values()].sort((a,b)=>b.n-a.n).map(v=>`<tr><td>${esc(v.name)}</td><td>${v.n}</td></tr>`).join('')}</tbody></table></div>`;
+    q('#iv-summary').innerHTML=`<div class="iv-panel"><strong>合計 ${items.length}件（旧基準 ${oldCount}件・新基準 ${newCount}件）</strong>${manager?`<p>確認待ち ${pending}件</p>`:''}<p>初回提出日が不明：全期間で${unknown}件${month?'（この月の集計には含めていません）':''}</p>${comparisonHtml(items)}<details><summary>従来の分類別内訳を確認</summary><ul>${Object.entries(buckets).map(([k,n])=>`<li>${esc(k)} ${n}件</li>`).join('')}</ul></details><table><caption>報告者別の提出件数</caption><thead><tr><th>報告者</th><th>件数</th></tr></thead><tbody>${[...totals.values()].sort((a,b)=>b.n-a.n).map(v=>`<tr><td>${esc(v.name)}</td><td>${v.n}</td></tr>`).join('')}</tbody></table></div>`;
     q('#iv-list').innerHTML=items.map(item=>{
       if(item.old){const r=item.old;return `<article class="iv-panel" data-case-kind="incidents" data-case-id="${esc(r.id)}"><h3>${esc(reportHeading({...r,title:titles['legacy/'+r.id]?.text||r.title}))} <small>旧基準</small></h3><p>報告日：${esc(reportDate(item.when))}（初回提出日）</p>${manager?`<button data-iv="title-legacy" data-id="${esc(r.id)}">タイトルを編集</button>`:''}<p>報告者：${esc(r.reporterName||r.createdBy||'未記録')}／旧分類：${esc(r.type||'未記録')}／旧A・B：${esc(r.level||'未記録')}</p><dl>${Object.entries({報告番号:r.reportNumber||r.id,発生日:r.occurredDate,発見者:r.discovererName,確認者:r.verifierName,場所:r.occurredPlace,作業:r.workContent,場面:r.scene,内容:r.details,影響:r.eventImpact,防止理由:r.goodPoint,人と行動:r.causeHuman,環境と連携:r.causeEnvironment,申し送り:r.handoff,対策:r.countermeasure}).map(([k,v])=>v?`<dt>${k}</dt><dd>${esc(v)}</dd>`:'').join('')}</dl>${ctx.legacyWorkflow(r)}${!terminal&&(manager||r.reporterId===user.staffId||r.createdById===user.staffId)?`<button data-iv="edit-legacy" data-id="${esc(r.id)}">履歴を残して編集</button>`:''}${manager?` <button data-iv="withdraw-legacy" data-id="${esc(r.id)}">理由を付けて取り下げ</button>`:''}</article>`;}
       const {record:r,value:v,id}=item;return `<article class="iv-panel" data-case-kind="incidents" data-case-id="${esc(id)}"><h3>${esc(reportHeading({...v,title:titles['v2/'+id]?.text||v.title}))}</h3><p>報告日：${esc(reportDate(item.when))}（初回提出日）／報告者：${esc(reporterGroup(v).name)}</p>${importerLabel(v,r.importedBy,roster)?`<p>取込者：${esc(importerLabel(v,r.importedBy,roster))}</p>`:''}<p>${r.basis==='legacy'?'旧基準を保持／新項目は未確認':'新基準'}・${esc(classification(v))}・${r.review==='confirmed'?`確認済み（${esc(reporterGroup({reporterId:r.reviewer,reporterName:person(r.reviewer)?.name||r.reviewer}).name)}）`:'確認待ち'}</p><details><summary>報告の詳細</summary><pre>${esc(reportText(v))}</pre></details>${ctx.workflow(r,id,v)}${!r.linkedTaskId&&!r.linkedNoticeId?`<p>対策状況：${esc(({pending:'未検討',decided:'対策決定',in_progress:'取り組み中',followup_pending:'院長確認待ち',confirmed:'定着完了'})[r.counterStatus]||'未検討')}</p><p>${esc(r.countermeasure)}</p>${manager?`<button data-iv="followup" data-id="${esc(id)}">対策・対応状況</button>`:''}`:''}<div class="iv-actions">${manager?`<button data-iv="title-v2" data-id="${esc(id)}">タイトルを編集</button>`:''}<button data-iv="export-record" data-id="${esc(id)}">HTML</button>${!terminal&&(manager||r.owner===user.staffId)?`<button data-iv="edit" data-id="${esc(id)}">編集</button><button data-iv="history" data-id="${esc(id)}">履歴</button>`:''}${manager?`<button data-iv="confirm" data-id="${esc(id)}">分類を確認</button><button data-iv="withdraw" data-id="${esc(id)}">取り下げ</button>${!r.linkedTaskId&&!r.linkedNoticeId?`<button data-iv="route-task" data-id="${esc(id)}">取り組みへ</button><button data-iv="route-notice" data-id="${esc(id)}">お知らせへ</button>`:''}`:''}</div></article>`;
