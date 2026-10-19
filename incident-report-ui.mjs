@@ -3,7 +3,10 @@ import {createIncidentStore,decodeRecord} from './incident-report-store.mjs?v=se
 
 export function reporterGroup(report, fallbackName=''){
   const name=String(report.reporterName||fallbackName||'未記録').trim();
-  const id=String(report.reporterId||'').trim();
+  let id=String(report.reporterId||'').trim();
+  // Verified legacy Tsuruta reports store the same reporter in createdById.
+  // Never override an explicit reporter ID or infer identity from a name alone.
+  if(!id&&report.createdById==='tsuruta'&&name==='鶴田'&&String(report.createdBy||'').trim()==='鶴田')id='tsuruta';
   if(id==='sugihira'||(!id&&['院長','杉平'].includes(name)))return {key:'sugihira',name:'院長'};
   if(id==='tamiya'||(!id&&name==='田宮'))return {key:'tamiya',name:'田宮'};
   return {key:id||`legacy-name:${name}`,name};
