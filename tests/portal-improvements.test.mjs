@@ -37,7 +37,7 @@ test('role scopes, existing read marks, membership, due groups and links',()=>{
  assert.equal(staff.some(x=>x.kind==='勤怠承認'),false);assert.equal(staff.some(x=>x.id==='read'),false);
  assert.ok(staff.every(x=>x.url.includes('?')));
  for(const p of [{staffId:'guest'},{staffId:'tsuruta',portalRole:'terminal'}])assert.equal(todayItems(source,p).length,0);
- const director=todayItems(source,{staffId:'sugihira',portalRole:'admin'});assert.equal(director.filter(x=>x.kind==='院長確認').length,1);assert.equal(director.filter(x=>x.kind==='勤怠承認').length,2);
+ const director=todayItems(source,{staffId:'sugihira',portalRole:'admin'});assert.equal(director.filter(x=>x.kind==='院長確認').length,1);assert.equal(director.filter(x=>x.kind==='勤怠承認').length,1);
  const restricted=todayItems(source,{staffId:'hokari',portalRole:'staff'});assert.equal(restricted.some(x=>x.kind.startsWith('ミーティング')),false);
 });
 test('all inline scripts parse and all pages include common assets',()=>{

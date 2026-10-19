@@ -22,6 +22,8 @@ export function todayItems(source,profile,today=localDay()) {
     if(review||unread)add(review?'院長確認':'ミーティング未確認',id,t.title,'',`meeting-management.html?caseKind=${kind==='meetingTasks'?'tasks':'notices'}&caseId=${encodeURIComponent(id)}`);
   }
   if(profile.portalRole==='admin')for(const kind of ['corrections','requests'])for(const [id,r] of entries(source[kind])) {
+    // Paid leave is normally handled by Momo; other admins retain proxy approval access.
+    if(kind==='requests'&&sid!=='momo')continue;
     if(r.status!=='pending'||r.cancelled||(kind==='requests'&&r.type!=='paid'))continue;
     add('勤怠承認',id,kind==='corrections'?'打刻修正の承認':'有給申請の承認','',`attendance.html?tab=admin&kind=${kind==='corrections'?'correction':'paid'}&item=${encodeURIComponent(id)}`);
   }
