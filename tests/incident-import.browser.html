@@ -1,0 +1,29 @@
+<!doctype html><meta charset="utf-8"><title>架空HTML取り込み検証</title><link rel="stylesheet" href="../incident-report.css"><h1>架空HTML取り込み検証</h1><p id="result">検証中</p><main id="preview"></main><script type="module">import {mountIncidentReports} from '../incident-report-ui.mjs';
+import {newReport,toHTML,normalizeReport} from '../incident-report-core.mjs';
+const data={},watchers=[];const pathGet=p=>p.split('/').filter(Boolean).reduce((v,k)=>v?.[k],data);
+const resolve=v=>v&&typeof v==='object'?(v['.sv']==='timestamp'?Date.now():Object.fromEntries(Object.entries(v).map(([k,x])=>[k,resolve(x)]))):v;
+function write(p,v){const bits=p.split('/').filter(Boolean),key=bits.pop();let o=data;for(const b of bits)o=o[b]??={};if(v===null)delete o[key];else o[key]=resolve(v);}
+const snapshot=p=>({val:()=>structuredClone(pathGet(p)),exists:()=>pathGet(p)!=null});
+const notify=()=>queueMicrotask(()=>watchers.forEach(w=>w.fn(snapshot(w.p))));
+const api={ref:(_,p='')=>p,get:async p=>snapshot(p),set:async(p,v)=>{write(p,v);notify();},remove:async p=>{write(p,null);notify();},update:async(p,values)=>{for(const [k,v]of Object.entries(values))write([p,k].filter(Boolean).join('/'),v);notify();},serverTimestamp:()=>({'.sv':'timestamp'}),onValue:(p,fn)=>{const w={p,fn};watchers.push(w);queueMicrotask(()=>fn(snapshot(p)));return()=>watchers.splice(watchers.indexOf(w),1);}};
+
+const value={...newReport('fixture-import-browser'),reporterName:'院長',place:'診療室の奥',phase:'補綴治療中',sharing:'朝礼で共有済み',details:'架空の取り込み検証',impact:'0',occurredDate:'2026-10-19',occurredTime:'09:00',work:'架空作業',ghostwriter:'',patientContext:'成人',materials:'模型',roles:'担当者1名',timeline:'準備後に発見',supplement:'補足',handoff:'確認をお願いします',domains:['治療・処置'],factors:['確認・照合'],actual:['影響なし・未然に防止'],potential:['診療の遅れ・中断'],prevention:['確認・照合'],response:['院長・担当者へ連絡']};
+mountIncidentReports(document.getElementById('preview'),{db:{},api,user:{staffId:'sugihira',name:'杉平'},manager:true,terminal:false,roster:[{id:'sugihira',name:'杉平'}],legacy:()=>[],onReports:()=>{},workflow:()=>'',legacyWorkflow:()=>'',destinations:()=>[],route:()=>{},parseLegacy:()=>[],ocr:async()=>[]});
+const pause=()=>new Promise(r=>setTimeout(r,20));const click=async action=>{const button=document.querySelector(`[data-iv="${action}"]`);button.click();await pause();for(let i=0;i<200&&button.isConnected&&button.disabled;i++)await pause();if(button.isConnected&&button.disabled)throw Error('action timed out: '+action);};
+try{
+ const transfer=new DataTransfer();transfer.items.add(new File([toHTML(value)],'fixture.html',{type:'text/html'}));document.querySelector('#iv-files').files=transfer.files;
+ await click('import');
+ if(document.querySelector('[data-field="reporterId"]').value!=='sugihira')throw Error('reporter not resolved');
+ if(document.querySelector('[data-field="place"]').value!==value.place||document.querySelector('[data-field="phase"]').value!==value.phase)throw Error('custom place/phase lost');
+ for(let i=0;i<3;i++)await click('next');
+ if(document.querySelector('[data-field="sharing"]').value!==value.sharing)throw Error('sharing lost');
+ await click('next');
+ if(document.querySelector('#iv-confirm'))throw Error('director confirmation still required');
+ await click('submit');
+ const record=pathGet('meetingManagement/incidentV2/records/'+value.reportId);if(!record)throw Error('not saved');
+ const expected=normalizeReport({...value,reporterId:'sugihira'});
+ if(JSON.stringify(JSON.parse(record.payload))!==JSON.stringify(expected))throw Error('report fields changed');
+ if(record.review!=='confirmed')throw Error('not automatically confirmed');
+ document.querySelector('#result').textContent='PASS: actual HTML import, all fields retained, director automatically confirmed, original report ID retained';
+}catch(e){document.querySelector('#result').textContent='FAIL: '+e.message;}
+</script>

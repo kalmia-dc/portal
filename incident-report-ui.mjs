@@ -1,5 +1,5 @@
 import {OPTIONS,IMPACT,SOURCE,newReport,normalizeReport,classification,reportText,toHTML,parseHTML,fromLegacy,escapeHtml as esc,monthKey} from './incident-report-core.mjs';
-import {createIncidentStore,decodeRecord} from './incident-report-store.mjs';
+import {createIncidentStore,decodeRecord} from './incident-report-store.mjs?v=import-preserve-20261019';
 
 export function reporterGroup(report, fallbackName=''){
   const name=String(report.reporterName||fallbackName||'未記録').trim();
@@ -7,6 +7,17 @@ export function reporterGroup(report, fallbackName=''){
   if(id==='sugihira'||(!id&&['院長','杉平'].includes(name)))return {key:'sugihira',name:'院長'};
   if(id==='tamiya'||(!id&&name==='田宮'))return {key:'tamiya',name:'田宮'};
   return {key:id||`legacy-name:${name}`,name};
+}
+
+export function matchImportedReporter(value,roster,user,manager){
+  const name=String(value.reporterName||'').trim();
+  const eligible=roster.filter(p=>p.availability!=='stopped'&&(manager||p.id===user.staffId));
+  const matches=eligible.filter(p=>p.id==='sugihira'?['院長','杉平'].includes(name):[p.name,p.label].includes(name));
+  return {...value,reporterId:matches.length===1?matches[0].id:'',reporterName:matches.length===1&&matches[0].id==='sugihira'?'院長':name};
+}
+export function preservedChoices(value,choices){
+  const entries=Object.entries(choices);
+  return value&&!Object.hasOwn(choices,value)?[[value,`${value}（取り込み値・要確認）`],...entries]:entries;
 }
 
 export function mountIncidentReports(root,ctx){
@@ -26,19 +37,19 @@ export function mountIncidentReports(root,ctx){
   const label=(text,input)=>`<label class="iv-field">${esc(text)}${input}</label>`;
   const input=(key,title,type='text')=>label(title,`<input data-field="${key}" type="${type}" value="${esc(draft[key]||'')}">`);
   const area=(key,title,required=false)=>label(title,`<textarea data-field="${key}" ${required?'required':''} rows="3">${esc(draft[key]||'')}</textarea>`);
-  const select=(key,title,choices)=>label(title,`<select data-field="${key}">${(key==='impact'?['unknown','na','0','1','2','3a','3b','4','5'].map(k=>[k,choices[k]]):Object.entries(choices)).map(([v,n])=>`<option value="${esc(v)}" ${draft[key]===v?'selected':''}>${esc(n)}</option>`).join('')}</select>`);
+  const select=(key,title,choices)=>label(title,`<select data-field="${key}">${(key==='impact'?['unknown','na','0','1','2','3a','3b','4','5'].map(k=>[k,choices[k]]):key==='reporterId'?Object.entries(choices):preservedChoices(draft[key],choices)).map(([v,n])=>`<option value="${esc(v)}" ${draft[key]===v?'selected':''}>${esc(n)}</option>`).join('')}</select>`);
   const checks=(key,title)=>`<fieldset><legend>${esc(title)}</legend><div class="iv-options">${OPTIONS[key].map(v=>`<label><input type="checkbox" data-multi="${key}" value="${esc(v)}" ${(draft[key]||[]).includes(v)?'checked':''}>${esc(v)}</label>`).join('')}</div></fieldset>`;
-  function readEditor(){if(!draft)return;for(const el of q('#iv-editor').querySelectorAll('[data-field]'))draft[el.dataset.field]=el.value;for(const key of Object.keys(OPTIONS)){const boxes=[...q('#iv-editor').querySelectorAll(`[data-multi="${key}"]`)];if(boxes.length)draft[key]=boxes.filter(e=>e.checked).map(e=>e.value);}if(draft.reporterId){const p=person(draft.reporterId);if(p)draft.reporterName=p.name;}dirty=true;}
+  function readEditor(){if(!draft)return;for(const el of q('#iv-editor').querySelectorAll('[data-field]'))draft[el.dataset.field]=el.value;for(const key of Object.keys(OPTIONS)){const boxes=[...q('#iv-editor').querySelectorAll(`[data-multi="${key}"]`)];if(boxes.length)draft[key]=boxes.filter(e=>e.checked).map(e=>e.value);}if(draft.reporterId){const p=person(draft.reporterId);if(p)draft.reporterName=p.id==='sugihira'?'院長':p.name;}dirty=true;}
   function cancelTimer(){if(timer){clearTimeout(timer);timer=null;}}
   function editor(){
     if(!editing||!draft){q('#iv-editor').innerHTML='';return;}
     const titles=['基本情報','起きたこと・影響','背景・防げた理由','対応・申し送り','全体確認'];
     let content='';
-    if(step===0){const choices=Object.fromEntries(roster.filter(p=>p.availability!=='stopped'&&(manager||p.id===user.staffId)).map(p=>[p.id,p.label||p.name]));content=select('reporterId','報告者',{'':'選択してください',...choices})+input('ghostwriter','代筆者（代筆時のみ）')+input('occurredDate','発生日（不明なら空欄）','date')+input('occurredTime','発生時刻（不明なら空欄）','time')+select('place','場所',Object.fromEntries(['',...OPTIONS.place].map(x=>[x,x||'選択してください'])))+input('work','作業内容（必要な場合）')+select('phase','場面',Object.fromEntries(['',...OPTIONS.phase].map(x=>[x,x||'未確認'])));}
+    if(step===0){const choices=Object.fromEntries(roster.filter(p=>p.availability!=='stopped'&&(manager||p.id===user.staffId)).map(p=>[p.id,p.id==='sugihira'?'院長':p.label||p.name]));content=select('reporterId','報告者',{'':'選択してください',...choices})+(!draft.reporterId&&draft.reporterName?`<p class="iv-error">取り込み元の報告者：${esc(draft.reporterName)}。名簿と一意に一致しないため、報告者を確認して選択してください。</p>`:'')+input('ghostwriter','代筆者（代筆時のみ）')+input('occurredDate','発生日（不明なら空欄）','date')+input('occurredTime','発生時刻（不明なら空欄）','time')+select('place','場所',Object.fromEntries(['',...OPTIONS.place].map(x=>[x,x||'選択してください'])))+input('work','作業内容（必要な場合）')+select('phase','場面',Object.fromEntries(['',...OPTIONS.phase].map(x=>[x,x||'未確認'])));}
     if(step===1)content=checks('domains','事象の分野（複数可）')+area('details','何が起きたか（必須）',true)+select('impact','患者への実際の影響',IMPACT)+`<p>分類候補：${esc(classification(draft))}。院長・主任の確認前は仮分類です。<a href="${SOURCE}" target="_blank" rel="noopener">分類基準</a></p>`+checks('actual','業務・職員への実際の影響')+checks('potential','起こり得た被害（実際の結果とは別）')+`<details><summary>必要な医療情報を補足（個人特定情報を除く）</summary>${area('patientContext','患者の年齢層・状態など、事例に必要な情報')}${input('materials','器具・薬剤名')}</details>`;
     if(step===2)content=checks('factors','背景・要因（原因と確定したものではありません）')+checks('prevention','被害の防止・拡大防止につながった点')+`<details><summary>必要な場合だけ補足</summary>${input('roles','関係者の人数・役割')}${area('timeline','発見・対応の時系列')}${area('supplement','その他の補足')}</details>`;
     if(step===3)content=checks('response','その場で行った対応')+select('sharing','共有状況',{'':'未確認','共有済み':'共有済み','未共有':'未共有','確認中':'確認中'})+area('handoff','ミーティングへの申し送り（必要な場合）')+'<p>今後の対策の提案は、実施済みの対応と区別して記載してください。対策・進捗は既存のお知らせ／取り組みで管理します。</p>';
-    if(step===4)content=`<pre>${esc(reportText(draft))}</pre><p>患者の個人特定情報や、未確認事項を断定した文章がないか確認してください。</p>${previous&&previous.owner!==draft.reporterId?'<label>報告者の訂正理由<input id="iv-reassign-reason" required></label>':''}${manager&&draft.impact!=='unknown'?'<label><input type="checkbox" id="iv-confirm">院長・主任として分類を確認済みにする</label>':''}<button type="button" data-iv="submit">${previous?'変更を保存':'内容を確認して提出'}</button>`;
+    if(step===4)content=`<pre>${esc(reportText(draft))}</pre><p>患者の個人特定情報や、未確認事項を断定した文章がないか確認してください。</p>${previous&&previous.owner!==draft.reporterId?'<label>報告者の訂正理由<input id="iv-reassign-reason" required></label>':''}${manager&&draft.impact!=='unknown'?(draft.reporterId==='sugihira'?'<p>院長の報告のため、提出時に分類を自動で確認済みにします。</p>':'<label><input type="checkbox" id="iv-confirm">院長・主任として分類を確認済みにする</label>'):''}<button type="button" data-iv="submit">${previous?'変更を保存':'内容を確認して提出'}</button>`;
     q('#iv-editor').innerHTML=`<section class="iv-panel"><h3>${previous?'報告の修正':'報告の作成'}：${step+1}/5 ${titles[step]}</h3>${content}<div class="iv-actions">${step?'<button type="button" data-iv="back">戻る</button>':''}${step<4?'<button type="button" data-iv="next">次へ</button>':''}${!previous&&!legacy?'<button type="button" data-iv="save-draft">下書き保存</button>':''}<button type="button" data-iv="export">HTMLを書き出す</button><button type="button" data-iv="close">閉じる</button></div><p id="iv-save-state">${previous?'提出済み報告の変更は最後の保存操作で確定します。':foreignDraftSaved?'代理下書きを保存しました。以後は報告者本人のみ開けます。':'下書きは本人だけが開けます。本人の下書きは自動保存します。'}</p></section>`;
   }
   function setEditor(value,record=null,old=null){cancelTimer();draft={...value};previous=record;legacy=old;step=0;editing=true;draftRevision=0;dirty=false;foreignDraftSaved=false;imported=false;editor();q('#iv-editor').scrollIntoView({block:'start',behavior:'smooth'});}
@@ -121,10 +132,10 @@ export function mountIncidentReports(root,ctx){
     if(images.length){status('写真の文字を読み取り中…');const values=await ctx.ocr(images,{set textContent(v){status(v);}});candidates.push(...values.map(x=>fromLegacy(x)));}
     if(candidates.length!==1)throw new Error('内容を一件ずつ確認するため、報告書1件分のファイルを選んでください');
     const value=candidates[0];let rec=null;const existing=feed[value.reportId]||privateRecords[value.reportId];if(existing){if(existing.state==='withdrawn')throw new Error('この報告は取り下げ済みです。院長・主任が理由を付けて復元してから取り込んでください');if(!manager&&existing.owner!==user.staffId)throw new Error('他の報告者の報告は更新できません');rec=await store.record(value.reportId);const before=decodeRecord(rec);q('#iv-import').insertAdjacentHTML('beforeend',`<details open><summary>同じIDの報告：変更前と取り込み内容</summary><h4>現在</h4><pre>${esc(reportText(before))}</pre><h4>取り込み</h4><pre>${esc(reportText(value))}</pre></details>`);value.revision=rec.revision;value.reporterId=rec.owner;if(!confirm('同じ報告IDが見つかりました。差分を確認して編集画面へ進みますか？'))return;}
-    else {const possible=allItems().filter(i=>(i.value?.details||i.old?.details||'').trim()===value.details.trim());if(possible.length&&!confirm('内容が一致する報告があります。別の報告として確認を続けますか？'))return;value.revision=0;value.reporterId=manager?'':user.staffId;if(!manager)value.reporterName=user.name;}
+    else {const possible=allItems().filter(i=>(i.value?.details||i.old?.details||'').trim()===value.details.trim());if(possible.length&&!confirm('内容が一致する報告があります。別の報告として確認を続けますか？'))return;value.revision=0;Object.assign(value,matchImportedReporter(value,roster,user,manager));}
     setEditor(value,rec);imported=true;status('取り込み内容と報告者を確認してください。まだ提出されていません。');q('#iv-files').value='';
   }
-  app.addEventListener('input',e=>{if(e.target.id==='iv-search'){search=e.target.value;render();return;}if(e.target.closest('#iv-editor')){editVersion++;if(e.target.dataset.field==='reporterId'&&!previous&&!legacy&&draft.reporterId!==e.target.value){draft.reportId=newReport().reportId;draftRevision=0;}readEditor();cancelTimer();if(!previous&&!legacy&&draft?.reporterId===user.staffId)timer=setTimeout(()=>safe(saveDraft),1400);}});
+  app.addEventListener('input',e=>{if(e.target.id==='iv-search'){search=e.target.value;render();return;}if(e.target.closest('#iv-editor')){editVersion++;if(e.target.dataset.field==='reporterId'&&!previous&&!legacy&&!imported&&draft.reporterId!==e.target.value){draft.reportId=newReport().reportId;draftRevision=0;}readEditor();cancelTimer();if(!previous&&!legacy&&draft?.reporterId===user.staffId)timer=setTimeout(()=>safe(saveDraft),1400);}});
   app.addEventListener('change',e=>{if(e.target.id==='iv-month'){month=e.target.value;render();}else if(e.target.dataset.field==='impact'){readEditor();editor();}});
   app.addEventListener('click',e=>{const b=e.target.closest('[data-iv]');if(!b||busy)return;e.preventDefault();safe(async()=>{busy=true;b.disabled=true;try{await run(b.dataset.iv,b.dataset.id);}finally{busy=false;if(b.isConnected)b.disabled=false;}});});
   if(!terminal){q('#iv-controls').innerHTML='<button class="btn primary" data-iv="new">報告を作成</button>';q('#iv-import').innerHTML='<section class="iv-panel iv-import-panel" aria-labelledby="iv-import-title"><h3 id="iv-import-title">HTML・写真から報告を取り込む</h3><p>Codex・ClaudeのHTML、従来HTML、写真に対応しています。</p><p>ファイルを選び、内容を読み取って確認してください。最後に「内容を確認して提出」を押すと一覧に反映されます。写真は保存しません。</p><label class="iv-field">取り込むファイル<input type="file" id="iv-files" accept=".html,.htm,image/*" multiple></label><button data-iv="import">内容を読み取って確認</button></section>';}

@@ -19,6 +19,7 @@ export function createIncidentStore({db,api,user,manager=false,isActive=()=>true
   async function commit(value,{previous=null,action='edit',reason='',confirmed=false,legacy=null,imported=false,linkedTaskId,linkedNoticeId,linkedOriginals,counterStatus,countermeasure,extraUpdates={}}={}){
     if(!isActive())throw new Error('ログイン状態が変わったため保存を中止しました');
     const r=validateSubmission(value),id=r.reportId;
+    if(manager&&r.reporterId==='sugihira'&&r.impact!=='unknown'&&['submit','import','edit','migrate'].includes(action))confirmed=true;
     if(previous&&previous.revision!==r.revision)throw new Error('他の更新があります。最新内容と差分を確認してください');
     if(previous&&previous.owner!==r.reporterId&&!reason.trim())throw new Error('報告者の訂正理由を入力してください');
     if(['withdraw','restore'].includes(action)&&(!manager||!reason.trim()))throw new Error('院長・主任が理由を入力してください');

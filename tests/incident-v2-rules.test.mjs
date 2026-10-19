@@ -14,6 +14,10 @@ test('private drafts, immutable history, atomic publication, proxy and withdrawa
   await env.withSecurityRulesDisabled(c=>api.set(api.ref(c.database()),{portalAccess:{users}}));
   const db=id=>env.authenticatedContext(id).database();
   const store=id=>createIncidentStore({db:db(id),api,user:{staffId:users[id].staffId},manager:['admin','leader'].includes(id)});
+  const director=await assertSucceeds(store('admin').commit({...newReport('director-auto-confirm'),reporterId:'sugihira',reporterName:'院長',details:'架空の自動確認試験',impact:'0'},{action:'import'}));
+  assert.equal(director.review,'confirmed');
+  const unknownDirector=await assertSucceeds(store('admin').commit({...newReport('director-unknown-impact'),reporterId:'sugihira',reporterName:'院長',details:'架空の未確認試験',impact:'unknown'},{action:'import'}));
+  assert.equal(unknownDirector.review,'pending');
   const r={...newReport('test-report-001'),reporterId:'author',reporterName:'架空担当',details:'架空の試験',impact:'0'};
   await assertSucceeds(store('owner').saveDraft(r));
   for(const id of ['other','admin','leader','terminal','revoked'])await assertFails(api.get(api.ref(db(id),`${BASE}/drafts/author`)));
