@@ -1,4 +1,4 @@
-import {normalizeReport,validateSubmission} from './incident-report-core.mjs';
+import {normalizeReport,validateSubmission} from './incident-report-core.mjs?v=semantic-title-20261019';
 export const BASE='meetingManagement/incidentV2';
 export function decodeRecord(record){return {...normalizeReport(JSON.parse(record.payload)),reporterId:record.owner,revision:record.revision};}
 export function publicRecord(record){const {reason,legacy,linkedOriginals,...visible}=record;return visible;}
@@ -40,12 +40,14 @@ export function createIncidentStore({db,api,user,manager=false,isActive=()=>true
     const updates={...extraUpdates,[`${paths.records}/${id}`]:record,[`${paths.history}/${id}/r${revision}`]:record,[`${paths.feed}/${id}`]:record.state==='submitted'?publicRecord(record):null,[`${paths.owners}/${record.owner}/${id}`]:true};
     if(previous?.owner&&previous.owner!==record.owner)updates[`${paths.owners}/${previous.owner}/${id}`]=null;
     if(legacy)updates[`meetingManagement/incidentReports/${legacy.id}`]=null;
+    if(r.title&&record.state==='submitted')updates[`meetingManagement/incidentTitles/v2/${id}`]={text:r.title,actor:user.staffId,updatedAt:stamp};
     // Private drafts are never read or deleted by a proxy after creation.
     if(record.owner===user.staffId)updates[`${paths.drafts}/${record.owner}/${id}`]=null;
     if(!isActive())throw new Error('ログイン状態が変わったため保存を中止しました');
     await update(ref(db),updates);return record;
   }
   return {paths,read,watch,saveDraft,commit,
+    async saveTitle(kind,id,text){if(!isActive()||!manager)throw new Error('タイトルの編集は院長・主任のみです');if(!['legacy','v2'].includes(kind)||!id||/[.#$\[\]/]/.test(id))throw new Error('報告IDが不正です');const title=String(text).trim();if(!title||title.length>100)throw new Error('タイトルを1〜100文字で入力してください');await set(ref(db,`meetingManagement/incidentTitles/${kind}/${id}`),{text:title,actor:user.staffId,updatedAt:serverTimestamp()});},
     deleteDraft:id=>remove(ref(db,`${paths.drafts}/${user.staffId}/${id}`)),
     history:id=>read(`${paths.history}/${id}`),record:id=>read(`${paths.records}/${id}`),
   };

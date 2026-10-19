@@ -51,6 +51,10 @@ node <このスキルのフォルダー>/scripts/render.mjs <確認済みJSONの
 
 この会話や手元のHTMLだけから院内全体の件数・傾向を推測しない。ポータルの集計画面を案内し、依頼された場合だけ、利用者が閲覧を許可された範囲の集計を確認する。
 
+## 報告タイトル
+- 確認済みの本文から「何が起きたか」が一読で分かる短いタイトルを作り、JSONのtitleに保存する。目安20〜40文字、上限100文字。本文冒頭の切り取りや省略記号で代用しない。
+- 実害と未然防止を区別し、未確認の因果関係・法的判断・患者の個人特定情報を加えない。確認用の全体表示とHTMLにもタイトルを含める。
+
 
 # Claudeプロジェクトでの実行
 
@@ -92,6 +96,8 @@ https://nho.hosp.go.jp/files/000192341.pdf#page=20
 
 ポータルは表示とデータが一致しなければ取り込みを拒否する。同じIDの既存報告は差分を見て更新し、履歴を残す。取り下げ済みの再取り込みは復元の手順を先に行う。旧形式は項目確認を経由し、新しい分類は未確認から始める。
 
+- 任意のtitleは本文の要点を表す100文字以内の見出し。旧HTMLとの互換性のため、titleがないときの正規化本文は変更しない。タイトルがあるときは先頭見出し内に表示し、JSONとの一致を検証する。
+
 
 ## 共通生成モジュール（正本と同じコード）
 
@@ -128,6 +134,7 @@ export function normalizeReport(value) {
   out.reporterId=String(value.reporterId||'');
   if(out.reporterId && !/^[A-Za-z0-9_-]{1,100}$/.test(out.reporterId))throw new Error('報告者IDが不正です');
   for(const key of TEXT)out[key]=String(value[key]||'').trim();
+  if(value.title){out.title=String(value.title).trim();if(out.title.length>100)throw new Error('タイトルは100文字以内にしてください');}
   if(!Object.hasOwn(IMPACT,out.impact))out.impact='unknown';
   for(const key of ['domains','factors','actual','potential','prevention','response']){
     const list=Array.isArray(value[key])?value[key]:[];
@@ -150,7 +157,7 @@ export function classification(r){
 export function monthKey(timestamp){return Number.isFinite(timestamp)&&timestamp>0?new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Tokyo',year:'numeric',month:'2-digit'}).format(timestamp):'';}
 export function escapeHtml(value){return String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function reportBlocks(value){const r=normalizeReport(value);const line=(label,v)=>`${label}：${Array.isArray(v)?v.join('、')||'未確認':v||'未確認'}`;return [
-  'カルミアデンタルクリニック インシデント報告書',
+  'カルミアデンタルクリニック インシデント報告書'+(r.title?'\nタイトル：'+r.title:''),
   line('報告番号',r.reportNumber||r.reportId),line('報告者',r.reporterName),line('代筆者',r.ghostwriter),line('発生日時',[r.occurredDate,r.occurredTime].filter(Boolean).join(' ')),
   line('場所',r.place),line('作業',r.work),line('場面',r.phase),line('事象の分野',r.domains),line('何が起きたか',r.details),
   line('患者への実際の影響',IMPACT[r.impact]),line('分類候補',classification(r)+'（ポータルで要確認）'),line('業務・職員への実際の影響',r.actual),line('起こり得た被害',r.potential),

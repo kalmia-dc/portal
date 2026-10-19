@@ -49,6 +49,14 @@ m.incidentV2={
  owners:{'.read':manager,'$owner':{'.read':`(${staff}) && $owner === ${sid}`,'$id':{'.write':`(${staff}) && ((${manager}) || $owner === ${sid}) && (newData.exists() ? (newData.val() === true && newData.parent().parent().parent().child('records').child($id).child('owner').val() === $owner) : ((${manager}) && newData.parent().parent().parent().child('records').child($id).child('owner').val() !== $owner))`}}},
  drafts:{'$owner':{'.read':`(${staff}) && $owner === ${sid}`,'$id':{'.write':`(${staff}) && ($owner === ${sid} || ((${manager}) && !data.exists() && newData.exists()))`,'.validate':`newData.hasChildren(['owner','payload','revision','updatedAt','actor']) && newData.child('owner').val() === $owner && newData.child('payload').isString() && newData.child('payload').val().length <= 100000 && newData.child('revision').val() === (data.exists() ? data.child('revision').val()+1 : 1) && newData.child('actor').val() === ${sid} && newData.child('updatedAt').val() === now`,'$other':{'.validate':false},...Object.fromEntries(['owner','payload','revision','updatedAt','actor'].map(k=>[k,{}]))}}},
 };
+// Titles are display metadata with the same visibility as their submitted source report.
+m.incidentTitles={};
+for(const kind of ['legacy','v2']){
+ const source=kind==='legacy'?"root.child('meetingManagement/incidentReports').child($id)":"root.child('meetingManagement/incidentV2/feed').child($id)";
+ const nextSource=kind==='legacy'?source:"newData.parent().parent().parent().child('incidentV2/feed').child($id)";
+ const writer=kind==='legacy'?manager:`(${staff}) && ((${manager}) || ${nextSource}.child('owner').val() === ${sid})`;
+ m.incidentTitles[kind]={'$id':{'.read':`(${active}) && ${source}.exists()`,'.write':`(${writer}) && ${nextSource}.exists() && newData.exists()`,'.validate':`newData.hasChildren(['text','actor','updatedAt'])`,text:{'.validate':'newData.isString() && newData.val().length > 0 && newData.val().length <= 100'},actor:{'.validate':`newData.val() === ${sid}`},updatedAt:{'.validate':'newData.val() === now'},'$other':{'.validate':false}}};
+}
 // Legacy content is preserved until an explicit versioned edit/withdrawal moves it.
 const draftRule=m.incidentV2.drafts.$owner.$id;
 draftRule['.validate']+=` && newData.hasChildren(['importedBy','importedAt']) && (data.exists() ? (newData.child('importedBy').val() === data.child('importedBy').val() && newData.child('importedAt').val() === data.child('importedAt').val()) : ((newData.child('importedBy').val() === '' && newData.child('importedAt').val() === 0) || (newData.child('importedBy').val() === ${sid} && newData.child('importedAt').val() === now)))`;

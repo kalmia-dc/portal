@@ -14,8 +14,19 @@ test('private drafts, immutable history, atomic publication, proxy and withdrawa
   await env.withSecurityRulesDisabled(c=>api.set(api.ref(c.database()),{portalAccess:{users}}));
   const db=id=>env.authenticatedContext(id).database();
   const store=id=>createIncidentStore({db:db(id),api,user:{staffId:users[id].staffId},manager:['admin','leader'].includes(id)});
-  const director=await assertSucceeds(store('admin').commit({...newReport('director-auto-confirm'),reporterId:'sugihira',reporterName:'院長',details:'架空の自動確認試験',impact:'0'},{action:'import'}));
+  const director=await assertSucceeds(store('admin').commit({...newReport('director-auto-confirm'),reporterId:'sugihira',reporterName:'院長',title:'準備中の確認漏れに気づいた',details:'架空の自動確認試験',impact:'0'},{action:'import'}));
   assert.equal(director.review,'confirmed');
+  const titlePath='meetingManagement/incidentTitles/v2/director-auto-confirm';
+  await assertSucceeds(api.get(api.ref(db('owner'),titlePath)));
+  await assertFails(api.set(api.ref(db('other'),titlePath),{text:'不正変更',actor:'other',updatedAt:api.serverTimestamp()}));
+  await assertSucceeds(store('admin').saveTitle('v2','director-auto-confirm','準備の確認漏れを処置前に発見した'));
+  await assertFails(store('admin').saveTitle('v2','no-source-report','存在しない報告'));
+  const persisted=await store('admin').record('director-auto-confirm');
+  await assertSucceeds(store('admin').commit(decodeRecord(persisted),{previous:persisted,action:'withdraw',reason:'架空試験'}));
+  const hidden=await store('admin').record('director-auto-confirm');
+  await assertFails(api.get(api.ref(db('owner'),titlePath)));
+  await assertSucceeds(store('admin').commit(decodeRecord(hidden),{previous:hidden,action:'restore',reason:'架空試験の復元'}));
+
   const unknownDirector=await assertSucceeds(store('admin').commit({...newReport('director-unknown-impact'),reporterId:'sugihira',reporterName:'院長',details:'架空の未確認試験',impact:'unknown'},{action:'import'}));
   assert.equal(unknownDirector.review,'pending');
   const r={...newReport('test-report-001'),reporterId:'author',reporterName:'架空担当',details:'架空の試験',impact:'0'};

@@ -30,6 +30,7 @@ export function normalizeReport(value) {
   out.reporterId=String(value.reporterId||'');
   if(out.reporterId && !/^[A-Za-z0-9_-]{1,100}$/.test(out.reporterId))throw new Error('報告者IDが不正です');
   for(const key of TEXT)out[key]=String(value[key]||'').trim();
+  if(value.title){out.title=String(value.title).trim();if(out.title.length>100)throw new Error('タイトルは100文字以内にしてください');}
   if(!Object.hasOwn(IMPACT,out.impact))out.impact='unknown';
   for(const key of ['domains','factors','actual','potential','prevention','response']){
     const list=Array.isArray(value[key])?value[key]:[];
@@ -52,7 +53,7 @@ export function classification(r){
 export function monthKey(timestamp){return Number.isFinite(timestamp)&&timestamp>0?new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Tokyo',year:'numeric',month:'2-digit'}).format(timestamp):'';}
 export function escapeHtml(value){return String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function reportBlocks(value){const r=normalizeReport(value);const line=(label,v)=>`${label}：${Array.isArray(v)?v.join('、')||'未確認':v||'未確認'}`;return [
-  'カルミアデンタルクリニック インシデント報告書',
+  'カルミアデンタルクリニック インシデント報告書'+(r.title?'\nタイトル：'+r.title:''),
   line('報告番号',r.reportNumber||r.reportId),line('報告者',r.reporterName),line('代筆者',r.ghostwriter),line('発生日時',[r.occurredDate,r.occurredTime].filter(Boolean).join(' ')),
   line('場所',r.place),line('作業',r.work),line('場面',r.phase),line('事象の分野',r.domains),line('何が起きたか',r.details),
   line('患者への実際の影響',IMPACT[r.impact]),line('分類候補',classification(r)+'（ポータルで要確認）'),line('業務・職員への実際の影響',r.actual),line('起こり得た被害',r.potential),

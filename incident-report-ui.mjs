@@ -1,5 +1,5 @@
-import {OPTIONS,IMPACT,SOURCE,newReport,normalizeReport,classification,reportText,toHTML,parseHTML,fromLegacy,escapeHtml as esc,monthKey} from './incident-report-core.mjs';
-import {createIncidentStore,decodeRecord} from './incident-report-store.mjs?v=import-preserve-20261019';
+import {OPTIONS,IMPACT,SOURCE,newReport,normalizeReport,classification,reportText,toHTML,parseHTML,fromLegacy,escapeHtml as esc,monthKey} from './incident-report-core.mjs?v=semantic-title-20261019';
+import {createIncidentStore,decodeRecord} from './incident-report-store.mjs?v=semantic-title-20261019';
 
 export function reporterGroup(report, fallbackName=''){
   const name=String(report.reporterName||fallbackName||'未記録').trim();
@@ -21,8 +21,7 @@ export function preservedChoices(value,choices){
 }
 
 export function reportHeading(value){
-  const text=String(value.details||'').replace(/\s+/g,' ').trim();
-  const chars=Array.from(text);return chars.length>56?chars.slice(0,56).join('')+'…':text||'内容未記入の報告';
+  return String(value.title||'').trim()||'タイトル未設定（詳細を確認）';
 }
 export function reportDate(timestamp){
   const value=Number(timestamp);if(!Number.isFinite(value)||value<=0||!Number.isFinite(new Date(value).getTime()))return '不明';
@@ -38,7 +37,7 @@ export function mountIncidentReports(root,ctx){
   const q=s=>app.querySelector(s);
   let feed={},drafts={},privateRecords={},draft=null,previous=null,legacy=null,step=0,draftRevision=0,editing=false,timer=null,busy=false,month='',search='',dirty=false,foreignDraftSaved=false;
   let draftQueue=Promise.resolve(),active=true,editVersion=0,imported=false;
-  const ownerListeners=new Map();
+  const ownerListeners=new Map(),titleListeners=new Map(),titles={};
   const disposers=[];
   const status=(message,error=false)=>{if(!active)return;q('#iv-status').textContent=message;q('#iv-status').className=error?'iv-error':'iv-status';};
   const safe=fn=>Promise.resolve().then(fn).catch(e=>status(e.message||'操作を完了できませんでした',true));
@@ -55,13 +54,13 @@ export function mountIncidentReports(root,ctx){
     const titles=['基本情報','起きたこと・影響','背景・防げた理由','対応・申し送り','全体確認'];
     let content='';
     if(step===0){const choices=Object.fromEntries(roster.filter(p=>p.availability!=='stopped'&&(manager||p.id===user.staffId)).map(p=>[p.id,p.id==='sugihira'?'院長':p.label||p.name]));content=select('reporterId','報告者',{'':'選択してください',...choices})+(!draft.reporterId&&draft.reporterName?`<p class="iv-error">取り込み元の報告者：${esc(draft.reporterName)}。名簿と一意に一致しないため、報告者を確認して選択してください。</p>`:'')+input('ghostwriter','代筆者（代筆時のみ）')+input('occurredDate','発生日（不明なら空欄）','date')+input('occurredTime','発生時刻（不明なら空欄）','time')+select('place','場所',Object.fromEntries(['',...OPTIONS.place].map(x=>[x,x||'選択してください'])))+input('work','作業内容（必要な場合）')+select('phase','場面',Object.fromEntries(['',...OPTIONS.phase].map(x=>[x,x||'未確認'])));}
-    if(step===1)content=checks('domains','事象の分野（複数可）')+area('details','何が起きたか（必須）',true)+select('impact','患者への実際の影響',IMPACT)+`<p>分類候補：${esc(classification(draft))}。院長・主任の確認前は仮分類です。<a href="${SOURCE}" target="_blank" rel="noopener">分類基準</a></p>`+checks('actual','業務・職員への実際の影響')+checks('potential','起こり得た被害（実際の結果とは別）')+`<details><summary>必要な医療情報を補足（個人特定情報を除く）</summary>${area('patientContext','患者の年齢層・状態など、事例に必要な情報')}${input('materials','器具・薬剤名')}</details>`;
+    if(step===1)content=input('title','タイトル（何が起きたかを短く・100文字以内）')+checks('domains','事象の分野（複数可）')+area('details','何が起きたか（必須）',true)+select('impact','患者への実際の影響',IMPACT)+`<p>分類候補：${esc(classification(draft))}。院長・主任の確認前は仮分類です。<a href="${SOURCE}" target="_blank" rel="noopener">分類基準</a></p>`+checks('actual','業務・職員への実際の影響')+checks('potential','起こり得た被害（実際の結果とは別）')+`<details><summary>必要な医療情報を補足（個人特定情報を除く）</summary>${area('patientContext','患者の年齢層・状態など、事例に必要な情報')}${input('materials','器具・薬剤名')}</details>`;
     if(step===2)content=checks('factors','背景・要因（原因と確定したものではありません）')+checks('prevention','被害の防止・拡大防止につながった点')+`<details><summary>必要な場合だけ補足</summary>${input('roles','関係者の人数・役割')}${area('timeline','発見・対応の時系列')}${area('supplement','その他の補足')}</details>`;
     if(step===3)content=checks('response','その場で行った対応')+select('sharing','共有状況',{'':'未確認','共有済み':'共有済み','未共有':'未共有','確認中':'確認中'})+area('handoff','ミーティングへの申し送り（必要な場合）')+'<p>今後の対策の提案は、実施済みの対応と区別して記載してください。対策・進捗は既存のお知らせ／取り組みで管理します。</p>';
     if(step===4)content=`<pre>${esc(reportText(draft))}</pre><p>患者の個人特定情報や、未確認事項を断定した文章がないか確認してください。</p>${previous&&previous.owner!==draft.reporterId?'<label>報告者の訂正理由<input id="iv-reassign-reason" required></label>':''}${manager&&draft.impact!=='unknown'?(draft.reporterId==='sugihira'?'<p>院長の報告のため、提出時に分類を自動で確認済みにします。</p>':'<label><input type="checkbox" id="iv-confirm">院長・主任として分類を確認済みにする</label>'):''}<button type="button" data-iv="submit">${previous?'変更を保存':'内容を確認して提出'}</button>`;
     q('#iv-editor').innerHTML=`<section class="iv-panel"><h3>${previous?'報告の修正':'報告の作成'}：${step+1}/5 ${titles[step]}</h3>${content}<div class="iv-actions">${step?'<button type="button" data-iv="back">戻る</button>':''}${step<4?'<button type="button" data-iv="next">次へ</button>':''}${!previous&&!legacy?'<button type="button" data-iv="save-draft">下書き保存</button>':''}<button type="button" data-iv="export">HTMLを書き出す</button><button type="button" data-iv="close">閉じる</button></div><p id="iv-save-state">${previous?'提出済み報告の変更は最後の保存操作で確定します。':foreignDraftSaved?'代理下書きを保存しました。以後は報告者本人のみ開けます。':'下書きは本人だけが開けます。本人の下書きは自動保存します。'}</p></section>`;
   }
-  function setEditor(value,record=null,old=null){cancelTimer();draft={...value};previous=record;legacy=old;step=0;editing=true;draftRevision=0;dirty=false;foreignDraftSaved=false;imported=false;editor();q('#iv-editor').scrollIntoView({block:'start',behavior:'smooth'});}
+  function setEditor(value,record=null,old=null){cancelTimer();const key=old?'legacy/'+old.id:'v2/'+value.reportId;draft={...value,title:titles[key]?.text||value.title||''};previous=record;legacy=old;step=0;editing=true;draftRevision=0;dirty=false;foreignDraftSaved=false;imported=false;editor();q('#iv-editor').scrollIntoView({block:'start',behavior:'smooth'});}
   async function saveDraft(){
     if(previous||legacy||!draft||foreignDraftSaved)return;
     readEditor();const snapshot=normalizeReport(draft);if(!snapshot.reporterId)throw new Error('下書きの報告者を選んでください');
@@ -74,7 +73,11 @@ export function mountIncidentReports(root,ctx){
   function legacyDate(r){return Number(r.createdAt||r.importedAt||0);}
   function allItems(){const ids=new Set(Object.values(feed).map(r=>r.legacyKey).filter(Boolean));return [...Object.entries(feed).map(([id,record])=>({id,record,value:decodeRecord(record),when:record.submittedAt})),...ctx.legacy().filter(r=>!ids.has(r.id)).map(old=>({id:old.id,old,when:legacyDate(old)}))];}
   function render(){
-    const all=allItems();const unknown=all.filter(x=>!monthKey(x.when)).length;
+    const all=allItems();
+    const keys=new Set(all.map(i=>(i.old?'legacy/':'v2/')+i.id));
+    for(const [key,stop] of titleListeners)if(!keys.has(key)){stop();titleListeners.delete(key);delete titles[key];}
+    for(const key of keys)if(!titleListeners.has(key)){titleListeners.set(key,()=>{});titleListeners.set(key,store.watch('meetingManagement/incidentTitles/'+key,value=>{titles[key]=value;render();},()=>{delete titles[key];}));}
+    const unknown=all.filter(x=>!monthKey(x.when)).length;
     const items=all.filter(x=>(!month||monthKey(x.when)===month)&&(!search||JSON.stringify(x.value||x.old).toLowerCase().includes(search.toLowerCase()))).sort((a,b)=>b.when-a.when);
     const totals=new Map();let oldCount=0,newCount=0,pending=0;const buckets={};
     for(const item of items){const r=item.value||item.old;const {key,name}=reporterGroup(r,item.old?.createdBy);const current=totals.get(key)||{name,n:0};current.n++;totals.set(key,current);
@@ -84,8 +87,8 @@ export function mountIncidentReports(root,ctx){
     }
     q('#iv-summary').innerHTML=`<div class="iv-panel"><strong>合計 ${items.length}件（旧基準 ${oldCount}件・新基準 ${newCount}件）</strong>${manager?`<p>確認待ち ${pending}件</p>`:''}<p>初回提出日が不明：全期間で${unknown}件${month?'（この月の集計には含めていません）':''}</p><ul>${Object.entries(buckets).map(([k,n])=>`<li>${esc(k)} ${n}件</li>`).join('')}</ul><table><caption>報告者別の提出件数</caption><thead><tr><th>報告者</th><th>件数</th></tr></thead><tbody>${[...totals.values()].map(v=>`<tr><td>${esc(v.name)}</td><td>${v.n}</td></tr>`).join('')}</tbody></table></div>`;
     q('#iv-list').innerHTML=items.map(item=>{
-      if(item.old){const r=item.old;return `<article class="iv-panel" data-case-kind="incidents" data-case-id="${esc(r.id)}"><h3>${esc(reportHeading(r))} <small>旧基準</small></h3><p>報告日：${esc(reportDate(item.when))}（初回提出日）</p><p>報告者：${esc(r.reporterName||r.createdBy||'未記録')}／旧分類：${esc(r.type||'未記録')}／旧A・B：${esc(r.level||'未記録')}</p><dl>${Object.entries({報告番号:r.reportNumber||r.id,発生日:r.occurredDate,発見者:r.discovererName,確認者:r.verifierName,場所:r.occurredPlace,作業:r.workContent,場面:r.scene,内容:r.details,影響:r.eventImpact,防止理由:r.goodPoint,人と行動:r.causeHuman,環境と連携:r.causeEnvironment,申し送り:r.handoff,対策:r.countermeasure}).map(([k,v])=>v?`<dt>${k}</dt><dd>${esc(v)}</dd>`:'').join('')}</dl>${ctx.legacyWorkflow(r)}${!terminal&&(manager||r.reporterId===user.staffId||r.createdById===user.staffId)?`<button data-iv="edit-legacy" data-id="${esc(r.id)}">履歴を残して編集</button>`:''}${manager?` <button data-iv="withdraw-legacy" data-id="${esc(r.id)}">理由を付けて取り下げ</button>`:''}</article>`;}
-      const {record:r,value:v,id}=item;return `<article class="iv-panel" data-case-kind="incidents" data-case-id="${esc(id)}"><h3>${esc(reportHeading(v))}</h3><p>報告日：${esc(reportDate(item.when))}（初回提出日）／報告者：${esc(reporterGroup(v).name)}</p>${r.importedBy?`<p>取込者：${esc(person(r.importedBy)?.name||r.importedBy)}</p>`:''}<p>${r.basis==='legacy'?'旧基準を保持／新項目は未確認':'新基準'}・${esc(classification(v))}・${r.review==='confirmed'?`確認済み（${esc(person(r.reviewer)?.name||r.reviewer)}）`:'確認待ち'}</p><details><summary>報告の詳細</summary><pre>${esc(reportText(v))}</pre></details>${ctx.workflow(r,id,v)}${!r.linkedTaskId&&!r.linkedNoticeId?`<p>対策状況：${esc(({pending:'未検討',decided:'対策決定',in_progress:'取り組み中',followup_pending:'院長確認待ち',confirmed:'定着完了'})[r.counterStatus]||'未検討')}</p><p>${esc(r.countermeasure)}</p>${manager?`<button data-iv="followup" data-id="${esc(id)}">対策・対応状況</button>`:''}`:''}<div class="iv-actions"><button data-iv="export-record" data-id="${esc(id)}">HTML</button>${!terminal&&(manager||r.owner===user.staffId)?`<button data-iv="edit" data-id="${esc(id)}">編集</button><button data-iv="history" data-id="${esc(id)}">履歴</button>`:''}${manager?`<button data-iv="confirm" data-id="${esc(id)}">分類を確認</button><button data-iv="withdraw" data-id="${esc(id)}">取り下げ</button>${!r.linkedTaskId&&!r.linkedNoticeId?`<button data-iv="route-task" data-id="${esc(id)}">取り組みへ</button><button data-iv="route-notice" data-id="${esc(id)}">お知らせへ</button>`:''}`:''}</div></article>`;
+      if(item.old){const r=item.old;return `<article class="iv-panel" data-case-kind="incidents" data-case-id="${esc(r.id)}"><h3>${esc(reportHeading({...r,title:titles['legacy/'+r.id]?.text||r.title}))} <small>旧基準</small></h3><p>報告日：${esc(reportDate(item.when))}（初回提出日）</p>${manager?`<button data-iv="title-legacy" data-id="${esc(r.id)}">タイトルを編集</button>`:''}<p>報告者：${esc(r.reporterName||r.createdBy||'未記録')}／旧分類：${esc(r.type||'未記録')}／旧A・B：${esc(r.level||'未記録')}</p><dl>${Object.entries({報告番号:r.reportNumber||r.id,発生日:r.occurredDate,発見者:r.discovererName,確認者:r.verifierName,場所:r.occurredPlace,作業:r.workContent,場面:r.scene,内容:r.details,影響:r.eventImpact,防止理由:r.goodPoint,人と行動:r.causeHuman,環境と連携:r.causeEnvironment,申し送り:r.handoff,対策:r.countermeasure}).map(([k,v])=>v?`<dt>${k}</dt><dd>${esc(v)}</dd>`:'').join('')}</dl>${ctx.legacyWorkflow(r)}${!terminal&&(manager||r.reporterId===user.staffId||r.createdById===user.staffId)?`<button data-iv="edit-legacy" data-id="${esc(r.id)}">履歴を残して編集</button>`:''}${manager?` <button data-iv="withdraw-legacy" data-id="${esc(r.id)}">理由を付けて取り下げ</button>`:''}</article>`;}
+      const {record:r,value:v,id}=item;return `<article class="iv-panel" data-case-kind="incidents" data-case-id="${esc(id)}"><h3>${esc(reportHeading({...v,title:titles['v2/'+id]?.text||v.title}))}</h3><p>報告日：${esc(reportDate(item.when))}（初回提出日）／報告者：${esc(reporterGroup(v).name)}</p>${r.importedBy?`<p>取込者：${esc(person(r.importedBy)?.name||r.importedBy)}</p>`:''}<p>${r.basis==='legacy'?'旧基準を保持／新項目は未確認':'新基準'}・${esc(classification(v))}・${r.review==='confirmed'?`確認済み（${esc(person(r.reviewer)?.name||r.reviewer)}）`:'確認待ち'}</p><details><summary>報告の詳細</summary><pre>${esc(reportText(v))}</pre></details>${ctx.workflow(r,id,v)}${!r.linkedTaskId&&!r.linkedNoticeId?`<p>対策状況：${esc(({pending:'未検討',decided:'対策決定',in_progress:'取り組み中',followup_pending:'院長確認待ち',confirmed:'定着完了'})[r.counterStatus]||'未検討')}</p><p>${esc(r.countermeasure)}</p>${manager?`<button data-iv="followup" data-id="${esc(id)}">対策・対応状況</button>`:''}`:''}<div class="iv-actions">${manager?`<button data-iv="title-v2" data-id="${esc(id)}">タイトルを編集</button>`:''}<button data-iv="export-record" data-id="${esc(id)}">HTML</button>${!terminal&&(manager||r.owner===user.staffId)?`<button data-iv="edit" data-id="${esc(id)}">編集</button><button data-iv="history" data-id="${esc(id)}">履歴</button>`:''}${manager?`<button data-iv="confirm" data-id="${esc(id)}">分類を確認</button><button data-iv="withdraw" data-id="${esc(id)}">取り下げ</button>${!r.linkedTaskId&&!r.linkedNoticeId?`<button data-iv="route-task" data-id="${esc(id)}">取り組みへ</button><button data-iv="route-notice" data-id="${esc(id)}">お知らせへ</button>`:''}`:''}</div></article>`;
     }).join('')||'<p>対象の報告はありません。</p>';
     privateList();
   }
@@ -104,6 +107,7 @@ export function mountIncidentReports(root,ctx){
     await store.commit(value,{previous:rec,legacy:old,action:'withdraw',reason,linkedOriginals:JSON.stringify(linkedOriginals),extraUpdates:extras});status('取り下げました。元の本文と履歴は限定公開です。');
   }
   async function run(action,id){
+    if(action==='title-legacy'||action==='title-v2'){const kind=action==='title-legacy'?'legacy':'v2';const source=kind==='legacy'?ctx.legacy().find(r=>r.id===id):decodeRecord(feed[id]);const current=titles[kind+'/'+id]?.text||source.title||'';const text=prompt('何が起きたかが分かる短いタイトル（100文字以内）',current);if(text===null)return;await store.saveTitle(kind,id,text);status('タイトルを保存しました。本文・分類・報告日は変更していません。');return;}
     if(action==='all'){month='';q('#iv-month').value='';render();return;}
     if(action==='new'){if(dirty&&!confirm('現在の未保存内容を閉じて新しく作成しますか？'))return;setEditor({...newReport(),reporterId:user.staffId,reporterName:user.name});return;}
     if(action==='next'||action==='back'){readEditor();normalizeReport(draft);step+=action==='next'?1:-1;editor();return;}
@@ -112,7 +116,7 @@ export function mountIncidentReports(root,ctx){
     if(action==='resume'){const d=drafts[id];setEditor(normalizeReport(JSON.parse(d.payload)));draftRevision=d.revision;return;}
     if(action==='delete-draft'){if(confirm('本人のこの下書きを削除しますか？'))await store.deleteDraft(id);return;}
     if(action==='export'){readEditor();download(draft);return;}
-    if(action==='export-record'){download(decodeRecord(feed[id]));return;}
+    if(action==='export-record'){download({...decodeRecord(feed[id]),...(titles['v2/'+id]?.text?{title:titles['v2/'+id].text}:{})});return;}
     if(action==='edit'){const r=await store.record(id);setEditor(decodeRecord(r),r);return;}
     if(action==='edit-legacy'){const old=ctx.legacy().find(r=>r.id===id);const v=fromLegacy(old,'legacy_'+id);v.reporterId=old.reporterId||old.createdById||'';v.reporterName=old.reporterName||old.createdBy||'';setEditor(v,null,old);return;}
     if(action==='submit'){
@@ -156,5 +160,5 @@ export function mountIncidentReports(root,ctx){
   }
   const beforeUnload=e=>{if(dirty){e.preventDefault();e.returnValue='';}};window.addEventListener('beforeunload',beforeUnload);
   render();
-  return {render,store,async link(id,kind,targetId,item){const r=await store.record(id);if(r.state!=='submitted'||r.linkedTaskId||r.linkedNoticeId)throw new Error('元報告の状態が変わりました。最新内容を確認してください');await store.commit(decodeRecord(r),{previous:r,action:'route',[kind==='tasks'?'linkedTaskId':'linkedNoticeId']:targetId,confirmed:false,extraUpdates:{[`meetingManagement/${kind}/${targetId}`]:item}});},dispose(){active=false;cancelTimer();disposers.forEach(fn=>fn());ownerListeners.forEach(fn=>fn());window.removeEventListener('beforeunload',beforeUnload);app.remove();}};
+  return {render,store,async link(id,kind,targetId,item){const r=await store.record(id);if(r.state!=='submitted'||r.linkedTaskId||r.linkedNoticeId)throw new Error('元報告の状態が変わりました。最新内容を確認してください');await store.commit(decodeRecord(r),{previous:r,action:'route',[kind==='tasks'?'linkedTaskId':'linkedNoticeId']:targetId,confirmed:false,extraUpdates:{[`meetingManagement/${kind}/${targetId}`]:item}});},dispose(){active=false;cancelTimer();disposers.forEach(fn=>fn());ownerListeners.forEach(fn=>fn());titleListeners.forEach(fn=>fn());window.removeEventListener('beforeunload',beforeUnload);app.remove();}};
 }
