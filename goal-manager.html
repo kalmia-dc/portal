@@ -1427,7 +1427,7 @@
 </header>
 
 <main>
-  <div class="readonly-note" id="readonlyNote" style="display:none;">閲覧モードです。登録・編集は百々さん（管理者）と杉平院長のみ可能です。</div>
+  <div class="readonly-note" id="readonlyNote" style="display:none;">閲覧モードです。登録・編集は百々さん（管理者）と院長のみ可能です。</div>
 
   <section class="month-board" aria-label="月次入力">
     <div>
@@ -1672,13 +1672,15 @@
 <div class="toast" id="toast"></div>
 
 <script type="module">
+import {personName} from './portal-person-display.mjs?v=20261019-director';
+
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import { getDatabase, ref, push as firebasePush, set as firebaseSet, remove as firebaseRemove, onValue as firebaseOnValue, get as firebaseGet }
   from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 import { startPortalAuth } from './portal-auth.js?v=labor-20261014-2';
 
 import { createPageLifecycle } from './portal-page-lifecycle.mjs';
-import { loadBusinessRoster } from './portal-business-roster.mjs';
+import { loadBusinessRoster } from './portal-business-roster.mjs?v=20261019-director';
 const pageLifecycle = createPageLifecycle();
 const activeCall = fn => async (...args) => { pageLifecycle.assertActive(); const value=await fn(...args); pageLifecycle.assertActive(); return value; };
 const get=activeCall(firebaseGet), set=activeCall(firebaseSet), push=activeCall(firebasePush), remove=activeCall(firebaseRemove);
@@ -1712,7 +1714,7 @@ const PDFJS_CMAP_URL = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/cmaps/'
 const PDFJS_STANDARD_FONT_DATA_URL = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/standard_fonts/';
 const TESSERACT_URL = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
 const EXCLUDED_GOAL_ITEMS = new Set(['物販売上']);
-const STAFF_NAMES = Object.fromEntries(businessRoster.members.map(m => [m.id, m.name]));
+const STAFF_NAMES = Object.fromEntries(businessRoster.members.map(m => [m.id, m.label]));
 
 const TEMPLATE_ITEMS = [
   { department: '全体', item: '初診', unit: '人', direction: 'up', detail: '月計表の新患数から初診数を引き、再初診数を足して確認', currentValue: '', targetValue: '45', history: [{ label: '1月', value: '23' }, { label: '2月', value: '33' }, { label: '3月', value: '37' }] },
@@ -1780,7 +1782,7 @@ function normalizeUser(user) {
   return {
     ...user,
     staffId: sid,
-    name: sid === 'sugihira' ? '杉平院長' : (user.name || STAFF_NAMES[sid] || 'ゲスト'),
+    name: sid === 'sugihira' ? '院長' : (user.name || STAFF_NAMES[sid] || 'ゲスト'),
     role: user.role || roleFromStaffId(sid)
   };
 }
@@ -1799,7 +1801,7 @@ function isEditor() {
 function init() {
   populatePeriodFilter(false);
   populateEntryMonthFilter();
-  document.getElementById('userBadge').textContent = currentUser.name;
+  document.getElementById('userBadge').textContent = personName(currentUser.name,currentUser.staffId);
   const modeBadge = document.getElementById('modeBadge');
   if (isEditor()) {
     modeBadge.textContent = currentUser.staffId === 'momo' ? '管理者' : '院長';
@@ -2658,7 +2660,7 @@ function groupRowHtml(group) {
         </div>
       </td>
       <td><span class="status-pill ${status}">${statusLabel(status)}</span></td>
-      <td><div>${escapeHtml(updated)}</div><div class="goal-detail">${escapeHtml(group.updatedBy || '')}</div></td>
+      <td><div>${escapeHtml(updated)}</div><div class="goal-detail">${escapeHtml(personName(group.updatedBy,group.updatedByStaffId) || '')}</div></td>
       <td>
         <div class="actions-cell">
           <button class="icon-btn action-btn" onclick="openGoalFromGroup('${group.uiKey}','${firstEditableMonth(group)}')" title="${isEditor() ? actionLabel(status) : '詳細'}">${isEditor() ? actionLabel(status) : '詳細'}</button>
@@ -3811,7 +3813,7 @@ window.openGoalModal = function(id = null, defaults = {}) {
   const ownerSelect=document.getElementById('fOwnerStaffId'); ownerSelect.replaceChildren(new Option('未紐付け・自由記入',''));
   const savedId=goal?.ownerStaffId || defaults.ownerStaffId || (!goal && !defaults.owner ? currentUser.staffId : '');
   for(const member of businessRoster.members.filter(m => m.availability !== 'stopped' || m.id===savedId)) ownerSelect.add(new Option(member.label,member.id));
-  if(savedId && ![...ownerSelect.options].some(o => o.value===savedId)) ownerSelect.add(new Option((goal?.owner || defaults.owner || savedId)+'（履歴）',savedId));
+  if(savedId && ![...ownerSelect.options].some(o => o.value===savedId)) ownerSelect.add(new Option(personName(goal?.owner || defaults.owner,savedId)+'（履歴）',savedId));
   ownerSelect.value=savedId;
   ownerSelect.onchange=() => {const member=businessRoster.members.find(m=>m.id===ownerSelect.value);if(member)setFormValue('fOwner',member.name);};
   document.getElementById('fOwner').oninput=()=>{ownerSelect.value='';};

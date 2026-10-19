@@ -139,9 +139,10 @@
 
 <!-- Firebase -->
 <script type="module">
+import {personName} from "./portal-person-display.mjs?v=20261019-director";
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getDatabase, ref, get, set, update, remove } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
-import {loadBusinessRoster} from './portal-business-roster.mjs';
+import {loadBusinessRoster} from './portal-business-roster.mjs?v=20261019-director';
 import {createPageLifecycle} from './portal-page-lifecycle.mjs';
 import { startPortalAuth } from "./portal-auth.js?v=labor-20261014-2";
 
@@ -401,8 +402,8 @@ function render() {
   if (!rosterPage.active) return;
   document.getElementById('header-info').innerHTML = state.user
     ? `<div class="row gap-sm">
-        <div class="avatar" style="width:30px;height:30px;font-size:11px;${getAvatarStyle(state.user.role)}">${initials(state.user.name)}</div>
-        <span style="font-size:13px;font-weight:500">${esc(state.user.label || state.user.name)}</span>
+        <div class="avatar" style="width:30px;height:30px;font-size:11px;${getAvatarStyle(state.user.role)}">${initials(personName(state.user.name,state.user.id))}</div>
+        <span style="font-size:13px;font-weight:500">${esc(state.user.label || personName(state.user.name,state.user.id))}</span>
         <span class="badge badge-${state.user.role}">${state.user.role}</span>
       </div>`
     : '';

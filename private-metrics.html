@@ -962,7 +962,7 @@
 </header>
 
 <main>
-  <div class="guard-note" id="guardNote">このページは百々さんと杉平院長のみ閲覧・編集できます。</div>
+  <div class="guard-note" id="guardNote">このページは百々さんと院長のみ閲覧・編集できます。</div>
 
   <section class="summary-board admin-only" aria-label="経営数値サマリー">
     <div>
@@ -1159,6 +1159,8 @@
 <div class="toast" id="toast"></div>
 
 <script type="module">
+import {personName} from './portal-person-display.mjs?v=20261019-director';
+
 import {createPageLifecycle} from './portal-page-lifecycle.mjs';
 const pageLifecycle=createPageLifecycle();
 async function pageAwait(work){pageLifecycle.assertActive();let result;try{result=await work();}catch(error){pageLifecycle.assertActive();throw error;}pageLifecycle.assertActive();return result;}
@@ -1247,7 +1249,7 @@ const PDFJS_URL = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.mi
 const PDFJS_WORKER_URL = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 const TESSERACT_URL = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
 const STAFF_NAMES = {
-  sugihira: '杉平院長',
+  sugihira: '院長',
   shimanaka: '嶋中',
   hokari: '保刈',
   shinoda: '篠田',
@@ -1289,7 +1291,7 @@ function normalizeUser(user) {
   return {
     ...user,
     staffId: sid,
-    name: sid === 'sugihira' ? '杉平院長' : (user.name || STAFF_NAMES[sid] || 'ゲスト')
+    name: sid === 'sugihira' ? '院長' : (user.name || STAFF_NAMES[sid] || 'ゲスト')
   };
 }
 
@@ -1301,7 +1303,7 @@ function init() {
   document.getElementById('monthFilter').value = currentMonth();
   const analysisYear = document.getElementById('analysisYear');
   if (analysisYear && !analysisYear.value) analysisYear.value = new Date().getFullYear();
-  document.getElementById('userBadge').textContent = currentUser.name;
+  document.getElementById('userBadge').textContent = personName(currentUser.name,currentUser.staffId);
   const modeBadge = document.getElementById('modeBadge');
 
   if (!isAdmin()) {
@@ -2029,7 +2031,7 @@ function metricRowHtml(metric) {
       <td><span class="category-pill">${escapeHtml(metric.category || '-')}</span></td>
       <td>${hasValue ? `<span class="num">${fmtNumber(metric.value, metric.unit)}</span>` : '<span class="input-badge value">数値未入力</span>'}</td>
       <td><div>${hasSource ? escapeHtml(metric.source) : '<span class="input-badge source">確認元未入力</span>'}</div></td>
-      <td><div>${escapeHtml(updated)}</div><div class="metric-detail">${escapeHtml(metric.updatedBy || metric.createdBy || '')}</div></td>
+      <td><div>${escapeHtml(updated)}</div><div class="metric-detail">${escapeHtml(personName(metric.updatedBy || metric.createdBy,metric.updatedBy ? metric.updatedByStaffId : metric.createdByStaffId) || '')}</div></td>
       <td>
         <div class="actions-cell">
           <button class="icon-btn" onclick="openMetricModal('${metric.id}')" title="編集">編集</button>

@@ -680,7 +680,9 @@
 </div><!-- /#app -->
 
 <script type="module">
-import {todayItems,localDay,noticeTargets} from "./portal-today.mjs?v=20261019-paid-owner";
+import {personName} from './portal-person-display.mjs?v=20261019-director';
+
+import {todayItems,localDay,noticeTargets} from "./portal-today.mjs?v=20261019-director";
 // ─────────────────────────────────────────
 // スタッフ定義（シフトアプリと同じ）
 // ─────────────────────────────────────────
@@ -1123,7 +1125,7 @@ async function initApp() {
   // ヘッダー日付
   const m=now.getMonth()+1, d=now.getDate(), dow=DAY_NAMES[now.getDay()];
   document.getElementById('todayBadge').textContent = `${m}月${d}日（${dow}）`;
-  document.getElementById('avatarLabel').textContent = u.name[0];
+  document.getElementById('avatarLabel').textContent = personName(u.name,u.staffId)[0];
 
   // 挨拶
   const h = now.getHours();
@@ -1136,7 +1138,7 @@ async function initApp() {
     ? `<span>ゲスト</span> さん`
     : u.staffId === 'sugihira'
     ? `<span>${rl}</span> さん`
-    : `<span>${rl}</span> ${u.name} さん`;
+    : `<span>${rl}</span> ${personName(u.name,u.staffId)} さん`;
   document.getElementById('heroTitle').innerHTML = titleHtml;
 
   // 今日のシフト
@@ -1295,7 +1297,7 @@ async function buildTodayStaff(now) {
 // ─────────────────────────────────────────
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import { getDatabase, ref, push, remove, onValue, get, set } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
-import {loadBusinessRoster} from './portal-business-roster.mjs';
+import {loadBusinessRoster} from './portal-business-roster.mjs?v=20261019-director';
 import {createPageLifecycle} from './portal-page-lifecycle.mjs';
 import { startPortalAuth } from './portal-auth.js?v=labor-20261014-2';
 
@@ -1322,7 +1324,7 @@ const authenticatedProfile = await startPortalAuth(_app, { pageName:'院内ポ�
 rosterPage.assertActive();
 const businessRoster = await loadBusinessRoster({read:path=>get(ref(_db,path)).then(s=>s.val()),profile:authenticatedProfile});
 rosterPage.assertActive();
-STAFF_ID_MAP = Object.fromEntries(businessRoster.members.map(s=>[s.id,s.name]));
+STAFF_ID_MAP = Object.fromEntries(businessRoster.members.map(s=>[s.id,s.label]));
 if(businessRoster.issues.length) {
   const warning=document.createElement('p'); warning.setAttribute('role','alert');
   warning.textContent='名簿の一部が未確認です。表示・候補が最新でない可能性があります。再読み込みしてください。';

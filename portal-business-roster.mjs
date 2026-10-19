@@ -1,3 +1,4 @@
+import {personName} from './portal-person-display.mjs?v=20261019-director';
 import {defaultStaff} from './portal-default-staff.mjs';
 import {isLifecycleStopped} from './portal-lifecycle-model.mjs';
 
@@ -20,12 +21,12 @@ export function buildBusinessRoster({defaults=defaultStaff,extra={},lifecycle={}
   Object.entries(extra||{}).forEach(([id,s])=>add(id,s));
   const members=[...byId.values()];
   const counts=new Map();
-  members.forEach(s=>counts.set(s.name,(counts.get(s.name)||0)+1));
-  return members.map(s=>({...s,label:counts.get(s.name)>1?`${s.name} (${s.id})`:s.name}));
+  members.forEach(s=>{const label=personName(s.name,s.id);counts.set(label,(counts.get(label)||0)+1);});
+  return members.map(s=>{const label=personName(s.name,s.id);return {...s,label:counts.get(label)>1?`${label} (${s.id})`:label};});
 }
 
 export function historyStaffLabel(roster,id,savedName) {
-  if(typeof savedName==='string' && savedName.trim()) return savedName;
+  if(typeof savedName==='string' && savedName.trim()) return personName(savedName,id);
   return (Array.isArray(roster)?roster:roster?.members)?.find(s=>s.id===id)?.label || id || '未紐付け';
 }
 

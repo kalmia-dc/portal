@@ -1,3 +1,4 @@
+import {personName} from './portal-person-display.mjs?v=20261019-director';
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import { getDatabase, ref, get, onValue, runTransaction, serverTimestamp, update } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 import { startPortalAuth } from './portal-auth.js?v=labor-20261014-2';
@@ -5,8 +6,8 @@ import { createPageLifecycle } from './portal-page-lifecycle.mjs';
 import { performMemberChange } from './portal-members-model.mjs';
 
 const firebaseConfig={apiKey:'AIzaSyDdMe7feUF6CKPHH0YIx7Suk-WnXtOYUu8',authDomain:'kalmia-shift.firebaseapp.com',databaseURL:'https://kalmia-shift-default-rtdb.asia-southeast1.firebasedatabase.app',projectId:'kalmia-shift',storageBucket:'kalmia-shift.firebasestorage.app',messagingSenderId:'714175473480',appId:'1:714175473480:web:7d6626a46e4a9dcb1fb57d'};
-import { setupLifecycleAdmin } from './portal-lifecycle-admin.js';
-import { setupJoinAdmin } from './portal-join-admin.js';
+import { setupLifecycleAdmin } from './portal-lifecycle-admin.js?v=20261019-director';
+import { setupJoinAdmin } from './portal-join-admin.js?v=20261019-director';
 import { defaultStaff } from './portal-default-staff.mjs';
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
@@ -29,7 +30,7 @@ function lock(value) {
 function text(parent, value, className='') { const p=document.createElement('p'); p.textContent=value; p.className=className; parent.append(p); }
 function row(parent, uid, data) {
   const node=document.createElement('div'); node.className='row';
-  text(node,data.name || data.displayName || '名前未入力');
+  text(node,personName(data.name || data.displayName,data.staffId || uid) || '名前未入力');
   text(node,data.email || 'メール情報なし（UIDで照合してください）');
   text(node,`UID: ${uid}`,'details'); parent.append(node); return node;
 }
@@ -115,7 +116,7 @@ async function load(success='一覧を読み込みました。') {
     for(const staff of Object.values(s.val()||{})) if(staff?.id && staff.name && ['DR','DH','DA'].includes(staff.role)) roster.set(staff.id,{...staff});
     const lifecycle=await lifecycleAdmin.load([...roster.values()],users);
     if(!page.active)return;
-    const renderRoster=()=>{ $('currentRoster').replaceChildren();for(const staff of roster.values())if($('showAllRoster').checked||!lifecycleAdmin.isStopped(staff.id))text($('currentRoster'),`${staff.name} (${staff.role})${lifecycleAdmin.isStopped(staff.id)?'・利用停止中':''}`);};$('showAllRoster').onchange=renderRoster;renderRoster();
+    const renderRoster=()=>{ $('currentRoster').replaceChildren();for(const staff of roster.values())if($('showAllRoster').checked||!lifecycleAdmin.isStopped(staff.id))text($('currentRoster'),`${personName(staff.name,staff.id)} (${staff.role})${lifecycleAdmin.isStopped(staff.id)?'・利用停止中':''}`);};$('showAllRoster').onchange=renderRoster;renderRoster();
     const joinIds=await joinAdmin.load([...roster.values()].filter(s=>!lifecycleAdmin.isStopped(s.id)));
     if(!page.active)return;
     for(const [uid,request] of Object.entries(requests)) {
@@ -126,7 +127,7 @@ async function load(success='一覧を読み込みました。') {
       const select=document.createElement('select');select.setAttribute('aria-label',`${request.email || uid} に対応するスタッフ`);
       select.dataset.uid=uid;
       select.add(new Option('スタッフを選択してください',''));
-      for(const staff of roster.values()) if(!lifecycleAdmin.isStopped(staff.id)) select.add(new Option(`${staff.name} (${staff.role} / ${staff.id})`,staff.id));
+      for(const staff of roster.values()) if(!lifecycleAdmin.isStopped(staff.id)) select.add(new Option(`${personName(staff.name,staff.id)} (${staff.role} / ${staff.id})`,staff.id));
       // Preserve explicit choices; never automatically bind a new name to an account.
       if(roster.has(selections.get(uid))) select.value=selections.get(uid);
       actions.append(select);

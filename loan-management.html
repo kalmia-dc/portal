@@ -261,11 +261,13 @@ input:focus,select:focus,textarea:focus{border-color:var(--mint)}
 </div>
 
 <script type="module">
+import {personName} from './portal-person-display.mjs?v=20261019-director';
+
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import { getDatabase, ref, push, set, update, onValue as firebaseOnValue, get, query, orderByChild, equalTo }
   from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 import {createPageLifecycle} from './portal-page-lifecycle.mjs';
-import {loadBusinessRoster} from './portal-business-roster.mjs';
+import {loadBusinessRoster} from './portal-business-roster.mjs?v=20261019-director';
 import { startPortalAuth } from './portal-auth.js?v=labor-20261014-2';
 
 const firebaseConfig = {
@@ -312,7 +314,7 @@ const STAFF_ROLES = {
   tsuruta:'DH', yoshida:'DH', takagi:'DH', matsumoto:'DH', yamada:'DH', hanowa:'DH',
   tamiya:'DA', tanaka:'DA', momo:'DA', guest:'ゲスト'
 };
-Object.assign(STAFF_NAMES,Object.fromEntries(businessRoster.members.map(member => [member.id,member.name])));
+Object.assign(STAFF_NAMES,Object.fromEntries(businessRoster.members.map(member => [member.id,member.label])));
 Object.assign(STAFF_ROLES,Object.fromEntries(businessRoster.members.map(member => [member.id,member.role])));
 const CATEGORY_LABELS = {
   uniform:'制服・名札',
@@ -453,10 +455,10 @@ function renderStaffOptions() {
   const previousFilter = staffFilter?.value || '';
   const editing = loans.find(loan => loan.id === editingId);
   const candidates = businessRoster.members.filter(member => member.id !== 'guest' && member.availability !== 'stopped');
-  if (editing?.staffId && !candidates.some(member => member.id === editing.staffId)) candidates.push({id:editing.staffId,label:editing.staffName || editing.staffId});
+  if (editing?.staffId && !candidates.some(member => member.id === editing.staffId)) candidates.push({id:editing.staffId,label:personName(editing.staffName,editing.staffId)});
   const staffEntries = candidates.map(member => [member.id,member.label || member.name]);
   const historical = new Map(businessRoster.members.map(member => [member.id,member.label]));
-  for (const loan of loans) if (loan.staffId && !historical.has(loan.staffId)) historical.set(loan.staffId,loan.staffName || loan.staffId);
+  for (const loan of loans) if (loan.staffId && !historical.has(loan.staffId)) historical.set(loan.staffId,personName(loan.staffName,loan.staffId));
   if (loanStaff) {
     loanStaff.innerHTML = staffEntries.map(([id, name]) => `<option value="${escAttr(id)}">${esc(name)}（${esc(STAFF_ROLES[id] || '')}）</option>`).join('');
   }
@@ -655,7 +657,7 @@ function renderLoanCard(loan) {
       <div class="card-head">
         <div>
           <h2 class="card-title">${esc(loan.description || '貸付案件')}</h2>
-          <div class="card-sub">${esc(loan.staffName || STAFF_NAMES[loan.staffId] || loan.staffId || '')}</div>
+          <div class="card-sub">${esc(personName(loan.staffName || STAFF_NAMES[loan.staffId],loan.staffId))}</div>
         </div>
         <div class="pill-row">${statusBadge}</div>
       </div>
@@ -751,7 +753,7 @@ function openLoan(id) {
   if (!loan || (!isAdmin() && loan.staffId !== currentUser.staffId)) return;
   activeLoanId = id;
   const status = effectiveStatus(loan);
-  document.getElementById('modalTitle').textContent = `${loan.staffName || ''} 借用書`;
+  document.getElementById('modalTitle').textContent = `${personName(loan.staffName,loan.staffId)} 借用書`;
   document.getElementById('modalMeta').textContent = `${STATUS_LABELS[status] || status} / ${yen(loan.amount)} / 免除判定日 ${formatDate(loan.exemptionDate)}`;
   document.getElementById('documentText').textContent = loan.loanDocumentText || buildLoanDocumentText(loan);
   document.getElementById('modalTimeline').innerHTML = renderTimeline(status);
@@ -837,7 +839,7 @@ function setAgreeStatus(text, type = '') {
 
 function buildLoanDocumentText(loan) {
   const originLabel = loan.originDateLabel || (loan.category === 'self_development' ? '受講日' : '購入日');
-  const staffName = loan.staffName || STAFF_NAMES[loan.staffId] || loan.staffId || '';
+  const staffName = personName(loan.staffName || STAFF_NAMES[loan.staffId],loan.staffId);
   return [
     '借　用　書',
     '',

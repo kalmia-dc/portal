@@ -1,3 +1,4 @@
+import {taskAssignedForDisplay} from './portal-person-display.mjs?v=20261019-director';
 export const noticeTargets=['shimanaka','tsuruta','yoshida','takagi','matsumoto','yamada','tamiya','tanaka','momo'];
 export function localDay(date=new Date()) {return new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Tokyo',year:'numeric',month:'2-digit',day:'2-digit'}).format(date);}
 export function todayItems(source,profile,today=localDay()) {
@@ -6,8 +7,7 @@ export function todayItems(source,profile,today=localDay()) {
   const add=(kind,id,title,date,url)=>items.push({kind,id,title,date:date||'',url,group:date&&date<today?'期限切れ':date===today?'今日':'確認待ち'});
   const entries=x=>Object.entries(x||{}).filter(([,v])=>v&&typeof v==='object');
   for(const [id,t] of entries(source.tasks)) {
-    const names=sid==='sugihira'?[profile.name,'杉平','院長']:[profile.name];
-    if(t.status==='完了'||!Array.isArray(t.assignees)||!names.some(n=>t.assignees.includes(n)))continue;
+    if(t.status==='完了'||!taskAssignedForDisplay(t,profile))continue;
     if(t.date&&t.date>today)continue;
     add('タスク',id,t.title,t.date,`task-manager.html?task=${encodeURIComponent(id)}`);
   }

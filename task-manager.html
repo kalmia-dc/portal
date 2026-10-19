@@ -926,13 +926,15 @@
 <div class="toast" id="toast"></div>
 
 <script type="module">
+import {personName,personMatchesForDisplay,taskAssignedForDisplay,taskCreatedForDisplay} from './portal-person-display.mjs?v=20261019-director';
+
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import { getDatabase, ref, push as firebasePush, set as firebaseSet, remove as firebaseRemove, onValue as firebaseOnValue, get as firebaseGet }
   from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 import { startPortalAuth } from './portal-auth.js?v=labor-20261014-2';
 
 import { createPageLifecycle } from './portal-page-lifecycle.mjs';
-import { loadBusinessRoster } from './portal-business-roster.mjs';
+import { loadBusinessRoster } from './portal-business-roster.mjs?v=20261019-director';
 const pageLifecycle = createPageLifecycle();
 const activeCall = fn => async (...args) => { pageLifecycle.assertActive(); const value=await fn(...args); pageLifecycle.assertActive(); return value; };
 const fetch=activeCall(globalThis.fetch.bind(globalThis));
@@ -1011,7 +1013,7 @@ function showNameBanner() {
   ban.id = 'nameBanner';
   ban.style.cssText = 'position:fixed;inset:0;background:rgba(44,42,38,0.5);z-index:400;display:flex;align-items:center;justify-content:center;padding:20px;';
   const opts = Object.entries(STAFF).map(([role, names]) =>
-    `<optgroup label="${role}">${names.map(n=>`<option>${n}</option>`).join('')}</optgroup>`
+    `<optgroup label="${role}">${names.map(n=>`<option value="${n}">${personName(n)}</option>`).join('')}</optgroup>`
   ).join('');
   ban.innerHTML = `
     <div style="background:white;border-radius:16px;padding:24px 20px;width:100%;max-width:300px;text-align:center;">
@@ -1278,7 +1280,7 @@ let initialTaskOpened=false;
 function init() {
   if (currentUser) {
     if (isGuestUser()) setupGuestReadonly();
-    document.getElementById('userBadge').textContent = isGuestUser() ? `${currentUser.name} / 閲覧専用` : currentUser.name;
+    document.getElementById('userBadge').textContent = isGuestUser() ? `${personName(currentUser.name,currentUser.staffId)} / 閲覧専用` : personName(currentUser.name,currentUser.staffId);
     setupGoogleForUser();
   } else {
     showNameBanner();
@@ -1409,6 +1411,7 @@ function normalizeProgressLogs(logs) {
     .map(log => ({
       text: String(log.text || ''),
       by: log.by || '不明',
+      ...(log.byStaffId ? {byStaffId:log.byStaffId} : {}),
       at: Number(log.at) || 0,
     }))
     .sort((a, b) => a.at - b.at);
@@ -1426,7 +1429,7 @@ function renderProgressLogs(logs) {
   if (!normalized.length) return '<div class="progress-empty">まだ記録はありません</div>';
   return normalized.map(log => `
     <div class="progress-log">
-      <div class="progress-log-meta">${fmtDateTime(log.at)}　${esc(log.by)}</div>
+      <div class="progress-log-meta">${fmtDateTime(log.at)}　${esc(personName(log.by,log.byStaffId))}</div>
       <div class="progress-log-text">${esc(log.text)}</div>
     </div>`).join('');
 }
@@ -1457,8 +1460,7 @@ function getFiltered() {
       // ① 自分が担当
       if (taskAssignedTo(t)) return true;
       // ② 自分が作成（通常 or Google取込）
-      if (t.createdBy === name) return true;
-      if (t.createdBy === `${name}（Google）`) return true;
+      if (taskCreatedForDisplay(t,currentUser)) return true;
       return false;
     })();
     if (!isRelated) return false;
@@ -1491,8 +1493,7 @@ function renderStats() {
   const related = isEveryone ? all : (currentUser ? all.filter(t => {
     const name = currentUser.name;
     return taskAssignedTo(t) ||
-           t.createdBy === name ||
-           t.createdBy === `${name}（Google）`;
+           taskCreatedForDisplay(t,currentUser);
   }) : []);
   const mine      = currentUser ? related.filter(t => taskAssignedTo(t)) : [];
   const incomplete = related.filter(t => t.status !== '完了').length;
@@ -1505,12 +1506,12 @@ function renderStats() {
     <div class="stat-card"><div class="stat-num" style="color:var(--high)">${overdue}</div><div class="stat-label">期限切れ</div></div>`;
 }
 
-function assigneeChips(assignees) {
-  if (!assignees||!assignees.length) return '';
-  return assignees.map(name => {
+function assigneeChips(assignees, refs) {
+  const rows=Array.isArray(refs)?refs:(assignees||[]).map(name=>({name}));
+  return rows.map(({name,staffId}) => {
     const r = ROLE_OF[name]||'';
     const cls = r==='DR'?'chip-dr':r==='DH'?'chip-dh':r==='DA'?'chip-da':'chip-other';
-    return `<span class="assignee-chip ${cls}">${name}</span>`;
+    return `<span class="assignee-chip ${cls}">${esc(personName(name,staffId))}</span>`;
   }).join('');
 }
 
@@ -1529,7 +1530,7 @@ function taskCardHtml(t) {
   const priCls={high:'badge-high',med:'badge-med',low:'badge-low'};
   const priLbl={high:'高',med:'中',low:'低'};
   const tags  = (t.tags||[]).map(g=>`<span class="tag">${esc(g)}</span>`).join('');
-  const chips = assigneeChips(t.assignees) + (taskAssigneeRows(t).some(r => !r.staffId) ? '<span class="assignee-chip">未紐付けの履歴</span>' : '');
+  const chips = assigneeChips(t.assignees,t.assigneeRefs) + (taskAssigneeRows(t).some(r => !r.staffId) ? '<span class="assignee-chip">未紐付けの履歴</span>' : '');
   const isDone = status === '完了';
   const gIcon  = t.googleTaskId ? `<span style="font-size:10px;color:#4285f4;margin-left:2px;">G</span>` : '';
   const latestLog = latestProgress(t.progressLogs);
@@ -1538,9 +1539,9 @@ function taskCardHtml(t) {
 
   // タスク種別ラベル
   const myName = currentUser?.name || '';
-  const isMeCreated  = t.createdBy === myName || t.createdBy === `${myName}（Google）`;
+  const isMeCreated  = taskCreatedForDisplay(t,currentUser);
   const isMeAssigned = taskAssignedTo(t);
-  const assigneesWithoutMe = (t.assignees||[]).filter(n => n !== myName);
+  const assigneesWithoutMe = taskAssigneeRows(t).filter(r => !personMatchesForDisplay(r,currentUser));
   let typeLabel = '';
   if (isMeCreated && isMeAssigned && assigneesWithoutMe.length === 0) {
     // 自分で作って自分がやる
@@ -1550,7 +1551,7 @@ function taskCardHtml(t) {
     typeLabel = `<span style="font-size:10px;background:#fff4e0;color:#e67e22;padding:2px 7px;border-radius:100px;font-weight:700;">→ 依頼</span>`;
   } else if (!isMeCreated && isMeAssigned) {
     // 誰かが作って自分にお願い
-    const from = t.createdBy || '不明';
+    const from = esc(personName(t.createdBy,t.createdByStaffId) || '不明');
     typeLabel = `<span style="font-size:10px;background:#f0f0ff;color:#6c5ce7;padding:2px 7px;border-radius:100px;font-weight:700;">${from} より</span>`;
   } else if (isMeCreated && isMeAssigned && assigneesWithoutMe.length > 0) {
     // 自分も担当で他にも依頼
@@ -1608,7 +1609,7 @@ function renderList() {
     const dl = daysLeft(t.date);
     let ds = '';
     if (t.date) ds = od?`⚠ ${fmtDate(t.date)} 期限切れ`:isToday(t.date)?'今日':dl!==null&&dl<=3?`あと${dl}日`:fmtDate(t.date)+'期限';
-    const chips = assigneeChips(t.assignees) + (taskAssigneeRows(t).some(r => !r.staffId) ? '<span class="assignee-chip">未紐付けの履歴</span>' : '');
+    const chips = assigneeChips(t.assignees,t.assigneeRefs) + (taskAssigneeRows(t).some(r => !r.staffId) ? '<span class="assignee-chip">未紐付けの履歴</span>' : '');
     const latestLog = latestProgress(t.progressLogs);
     const repeatBadge = recurrenceBadge(t.recurrence);
     return `<div class="list-item pri-${t.priority} ${od?'overdue':''}" onclick="window._openTask('${t.id}')">
@@ -1618,7 +1619,7 @@ function renderList() {
           <span>${t.category||'その他'}</span><span>${status}</span>
           ${ds?`<span>${ds}</span>`:''}
           ${repeatBadge}
-          ${t.createdBy?`<span>作成: ${t.createdBy}</span>`:''}
+          ${t.createdBy?`<span>作成: ${esc(personName(t.createdBy,t.createdByStaffId))}</span>`:''}
         </div>
         ${chips?`<div class="task-assignees" style="margin-top:5px">${chips}</div>`:''}
         ${latestLog?`<div class="task-progress-preview">${esc(latestLog.text)}</div>`:''}
@@ -1631,10 +1632,7 @@ function renderList() {
 
 // ===== ASSIGNEE GRID =====
 function taskAssignedTo(task, user = currentUser) {
-  if (!user) return false;
-  // Unlinked legacy names retain display-filter compatibility only; no ID is inferred or saved.
-  if (Array.isArray(task.assigneeRefs)) return task.assigneeRefs.some(r => r.staffId ? r.staffId === user.staffId : r.name === user.name);
-  return (task.assignees || []).includes(user.name); // legacy display/filter compatibility only
+  return taskAssignedForDisplay(task, user);
 }
 function taskAssigneeRows(task = {}) {
   // Explicit references only. Never infer an ID from an old name.
@@ -1647,7 +1645,7 @@ function buildAssigneeGrid(task = {}) {
   for (const saved of selected) {
     const index = saved.staffId ? rows.findIndex(r => r.staffId === saved.staffId) : -1;
     if (index >= 0) rows[index] = {...rows[index], name:saved.name}; // preserve historical snapshot
-    else rows.push({...saved,label:saved.name + (saved.staffId ? '（履歴）' : '（未紐付け）')});
+    else rows.push({...saved,label:personName(saved.name,saved.staffId) + (saved.staffId ? '（履歴）' : '（未紐付け）')});
   }
   const grid = document.getElementById('assigneeGrid');
   grid.replaceChildren();

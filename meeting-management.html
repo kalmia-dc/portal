@@ -1087,10 +1087,12 @@ button{cursor:pointer}
 <div class="toast" id="toast"></div>
 
 <script type="module">
+import {personName} from './portal-person-display.mjs?v=20261019-director';
+
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import { getDatabase, ref, push, set, update, remove, onValue as firebaseOnValue, get, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 import {createPageLifecycle} from './portal-page-lifecycle.mjs';
-import {loadBusinessRoster} from './portal-business-roster.mjs';
+import {loadBusinessRoster} from './portal-business-roster.mjs?v=20261019-director';
 import { startPortalAuth } from './portal-auth.js?v=labor-20261014-2';
 import {mountIncidentReports} from './incident-report-ui.mjs?v=hide-excluded-counts-20261019';
 import {classification} from './incident-report-core.mjs';
@@ -1133,7 +1135,7 @@ const DIRECTOR_ID = 'sugihira';
 const LEADER_IDS = ['momo', 'yamada'];
 const MANUAL_ADMIN_IDS = [DIRECTOR_ID, 'momo'];
 const STAFF_NAMES = {
-  sugihira:'杉平', shimanaka:'嶋中', hokari:'保刈', shinoda:'篠田',
+  sugihira:'院長', shimanaka:'嶋中', hokari:'保刈', shinoda:'篠田',
   tsuruta:'鶴田', yoshida:'吉田', takagi:'高木', matsumoto:'松本',
   yamada:'山田', tamiya:'田宮', tanaka:'田中', momo:'百々'
 };
@@ -1159,7 +1161,7 @@ function targetSnapshot() {
   if (!businessRoster.complete || !currentNoticeTargetIds.length) throw new Error('職員名簿と確認対象者を再確認してください');
   return {targetStaffIds:[...currentNoticeTargetIds], targetStaffNames:Object.fromEntries(currentNoticeTargetIds.map(id => [id,currentNoticeTargets[id].name]))};
 }
-Object.assign(STAFF_NAMES,Object.fromEntries(businessRoster.members.map(member => [member.id,member.name])));
+Object.assign(STAFF_NAMES,Object.fromEntries(businessRoster.members.map(member => [member.id,member.label])));
 const STATUS_LABELS = {
   todo:'ミーティング未共有',
   all_read:'全員確認済み',
@@ -1433,7 +1435,7 @@ function setupUser() {
   chip.classList.add(`role-${role}`);
   const staffRole = NOTICE_TARGETS[currentUser.staffId]?.role || 'スタッフ';
   const label = role === 'director' ? '院長' : role === 'leader' ? '主任' : role === 'terminal' ? '閲覧専用' : staffRole;
-  chip.querySelector('span').textContent = `${currentUser.name} / ${label}`;
+  chip.querySelector('span').textContent = `${personName(currentUser.name,currentUser.staffId)} / ${label}`;
   document.getElementById('scopeText').textContent = isReadOnlyTerminal()
     ? '閲覧専用：取り組み・お知らせ・報告'
     : canSeeOpinions()
@@ -3272,7 +3274,7 @@ function progressLogEntries(task) {
 
 function progressLogHtml(log) {
   const dateText = log.createdAt ? formatDate(log.createdAt) : '記入日未記録';
-  const author = log.createdBy || '記入者未記録';
+  const author = personName(log.createdBy,log.createdById) || '記入者未記録';
   return `
     <div class="progress-log">
       <div class="progress-log-meta">${esc(dateText)} / ${esc(author)}</div>
@@ -3307,7 +3309,7 @@ function taskRejectionHtml(task) {
   }
   if (!logs.length) return '';
   logs.sort((a,b) => b.rejectedAt - a.rejectedAt);
-  return `<section class="read-status reject-status"><strong>定着確認依頼の却下履歴</strong>${logs.map(log => `<div style="margin-top:10px"><div>${esc(formatDate(log.rejectedAt))} / ${esc(log.rejectedById === DIRECTOR_ID || ['杉平','院長'].includes(log.rejectedBy) ? '院長' : log.rejectedBy || '-')}</div><div style="white-space:pre-wrap;overflow-wrap:anywhere">却下理由：${esc(log.reason || '理由の記録なし')}</div></div>`).join('')}</section>`;
+  return `<section class="read-status reject-status"><strong>定着確認依頼の却下履歴</strong>${logs.map(log => `<div style="margin-top:10px"><div>${esc(formatDate(log.rejectedAt))} / ${esc(personName(log.rejectedBy,log.rejectedById) || '-')}</div><div style="white-space:pre-wrap;overflow-wrap:anywhere">却下理由：${esc(log.reason || '理由の記録なし')}</div></div>`).join('')}</section>`;
 }
 
 function taskReadButtonHtml(task) {
@@ -3344,7 +3346,7 @@ function renderNotices() {
           <h3>${esc(notice.title || '')}</h3>
           <div class="meta">
             <span>${formatDate(notice.createdAt)}</span>
-            <span>登録: ${esc(notice.createdBy || '-')}</span>
+            <span>登録: ${esc(personName(notice.createdBy,notice.createdById) || '-')}</span>
           </div>
         </div>
       </div>
@@ -3483,7 +3485,7 @@ function renderIncidentReports() {
           <h3>${esc(report.reportNumber || buildIncidentReportNumber(report))}</h3>
           <div class="meta">
             <span>${esc(formatIncidentOccurredAt(report))}</span>
-            <span>記入者（報告者）: ${esc(report.reporterName || report.createdBy || '-')}</span>
+            <span>記入者（報告者）: ${esc(personName(report.reporterName || report.createdBy,report.reporterId || report.createdById) || '-')}</span>
             <span>発見者: ${esc(report.discovererName || '-')}</span>
             ${report.verifierName ? `<span>確認者: ${esc(report.verifierName)}</span>` : ''}
           </div>
@@ -4148,7 +4150,7 @@ function renderOpinions() {
           <h3>${esc(shortTitle(opinion.content))}</h3>
           <div class="meta">
             <span>${formatDate(opinion.createdAt)}</span>
-            <span>登録: ${esc(opinion.createdBy || '-')}</span>
+            <span>登録: ${esc(personName(opinion.createdBy,opinion.createdById) || '-')}</span>
           </div>
         </div>
         <span class="badge decision-${escAttr(opinion.decision || 'pending')}">${DECISION_LABELS[opinion.decision || 'pending'] || DECISION_LABELS.pending}</span>
@@ -4531,8 +4533,7 @@ function formatElapsedSince(ts) {
 
 function displayCreatedBy(item) {
   const name = String(item?.createdBy || '').trim();
-  if (item?.createdById === DIRECTOR_ID || name === '院長' || name === '杉平') return '院長';
-  return name || '-';
+  return personName(name,item?.createdById) || '-';
 }
 
 function shortTitle(text = '') {

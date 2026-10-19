@@ -254,6 +254,8 @@ body.viewer-open{overflow:hidden}
 </div>
 
 <script type="module">
+import {personName} from './portal-person-display.mjs?v=20261019-director';
+
 import {createPageLifecycle} from './portal-page-lifecycle.mjs';
 const pageLifecycle=createPageLifecycle();
 async function pageAwait(work){pageLifecycle.assertActive();let result;try{result=await work();}catch(error){pageLifecycle.assertActive();throw error;}pageLifecycle.assertActive();return result;}
@@ -970,7 +972,7 @@ function renderCommentSection(item) {
     ? comments.map(comment => `
         <div class="comment">
           <div class="comment-head">
-            <span>${esc(comment.createdBy || '不明')}</span>
+            <span>${esc(personName(comment.createdBy,comment.createdById) || '不明')}</span>
             <span>${esc(formatDateTime(comment.createdAt))}</span>
           </div>
           <div class="comment-text">${esc(comment.text || '')}</div>

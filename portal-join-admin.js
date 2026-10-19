@@ -1,3 +1,4 @@
+import {personName} from './portal-person-display.mjs?v=20261019-director';
 import {approveApplication} from './portal-join-model.mjs';
 import {staffNameKey} from './portal-roster-model.mjs';
 import {defaultStaff} from './portal-default-staff.mjs';
@@ -28,12 +29,12 @@ export function setupJoinAdmin({actor,db,page={active:true},api,lock,isBusy,mess
     // Auth reconnect can close a pending dialog. Preserve that draft and its ID
     // when the same revision is opened again, but require a fresh identity check.
     if(selected?.uid===request.uid && selected.revision===request.revision && !completed) {
-      lock(true);const previousId=$('joinExisting').value;$('joinExisting').replaceChildren(new Option('選んでください',''));for(const staff of roster)$('joinExisting').add(new Option(`${staff.name} (${staff.role})`,staff.id));$('joinExisting').value=previousId;if($('joinMode').value==='existing')modeChanged();$('joinIdentityChecked').checked=false;$('joinApproval').showModal();return;
+      lock(true);const previousId=$('joinExisting').value;$('joinExisting').replaceChildren(new Option('選んでください',''));for(const staff of roster)$('joinExisting').add(new Option(`${personName(staff.name,staff.id)} (${staff.role})`,staff.id));$('joinExisting').value=previousId;if($('joinMode').value==='existing')modeChanged();$('joinIdentityChecked').checked=false;$('joinApproval').showModal();return;
     }
     selected=request;completed=false;$('cancelJoinApproval').textContent='取り消す';$('joinApprovalForm').querySelectorAll('input,select,button').forEach(el=>el.disabled=false);newStaffId='staff_join_'+crypto.randomUUID();lock(true);
     $('joinApplicant').textContent=`${request.name} / ${request.email}\n申告職種：${request.jobRole}`;
     $('joinExisting').replaceChildren(new Option('選んでください',''));
-    for(const staff of roster)$('joinExisting').add(new Option(`${staff.name} (${staff.role})`,staff.id));
+    for(const staff of roster)$('joinExisting').add(new Option(`${personName(staff.name,staff.id)} (${staff.role})`,staff.id));
     const matches=roster.filter(s=>staffNameKey(s.name)===staffNameKey(request.name));
     $('joinMode').value=matches.length===1?'existing':'new';
     if(matches.length===1)$('joinExisting').value=matches[0].id;

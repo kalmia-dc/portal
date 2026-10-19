@@ -1,3 +1,4 @@
+import {personName} from './portal-person-display.mjs?v=20261019-director';
 import {isLifecycleStopped,linkedAccounts,lifecycleProtection,performLifecycleChange} from './portal-lifecycle-model.mjs';
 export function setupLifecycleAdmin({actor,db,page={active:true},api,lock,isBusy,reload,defaultStaff}){
   const $=id=>document.getElementById(id),{get,ref,onValue,runTransaction,serverTimestamp}=api;
@@ -8,7 +9,7 @@ export function setupLifecycleAdmin({actor,db,page={active:true},api,lock,isBusy
   function render(){
     const stopped=$('showStoppedMembers').checked;$('lifecycleList').replaceChildren();
     for(const staff of roster.filter(s=>isLifecycleStopped(states[s.id])===stopped)){
-      const row=document.createElement('div');row.className='row';const name=document.createElement('strong');name.textContent=`${staff.name}（${staff.role||'職種未設定'}）`;
+      const row=document.createElement('div');row.className='row';const name=document.createElement('strong');name.textContent=`${personName(staff.name,staff.id)}（${staff.role||'職種未設定'}）`;
       const linked=linkedAccounts(users,staff.id),p=document.createElement('p');p.textContent=`${stopped?'利用停止中':'通常表示'}・関連ログイン ${linked.length}件`;
       const b=document.createElement('button');b.type='button';b.textContent=stopped?'復帰の内容を確認':'このスタッフを選ぶ';
       const protectedReason=lifecycleProtection(actor,staff,users);b.disabled=!ready||!!protectedReason;b.dataset.protected=String(b.disabled);
@@ -23,7 +24,7 @@ export function setupLifecycleAdmin({actor,db,page={active:true},api,lock,isBusy
     if(completed||selection?.staff.id!==staff.id||selection?.action!==action||selection?.expected?.revision!==states[staff.id]?.revision){selection={staff,action,expected:states[staff.id]||null};operationId=crypto.randomUUID();}
     completed=false;lock(true);
     $('lifecycleTitle').textContent=action==='stop'?'2. 停止する内容を確認':'2. 復帰する内容を確認';
-    $('lifecycleTarget').textContent=`${staff.name}（${staff.role||'職種未設定'}）`;
+    $('lifecycleTarget').textContent=`${personName(staff.name,staff.id)}（${staff.role||'職種未設定'}）`;
     $('lifecycleAccounts').replaceChildren();const linked=linkedAccounts(users,staff.id);
     for(const m of linked){const li=document.createElement('li');li.textContent=`${m.email||m.uid}：${m.active===true?(action==='stop'?'ログイン停止':'ログイン再開'):'個別解除済みのため、解除状態を維持'}`;$('lifecycleAccounts').append(li);}
     if(!linked.length)$('lifecycleAccounts').textContent='紐付いたログインはありません。名簿・シフト・勤怠の表示状態を変更します。';

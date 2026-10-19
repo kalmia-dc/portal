@@ -177,9 +177,10 @@ body.is-admin .admin-only{display:block}
 </div>
 
 <script type="module">
+import {personName} from "./portal-person-display.mjs?v=20261019-director";
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import { getDatabase, ref, set, get, onValue } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
-import {loadBusinessRoster} from './portal-business-roster.mjs';
+import {loadBusinessRoster} from './portal-business-roster.mjs?v=20261019-director';
 import {createPageLifecycle} from './portal-page-lifecycle.mjs';
 import { startPortalAuth } from './portal-auth.js?v=labor-20261014-2';
 
@@ -353,7 +354,7 @@ else queueMicrotask(bootSkill);
 async function checkPortalSkillParams() {
   if (!rosterPage.active) return;
   const sid     = authenticatedProfile.staffId;
-  const name    = authenticatedProfile.name;
+  const name    = personName(authenticatedProfile.name,authenticatedProfile.staffId);
   const profileRole = authenticatedProfile.role;
   const role = profileRole==='DA' ? (businessRoster.members.find(s=>s.id===sid)?.skillRole || 'DA助手') : profileRole;
   const isAdmin = authenticatedProfile.isTrainingAdmin;
