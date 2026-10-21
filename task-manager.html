@@ -556,9 +556,25 @@
   }
 
   .assignee-grid { display: flex; flex-wrap: wrap; gap: 6px; }
-  .assignee-checkbox { display: none; }
+  .assignee-option { position: relative; max-width: 100%; }
+  .assignee-checkbox {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 20px;
+    height: 20px;
+    margin: 0;
+    accent-color: #007f75;
+    cursor: pointer;
+  }
   .assignee-label {
-    padding: 5px 12px;
+    display: flex;
+    align-items: center;
+    min-height: 44px;
+    margin: 0;
+    padding: 8px 12px 8px 42px;
+    overflow-wrap: anywhere;
     border: 2px solid var(--border);
     border-radius: 100px;
     font-size: 12px;
@@ -573,6 +589,8 @@
   .role-dr .assignee-checkbox:checked + .assignee-label { background: #e0faf7; border-color: #00b894; color: #00b894; }
   .role-dh .assignee-checkbox:checked + .assignee-label { background: #ede7ff; border-color: #6c5ce7; color: #6c5ce7; }
   .role-da .assignee-checkbox:checked + .assignee-label { background: #fff4e0; border-color: #e67e22; color: #e67e22; }
+  .assignee-checkbox:checked + .assignee-label { background: #e0faf7; border-color: #007f75; color: #00665e; }
+  .assignee-checkbox:focus-visible + .assignee-label { outline: 3px solid #007f75; outline-offset: 2px; }
 
   .progress-log-list {
     display: flex;
@@ -896,7 +914,7 @@
 
     <div class="form-group">
       <label>担当者（複数選択可）</label>
-      <div id="assigneeGrid"></div>
+      <div id="assigneeGrid" class="assignee-grid"></div>
     </div>
 
     <div class="form-group">
@@ -1523,8 +1541,8 @@ function taskCardHtml(t) {
   if (t.date) {
     let cls='badge-date', txt=fmtDate(t.date);
     if (od)                          { cls+=' overdue-date'; txt=`⚠ ${txt}`; }
-    else if (isToday(t.date))        { cls+=' today-date'; txt='今日'; }
-    else if (dl!==null && dl<=3)     { txt=`あと${dl}日`; }
+    else if (status!=='完了' && isToday(t.date)) { cls+=' today-date'; txt='今日'; }
+    else if (status!=='完了' && dl!==null && dl<=3) { txt=`あと${dl}日`; }
     dateLabel = `<span class="badge ${cls}">${txt}</span>`;
   }
   const priCls={high:'badge-high',med:'badge-med',low:'badge-low'};
@@ -1608,7 +1626,7 @@ function renderList() {
     const od = isOverdue(t.date) && status!=='完了';
     const dl = daysLeft(t.date);
     let ds = '';
-    if (t.date) ds = od?`⚠ ${fmtDate(t.date)} 期限切れ`:isToday(t.date)?'今日':dl!==null&&dl<=3?`あと${dl}日`:fmtDate(t.date)+'期限';
+    if (t.date) ds = status==='完了'?fmtDate(t.date):od?`⚠ ${fmtDate(t.date)} 期限切れ`:isToday(t.date)?'今日':dl!==null&&dl<=3?`あと${dl}日`:fmtDate(t.date)+'期限';
     const chips = assigneeChips(t.assignees,t.assigneeRefs) + (taskAssigneeRows(t).some(r => !r.staffId) ? '<span class="assignee-chip">未紐付けの履歴</span>' : '');
     const latestLog = latestProgress(t.progressLogs);
     const repeatBadge = recurrenceBadge(t.recurrence);
@@ -1654,7 +1672,9 @@ function buildAssigneeGrid(task = {}) {
     cb.value=row.name; cb.dataset.staffId=row.staffId;
     cb.checked=selected.some(r => row.staffId ? r.staffId===row.staffId : !r.staffId && r.name===row.name);
     const label=document.createElement('label'); label.htmlFor=cb.id; label.className='assignee-label'; label.textContent=row.label;
-    grid.append(cb,label);
+    const option = document.createElement('div'); option.className='assignee-option';
+    option.append(cb,label);
+    grid.append(option);
   });
 }
 
@@ -1719,8 +1739,8 @@ function openModal(id = null) {
     document.querySelector('#pri-med').checked = true;
     document.querySelector('#st-todo').checked  = true;
     document.querySelectorAll('.assignee-checkbox').forEach(cb => cb.checked = false);
-    if (currentUser) {
-      const myBox = document.getElementById(`asgn_${currentUser.name}`);
+    if (currentUser?.staffId) {
+      const myBox = [...document.querySelectorAll('.assignee-checkbox')].find(cb => cb.dataset.staffId === currentUser.staffId);
       if (myBox) myBox.checked = true;
     }
     document.getElementById('btnDelete').style.display = 'none';
@@ -1729,7 +1749,6 @@ function openModal(id = null) {
   }
   setModalReadonly(isGuestUser());
   document.getElementById('overlay').classList.add('open');
-  if (!isGuestUser()) pageLifecycle.timeout(() => document.getElementById('fTitle').focus(), 300);
 }
 
 function closeModal() { document.getElementById('overlay').classList.remove('open'); editingId = null; }

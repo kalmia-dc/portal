@@ -16,7 +16,7 @@ const context=vm.createContext({console,structuredClone,Date,Math,Set,Object,Arr
   alert:m=>alerts.push(m),confirm:()=>{confirmationCount++;return confirmAnswer;},setTimeout:f=>timers.push(f),
   fetch:async()=>({ok:true,json:async()=>JSON.parse(fs.readFileSync(base+'/portal-holidays.json'))}),
   window:{addEventListener(){}},document:{getElementById:id=>{if(!nodes.has(id))nodes.set(id,node());return nodes.get(id);},querySelectorAll:()=>[],createElement:node,body:node()},localStorage:{getItem:()=>null},location:{search:'',hash:''}});
-vm.runInContext(extension,context);vm.runInContext(balance,context);
+vm.runInContext(fs.readFileSync(base+'/portal-statistics.js','utf8'),context);vm.runInContext(extension,context);vm.runInContext(balance,context);
 const main=scripts.find(([,a,c])=>!a&&c.includes('const SHIFT'))[2];
 for(const file of ['shift-entry.js','shift-staff-month.js','shift-member-access.js','shift-staff-order.js'])vm.runInContext(fs.readFileSync(base+'/'+file,'utf8'),context);
 vm.runInContext(main,context);

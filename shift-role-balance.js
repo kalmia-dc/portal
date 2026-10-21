@@ -1,6 +1,6 @@
 // Actual assigned headcounts; existing coverage totals retain their own rules.
 function countRoleStaffing(role, ds){
-  return STAFF.filter(s=>s.role===role).filter(s=>{
+  return STAFF.filter(s=>isNormalStatisticsStaff(s.id)&&s.role===role).filter(s=>{
     const k=shiftData[s.id]?.[ds];
     if(k==='admin') return false;
     return role==='DA' ? isFieldDa(s.id,ds) : isWorking(s.id,ds);

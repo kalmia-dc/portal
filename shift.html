@@ -900,6 +900,7 @@
 </style>
 <link rel="stylesheet" href="./portal-common.css?v=20261005">
 <script defer src="./portal-common.js?v=20261005"></script>
+<script src="./portal-statistics.js?v=20261021"></script>
 </head>
 <!-- Firebase SDK -->
 <script type="module">
@@ -1471,8 +1472,8 @@
 
 </div><!-- /#mainApp -->
 
-<script src="clinic-leave.js?v=20261009-visibility"></script>
-<script src="shift-role-balance.js?v=20260903-role-balance"></script>
+<script src="clinic-leave.js?v=20261021-statistics"></script>
+<script src="shift-role-balance.js?v=20261021-statistics"></script>
 <script src="shift-entry.js?v=20261009-visibility"></script>
 <script src="shift-staff-month.js?v=20261009"></script>
 <script src="shift-member-access.js?v=20261009-visibility"></script>
@@ -1879,11 +1880,11 @@ function compareDhWorkCandidate(a, b, ds, wds){
     (sa.triples-sb.triples) || (sa.workdays-sb.workdays);
 }
 function countCoreDrDh(ds){
-  return STAFF.filter(s=>s.role==='DR'||(s.role==='DH'&&s.id!=='hanowa'))
+  return STAFF.filter(s=>isNormalStatisticsStaff(s.id)&&(s.role==='DR'||(s.role==='DH'&&s.id!=='hanowa')))
     .filter(s=>isRuleWorking(s.id,ds)).length;
 }
 function countCoreDh(ds){
-  return STAFF.filter(s=>s.role==='DH'&&s.id!=='hanowa')
+  return STAFF.filter(s=>isNormalStatisticsStaff(s.id)&&s.role==='DH'&&s.id!=='hanowa')
     .filter(s=>isRuleWorking(s.id,ds)).length;
 }
 function isFieldDa(id, ds){
@@ -4216,7 +4217,7 @@ function generateShift(){
 }
 
 function printShiftOnePage(){
-  const y=currentYear,m=currentMonth,days=daysInMonth(y,m),all=orderedShiftStaff();
+  const y=currentYear,m=currentMonth,days=daysInMonth(y,m),all=orderedShiftStaff().filter(s=>isNormalStatisticsStaff(s.id));
   const staff=[...all.filter(s=>s.role==='DR'&&['full','director','part'].includes(s.type)),...all.filter(s=>s.role==='DH'),...all.filter(s=>s.role==='DA'&&['full','part'].includes(s.type))];
   const rowUnits=staff.reduce((n,s)=>n+Math.max(1,Math.ceil(Array.from(s.name).length/7)),0);
   if(rowUnits>16){alert('A4横1枚は短い氏名で16名までが目安です。長い氏名も含めると読める文字サイズを保てないため、「印刷（詳細・分割）」をご利用ください。');return;}
@@ -4268,8 +4269,8 @@ function printShift(){
   const y=currentYear, m=currentMonth, days=daysInMonth(y,m);
   const dowNames=['日','月','火','水','木','金','土'];
   const escapePrint=(value)=>String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  // Group presentation only; retain every staff member, including unknown roles/types.
-  const staff=orderedShiftStaff();
+  // Normal report excludes only the verified test ID; source shifts remain available.
+  const staff=orderedShiftStaff().filter(s=>isNormalStatisticsStaff(s.id));
   const groups=[
     {label:'DR',staff:staff.filter(s=>s.role==='DR')},
     {label:'DH・DA',staff:staff.filter(s=>s.role==='DH'||s.role==='DA')},
@@ -4365,9 +4366,9 @@ function renderStaffList(){
         <div class="staff-item">
           <span class="badge ${role}">${role}</span>
           <span class="staff-name">${s.name}</span>
-          ${usesMonthlyHoursTarget(s) ? `<span style="font-size:.65rem;color:${h>=155?'var(--teal)':h>=140?'var(--amber)':'var(--red)'};font-family:'DM Mono',monospace;">${h}h</span>` : `<span class="staff-type">${shiftEmploymentLabel(s)}</span>`}
+          ${!isNormalStatisticsStaff(s.id) ? '<span class="staff-type">集計対象外</span>' : usesMonthlyHoursTarget(s) ? `<span style="font-size:.65rem;color:${h>=155?'var(--teal)':h>=140?'var(--amber)':'var(--red)'};font-family:'DM Mono',monospace;">${h}h</span>` : `<span class="staff-type">${shiftEmploymentLabel(s)}</span>`}
         </div>
-        ${usesMonthlyHoursTarget(s)?`<div class="hours-bar" style="margin:-4px 0 6px 40px;"><div class="hours-bar-fill" style="width:${pct}%;background:${h>=155?'var(--teal)':h>=140?'var(--amber)':'var(--red)'};"></div></div>`:''}
+        ${isNormalStatisticsStaff(s.id)&&usesMonthlyHoursTarget(s)?`<div class="hours-bar" style="margin:-4px 0 6px 40px;"><div class="hours-bar-fill" style="width:${pct}%;background:${h>=155?'var(--teal)':h>=140?'var(--amber)':'var(--red)'};"></div></div>`:''}
       `;
     });
     el.appendChild(div);
@@ -4511,7 +4512,7 @@ function renderSummary(){
     if(shiftData['hanowa']?.[ds]==='hanowa') hanowa++;
   }
 
-  STAFF.forEach(s=>{
+  STAFF.filter(s=>isNormalStatisticsStaff(s.id)).forEach(s=>{
     for(let d=1; d<=days; d++){
       const ds = dateStr(y,m,d);
       if(shiftData[s.id]?.[ds]==='paid') paid++;
@@ -4529,7 +4530,7 @@ function renderSummary(){
   // sidebar summary
   const sl = document.getElementById('summaryList');
   sl.innerHTML = '';
-  visibleShiftStaff().filter(usesMonthlyHoursTarget).forEach(s=>{
+  visibleShiftStaff().filter(s=>isNormalStatisticsStaff(s.id)).filter(usesMonthlyHoursTarget).forEach(s=>{
     const h = getHours(s.id, y, m);
     const pct = Math.round(h/160*100);
     const color = h>=155?'var(--teal)':h>=140?'var(--amber)':'var(--red)';
@@ -4722,7 +4723,7 @@ function exportCSV(){
     Array.from({length:days},(_,i)=>`${m+1}/${i+1}`)
   ).concat(['合計時間']);
 
-  const rows = orderedShiftStaff().map(s=>{
+  const rows = orderedShiftStaff().filter(s=>isNormalStatisticsStaff(s.id)).map(s=>{
     const cells = [s.name, s.role, s.type==='full'?'常勤':s.type==='director'?'院長':s.type==='part'?'非常勤':'スポット'];
     for(let d=1; d<=days; d++){
       const ds = dateStr(y,m,d);

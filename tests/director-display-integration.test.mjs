@@ -48,14 +48,15 @@ test('actual task list renders canonical assignee and creator labels; inputs ret
  const currentUser={staffId:'sugihira',name:'杉平'};
  const task={title:'Mock old task',status:'未着手',date:'2026-01-01',priority:'med',assignees:['杉平'],assigneeRefs:[{staffId:'sugihira',name:'杉平'}],createdBy:'杉平',createdByStaffId:'sugihira'};
  const children=[];const nodes={viewContainer:{},assigneeGrid:{replaceChildren:()=>children.splice(0),append:(...x)=>children.push(...x)}};
- const c=vm.createContext({personName,taskAssignedForDisplay,taskCreatedForDisplay,currentUser,tasks:{sample:task},currentFilter:'all',BOARD_STATUSES:['未着手','完了'],ROLE_OF:{},businessRoster:{members:buildBusinessRoster()},esc:String,isOverdue:()=>true,daysLeft:()=>-1,fmtDate:()=> '1/1',isToday:()=>false,normalizeStatus:s=>s,latestProgress:()=>null,recurrenceBadge:()=>'',document:{getElementById:id=>nodes[id],createElement:tag=>({tag,dataset:{}})}});
+ const c=vm.createContext({personName,taskAssignedForDisplay,taskCreatedForDisplay,currentUser,tasks:{sample:task},currentFilter:'all',BOARD_STATUSES:['未着手','完了'],ROLE_OF:{},businessRoster:{members:buildBusinessRoster()},esc:String,isOverdue:()=>true,daysLeft:()=>-1,fmtDate:()=> '1/1',isToday:()=>false,normalizeStatus:s=>s,latestProgress:()=>null,recurrenceBadge:()=>'',document:{getElementById:id=>nodes[id],createElement:tag=>({tag,dataset:{},children:[],append(...items){this.children.push(...items);}})}});
  vm.runInContext(section('function getFiltered()','// ===== RENDER =====')+section('function assigneeChips(','function taskCardHtml(')+section('function renderList()','// ===== MODAL ====='),c);
  vm.runInContext('renderList()',c);
  assert.match(nodes.viewContainer.innerHTML,/作成: 院長/);
  assert.match(nodes.viewContainer.innerHTML,/>院長<\/span>/);
  assert(!nodes.viewContainer.innerHTML.includes('杉平'));
  c.task=task;vm.runInContext('buildAssigneeGrid(task)',c);
- const checkbox=children.find(x=>x.tag==='input'&&x.dataset.staffId==='sugihira');
+ const controls=children.flatMap(x=>x.children);
+ const checkbox=controls.find(x=>x.tag==='input'&&x.dataset.staffId==='sugihira');
  assert.equal(checkbox.value,'杉平');assert.equal(checkbox.checked,true);
- assert.equal(children.find(x=>x.tag==='label'&&x.htmlFor===checkbox.id).textContent,'院長');
+ assert.equal(controls.find(x=>x.tag==='label'&&x.htmlFor===checkbox.id).textContent,'院長');
 });

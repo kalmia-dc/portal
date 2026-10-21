@@ -11,7 +11,7 @@ const context=vm.createContext({console,structuredClone,Date,Math,Set,Object,Arr
   alert(){},confirm:()=>false,setTimeout(){},fetch:async()=>({ok:true,json:async()=>JSON.parse(fs.readFileSync(base+'/portal-holidays.json'))}),
   window:{addEventListener(){}},document:{getElementById:id=>{if(!nodes.has(id))nodes.set(id,node());return nodes.get(id);},querySelectorAll:()=>[],createElement:node,body:node()},localStorage:{getItem:()=>null},location:{search:'',hash:''}});
 const run=s=>vm.runInContext(s,context);
-for(const file of ['clinic-leave.js','shift-role-balance.js','shift-entry.js','shift-staff-month.js','shift-member-access.js','shift-staff-order.js'])run(fs.readFileSync(base+'/'+file,'utf8'));
+for(const file of ['portal-statistics.js','clinic-leave.js','shift-role-balance.js','shift-entry.js','shift-staff-month.js','shift-member-access.js','shift-staff-order.js'])run(fs.readFileSync(base+'/'+file,'utf8'));
 run(scripts.find(([,a,c])=>!a&&c.includes('const SHIFT'))[2]);
 await run('window.__holidayDataReady');
 run(`currentYear=2026;currentMonth=9;currentUser={role:'admin'};render=()=>{};

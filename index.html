@@ -418,6 +418,7 @@
 </style>
 <link rel="stylesheet" href="./portal-common.css?v=20261005">
 <script defer src="./portal-common.js?v=20261005"></script>
+<script src="./portal-statistics.js?v=20261021"></script>
 <script src="./portal-shift-time.js?v=20261005"></script>
 </head>
 <body>
@@ -1282,7 +1283,7 @@ async function buildTodayStaff(now) {
   let html = '';
 
   for (const role of ['DR','DH','DA']) {
-    const attending = businessRoster.members.filter(s=>s.role===role).filter(member => {
+    const attending = businessRoster.members.filter(s=>isNormalStatisticsStaff(s.id)&&s.role===role).filter(member => {
       const sid = member.id;
       if (!sid) return false;
       const dateKey2 = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;

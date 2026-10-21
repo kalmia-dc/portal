@@ -24,7 +24,7 @@ export async function makeHarness(){
     alert:x=>alerts.push(x),confirm:()=>true,setTimeout(){},fetch:async()=>({ok:true,json:async()=>JSON.parse(fs.readFileSync('portal-holidays.json'))}),
     window:{_fb:fb,addEventListener(){}},document:{getElementById:field,querySelectorAll:()=>[],createElement:node,body:node()},localStorage:{getItem:()=>null},location:{search:'',hash:''}});
   const run=s=>vm.runInContext(s,c);
-  for(const file of ['clinic-leave.js','shift-role-balance.js','shift-entry.js','shift-staff-month.js','shift-member-access.js','shift-staff-order.js'])run(fs.readFileSync(file,'utf8'));
+  for(const file of ['portal-statistics.js','clinic-leave.js','shift-role-balance.js','shift-entry.js','shift-staff-month.js','shift-member-access.js','shift-staff-order.js'])run(fs.readFileSync(file,'utf8'));
   const html=fs.readFileSync('shift.html','utf8');run([...html.matchAll(/<script([^>]*)>([\s\S]*?)<\/script>/g)].find(([,a,s])=>!a&&s.includes('const SHIFT'))[2]);await run('window.__holidayDataReady');
   run(`currentYear=2026;currentMonth=9;currentUser={role:'admin'};render=()=>{};
     STAFF=[{id:'a',name:'架空医師A',role:'DR',type:'spot'},{id:'b',name:'架空衛生士B',role:'DH',type:'full'}];receiveShiftMembers({});staffOrderLoaded=true;`);
