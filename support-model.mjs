@@ -1,7 +1,8 @@
+import {accountPersonName} from './portal-person-display.mjs?v=20261021-director';
 export const STATUSES=['未確認','確認中','対応中','対応済み','保留'];
 export function speakerInfo(e){
  const ai=e.type==='message'&&e.actorRole==='admin'&&e.authorType==='ai'&&e.source==='hirasol-assisted';
- return {ai,label:ai?'ヒラソル（AIアシスタント）':`${e.actorName}（${e.actorRole==='admin'?'管理者':'スタッフ'}）`,note:ai?`管理者申告のAI返信・独立したAI本人認証ではありません。送信操作：${e.actorName} ／ actor UID：${e.actorUid}`:e.authorType===undefined?'過去の発言：送信元区分は未記録':'人間による送信'};
+ return {ai,label:ai?'ヒラソル（AIアシスタント）':`${accountPersonName(e.actorName,e.actorUid)}（${e.actorRole==='admin'?'管理者':'スタッフ'}）`,note:ai?`管理者申告のAI返信・独立したAI本人認証ではありません。送信操作：${accountPersonName(e.actorName,e.actorUid)} ／ actor UID：${e.actorUid}`:e.authorType===undefined?'過去の発言：送信元区分は未記録':'人間による送信'};
 }
 export function projectThread(id,record){
  if(!record)return null;

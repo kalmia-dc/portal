@@ -174,7 +174,7 @@ function renderAdmin(){
   const paid=Object.values(shiftRequests).filter(r=>r.type==='paid'&&r.status==='pending'&&!r.cancelled);
   const queue=[...corr.map(r=>({kind:'correction',...r})),...paid.map(r=>({kind:'paid',...r}))].sort((a,b)=>String(a.submittedAt).localeCompare(String(b.submittedAt)));
   const leaveAlerts=allStaff().map(s=>({staff:s,alert:leaveCompliance(s.id)})).filter(x=>x.alert&&x.alert.level!=='ok');
-  const alertHtml=leaveAlerts.map(x=>`<div class="item"><span class="flag ${x.alert.level}">有給</span> <b>${x.staff.name}</b>：${esc(x.alert.text)}</div>`).join('');
+  const alertHtml=leaveAlerts.map(x=>`<div class="item"><span class="flag ${x.alert.level}">有給</span> <b>${esc(personName(x.staff.name,x.staff.id))}</b>：${esc(x.alert.text)}</div>`).join('');
   const queueHtml=queue.length?queue.map(r=>`<div class="item" data-approval-id="${esc(r.id)}" data-approval-kind="${r.kind}" tabindex="-1"><div class="item-head"><div><b>${staffName(r.staffId)}｜${r.kind==='paid'?'有給申請':`${r.date} ${PUNCH_LABEL[r.type]} ${r.requestedTime}`}</b><br><small>${esc(r.comment||r.reason||'')}</small></div><div class="row"><button class="btn" onclick="approveItem('${r.kind}','${r.id}')">承認</button><button class="btn danger" onclick="rejectItem('${r.kind}','${r.id}')">差し戻し</button></div></div></div>`).join(''):'<div class="empty">承認待ちはありません</div>';
   $('adminQueue').innerHTML=alertHtml+queueHtml;
   focusApprovalFromUrl();

@@ -17,6 +17,15 @@ export function personDisplayName({staffId = '', name = ''} = {}) {
 
 export const personName = (name, staffId = '') => personDisplayName({name, staffId});
 
+// Display only: verified director UID from the registered account list.
+// Never use this mapping for authorization or persisted identity changes.
+export function accountPersonName(name, uid = '', staffId = '') {
+  if (staffId) return personName(name, staffId);
+  if (uid === 'bYJNghzzWBeZ8iDOA67CM4q316p2') return personName(name, DIRECTOR_STAFF_ID);
+  // An explicit other account must not be inferred from a matching old name.
+  return uid ? name : personName(name);
+}
+
 export function personMatchesForDisplay(record = {}, person) {
   if (!person?.staffId) return false;
   // An explicit different ID must never be overridden by a matching name.

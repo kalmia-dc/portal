@@ -1,4 +1,5 @@
-import {speakerInfo} from './support-model.mjs';
+import {speakerInfo} from './support-model.mjs?v=20261021-director';
+import {accountPersonName} from './portal-person-display.mjs?v=20261021-director';
 const $=id=>document.getElementById(id);
 const statuses=['未確認','確認中','対応中','対応済み','保留'];
 let me,current=null,threads=[],busy=false,pending=null,accessLost=false;
@@ -19,16 +20,16 @@ function renderList(){
   $('threads').replaceChildren();
   const visible=threads.filter(t=>!$('unanswered').checked||me.role!=='admin'||t.unanswered);
   if(!visible.length)$('threads').textContent='該当する相談はありません。';
-  for(const t of visible){const b=document.createElement('button');b.className='thread';b.dataset.threadId=t.id;b.setAttribute('aria-current',String(t.id===current?.id));const title=document.createElement('span');title.textContent=t.events.find(e=>e.type==='message').body.slice(0,55);const meta=document.createElement('small');meta.textContent=`${t.status} · ${t.ownerName} · #${t.id.slice(0,8)}`;b.append(title,meta);if(t.unanswered){const badge=document.createElement('span');badge.className='badge';badge.textContent='管理者から未返信';b.append(badge);}b.onclick=()=>select(t);$('threads').append(b);}
+  for(const t of visible){const b=document.createElement('button');b.className='thread';b.dataset.threadId=t.id;b.setAttribute('aria-current',String(t.id===current?.id));const title=document.createElement('span');title.textContent=t.events.find(e=>e.type==='message').body.slice(0,55);const meta=document.createElement('small');meta.textContent=`${t.status} · ${accountPersonName(t.ownerName,t.ownerUid)} · #${t.id.slice(0,8)}`;b.append(title,meta);if(t.unanswered){const badge=document.createElement('span');badge.className='badge';badge.textContent='管理者から未返信';b.append(badge);}b.onclick=()=>select(t);$('threads').append(b);}
 }
 async function select(t){if(busy)return;remember();lock(true);try{const fresh=t?await api('threads/'+t.id):null;current=fresh;sender.value='portal-ui';sender.onchange();restore();render();feedback(t?'最新の会話を取得しました。返信先と内容を確認してください。':'');}catch(e){feedback(e.message);}finally{lock(false);}}
 function render(){
   renderList();$('empty').hidden=true;$('detail').hidden=!current;$('composer').hidden=false;$('optional').hidden=!!current;
   $('compose-title').textContent=current?'この相談に追記する':'新しい相談';
-  $('reply-target').textContent=current?`送信先：#${current.id} ／ ${current.ownerName} ／ 直前の発言 #${current.events.filter(e=>e.type==='message').at(-1).seq}`:'短い文章だけで始められます。';
+  $('reply-target').textContent=current?`送信先：#${current.id} ／ ${accountPersonName(current.ownerName,current.ownerUid)} ／ 直前の発言 #${current.events.filter(e=>e.type==='message').at(-1).seq}`:'短い文章だけで始められます。';
   senderLabel.hidden=me.role!=='admin'||!current;
   if(!current)return;
-  $('thread-title').textContent=`${current.ownerName} の相談`;
+  $('thread-title').textContent=`${accountPersonName(current.ownerName,current.ownerUid)} の相談`;
   $('thread-meta').textContent=`スレッドID：${current.id} ／ ${current.status} ／ 版 ${current.revision}${current.page?' ／ 画面：'+current.page:''}${current.occurredAt?' ／ 発生時刻（本人申告・端末現地時刻）：'+current.occurredAt:''}`;
   $('events').replaceChildren();
   for(const e of current.events){const speaker=speakerInfo(e);const item=document.createElement('article');item.dataset.eventId=e.id;item.className='event '+(e.type==='status'?'status':speaker.ai?'ai':e.actorRole==='admin'?'admin':'');const badge=document.createElement('strong');badge.className='author-badge';badge.textContent=speaker.label;const meta=document.createElement('small');meta.textContent=`#${e.seq} · ${new Date(e.at).toLocaleString('ja-JP')} · サーバー記録`;const body=document.createElement('p');body.textContent=e.type==='status'?`状態変更：${e.from} → ${e.to}`:e.body;const source=document.createElement('small');source.textContent=speaker.note;item.append(badge,meta,body,source);if(e.replyTo){const reply=document.createElement('small');reply.textContent=`返信先：発言 #${current.events.find(v=>v.id===e.replyTo)?.seq}`;item.append(reply);}$('events').append(item);}
@@ -39,7 +40,7 @@ for(const s of statuses){const o=document.createElement('option');o.value=s;o.te
 $('new').onclick=()=>select(null);
 $('unanswered').onchange=renderList;
 $('refresh').onclick=async()=>{lock(true);try{await refresh();feedback('最新の会話を表示しました。入力内容は保持しています。');}catch(e){feedback(e.message)}finally{lock(false)}};
-$('switch').onclick=async()=>{lock(true);try{me=await api('fixture-session',{user:$('identity').value});drafts.clear();pending=null;current=null;$('body').value='';$('page').value='';$('occurred').value='';$('unanswered').checked=false;threads=await api('threads');$('who').textContent=me.name;render();feedback();}catch(e){feedback(e.message)}finally{lock(false)}};
+$('switch').onclick=async()=>{lock(true);try{me=await api('fixture-session',{user:$('identity').value});drafts.clear();pending=null;current=null;$('body').value='';$('page').value='';$('occurred').value='';$('unanswered').checked=false;threads=await api('threads');$('who').textContent=accountPersonName(me.name,me.uid);render();feedback();}catch(e){feedback(e.message)}finally{lock(false)}};
 async function submit(kind){
   if(busy)return;
   const target=current?.id??null;
@@ -62,4 +63,4 @@ $('composer').onsubmit=e=>{e.preventDefault();submit('message')};
 $('set-status').onclick=()=>submit('status');
 window.addEventListener('beforeunload',e=>{if($('body')?.value.trim()||busy){e.preventDefault();e.returnValue='';}});
 window.addEventListener('portalAccessLost',()=>{accessLost=true;drafts.clear();pending=null;current=null;threads=[];me=null;$('threads').replaceChildren();$('events').replaceChildren();$('detail').hidden=true;$('composer').hidden=true;$('who').textContent='利用許可が失効しました';$('body').value='';$('page').value='';$('occurred').value='';lock(true);feedback('利用許可が失効しました。再ログインして確認してください。');});
-try{me=await api('me');$('who').textContent=me.name;threads=await api('threads');render();}catch(e){if(globalThis.supportTransport){feedback(e.message);lock(true);}else $('switch').click();}
+try{me=await api('me');$('who').textContent=accountPersonName(me.name,me.uid);threads=await api('threads');render();}catch(e){if(globalThis.supportTransport){feedback(e.message);lock(true);}else $('switch').click();}
