@@ -1,0 +1,27 @@
+{
+  "id": "/portal/",
+  "name": "カルミア院内ポータル",
+  "short_name": "カルミアポータル",
+  "description": "カルミアデンタルクリニックのスタッフ用ポータル（オンライン利用）",
+  "lang": "ja",
+  "start_url": "/portal/index.html",
+  "scope": "/portal/",
+  "display": "standalone",
+  "background_color": "#f0f8ff",
+  "theme_color": "#4ecdc4",
+  "prefer_related_applications": false,
+  "icons": [
+    {
+      "src": "/portal/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/portal/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

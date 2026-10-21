@@ -3,6 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- Portal PWA: online use only; no service worker or offline cache. -->
+<link rel="manifest" href="/portal/manifest.webmanifest">
+<meta name="theme-color" content="#4ecdc4">
+<meta name="application-name" content="カルミアポータル">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="カルミアポータル">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="apple-touch-icon" sizes="180x180" href="/portal/icons/apple-touch-icon.png">
 <title>カルミアデンタル スタッフポータル</title>
 <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Zen+Maru+Gothic:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
@@ -406,6 +414,7 @@
   #app .tool-item.shift-tool { background:#edf6f3; border-color:#c7ded8; }
   #app a:focus-visible, #app button:focus-visible { outline:3px solid #247b73; outline-offset:3px; }
   @media(max-width:720px){ #app .hero { padding:18px 16px 0; } }
+.schedule-response-badge{display:inline-block;font-size:11px;padding:2px 7px;border-radius:10px;background:#e6f4f1;color:#176d65;white-space:nowrap;vertical-align:middle}
 </style>
 <link rel="stylesheet" href="./portal-common.css?v=20261005">
 <script defer src="./portal-common.js?v=20261005"></script>
@@ -682,7 +691,7 @@
 <script type="module">
 import {personName} from './portal-person-display.mjs?v=20261019-director';
 
-import {todayItems,localDay,noticeTargets} from "./portal-today.mjs?v=20261019-director";
+import {todayItems,localDay,noticeTargets,scheduleDecision,decidedScheduleEntries} from "./portal-today.mjs?v=20261021-schedule-top";
 // ─────────────────────────────────────────
 // スタッフ定義（シフトアプリと同じ）
 // ─────────────────────────────────────────
@@ -1798,7 +1807,7 @@ function renderTodayActions(){
  let html='';
  for(const group of ['期限切れ','今日','確認待ち']){
    const rows=items.filter(x=>x.group===group);
-   if(rows.length)html+='<div class="today-group">'+group+'（'+rows.length+'）</div>'+rows.map(x=>'<a class="today-link" href="'+escHtml(x.url)+'"><span>'+escHtml(x.title||x.kind)+'</span><small>'+escHtml(x.kind)+(x.date?' / '+escHtml(x.date):'')+' →</small></a>').join('');
+   if(rows.length)html+='<div class="today-group">'+group+'（'+rows.length+'）</div>'+rows.map(x=>'<a class="today-link" href="'+escHtml(x.url)+'"><span>'+escHtml(x.title||x.kind)+(x.responseStatus?' <span class="schedule-response-badge">'+escHtml(x.responseStatus)+'</span>':'')+'</span><small>'+escHtml(x.kind)+(x.date?' / '+escHtml(x.date):'')+' →</small></a>').join('');
  }
  list.innerHTML=html||'<p class="today-status">'+(todayPending.size?'やることを読み込み中です…':todayErrors.size?'取得できた情報には、今日までのタスク・確認待ちはありません。':'今日までのタスク・確認待ちはありません')+'</p>';
  if(html&&todayPending.size)list.innerHTML+='<p class="today-status">一部を読み込み中です…</p>';
@@ -1847,36 +1856,37 @@ async function loadScheduleEvents(staffId) {
     card.style.display='none';
 
     // ── 決定済みイベント（main） ──
-    const decided = Object.entries(all)
-      .filter(([, ev]) => ev.decided && (!ev.members || (Array.isArray(ev.members)&&ev.members.includes(staffId))))
-      .sort((a, b) => a[1].decided < b[1].decided ? -1 : 1); // 日付昇順
+    const decided = decidedScheduleEntries(all, staffId, today);
+    section.style.display = decided.length ? 'block' : 'none';
+    board.innerHTML = '';
 
     if (decided.length) {
       section.style.display = 'block';
       board.innerHTML = decided.map(([id, ev]) => {
-        const decidedDate = ev.decided;
-        const dt   = new Date(decidedDate + 'T00:00:00');
-        const isPast = decidedDate < today;
+        const decision = scheduleDecision(ev, today);
+        const remainingDates = decision.dates.filter(day => day >= today);
+        const decidedDate = remainingDates[0];
+        const dt = decidedDate ? new Date(decidedDate + 'T00:00:00') : null;
+        const dateLabel = remainingDates.map(fmt).join('・') + (decision.unknown ? (remainingDates.length ? '・' : '') + '日付確認中' : '');
         return `
           <div onclick="goToScheduleApp('${id}')" style="
             display:flex;align-items:center;gap:12px;
             padding:13px 16px;border-bottom:1px solid var(--light-gray);
             cursor:pointer;
-            ${isPast ? 'opacity:.5;' : ''}
           ">
             <div style="
               width:48px;height:48px;border-radius:12px;flex-shrink:0;
-              background:${isPast ? '#f0f0f0' : 'linear-gradient(135deg,#4ecdc4,#74b9ff)'};
-              color:${isPast ? '#aaa' : '#fff'};
+              background:linear-gradient(135deg,#4ecdc4,#74b9ff);
+              color:#fff;
               display:flex;flex-direction:column;align-items:center;justify-content:center;
               font-family:'Nunito',sans-serif;line-height:1.1;
             ">
-              <span style="font-size:10px;font-weight:700">${dt.getMonth()+1}月</span>
-              <span style="font-size:18px;font-weight:900">${dt.getDate()}</span>
+              <span style="font-size:10px;font-weight:700">${dt ? (dt.getMonth()+1)+'月' : '日付'}</span>
+              <span style="font-size:18px;font-weight:900">${dt ? dt.getDate() : '?'}</span>
             </div>
             <div style="flex:1;min-width:0;">
               <p style="font-weight:700;font-size:14px;margin:0 0 2px">${escHtml(ev.name)}</p>
-              <p style="font-size:11px;color:var(--gray);margin:0">${fmt(decidedDate)}${isPast ? '（終了）' : ''}</p>
+              <p style="font-size:11px;color:var(--gray);margin:0">${dateLabel}</p>
             </div>
             <span style="font-size:18px;color:var(--light-gray)">›</span>
           </div>`;
