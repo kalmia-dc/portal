@@ -12,6 +12,6 @@ async function boot(){
  document.querySelector('.demo')?.remove();
  document.getElementById('identity').closest('label').hidden=true;
  document.getElementById('switch').hidden=true;
- await import('./support-ui.mjs');
+ await import('./support-ui.mjs?v=20261021-director');
 }
 boot().catch(()=>{const target=document.getElementById('feedback');if(target)target.textContent='利用許可または接続を確認できません。管理者へご確認ください。ローカルでは専用fixtureを使用してください。';});
