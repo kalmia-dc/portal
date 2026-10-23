@@ -57,8 +57,12 @@ export const businessCards=onCall(options,async req=>{
     // Check permission and revision before staging any files. Transaction checks again.
     changeRecord(current,{action,fields,expectedRevision:d.expectedRevision,operationId},actor,Date.now());
     const staged={};if(action==='save')for(const side of ['front','back'])if(d.images?.[side]){const im=imageData(d.images[side]);const path=`business-cards/cards/${id}/${randomUUID()}-${side}.${im.ext}`;await bucket().file(path).save(im.bytes,{resumable:false,metadata:{contentType:im.type,cacheControl:'private,no-store'}});staged[side]=path;}
-    let failure;
-    const changed=await ref.transaction(value=>{try{if(value?.operationId===operationId){if(value.operationHash!==operationHash)throw Error('同時保存の内容が異なります。再読み込みしてください。');return value;}const updated=changeRecord(value,{action,fields,expectedRevision:d.expectedRevision,operationId},actor,Date.now());updated.operationHash=operationHash;if(action==='save')updated.images={...value?.images,...staged};return updated;}catch(e){failure=e;return undefined;}});
+    // Keep the location synchronized while the transaction starts. A one-off get()
+    // does not retain the SDK's transaction cache; an initial null would otherwise
+    // be mistaken for a revision conflict on an existing card.
+    const keepCurrent=()=>{};ref.on('value',keepCurrent);
+    let failure,changed;
+    try{await ref.once('value');changed=await ref.transaction(value=>{failure=undefined;try{if(value?.operationId===operationId){if(value.operationHash!==operationHash)throw Error('同時保存の内容が異なります。再読み込みしてください。');return value;}const updated=changeRecord(value,{action,fields,expectedRevision:d.expectedRevision,operationId},actor,Date.now());updated.operationHash=operationHash;if(action==='save')updated.images={...value?.images,...staged};return updated;}catch(e){failure=e;return undefined;}});}finally{ref.off('value',keepCurrent);}
     for(const path of Object.values(staged))if(!Object.values(changed.snapshot.val()?.images||{}).includes(path))await bucket().file(path).delete({ignoreNotFound:true});
     if(failure)throw failure;if(!changed.committed)throw Error('保存できませんでした。');
     if(action==='purge')await bucket().deleteFiles({prefix:`business-cards/cards/${id}/`});
