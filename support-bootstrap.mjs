@@ -14,6 +14,6 @@ async function boot(){
  document.getElementById('switch').hidden=true;
  const [{getDatabase,ref,set},{createReadStore}]=await Promise.all([import('https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js'),import('./support-read-store.mjs')]);
  window.supportMarkRead=createReadStore({db:getDatabase(app),ref,set,uid:window.portalAuth.user.uid,currentUid:()=>window.portalAuth?.user?.uid,isActive:()=>!window.portalAccessLost&&!!window.portalAuth?.user});
- await import('./support-ui.mjs?v=20261023-unread');
+ await import('./support-ui.mjs?v=20261023-admin-review');
 }
 boot().catch(()=>{const target=document.getElementById('feedback');if(target)target.textContent='利用許可または接続を確認できません。管理者へご確認ください。ローカルでは専用fixtureを使用してください。';});
