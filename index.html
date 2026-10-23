@@ -694,6 +694,7 @@
 <script type="module">
 import {personName} from './portal-person-display.mjs?v=20261019-director';
 
+import {unreadItems} from "./support-unread.mjs";
 import {todayItems,localDay,noticeTargets,scheduleDecision,decidedScheduleEntries} from "./portal-today.mjs?v=20261021-schedule-top";
 // ─────────────────────────────────────────
 // スタッフ定義（シフトアプリと同じ）
@@ -1308,7 +1309,7 @@ async function buildTodayStaff(now) {
 // Firebase（シフトアプリと同じプロジェクト）
 // ─────────────────────────────────────────
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getDatabase, ref, push, remove, onValue, get, set } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
+import { getDatabase, ref, push, remove, onValue, get, set, query, orderByChild, equalTo } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 import {loadBusinessRoster} from './portal-business-roster.mjs?v=20261019-director';
 import {createPageLifecycle} from './portal-page-lifecycle.mjs';
 import { startPortalAuth } from './portal-auth.js?v=labor-20261014-2';
@@ -1806,7 +1807,7 @@ function renderTodayActions(){
  const card=document.getElementById('heroTaskCard'),list=document.getElementById('heroTaskList');
  if(isGuestUser()||authenticatedProfile.portalRole==='terminal'){card.style.display='none';return;}
  card.style.display='block';
- const items=todayItems(todaySources,authenticatedProfile);
+ const items=[...todayItems(todaySources,authenticatedProfile),...unreadItems(todaySources.supportChats,todaySources.supportReads,authenticatedProfile.uid)];
  let html='';
  for(const group of ['期限切れ','今日','確認待ち']){
    const rows=items.filter(x=>x.group===group);
@@ -1824,6 +1825,13 @@ function loadMyTasks(staffName){
  if(todayExtraStarted)return;todayExtraStarted=true;
  if(isGuestUser()||authenticatedProfile.portalRole==='terminal')return;
  watchToday('tasks','tasks','タスク');
+ const uid=authenticatedProfile.uid;
+ if(uid){
+  watchToday('supportReads','supportChatReads/'+uid,'相談の既読');
+  todayPending.add('相談の返信');
+  const own=query(ref(_db,'supportChats'),orderByChild('meta/ownerUid'),equalTo(uid));
+  watchPageValue(own,snap=>{todaySources.supportChats=snap.val()||{};todayPending.delete('相談の返信');todayErrors.delete('相談の返信');renderTodayActions();},()=>{delete todaySources.supportChats;todayPending.delete('相談の返信');todayErrors.add('相談の返信');renderTodayActions();});
+ }
  if(noticeTargets.includes(authenticatedProfile.staffId)||authenticatedProfile.staffId==='sugihira'){
    watchToday('meetingTasks','meetingManagement/tasks','ミーティング');
    if(noticeTargets.includes(authenticatedProfile.staffId))watchToday('meetingNotices','meetingManagement/notices','お知らせ');
