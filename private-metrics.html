@@ -2127,6 +2127,28 @@ function repairLegacyPdfText(text) {
   }}
 }
 
+function pdfTextContentToLines(content) {
+  const items = (content?.items || []).filter(item => typeof item.str === 'string');
+  // Without coordinates, preserve explicit line boundaries rather than merging totals.
+  if (items.some(item => !Number.isFinite(item.transform?.[4]) || !Number.isFinite(item.transform?.[5]))) {
+    return items.map(item => item.str + (item.hasEOL ? '\n' : ' ')).join('').trim();
+  }
+  const rows = [];
+  for (const item of items) {
+    const str = item.str.trim();
+    if (!str) continue;
+    const x = item.transform[4], y = item.transform[5];
+    const height = Math.abs(Number(item.height || item.transform[3] || 0));
+    const tolerance = Math.max(2, Math.min(6, height * 0.45 || 3));
+    let row = rows.find(entry => Math.abs(entry.y - y) <= tolerance);
+    if (!row) { row = { y, items: [] }; rows.push(row); }
+    row.items.push({ x, str });
+  }
+  return rows.sort((a, b) => b.y - a.y)
+    .map(row => row.items.sort((a, b) => a.x - b.x).map(item => item.str).join(' '))
+    .join('\n');
+}
+
 async function readPdfText(file) {try{
   const pdfjs = await pageAwait(async () => (loadPdfJs()));
   const pdf = await pageAwait(async () => (pdfjs.getDocument({ data: new Uint8Array(await pageAwait(async () => (file.arrayBuffer()))) }).promise));
@@ -2135,7 +2157,7 @@ async function readPdfText(file) {try{
     setImportStatus(`PDF読み取り中 ${pageNo}/${pdf.numPages}`);
     const page = await pageAwait(async () => (pdf.getPage(pageNo)));
     const content = await pageAwait(async () => (page.getTextContent()));
-    pages.push(content.items.map(item => item.str).join('\n'));
+    pages.push(pdfTextContentToLines(content));
   }
   const text = repairLegacyPdfText(pages.join('\n\n').trim());
   if (text.length >= 20) return text;
