@@ -1,0 +1,4 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {csvText,suggestions,zipStore}from '../business-cards-utils.mjs';
+test('CSV quotes preserve commas, newlines, leading zeros and quotes',()=>{assert.equal(csvText(['氏名','電話'],[{'氏名':'山田,"太郎"\n次行','電話':'0312345678'}]),'"氏名","電話"\r\n"山田,""太郎""\n次行","0312345678"\r\n');});
+test('OCR suggests email and phone without guessing name',()=>{assert.deepEqual(suggestions('試験 太郎\nTEL 03-1234-5678 test@example.invalid'),{'電子メール(A)':'test@example.invalid','TEL(A)':'03-1234-5678'});});
+test('ZIP central directory offsets and CRC match known standard fixture',()=>{const z=zipStore([{name:'a.txt',data:new TextEncoder().encode('123456789')}]);const v=new DataView(z.buffer);assert.equal(v.getUint32(14,true),0xcbf43926);assert.equal(v.getUint32(z.length-22,true),0x06054b50);assert.equal(v.getUint32(z.length-6,true),44);assert.equal(v.getUint16(6,true),0x800);});
