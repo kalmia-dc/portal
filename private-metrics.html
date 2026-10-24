@@ -951,7 +951,7 @@
   <div class="brand">
     <a class="back-link" href="./index.html" title="ポータルに戻る" aria-label="ポータルに戻る">←</a>
     <div class="title-wrap">
-      <h1>非公開経営数値</h1>
+      <h1>目標・実績 — 月次入力・経営分析</h1>
       <div class="subtitle">管理者専用・スタッフ非公開データ</div>
     </div>
   </div>
@@ -962,6 +962,7 @@
 </header>
 
 <main>
+  <p class="guard-note">初診・再初診・一日平均来院数・自費率は共有目標へ反映されます。売上・確認元・メモは管理者限定です。保険売上＝保険点数×10円。過去値は保存操作をするまで変更しません。</p>
   <div class="guard-note" id="guardNote">このページは百々さんと院長のみ閲覧・編集できます。</div>
 
   <section class="summary-board admin-only" aria-label="経営数値サマリー">
@@ -971,7 +972,7 @@
       <div class="summary-meta" id="summarySub">読み込み中</div>
     </div>
     <div class="summary-actions">
-      <button class="btn primary" onclick="openMetricModal()">経営数値を登録</button>
+      <button class="btn primary" onclick="openMetricModal()">月次の数値を入力</button>
       <div class="utility-actions">
         <button class="btn secondary" onclick="exportCSV()">CSV</button>
         <button class="btn secondary" onclick="window.print()">印刷</button>
@@ -1073,7 +1074,7 @@
       </div>
       <div class="field">
         <label for="fItem">項目名</label>
-        <input type="text" id="fItem" placeholder="例：総売上">
+        <input type="text" id="fItem" list="metricItems" placeholder="例：保険点数"><datalist id="metricItems"><option>保険点数</option><option>自費売上</option><option>初診</option><option>再初診</option><option>一日平均来院数</option><option>月間延べ患者数</option><option>総売上</option><option>物販合計</option></datalist>
       </div>
       <div class="field">
         <label for="fValue">数値</label>
@@ -1105,7 +1106,7 @@
     <div class="modal-head">
       <div>
         <div class="modal-title">写真/PDFから取り込み</div>
-        <div class="panel-sub">読み取り後、候補を確認してから保存します</div>
+        <div class="panel-sub">読み取り後、候補を確認して保存します。保険売上・自費率は保険点数と自費売上から自動計算され、直接の入力値は保存しません。</div>
       </div>
       <button class="icon-btn" onclick="closeImportModal()" title="閉じる">×</button>
     </div>
@@ -1160,13 +1161,15 @@
 
 <script type="module">
 import {personName} from './portal-person-display.mjs?v=20261019-director';
+import {configureMetricsNavigation} from './goal-metrics-navigation.mjs?v=20261023-1';
+import {canManage, buildMonthlyPatch, canonicalItem, SHARED_ITEMS, insuranceSales, selfPayRate} from './goal-metrics-model.mjs?v=20261023-1';
 
 import {createPageLifecycle} from './portal-page-lifecycle.mjs';
 const pageLifecycle=createPageLifecycle();
 async function pageAwait(work){pageLifecycle.assertActive();let result;try{result=await work();}catch(error){pageLifecycle.assertActive();throw error;}pageLifecycle.assertActive();return result;}
 
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getDatabase, ref, push, set, remove, onValue as firebaseOnValue, get }
+import { getDatabase, ref, push, set, remove, update, onValue as firebaseOnValue, get }
   from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 import { startPortalAuth } from './portal-auth.js?v=labor-20261014-2';
 
@@ -1296,11 +1299,12 @@ function normalizeUser(user) {
 }
 
 function isAdmin() {
-  return ADMIN_IDS.includes(currentUser.staffId);
+  return canManage(authenticatedProfile);
 }
 
 function init() {
-  document.getElementById('monthFilter').value = currentMonth();
+  const requestedMonth=new URLSearchParams(location.search).get('month');
+  document.getElementById('monthFilter').value = /^\d{4}-(0[1-9]|1[0-2])$/.test(requestedMonth||'')?requestedMonth:currentMonth();
   const analysisYear = document.getElementById('analysisYear');
   if (analysisYear && !analysisYear.value) analysisYear.value = new Date().getFullYear();
   document.getElementById('userBadge').textContent = personName(currentUser.name,currentUser.staffId);
@@ -1413,10 +1417,8 @@ function effectiveMetricsForMonth(month, overrides = []) {
 
 function calculatedSelfPayRateValue(month, overrides = []) {
   const metrics = effectiveMetricsForMonth(month, overrides);
-  const selfPaySales = parseNumber(metrics.get('自費売上')?.value);
-  const insuranceSales = parseNumber(metrics.get('保険売上')?.value);
-  if (selfPaySales === null || insuranceSales === null || selfPaySales + insuranceSales <= 0) return '';
-  return formatImportValue((selfPaySales / (selfPaySales + insuranceSales)) * 100, 2);
+  const rate=selfPayRate(metrics.get('保険点数')?.value, metrics.get('自費売上')?.value);
+  return rate===null?'':String(rate);
 }
 
 function selfPayRateMetricData(month, overrides = []) {
@@ -1428,8 +1430,8 @@ function selfPayRateMetricData(month, overrides = []) {
     item: '自費率',
     value,
     unit: '%',
-    source: '自費売上・保険売上から自動計算',
-    note: '自費売上 ÷ (保険売上 + 自費売上) × 100'
+    source: '保険点数・自費売上から自動計算',
+    note: '自費売上 ÷ (保険点数 × 10円 + 自費売上) × 100'
   };
 }
 
@@ -1453,29 +1455,6 @@ function addAutoSelfPayRateCandidates(candidates) {
   });
   return result;
 }
-
-async function savePrivateMetricData(data) {try{
-  const normalizedData = normalizedMetricData(data);
-  const existing = findExistingMetric(normalizedData.month, normalizedData.item);
-  const payload = {
-    ...(existing || {}),
-    ...normalizedData,
-    updatedAt: Date.now(),
-    updatedBy: currentUser.name
-  };
-  delete payload.id;
-  if (existing) {
-    await pageAwait(async () => (set(ref(db, `${DB_PATH}/${existing.id}`), payload)));
-    return existing.id;
-  }
-  const newRef = push(ref(db, DB_PATH));
-  await pageAwait(async () => (set(newRef, {
-    ...payload,
-    createdAt: Date.now(),
-    createdBy: currentUser.name
-  })));
-  return newRef.key;
-}catch(error){if(error?.code!=='portal/access-lost')throw error;}}
 
 function addMonths(month, offset) {
   const [year, monthNumber] = month.split('-').map(Number);
@@ -1530,49 +1509,14 @@ function computedGoalAverage(goals, targetGoal, overrides = []) {
   };
 }
 
-async function syncGoalSelfPayRate(month, value) {try{
-  const snap = await pageAwait(async () => (get(ref(db, GOAL_DB_PATH))));
-  const goals = snap.val() || {};
-  const entries = Object.entries(goals);
-  const existing = entries.find(([, goal]) => goal.month === month && goal.item === '自費率');
-  const id = existing?.[0];
-  const current = existing?.[1] || {};
-  const average = computedGoalAverage(goals, { ...current, month, item: '自費率' }, [{ month, item: '自費率', actualValue: value }]);
-  const payload = {
-    ...current,
-    month,
-    department: current.department || '全体',
-    item: '自費率',
-    unit: '%',
-    direction: current.direction || 'up',
-    detail: current.detail || '自費売上 ÷ (保険売上 + 自費売上)',
-    currentValue: average.currentValue,
-    targetValue: current.targetValue || '',
-    actualValue: value,
-    owner: current.owner || currentUser.name,
-    note: current.note || '',
-    history: average.history,
-    updatedAt: Date.now(),
-    updatedBy: currentUser.name
-  };
-  if (id) {
-    await pageAwait(async () => (set(ref(db, `${GOAL_DB_PATH}/${id}`), payload)));
-  } else {
-    await pageAwait(async () => (push(ref(db, GOAL_DB_PATH), {
-      ...payload,
-      createdAt: Date.now(),
-      createdBy: currentUser.name
-    })));
-  }
-}catch(error){if(error?.code!=='portal/access-lost')throw error;}}
-
-async function syncSelfPayRateForMonth(month, overrides = []) {try{
-  const data = selfPayRateMetricData(month, overrides);
-  if (!data) return false;
-  await pageAwait(async () => (savePrivateMetricData(data)));
-  await pageAwait(async () => (syncGoalSelfPayRate(month, data.value)));
-  return true;
-}catch(error){if(error?.code!=='portal/access-lost')throw error;}}
+async function saveMonthlyChanges(changes, importMeta=null) {
+  if(!isAdmin())throw Error('管理者権限が必要です。');
+  pageLifecycle.assertActive();
+  const [metricSnap,goalSnap]=await pageAwait(()=>Promise.all([get(ref(db,DB_PATH)),get(ref(db,GOAL_DB_PATH))]));
+  const historyId=push(ref(db,IMPORT_HISTORY_PATH)).key;
+  const patch=buildMonthlyPatch({metrics:metricSnap.val()||{},goals:goalSnap.val()||{},changes,profile:authenticatedProfile,historyId,importMeta});
+  await pageAwait(()=>update(ref(db),patch));
+}
 
 function filteredMetrics() {
   const month = document.getElementById('monthFilter').value || currentMonth();
@@ -2379,7 +2323,7 @@ function parseMonthlyReport(rawText) {
   const daily = dailyTotal.nums;
   const insurance = insuranceTotal?.nums || [];
   const insurancePoints = insurance[2] ?? daily[4] ?? null;
-  const insuranceSales = insurance[4] ?? (Number.isFinite(insurancePoints) ? insurancePoints * 10 : null);
+  const insuranceSales = Number.isFinite(insurancePoints) ? insurancePoints * 10 : null;
   return {
     patientTotal: daily[0],
     reportRevisit: daily[1],
@@ -2488,7 +2432,7 @@ function renderImportCandidates() {
       </div>
       <div>
         <span class="import-candidate-label">数値</span>
-        <input type="text" inputmode="decimal" value="${escapeHtml(candidate.value)}" onchange="updateImportCandidate(${index}, 'value', this.value)">
+        <input type="text" inputmode="decimal" ${['保険売上','自費率'].includes(canonicalItem(candidate.item))?'readonly aria-label="自動計算（保存時に元数値から計算）"':''} value="${escapeHtml(candidate.value)}" onchange="updateImportCandidate(${index}, 'value', this.value)">
       </div>
       <div>
         <span class="import-candidate-label">単位</span>
@@ -2570,101 +2514,40 @@ window.setAllImportCandidates = function(enabled) {
   renderImportCandidates();
 };
 
-window.saveImportCandidates = async function() {try{
-  if (!isAdmin() || saving) return;
-  let selected = importCandidates
-    .map(candidate => ({
-      ...candidate,
-      month: String(candidate.month || '').trim(),
-      category: String(candidate.category || 'その他').trim(),
-      item: canonicalMetricItem(candidate.item),
-      value: String(candidate.value ?? '').trim(),
-      unit: String(candidate.unit || '').trim(),
-      source: String(candidate.source || '').trim(),
-      note: String(candidate.note || '').trim()
-    }))
-    .map(candidate => ({
-      ...candidate,
-      category: canonicalMetricCategory(candidate.category, candidate.item)
-    }))
-    .filter(candidate => candidate.enabled && candidate.month && candidate.item && candidate.value);
-  selected = addAutoSelfPayRateCandidates(selected)
-    .filter(candidate => candidate.enabled && candidate.month && candidate.item && candidate.value);
-  if (!selected.length) {
-    setImportStatus('保存対象の候補がありません', 'error');
-    return;
-  }
-
-  saving = true;
-  const saveBtn = document.getElementById('importSaveBtn');
-  saveBtn.disabled = true;
-  try {
-    let saved = 0;
-    const months = new Set();
-    for (const candidate of selected) {
-      const data = {
-        month: candidate.month,
-        category: canonicalMetricCategory(candidate.category, candidate.item),
-        item: candidate.item,
-        value: candidate.value,
-        unit: candidate.unit || '',
-        source: candidate.source || '',
-        note: candidate.note || ''
-      };
-      await pageAwait(async () => (savePrivateMetricData(data)));
-      saved++;
-      months.add(candidate.month);
-    }
-
-    let syncedRates = 0;
-    for (const month of months) {
-      const rateData = selfPayRateMetricData(month, selected);
-      if (!rateData) continue;
-      await pageAwait(async () => (syncGoalSelfPayRate(month, rateData.value)));
-      syncedRates++;
-    }
-
-    await pageAwait(async () => (push(ref(db, IMPORT_HISTORY_PATH), {
-      fileName: importFileMeta?.name || '',
-      fileType: importFileMeta?.type || '',
-      fileSize: importFileMeta?.size || 0,
-      importedAt: Date.now(),
-      importedBy: currentUser.name,
-      importedRows: saved,
-      months: Array.from(months).sort(),
-      source: 'private-metrics-upload'
-    })));
-
-    const firstMonth = Array.from(months).sort()[0];
-    if (firstMonth) document.getElementById('monthFilter').value = firstMonth;
-    closeImportModal();
-    showToast(`${saved}件を取り込みました${syncedRates ? `（自費率${syncedRates}ヶ月分を自動計算）` : ''}`);
-    render();
-  } catch (error) {if (pageLifecycle.active) {
-    setImportStatus(`保存に失敗しました: ${error.message}`, 'error');
-  }} finally {if (pageLifecycle.active) {
-    saving = false;
-    saveBtn.disabled = false;
-  }}
-}catch(error){if(error?.code!=='portal/access-lost')throw error;}};
+window.saveImportCandidates = async function() {
+  if(!isAdmin()||saving)return;
+  const selected=importCandidates.filter(c=>c.enabled&&!['保険売上','自費率'].includes(canonicalItem(c.item))).map(c=>({month:c.month,item:c.item,category:c.category,unit:c.unit,value:c.value,source:c.source||'',note:c.note||''}));
+  if(!selected.length){setImportStatus('保存する元の数値を選択してください。保険売上・自費率は自動計算です。','error');return;}
+  saving=true;document.getElementById('importSaveBtn').disabled=true;
+  try{
+    await saveMonthlyChanges(selected,{fileName:importFileMeta?.name||'',fileType:importFileMeta?.type||'',fileSize:importFileMeta?.size||0});
+    document.getElementById('monthFilter').value=selected[0].month;
+    closeImportModal();showToast('月次入力を保存しました。共有4指標も反映しました。');render();
+  }catch(error){if(pageLifecycle.active)setImportStatus('保存に失敗しました: '+error.message,'error');}
+  finally{if(pageLifecycle.active){saving=false;document.getElementById('importSaveBtn').disabled=false;}}
+};
 
 window.openMetricModal = function(id = null) {
   if (!isAdmin()) return;
   editingId = id;
   const rawMetric = id ? allMetrics[id] : null;
   const metric = rawMetric ? normalizedMetricData(rawMetric) : null;
+  if(metric&&['保険売上','自費率'].includes(canonicalItem(metric.item))){showToast('この値は自動計算です。保険点数・自費売上を月次入力で編集してください。過去値は元のまま表示しています。');return;}
   document.getElementById('modalTitle').textContent = metric ? '経営数値を編集' : '経営数値を登録';
   document.getElementById('deleteBtn').style.display = metric ? 'inline-flex' : 'none';
 
   const month = document.getElementById('monthFilter').value || currentMonth();
   setFormValue('fMonth', metric?.month || month);
   setFormValue('fCategory', metric?.category || '売上');
-  setFormValue('fItem', metric?.item || '');
+  const requested=canonicalItem(new URLSearchParams(location.search).get('item')||'');
+  setFormValue('fItem', metric?.item || (requested==='自費率'?'保険点数':Object.hasOwn(SHARED_ITEMS,requested)?requested:''));
   setFormValue('fValue', metric?.value ?? '');
   setFormValue('fUnit', metric?.unit || '円');
   setFormValue('fSource', metric?.source || '');
   setFormValue('fNote', metric?.note || '');
 
+  document.getElementById('fMonth').disabled=!!metric;
+  document.getElementById('fItem').disabled=!!metric;
   document.getElementById('metricModal').classList.add('open');
 };
 
@@ -2682,65 +2565,28 @@ window.closeModalOnBackdrop = function(event) {
   if (event.target.id === 'importModal') closeImportModal();
 };
 
-window.saveMetric = async function() {try{
-  if (!isAdmin() || saving) return;
-  const month = document.getElementById('fMonth').value;
-  const item = document.getElementById('fItem').value.trim();
-  if (!month) { showToast('対象月を選択してください'); return; }
-  if (!item) { showToast('項目名を入力してください'); return; }
+window.saveMetric = async function() {
+  if(!isAdmin()||saving)return;
+  const data={month:document.getElementById('fMonth').value,item:canonicalItem(document.getElementById('fItem').value),category:document.getElementById('fCategory').value,unit:document.getElementById('fUnit').value,value:document.getElementById('fValue').value,source:document.getElementById('fSource').value,note:document.getElementById('fNote').value};
+  const previous=editingId?allMetrics[editingId]:null;
+  if(previous&&(previous.month!==data.month||canonicalItem(previous.item)!==data.item)){showToast('既存項目の対象月・項目名は変更できません。別の項目として登録してください。');return;}
+  saving=true;document.getElementById('saveBtn').disabled=true;
+  try{await saveMonthlyChanges([data]);document.getElementById('monthFilter').value=data.month;closeMetricModal();showToast('月次入力を保存しました');}
+  catch(error){if(pageLifecycle.active)showToast('保存に失敗しました: '+error.message);}
+  finally{if(pageLifecycle.active){saving=false;document.getElementById('saveBtn').disabled=false;}}
+};
 
-  const data = {
-    month,
-    category: canonicalMetricCategory(document.getElementById('fCategory').value, item),
-    item: canonicalMetricItem(item),
-    value: document.getElementById('fValue').value.trim(),
-    unit: document.getElementById('fUnit').value.trim(),
-    source: document.getElementById('fSource').value.trim(),
-    note: document.getElementById('fNote').value.trim(),
-    updatedAt: Date.now(),
-    updatedBy: currentUser.name
-  };
-
-  saving = true;
-  document.getElementById('saveBtn').disabled = true;
-  try {
-    if (editingId) {
-      const existing = allMetrics[editingId] || {};
-      await pageAwait(async () => (set(ref(db, `${DB_PATH}/${editingId}`), { ...existing, ...data })));
-      showToast('経営数値を更新しました');
-    } else {
-      await pageAwait(async () => (push(ref(db, DB_PATH), {
-        ...data,
-        createdAt: Date.now(),
-        createdBy: currentUser.name
-      })));
-      showToast('経営数値を登録しました');
-    }
-    if (['自費売上', '保険売上'].includes(canonicalMetricItem(item))) {
-      const synced = await pageAwait(async () => (syncSelfPayRateForMonth(month, [data])));
-      if (synced) showToast('経営数値を保存し、自費率を自動計算しました');
-    }
-    document.getElementById('monthFilter').value = month;
-    closeMetricModal();
-  } catch(e) {if (pageLifecycle.active) {
-    showToast('保存に失敗しました: ' + e.message);
-  }} finally {if (pageLifecycle.active) {
-    saving = false;
-    document.getElementById('saveBtn').disabled = false;
-  }}
-}catch(error){if(error?.code!=='portal/access-lost')throw error;}};
-
-window.deleteMetric = async function() {try{
-  if (!isAdmin() || !editingId) return;
-  if (!confirm('この経営数値を削除しますか？')) return;
-  try {
-    await pageAwait(async () => (remove(ref(db, `${DB_PATH}/${editingId}`))));
-    closeMetricModal();
-    showToast('削除しました');
-  } catch(e) {if (pageLifecycle.active) {
-    showToast('削除に失敗しました: ' + e.message);
-  }}
-}catch(error){if(error?.code!=='portal/access-lost')throw error;}};
+window.deleteMetric = async function() {
+  if(!isAdmin()||!editingId||saving)return;
+  const metric=allMetrics[editingId];
+  if(!metric)return;
+  if(['保険売上','自費率'].includes(canonicalItem(metric.item))){showToast('自動計算項目は直接削除できません。保険点数・自費売上を確認してください。');return;}
+  if(!confirm('この月の数値を削除しますか？共有実績・関連する算出値も更新されます。変更前の値は管理者用履歴に残ります。'))return;
+  saving=true;
+  try{await saveMonthlyChanges([{...metric,deleted:true}]);closeMetricModal();showToast('削除し、関連する実績を更新しました');}
+  catch(error){if(pageLifecycle.active)showToast('削除に失敗しました: '+error.message);}
+  finally{if(pageLifecycle.active)saving=false;}
+};
 
 window.exportCSV = function() {
   if (!isAdmin()) return;
@@ -2782,9 +2628,11 @@ function showToast(message) {
 window.render = render;
 window.renderAnalysis = renderAnalysis;
 
+configureMetricsNavigation(authenticatedProfile,pageLifecycle);
 init();
 
 function onValue(target,next,error,...options){pageLifecycle.assertActive();return pageLifecycle.add(firebaseOnValue(target,pageLifecycle.guard(next),pageLifecycle.guard(error),...options));}
 </script>
 </body>
 </html>
+

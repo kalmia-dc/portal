@@ -1416,7 +1416,7 @@
   <div class="brand">
     <a class="back-link" href="./index.html" title="ポータルに戻る" aria-label="ポータルに戻る">←</a>
     <div class="title-wrap">
-      <h1>目標管理</h1>
+      <h1>目標・実績</h1>
       <div class="subtitle">月別入力・6ヶ月平均・半期達成状況</div>
     </div>
   </div>
@@ -1427,6 +1427,7 @@
 </header>
 
 <main>
+  <p class="readonly-note editor-only">初診・再初診・一日平均来院数・自費率の実績と月計表の取込は <a href="./goal-metrics.html#input" target="_top">月次入力</a> にまとめました。半期目標やその他の診療指標はこの画面で入力できます。</p>
   <div class="readonly-note" id="readonlyNote" style="display:none;">閲覧モードです。登録・編集は百々さん（管理者）と院長のみ可能です。</div>
 
   <section class="month-board" aria-label="月次入力">
@@ -1673,6 +1674,8 @@
 
 <script type="module">
 import {personName} from './portal-person-display.mjs?v=20261019-director';
+import {configureMetricsNavigation} from './goal-metrics-navigation.mjs?v=20261023-1';
+import {canManage, canonicalItem, SHARED_ITEMS} from './goal-metrics-model.mjs?v=20261023-1';
 
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import { getDatabase, ref, push as firebasePush, set as firebaseSet, remove as firebaseRemove, onValue as firebaseOnValue, get as firebaseGet }
@@ -1795,7 +1798,7 @@ function roleFromStaffId(sid) {
 }
 
 function isEditor() {
-  return EDITOR_IDS.includes(currentUser.staffId);
+  return canManage(authenticatedProfile);
 }
 
 function init() {
@@ -2154,7 +2157,7 @@ function calculatedSelfPayRateValue(month) {
 
 function actualValueForGoal(goal) {
   if (canonicalGoalItem(goal.item) !== '自費率') return goal.actualValue;
-  return calculatedSelfPayRateValue(goal.month) || goal.actualValue;
+  return goal.actualValue; // 保存済みの共有値を表示し、過去値を再計算で置き換えない。
 }
 
 function displayGoalItem(item) {
@@ -2239,28 +2242,9 @@ function goalActualForMonth(goal, month) {
 }
 
 function selfPayRateActualForMonth(month) {
-  const calculatedValue = calculatedSelfPayRateValue(month);
-  const calculatedNumber = parseNumber(calculatedValue);
-  if (calculatedNumber !== null) {
-    return {
-      month,
-      item: '自費率',
-      unit: '%',
-      actualValue: calculatedValue,
-      actualNumber: calculatedNumber
-    };
-  }
-
-  const fallback = Object.entries(allGoals)
-    .map(([id, item]) => ({ id, ...item }))
-    .find(item => item.month === month && canonicalGoalItem(item.item) === '自費率');
-  const fallbackNumber = parseNumber(fallback?.actualValue);
-  return fallbackNumber === null ? null : {
-    ...fallback,
-    month,
-    actualValue: fallback.actualValue,
-    actualNumber: fallbackNumber
-  };
+  const fallback=Object.entries(allGoals).map(([id,item])=>({id,...item})).find(item=>item.month===month&&canonicalGoalItem(item.item)==='自費率');
+  const value=parseNumber(fallback?.actualValue);
+  return value===null?null:{...fallback,month,actualValue:fallback.actualValue,actualNumber:value};
 }
 
 function actualForAverageMonth(goal, month) {
@@ -3237,7 +3221,7 @@ function parseMonthlyReport(rawText) {
   const daily = dailyTotal.nums;
   const insurance = insuranceTotal?.nums || [];
   const insurancePoints = insurance[2] ?? daily[4] ?? null;
-  const insuranceSales = insurance[4] ?? (Number.isFinite(insurancePoints) ? insurancePoints * 10 : null);
+  const insuranceSales = Number.isFinite(insurancePoints) ? insurancePoints * 10 : null;
   return {
     patientTotal: daily[0],
     reportRevisit: daily[1],
@@ -3528,6 +3512,7 @@ window.saveImportCandidates = async function() {
     return;
   }
 
+  if(selected.some(c=>Object.hasOwn(SHARED_ITEMS,canonicalItem(c.item))&&String(c.actualValue??'').trim()!=='')){setImportStatus('共有4指標の実績は月次入力で取り込んでください。ここでは半期目標とその他の診療指標を取り込みます。','error');return;}
   const saveBtn = document.getElementById('importSaveBtn');
   saveBtn.disabled = true;
   try {
@@ -3678,10 +3663,15 @@ function quickFieldDataKey(fieldKey) {
   return fieldKey === 'target' ? 'targetValue' : 'actualValue';
 }
 
+function openMonthlyInput(month,item) {
+  const params=new URLSearchParams({month,item:canonicalItem(item)});
+  window.top.location.href='./goal-metrics.html?'+params+'#input';
+}
 window.openQuickGoalInput = function(groupKey, month, fieldKey) {
   if (!isEditor()) return;
   const group = renderedGoalGroups.get(groupKey);
   if (!group) return;
+  if(fieldKey!=='target'&&Object.hasOwn(SHARED_ITEMS,canonicalItem(group.item))){openMonthlyInput(month,group.item);return;}
   const row = group.rowsByMonth[month];
   const fieldLabel = quickFieldLabel(fieldKey);
   const isTarget = fieldKey === 'target';
@@ -3728,6 +3718,7 @@ window.saveQuickGoalInput = async function() {
     return;
   }
 
+  if(quickInputContext.fieldKey!=='target'&&Object.hasOwn(SHARED_ITEMS,canonicalItem(group.item))){showToast('この実績は月次入力から保存してください');return;}
   const savedMonth = quickInputContext.month;
   const savedFieldLabel = quickFieldLabel(quickInputContext.fieldKey);
 
@@ -3828,6 +3819,13 @@ window.openGoalModal = function(id = null, defaults = {}) {
   document.querySelectorAll('#goalModal input, #goalModal select, #goalModal textarea').forEach(el => {
     el.disabled = !isEditor();
   });
+  const configureShared=()=>{
+    const shared=Object.hasOwn(SHARED_ITEMS,canonicalItem(document.getElementById('fItem').value));
+    document.getElementById('fActual').disabled=!isEditor()||shared;
+    document.getElementById('fActual').title=shared?'実績は「月次入力」で入力します':'';
+  };
+  if(goal&&Object.hasOwn(SHARED_ITEMS,canonicalItem(goal.item)))for(const id of ['fMonth','fItem','fUnit'])document.getElementById(id).disabled=true;
+  document.getElementById('fItem').oninput=configureShared;configureShared();
   document.getElementById('goalModal').classList.add('open');
 };
 
@@ -3872,6 +3870,9 @@ window.saveGoal = async function() {
   if (!item) { showToast('項目を入力してください'); return; }
   const month = document.getElementById('fMonth').value;
   if (!month) { showToast('対象月を選択してください'); return; }
+  const shared=Object.hasOwn(SHARED_ITEMS,item);
+  if(editingId&&Object.hasOwn(SHARED_ITEMS,canonicalItem(allGoals[editingId]?.item))&&(item!==canonicalItem(allGoals[editingId].item)||month!==allGoals[editingId].month)){showToast('共有項目の対象月・項目名は変更できません');return;}
+  if(!editingId&&shared&&findExistingGoal(month,item)){showToast('この月の共有項目は登録済みです。一覧から目標を編集してください');return;}
   const targetValue = document.getElementById('fTarget').value.trim();
   if (targetValue && parseNumber(targetValue) === 0) {
     showToast('目標値は0以外で入力してください');
@@ -3886,7 +3887,7 @@ window.saveGoal = async function() {
     detail: document.getElementById('fDetail').value.trim(),
     direction: document.getElementById('fDirection').value,
     currentValue: document.getElementById('fCurrent').value.trim(),
-    actualValue: document.getElementById('fActual').value.trim(),
+    actualValue: shared ? (allGoals[editingId]?.actualValue ?? '') : document.getElementById('fActual').value.trim(),
     owner: document.getElementById('fOwner').value.trim(),
     ownerStaffId: document.getElementById('fOwnerStaffId').value,
     note: document.getElementById('fNote').value.trim(),
@@ -3898,6 +3899,7 @@ window.saveGoal = async function() {
     updatedBy: currentUser.name
   };
 
+  if(shared&&editingId){data.currentValue=allGoals[editingId]?.currentValue??'';data.history=allGoals[editingId]?.history||[];}
   saving = true;
   document.getElementById('saveBtn').disabled = true;
   try {
@@ -3941,6 +3943,7 @@ window.saveGoal = async function() {
 
 window.deleteGoal = async function() {
   if (!isEditor() || !editingId) return;
+  if(Object.hasOwn(SHARED_ITEMS,canonicalItem(allGoals[editingId]?.item))){showToast('共有項目の実績変更・削除は月次入力から行ってください。半期目標は編集できます。');return;}
   if (!confirm('この目標を削除しますか？')) return;
   try {
     await remove(ref(db, `${DB_PATH}/${editingId}`));
@@ -4055,7 +4058,9 @@ function showToast(message) {
 
 window.render = render;
 
+configureMetricsNavigation(authenticatedProfile,pageLifecycle);
 init();
 </script>
 </body>
 </html>
+

@@ -529,7 +529,7 @@
           <span class="tool-icon">￥</span><span class="tool-name">貸付・借用</span>
         </a>
         <a class="tool-item" href="#" onclick="goToGoalApp();return false;" style="background:linear-gradient(135deg,#eef5ff,#dbeafe);border:2px solid #9fc5f8;">
-          <span class="tool-icon">◎</span><span class="tool-name">目標管理</span>
+          <span class="tool-icon">◎</span><span class="tool-name">目標・実績</span>
         </a>
         <a class="tool-item" href="#" onclick="goToScheduleApp();return false;" style="background:linear-gradient(135deg,#fff0f8,#ffe0f0);border:2px solid #ffb8d8;">
           <span class="tool-icon">🎉</span><span class="tool-name">日程調整</span>
@@ -570,7 +570,7 @@
           <span class="tool-icon">⚙️</span><span class="tool-name">シフト管理（管理者）</span>
         </a>
         <a class="tool-item" id="privateMetricsToolBtn" data-guest-hidden="true" href="#" onclick="goToPrivateMetricsApp();return false;" style="display:none;background:linear-gradient(135deg,#fff6f0,#ffe4d6);border:2px solid #ffb996;">
-          <span class="tool-icon">秘</span><span class="tool-name">非公開<br>経営数値</span>
+          <span class="tool-icon">秘</span><span class="tool-name">目標・実績<br>経営分析</span>
         </a>
         <a class="tool-item" id="laborManagementToolBtn" href="./labor-management.html" style="display:none"><span class="tool-icon">労</span><span class="tool-name">労務管理<br>入退社・利用登録</span></a>
         <a class="tool-item" id="memberManagementToolBtn" data-guest-hidden="true" href="./portal-members.html" style="display:none"><span class="tool-icon">人</span><span class="tool-name">ログイン<br>メンバー管理</span></a>
@@ -955,7 +955,7 @@ function goToTaskApp() {
 function goToGoalApp() {
   if (!currentUser) return;
   const params = new URLSearchParams({ sid: currentUser.staffId, name: currentUser.name });
-  window.location.href = `https://kalmia-dc.github.io/portal/goal-manager.html?${params}`;
+  window.location.href = `https://kalmia-dc.github.io/portal/goal-metrics.html?${params}#goals`;
 }
 
 function goToLoanApp() {
@@ -967,7 +967,7 @@ function goToLoanApp() {
 function goToPrivateMetricsApp() {
   if (!currentUser || !ADMIN_STAFF.includes(currentUser.staffId)) return;
   const params = new URLSearchParams({ sid: currentUser.staffId, name: currentUser.name });
-  window.location.href = `https://kalmia-dc.github.io/portal/private-metrics.html?${params}`;
+  window.location.href = `https://kalmia-dc.github.io/portal/goal-metrics.html?${params}#analysis`;
 }
 
 function goToScheduleApp(eventId) {
@@ -1935,3 +1935,4 @@ Object.assign(window, {
 </script>
 </body>
 </html>
+
