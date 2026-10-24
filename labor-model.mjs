@@ -40,7 +40,7 @@ export function validateEmployee(data) {
   if(data.basic.birthDate)jstStart(data.basic.birthDate);
   if(data.googleEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.googleEmail))throw Error('Googleメールアドレスを確認してください。');
   if(!['draft','confirmed','retiring','cancelled'].includes(data.status))throw Error('在籍状態を確認してください。');
-  if(data.status!=='draft'&&(!['DR','DH','DA'].includes(data.role)||!['full','part','spot'].includes(data.type)||!data.googleEmail||!data.periods?.[data.currentPeriod]))throw Error('確定済みの必須項目は空欄にできません。');
+  if(data.status!=='draft'&&(!['DR','DH','DA'].includes(data.role)||!['full','part','spot'].includes(data.type)||!data.periods?.[data.currentPeriod]))throw Error('確定済みの必須項目は空欄にできません。');
   for(const item of Object.values(data.tasks||{})){if(!text(item.title)||!PROGRESS.includes(item.status))throw Error('手続きの名称と状況を確認してください。');if(item.due)jstStart(item.due);}
   for(const item of Object.values(data.insurance||{}))if(!ENROLLMENTS.includes(item.enrollment)||!PROGRESS.includes(item.progress))throw Error('保険の状況を確認してください。');
   for(const doc of Object.values(data.documents||{}))retention(doc);
@@ -51,7 +51,7 @@ export function transition(employee, action, input={}, now=Date.now()) {
   if(action==='confirm'||action==='rehire') {
     if(action==='confirm'&&data.status!=='draft')throw Error('入社は確定済みです。');
     if(action==='rehire'&&!['retiring','cancelled'].includes(data.status))throw Error('再入社の対象ではありません。');
-    if(!['DR','DH','DA'].includes(data.role)||!['full','part','spot'].includes(data.type)||!data.googleEmail)throw Error('職種・雇用形態・Googleメールを入力してください。');
+    if(!['DR','DH','DA'].includes(data.role)||!['full','part','spot'].includes(data.type))throw Error('職種・雇用形態を入力してください。');
     const p=period(input,key(input.id));
     if(Object.values(data.periods).some(old=>!old.cancelled&&p.startAt<old.endAt&&p.endAt>old.startAt))throw Error('以前の在籍期間と重複しています。');
     data.periods[p.id]=p;data.currentPeriod=p.id;data.status=p.endDate?'retiring':'confirmed';

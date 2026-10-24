@@ -1,4 +1,4 @@
-import {draftEmployee,recordUpdate,lifecycleProjection,removeReviewedShifts,key,text,canonical} from './labor-model.mjs';
+import {draftEmployee,recordUpdate,lifecycleProjection,removeReviewedShifts,key,text,canonical} from './labor-model.mjs?v=20261024-retirement';
 import {approvalUpdates} from './portal-join-model.mjs';
 import {joinNameKey} from './portal-join-model.mjs';
 import {lifecycleProtection} from './portal-lifecycle-model.mjs';
@@ -25,7 +25,7 @@ export function createLaborStore(port, actor, defaults=[]) {
       const oldLife=await read('staffLifecycle/'+data.staffId);
       updates['staffLifecycle/'+data.staffId]=lifecycleProjection(data,oldLife,operationId,actor,timestamp);
       const oldRoster=all.find(s=>s.id===data.staffId)||{};
-      updates['extra_staff/'+data.staffId]={id:data.staffId,name:data.basic.name,role:data.role,type:data.type,...(oldRoster.satFixed?{satFixed:true}:{}),...(oldRoster.uketsuke?{uketsuke:true}:{})};
+      updates['extra_staff/'+data.staffId]={id:data.staffId,name:data.basic.name,role:data.role,type:data.type,schedulePeriods:Object.values(data.periods).filter(p=>!p.cancelled).map(p=>({start:p.startDate,end:p.endDate||'9999-12-31'})),...(oldRoster.satFixed?{satFixed:true}:{}),...(oldRoster.uketsuke?{uketsuke:true}:{})};
       updates['laborNameClaims/'+joinNameKey(data.basic.name)]=data.staffId;
     }
     if(file){
@@ -47,6 +47,7 @@ export function createLaborStore(port, actor, defaults=[]) {
   async function matchAccount(data, request) {
     await authorize();const stored=hydrate(await read('laborRecords/'+data.staffId));
     if(!stored||stored.data.status==='draft'||stored.data.status==='cancelled')throw Error('入社確定後に照合してください。');
+    if(!text(stored.data.googleEmail))throw Error('ポータルアカウントなしの職員です。紐付ける場合は本人のGoogleメールを先に登録してください。');
     if(text(request.email).toLowerCase()!==text(stored.data.googleEmail).toLowerCase())throw Error('Googleメールが一致しません。');
     const current=await read('portalJoinRequests/'+request.uid),member=await read('portalAccess/users/'+request.uid),all=await roster();
     const users=await read('portalAccess/users')||{};

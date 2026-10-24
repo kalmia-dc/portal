@@ -14,7 +14,9 @@ export function buildBusinessRoster({defaults=defaultStaff,extra={},lifecycle={}
     const skillRole=role==='DA' ? ((value.uketsuke===true || (value.uketsuke!==false && ['tamiya','tanaka'].includes(id)))?'DA受付':'DA助手') : role;
     const hasWindow=(Number.isFinite(record?.startAt) && Number.isFinite(record?.endAt)) || (Number.isFinite(record?.previousStartAt) && Number.isFinite(record?.previousEndAt));
     const known=record && (record.state==='stopped' || (record.hrManaged===true ? hasWindow : record.state==='active'));
-    byId.set(id,{id,name,role,skillRole,availability:known ? (isLifecycleStopped(record,now)?'stopped':'active') : 'unknown'});
+    const windows=record?.state==='stopped' ? [] : record?.hrManaged===true ? Object.values(record.periods||{}).filter(p=>!p.cancelled).map(p=>({start:p.startDate,end:p.endDate||'9999-12-31'})) : value.schedulePeriods;
+    const schedulePeriods=Array.isArray(windows)?windows.filter(p=>/^\d{4}-\d{2}-\d{2}$/.test(p?.start)&&/^\d{4}-\d{2}-\d{2}$/.test(p?.end)).map(p=>({start:p.start,end:p.end})):undefined;
+    byId.set(id,{id,name,role,skillRole,...(schedulePeriods?{schedulePeriods}:{}),availability:known ? (isLifecycleStopped(record,now)?'stopped':'active') : 'unknown'});
   };
   defaults.forEach(s=>add(s.id,s));
   // The database key is authoritative. A conflicting embedded id never rekeys a person.
