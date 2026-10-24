@@ -27,3 +27,5 @@ test('live candidate changes exactly one write expression and preserves every ot
  const old=a.rules.staffLifecycle.$staffId['.write'],next=b.rules.staffLifecycle.$staffId['.write'];assert.ok(next.startsWith('('+old+') || ('));assert.match(next,/\$staffId === 'test'/);
  b.rules.staffLifecycle.$staffId['.write']=old;assert.deepEqual(b,a);
 });
+
+test('management reads only explicitly permitted config leaves, never the denied parent',async()=>{const d=db('owner');await assertFails(get(ref(d,'laborConfig')));for(const path of ['extra_staff/test','portalAccess/users','attendance/cards','staffLifecycle/test','laborConfig/enabled','laborConfig/owners/owner','laborConfig/protectedStaff/test'])await get(ref(d,path));});
