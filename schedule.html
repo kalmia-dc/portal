@@ -162,6 +162,18 @@ const db = getDatabase(app);
 const rosterPage = createPageLifecycle();
 const authenticatedProfile = await startPortalAuth(app, { pageName:'日程調整' });
 rosterPage.assertActive();
+// Explicit admin entry: fresh reads without automatic notifications or answers.
+const managementMode = new URLSearchParams(location.search).get('manage') === '1';
+if (managementMode && authenticatedProfile.isAdmin !== true) {
+  document.getElementById('main').textContent = '管理確認モードは管理者のみ利用できます。';
+  throw new Error('Administrator required for schedule management mode');
+}
+if (managementMode) {
+  const notice = document.createElement('p');
+  notice.setAttribute('role', 'status');
+  notice.textContent = '管理確認モード：通知・未回答の自動処理は実行しません。最新情報の確認は再読み込みしてください。';
+  document.getElementById('main').before(notice);
+}
 const businessRoster = await loadBusinessRoster({read:path=>get(ref(db,path)).then(s=>s.val()),profile:authenticatedProfile});
 rosterPage.assertActive();
 if(businessRoster.issues.length) {
@@ -1124,7 +1136,6 @@ window.openEditEvent = () => {
   state.calMonth = now.getMonth() + 1;
   state.view = 'editEvent';
   render();
-  attachEditEventHandlers();
 };
 
 function renderEditEventForm() {
@@ -1279,11 +1290,11 @@ window.doDeleteEvent = async () => {
         if (!rosterPage.active) return;
 
         // 期限切れ未回答を自動で×に
-        if (!isGuestUser()) await autoFillExpired(staff.id);
+        if (!managementMode && !isGuestUser()) await autoFillExpired(staff.id);
         if (!rosterPage.active) return;
 
         // 回答期限前日通知チェック
-        if (!isGuestUser()) checkScheduleDeadlines();
+        if (!managementMode && !isGuestUser()) checkScheduleDeadlines();
 
         // 特定イベントへの直接遷移
         const evid = params.get('evid');
