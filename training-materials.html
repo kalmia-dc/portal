@@ -34,7 +34,7 @@ header{height:58px;background:var(--white);display:flex;align-items:center;justi
 .eyebrow{font-family:'Nunito',sans-serif;font-weight:800;font-size:12px;letter-spacing:.08em;opacity:.82;margin-bottom:4px}
 h1{font-size:24px;line-height:1.25;margin:0 0 8px;font-weight:900}
 .lead{margin:0;font-size:13px;line-height:1.7;opacity:.9}
-.auth-panel{background:var(--white);border-radius:16px;padding:16px;box-shadow:var(--shadow);min-width:0;max-width:100%}
+.portal-guide,.auth-panel{background:var(--white);border-radius:16px;padding:16px;box-shadow:var(--shadow);min-width:0;max-width:100%}
 body.is-admin .auth-panel{display:none}
 body.is-editing-material .auth-panel{display:none}
 .auth-grid{display:grid;grid-template-columns:150px minmax(0,1fr) auto;gap:10px;align-items:end}
@@ -154,6 +154,11 @@ body.viewer-open{overflow:hidden}
       <p class="lead">文章、PDF、画像、動画、リンクをまとめて保管し、必要な手順をすぐ確認できます。</p>
     </div>
 
+    <section class="portal-guide" aria-label="ポータルの使い方">
+      <div class="panel-head"><div class="panel-title">ポータルの使い方</div></div>
+      <p>スマホのホーム画面にポータルを登録する方法を、iPhoneのChrome、iPhoneのSafari、AndroidのChromeの順にまとめています。</p>
+      <a class="btn secondary" href="./assets/kalmia-portal-home-screen-guide.pdf" target="_blank" rel="noopener">ホーム画面への登録方法（PDF）を開く</a>
+    </section>
     <section class="auth-panel" id="authPanel" aria-label="ログインと編集権限">
       <div class="panel-head">
         <div class="panel-title">Googleログインと編集権限</div>

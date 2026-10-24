@@ -1,4 +1,13 @@
 [
+{
+  "id": "2026-10-24-home-screen-guide",
+  "type": "new",
+  "audience": "all",
+  "text": "スマホのホーム画面からポータルを開くための登録方法をPDFにまとめました。iPhoneのChrome、iPhoneのSafari、AndroidのChromeの順にご案内しています。PDFは「マニュアル」の「ポータルの使い方」からいつでも開けます。",
+  "createdAt": "2026-10-24T02:18:23.8871649+00:00",
+  "linkUrl": "./assets/kalmia-portal-home-screen-guide.pdf",
+  "linkLabel": "ホーム画面への登録方法（PDF）を開く"
+},
   {
     "id": "2026-10-21-support-chat-release",
     "type": "new",
