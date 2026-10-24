@@ -21,15 +21,15 @@ test('retirement writes only scoped HR, roster and history; does not grant accou
  assert.deepEqual(patch['extra_staff/fixture'].schedulePeriods,[{start:'2025-07-01',end:'2026-08-31'}]);
  await assert.rejects(store.matchAccount(retired(),{email:''}),/アカウントなし/);
 });
-test('admin and ordinary roster omit retired staff in future and retain past answers and shared slots',()=>{
+test('admin and ordinary roster omit retired staff in future and retain past answers while excluding usage slots from future events',()=>{
  const defaults=[{id:'fixture',name:'架空職員',role:'DR'},{id:'test',name:'test',role:'DH'},{id:'hanowa',name:'ハノワ',role:'DH'}];
  const extra={fixture:{...defaults[0],schedulePeriods:[{start:'2025-07-01',end:'2026-08-31'}]}};
  const life=lifecycleProjection(retired(),null,'op',{uid:'owner'},now);
  for(const lifecycle of [{},{fixture:life}]){
   const roster=buildBusinessRoster({defaults,extra,lifecycle,now});
   const event={dates:['2026-11-08'],responses:{fixture:{'2026-11-08':'o'}}},before=JSON.stringify(event);
-  assert.deepEqual(scheduleMembers(roster,event,now).map(s=>s.id),['test','hanowa']);
-  assert.deepEqual(scheduleMembers(roster,{...event,members:['fixture','test','hanowa']},now).map(s=>s.id),['test','hanowa']);
+  assert.deepEqual(scheduleMembers(roster,event,now).map(s=>s.id),[]);
+  assert.deepEqual(scheduleMembers(roster,{...event,members:['fixture','test','hanowa']},now).map(s=>s.id),[]);
   assert.equal(JSON.stringify(event),before);
   assert.equal(scheduleMembers(roster,{dates:['2026-08-01']},now).length,3);
  }

@@ -9,7 +9,7 @@ const c=vm.createContext({console,structuredClone,Date,Math,Set,Object,Array,Str
  alert(){},confirm:s=>{confirmation=s;return answer},setTimeout(){},fetch:async()=>({ok:true,json:async()=>JSON.parse(fs.readFileSync('portal-holidays.json'))}),
  window:{addEventListener(){}},document:{getElementById:field,querySelectorAll:()=>[],createElement:node,body:node()},localStorage:{getItem:()=>null},location:{search:'',hash:''}});
 const run=s=>vm.runInContext(s,c);
-for(const file of ['portal-statistics.js','clinic-leave.js','shift-role-balance.js','shift-entry.js','shift-staff-month.js','shift-member-access.js','shift-staff-order.js'])run(fs.readFileSync(file,'utf8'));
+for(const file of ['portal-staff-usage.js','portal-statistics.js','clinic-leave.js','shift-role-balance.js','shift-entry.js','shift-staff-month.js','shift-member-access.js','shift-staff-order.js'])run(fs.readFileSync(file,'utf8'));
 run([...html.matchAll(/<script([^>]*)>([\s\S]*?)<\/script>/g)].find(([,a,s])=>!a&&s.includes('const SHIFT'))[2]);
 await run('window.__holidayDataReady');
 run("var confirmationResult=requestShiftEntryConfirmation('対象確認')");

@@ -267,7 +267,8 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/fireba
 import { getDatabase, ref, push, set, update, onValue as firebaseOnValue, get, query, orderByChild, equalTo }
   from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 import {createPageLifecycle} from './portal-page-lifecycle.mjs';
-import {loadBusinessRoster} from './portal-business-roster.mjs?v=20261019-director';
+import {canUseStaff,canAssignStaff} from './portal-staff-usage.mjs?v=20261024-usage';
+import {loadBusinessRoster} from './portal-business-roster.mjs?v=20261024-usage';
 import { startPortalAuth } from './portal-auth.js?v=labor-20261014-2';
 
 const firebaseConfig = {
@@ -454,7 +455,7 @@ function renderStaffOptions() {
   const priorSelection = loanStaff?.value || '';
   const previousFilter = staffFilter?.value || '';
   const editing = loans.find(loan => loan.id === editingId);
-  const candidates = businessRoster.members.filter(member => member.id !== 'guest' && member.availability !== 'stopped');
+  const candidates = businessRoster.members.filter(member => canUseStaff(member.id) && member.id !== 'guest' && member.availability !== 'stopped');
   if (editing?.staffId && !candidates.some(member => member.id === editing.staffId)) candidates.push({id:editing.staffId,label:personName(editing.staffName,editing.staffId)});
   const staffEntries = candidates.map(member => [member.id,member.label || member.name]);
   const historical = new Map(businessRoster.members.map(member => [member.id,member.label]));
@@ -523,7 +524,7 @@ async function saveLoan(event) {
   const staffId = document.getElementById('loanStaff').value;
   if (!businessRoster.complete && (!editingId || staffId !== loans.find(loan => loan.id === editingId)?.staffId)) return setFormStatus('職員名簿を再読み込みしてください', 'err');
   const originalLoan = loans.find(loan => loan.id === editingId);
-  if (staffId !== originalLoan?.staffId && !businessRoster.members.some(member => member.id === staffId && member.availability !== 'stopped')) return setFormStatus('対象職員を確認してください', 'err');
+  if (staffId !== originalLoan?.staffId && !businessRoster.members.some(member => canUseStaff(member.id) && member.id === staffId && member.availability !== 'stopped')) return setFormStatus('対象職員を確認してください', 'err');
   const category = document.getElementById('loanCategory').value;
   const amount = Number(document.getElementById('loanAmount').value || 0);
   const originDate = document.getElementById('originDate').value;

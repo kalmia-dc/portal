@@ -1683,7 +1683,8 @@ import { getDatabase, ref, push as firebasePush, set as firebaseSet, remove as f
 import { startPortalAuth } from './portal-auth.js?v=labor-20261014-2';
 
 import { createPageLifecycle } from './portal-page-lifecycle.mjs';
-import { loadBusinessRoster } from './portal-business-roster.mjs?v=20261019-director';
+import {canUseStaff,canAssignStaff} from './portal-staff-usage.mjs?v=20261024-usage';
+import { loadBusinessRoster } from './portal-business-roster.mjs?v=20261024-usage';
 const pageLifecycle = createPageLifecycle();
 const activeCall = fn => async (...args) => { pageLifecycle.assertActive(); const value=await fn(...args); pageLifecycle.assertActive(); return value; };
 const get=activeCall(firebaseGet), set=activeCall(firebaseSet), push=activeCall(firebasePush), remove=activeCall(firebaseRemove);
@@ -3543,7 +3544,8 @@ window.saveImportCandidates = async function() {
           updatedAt: Date.now(),
           updatedBy: currentUser.name
         };
-        delete data.id;
+        if(!canAssignStaff(data.ownerStaffId,existing ? [existing.ownerStaffId] : []))throw Error('勤怠・シフト専用枠は新しい担当者に指定できません');
+  delete data.id;
         delete data.targetValue;
         if (existing) {
           await set(ref(db, `${DB_PATH}/${existing.id}`), data);
@@ -3632,6 +3634,7 @@ async function saveHalfYearTarget(periodMonth, item, unit, targetValue, defaults
     updatedAt: Date.now(),
     updatedBy: currentUser.name
   };
+  if(!canAssignStaff(data.ownerStaffId,existing ? [existing.ownerStaffId] : []))throw Error('勤怠・シフト専用枠は新しい担当者に指定できません');
   delete data.id;
   if (existing?.id) {
     await set(ref(db, `${TARGET_DB_PATH}/${existing.id}`), data);
@@ -3738,7 +3741,8 @@ window.saveQuickGoalInput = async function() {
         updatedAt: Date.now(),
         updatedBy: currentUser.name
       };
-      delete data.id;
+      if(!canAssignStaff(data.ownerStaffId,row ? [row.ownerStaffId] : []))throw Error('勤怠・シフト専用枠は新しい担当者に指定できません');
+  delete data.id;
       delete data.targetValue;
       if (row?.id) {
         await set(ref(db, `${DB_PATH}/${row.id}`), data);
@@ -3803,8 +3807,8 @@ window.openGoalModal = function(id = null, defaults = {}) {
   setFormValue('fOwner', goal?.owner || defaults.owner || currentUser.name);
   const ownerSelect=document.getElementById('fOwnerStaffId'); ownerSelect.replaceChildren(new Option('未紐付け・自由記入',''));
   const savedId=goal?.ownerStaffId || defaults.ownerStaffId || (!goal && !defaults.owner ? currentUser.staffId : '');
-  for(const member of businessRoster.members.filter(m => m.availability !== 'stopped' || m.id===savedId)) ownerSelect.add(new Option(member.label,member.id));
-  if(savedId && ![...ownerSelect.options].some(o => o.value===savedId)) ownerSelect.add(new Option(personName(goal?.owner || defaults.owner,savedId)+'（履歴）',savedId));
+  for(const member of businessRoster.members.filter(m => canUseStaff(m.id) && m.availability !== 'stopped' || (goal && m.id===savedId))) ownerSelect.add(new Option(member.label,member.id));
+  if(goal && savedId && ![...ownerSelect.options].some(o => o.value===savedId)) ownerSelect.add(new Option(personName(goal?.owner || defaults.owner,savedId)+'（履歴）',savedId));
   ownerSelect.value=savedId;
   ownerSelect.onchange=() => {const member=businessRoster.members.find(m=>m.id===ownerSelect.value);if(member)setFormValue('fOwner',member.name);};
   document.getElementById('fOwner').oninput=()=>{ownerSelect.value='';};
@@ -3899,6 +3903,7 @@ window.saveGoal = async function() {
     updatedBy: currentUser.name
   };
 
+  if(!canAssignStaff(data.ownerStaffId,editingId ? [allGoals[editingId]?.ownerStaffId] : [])){showToast('勤怠・シフト専用枠は新しい担当者に指定できません');return;}
   if(shared&&editingId){data.currentValue=allGoals[editingId]?.currentValue??'';data.history=allGoals[editingId]?.history||[];}
   saving = true;
   document.getElementById('saveBtn').disabled = true;

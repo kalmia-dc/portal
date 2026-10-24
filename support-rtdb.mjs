@@ -1,3 +1,4 @@
+import {canUseStaff,canAssignStaff} from './portal-staff-usage.mjs?v=20261024-usage';
 import {changeThread,projectThread} from './support-model.mjs';
 // Atomic Firebase REST multipath PATCH + rules revision check is the CAS boundary.
 // No offline write queue,
@@ -24,6 +25,7 @@ export function createRtdbTransport({databaseURL,user,profile,fetcher=fetch,isAc
   if(path==='threads'&&!p){const query=actor.role==='admin'?{}:{orderBy:'meta/ownerUid',equalTo:actor.uid};const r=await call('',{query});return Object.entries(r.value||{}).map(([id,t])=>projectThread(id,t)).sort((a,b)=>b.updatedAt-a.updatedAt);}
   const match=path.match(/^threads\/([a-zA-Z0-9-]{8,80})$/);
   const creating=path==='threads'&&p?.kind==='create';
+  if(creating&&!canUseStaff(profile.staffId))throw Error('この枠は勤怠・シフト専用です。新しい相談には使用できません。');
   if(!creating&&!match)throw Error('操作先が不正です。');
   const id=creating?p.requestId:match[1];
   if(!/^[a-zA-Z0-9-]{8,80}$/.test(id))throw Error('相談IDが不正です。');

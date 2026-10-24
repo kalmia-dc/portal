@@ -952,7 +952,8 @@ import { getDatabase, ref, push as firebasePush, set as firebaseSet, remove as f
 import { startPortalAuth } from './portal-auth.js?v=labor-20261014-2';
 
 import { createPageLifecycle } from './portal-page-lifecycle.mjs';
-import { loadBusinessRoster } from './portal-business-roster.mjs?v=20261019-director';
+import {canUseStaff,canAssignStaff} from './portal-staff-usage.mjs?v=20261024-usage';
+import { loadBusinessRoster } from './portal-business-roster.mjs?v=20261024-usage';
 const pageLifecycle = createPageLifecycle();
 const activeCall = fn => async (...args) => { pageLifecycle.assertActive(); const value=await fn(...args); pageLifecycle.assertActive(); return value; };
 const fetch=activeCall(globalThis.fetch.bind(globalThis));
@@ -984,7 +985,7 @@ let gsiReady     = false;
 
 // ===== STAFF =====
 const STAFF = {};
-for (const member of businessRoster.members.filter(m => m.availability !== 'stopped')) (STAFF[member.role] ||= []).push(member.name);
+for (const member of businessRoster.members.filter(m => canUseStaff(m.id) && m.availability !== 'stopped')) (STAFF[member.role] ||= []).push(member.name);
 const ROLE_OF = {};
 Object.entries(STAFF).forEach(([role, names]) => names.forEach(n => ROLE_OF[n] = role));
 
@@ -1659,7 +1660,7 @@ function taskAssigneeRows(task = {}) {
 }
 function buildAssigneeGrid(task = {}) {
   const selected = taskAssigneeRows(task);
-  const rows = businessRoster.members.filter(m => m.availability !== 'stopped').map(m => ({staffId:m.id,name:m.name,label:m.label}));
+  const rows = businessRoster.members.filter(m => canUseStaff(m.id) && m.availability !== 'stopped').map(m => ({staffId:m.id,name:m.name,label:m.label}));
   for (const saved of selected) {
     const index = saved.staffId ? rows.findIndex(r => r.staffId === saved.staffId) : -1;
     if (index >= 0) rows[index] = {...rows[index], name:saved.name}; // preserve historical snapshot
@@ -2042,6 +2043,7 @@ async function saveTask() {
   const recurrence = normalizeRecurrence(document.getElementById('fRecurrence').value);
   if (recurrence !== 'none' && !dateVal) { showToast('繰り返しタスクには期限が必要です'); return; }
   const assigneeRefs = [...document.querySelectorAll('.assignee-checkbox:checked')].map(cb => ({staffId:cb.dataset.staffId || '', name:cb.value}));
+  if(assigneeRefs.some(r=>!canAssignStaff(r.staffId,taskAssigneeRows(tasks[editingId]||{}).map(x=>x.staffId)))) {showToast('勤怠・シフト専用枠は新しい担当者に指定できません');return;}
   const assignees = assigneeRefs.map(r => r.name);
   if (!assignees.length) { showToast('担当者を1人以上選択してください'); return; }
   const newStatus = document.querySelector('input[name="status"]:checked').value;

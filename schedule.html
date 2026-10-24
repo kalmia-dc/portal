@@ -139,11 +139,11 @@
 
 <!-- Firebase -->
 <script type="module">
-import {eligibleForSchedule,scheduleMembers} from './schedule-members.mjs';
+import {eligibleForSchedule,scheduleMembers} from './schedule-members.mjs?v=20261024-usage';
 import {personName} from "./portal-person-display.mjs?v=20261019-director";
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getDatabase, ref, get, set, update, remove } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
-import {loadBusinessRoster} from './portal-business-roster.mjs?v=20261024-retirement';
+import {loadBusinessRoster} from './portal-business-roster.mjs?v=20261024-usage';
 import {createPageLifecycle} from './portal-page-lifecycle.mjs';
 import { startPortalAuth } from "./portal-auth.js?v=labor-20261014-2";
 

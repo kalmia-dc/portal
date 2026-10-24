@@ -1,8 +1,10 @@
+import {canUseStaff,canAssignStaff} from './portal-staff-usage.mjs?v=20261024-usage';
 // Scheduling dates only; no HR details or account permissions are exposed.
 export const scheduleToday=(now=Date.now())=>new Date(now+9*3600000).toISOString().slice(0,10);
 export function eligibleForSchedule(staff,dates=[],now=Date.now()) {
   const today=scheduleToday(now),future=dates.filter(d=>d>=today);
   if(dates.length && !future.length)return true; // Preserve historical rosters and answers.
+  if(!canUseStaff(staff.id))return false;
   if(Array.isArray(staff.schedulePeriods))return (future.length?future:[today]).some(d=>staff.schedulePeriods.some(p=>p.start<=d&&d<=p.end));
   return staff.availability!=='stopped'; // Legacy/unknown entries (including shared slots) stay unchanged.
 }

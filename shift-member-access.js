@@ -2,6 +2,7 @@ let shiftMembers={},shiftMembersLoaded=false,shiftMembersVersion=0;
 let shiftLifecycle={},shiftLifecycleLoaded=false;
 function laborShiftPeriod(sid,date){const life=shiftLifecycle[sid];if(!life?.hrManaged)return null;return Object.entries(life.periods||{}).find(([,p])=>!p.cancelled&&p.startDate<=date&&date<=p.endDate)?.[0]||null;}
 function staffAccessIssue(sid,users=shiftMembers,date=null){
+  if(!globalThis.PortalStaffUsage.canUseStaff(sid,'shift'))return '打刻テスト専用枠です。シフトの新規登録・編集・復元はできません。履歴は保持されています。';
   if(shiftLifecycle[sid]?.hrManaged){if(date)return laborShiftPeriod(sid,date)?'':'勤務日が在籍期間外です。';const month=typeof currentYear!=='undefined'?String(currentYear)+'-'+String(currentMonth+1).padStart(2,'0'):'';return Object.values(shiftLifecycle[sid].periods||{}).some(p=>!p.cancelled&&(!month||p.startDate<=month+'-31'&&p.endDate>=month+'-01'))?'':'表示月に在籍期間がありません。';}
   if(shiftLifecycle[sid]?.state==='stopped')return '退職・利用停止中のスタッフです。履歴は保持されています。';
   // Explicit staff-level restoration does not reactivate individually revoked logins.
@@ -63,7 +64,7 @@ function restoreRevokedShiftData(snapshot){
 // Display preference is local to this open page; data, totals and saved order are unchanged.
 let showRevokedShiftStaff=false;
 function visibleShiftStaff(){
-  return orderedShiftStaff().filter(s=>!shiftMembersLoaded||showRevokedShiftStaff||!staffAccessIssue(s.id));
+  return orderedShiftStaff().filter(s=>showRevokedShiftStaff||(globalThis.PortalStaffUsage.canUseStaff(s.id,'shift')&&(!shiftMembersLoaded||!staffAccessIssue(s.id))));
 }
 function setShowRevokedShiftStaff(value){showRevokedShiftStaff=value===true;render();}
 function renderShiftStaffVisibility(){

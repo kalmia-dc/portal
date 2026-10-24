@@ -1,3 +1,4 @@
+import {canUseStaff,canAssignStaff} from './portal-staff-usage.mjs?v=20261024-usage';
 import {personName} from './portal-person-display.mjs?v=20261019-director';
 import {defaultStaff} from './portal-default-staff.mjs';
 import {isLifecycleStopped} from './portal-lifecycle-model.mjs';
@@ -16,7 +17,7 @@ export function buildBusinessRoster({defaults=defaultStaff,extra={},lifecycle={}
     const known=record && (record.state==='stopped' || (record.hrManaged===true ? hasWindow : record.state==='active'));
     const windows=record?.state==='stopped' ? [] : record?.hrManaged===true ? Object.values(record.periods||{}).filter(p=>!p.cancelled).map(p=>({start:p.startDate,end:p.endDate||'9999-12-31'})) : value.schedulePeriods;
     const schedulePeriods=Array.isArray(windows)?windows.filter(p=>/^\d{4}-\d{2}-\d{2}$/.test(p?.start)&&/^\d{4}-\d{2}-\d{2}$/.test(p?.end)).map(p=>({start:p.start,end:p.end})):undefined;
-    byId.set(id,{id,name,role,skillRole,...(schedulePeriods?{schedulePeriods}:{}),availability:known ? (isLifecycleStopped(record,now)?'stopped':'active') : 'unknown'});
+    byId.set(id,{id,name,role,skillRole,businessEligible:canUseStaff(id),...(schedulePeriods?{schedulePeriods}:{}),availability:known ? (isLifecycleStopped(record,now)?'stopped':'active') : 'unknown'});
   };
   defaults.forEach(s=>add(s.id,s));
   // The database key is authoritative. A conflicting embedded id never rekeys a person.

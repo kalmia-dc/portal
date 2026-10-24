@@ -900,6 +900,7 @@
 </style>
 <link rel="stylesheet" href="./portal-common.css?v=20261005">
 <script defer src="./portal-common.js?v=20261005"></script>
+<script src="./portal-staff-usage.js?v=20261024-usage"></script>
 <script src="./portal-statistics.js?v=20261021"></script>
 </head>
 <!-- Firebase SDK -->
@@ -1476,7 +1477,7 @@
 <script src="shift-role-balance.js?v=20261021-statistics"></script>
 <script src="shift-entry.js?v=20261009-visibility"></script>
 <script src="shift-staff-month.js?v=20261009"></script>
-<script src="shift-member-access.js?v=20261009-visibility"></script>
+<script src="shift-member-access.js?v=20261024-usage"></script>
 <script src="shift-staff-order.js?v=20261009"></script>
 <script>
 // ──────────────────────────────────────────────
@@ -1763,7 +1764,7 @@ const MOMO_MAX_CONSECUTIVE_DAYS = 5;
 const AUTO_PROTECTED_STAFF_IDS = ['tamiya','yamada'];
 
 function isAutoProtectedStaff(id){
-  return AUTO_PROTECTED_STAFF_IDS.includes(id)||isFlexibleAttendance(id)||(shiftMembersLoaded&&!!staffAccessIssue(id));
+  return !globalThis.PortalStaffUsage.canUseStaff(id,'shift')||AUTO_PROTECTED_STAFF_IDS.includes(id)||isFlexibleAttendance(id)||(shiftMembersLoaded&&!!staffAccessIssue(id));
 }
 function isFixedOffDay(id, ds){
   if(id!=='momo') return false;

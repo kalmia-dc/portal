@@ -1,3 +1,4 @@
+import {canUseStaff,canAssignStaff} from './portal-staff-usage.mjs?v=20261024-usage';
 import {personName} from './portal-person-display.mjs?v=20261021-director';
 import {OPTIONS,IMPACT,SOURCE,newReport,normalizeReport,classification,reportText,toHTML,parseHTML,fromLegacy,escapeHtml as esc,monthKey} from './incident-report-core.mjs?v=semantic-title-20261019';
 import {createIncidentStore,decodeRecord} from './incident-report-store.mjs?v=semantic-title-20261019';
@@ -22,7 +23,7 @@ export function importerLabel(report, importedBy, roster=[]){
 
 export function matchImportedReporter(value,roster,user,manager){
   const name=String(value.reporterName||'').trim();
-  const eligible=roster.filter(p=>p.availability!=='stopped'&&(manager||p.id===user.staffId));
+  const eligible=roster.filter(p=>canUseStaff(p.id)&&p.availability!=='stopped'&&(manager||p.id===user.staffId));
   const matches=eligible.filter(p=>p.id==='sugihira'?['院長','杉平'].includes(name):[p.name,p.label].includes(name));
   return {...value,reporterId:matches.length===1?matches[0].id:'',reporterName:matches.length===1&&matches[0].id==='sugihira'?'院長':name};
 }
@@ -84,7 +85,7 @@ export function mountIncidentReports(root,ctx){
     if(!editing||!draft){q('#iv-editor').innerHTML='';return;}
     const titles=['基本情報','起きたこと・影響','背景・防げた理由','対応・申し送り','全体確認'];
     let content='';
-    if(step===0){const choices=Object.fromEntries(roster.filter(p=>p.availability!=='stopped'&&(manager||p.id===user.staffId)).map(p=>[p.id,p.id==='sugihira'?'院長':p.label||p.name]));content=select('reporterId','報告者',{'':'選択してください',...choices})+(!draft.reporterId&&draft.reporterName?`<p class="iv-error">取り込み元の報告者：${esc(draft.reporterName)}。名簿と一意に一致しないため、報告者を確認して選択してください。</p>`:'')+input('ghostwriter','代筆者（代筆時のみ）')+input('occurredDate','発生日（不明なら空欄）','date')+input('occurredTime','発生時刻（不明なら空欄）','time')+select('place','場所',Object.fromEntries(['',...OPTIONS.place].map(x=>[x,x||'選択してください'])))+input('work','作業内容（必要な場合）')+select('phase','場面',Object.fromEntries(['',...OPTIONS.phase].map(x=>[x,x||'未確認'])));}
+    if(step===0){const choices=Object.fromEntries(roster.filter(p=>canUseStaff(p.id)&&p.availability!=='stopped'&&(manager||p.id===user.staffId)).map(p=>[p.id,p.id==='sugihira'?'院長':p.label||p.name]));content=select('reporterId','報告者',{'':'選択してください',...choices})+(!draft.reporterId&&draft.reporterName?`<p class="iv-error">取り込み元の報告者：${esc(draft.reporterName)}。名簿と一意に一致しないため、報告者を確認して選択してください。</p>`:'')+input('ghostwriter','代筆者（代筆時のみ）')+input('occurredDate','発生日（不明なら空欄）','date')+input('occurredTime','発生時刻（不明なら空欄）','time')+select('place','場所',Object.fromEntries(['',...OPTIONS.place].map(x=>[x,x||'選択してください'])))+input('work','作業内容（必要な場合）')+select('phase','場面',Object.fromEntries(['',...OPTIONS.phase].map(x=>[x,x||'未確認'])));}
     if(step===1)content=input('title','タイトル（何が起きたかを短く・100文字以内）')+checks('domains','事象の分野（複数可）')+area('details','何が起きたか（必須）',true)+select('impact','患者への実際の影響',IMPACT)+`<p>分類候補：${esc(classification(draft))}。院長・主任の確認前は仮分類です。<a href="${SOURCE}" target="_blank" rel="noopener">分類基準</a></p>`+checks('actual','業務・職員への実際の影響')+checks('potential','起こり得た被害（実際の結果とは別）')+`<details><summary>必要な医療情報を補足（個人特定情報を除く）</summary>${area('patientContext','患者の年齢層・状態など、事例に必要な情報')}${input('materials','器具・薬剤名')}</details>`;
     if(step===2)content=checks('factors','背景・要因（原因と確定したものではありません）')+checks('prevention','被害の防止・拡大防止につながった点')+`<details><summary>必要な場合だけ補足</summary>${input('roles','関係者の人数・役割')}${area('timeline','発見・対応の時系列')}${area('supplement','その他の補足')}</details>`;
     if(step===3)content=checks('response','その場で行った対応')+select('sharing','共有状況',{'':'未確認','共有済み':'共有済み','未共有':'未共有','確認中':'確認中'})+area('handoff','ミーティングへの申し送り（必要な場合）')+'<p>今後の対策の提案は、実施済みの対応と区別して記載してください。対策・進捗は既存のお知らせ／取り組みで管理します。</p>';
@@ -94,7 +95,7 @@ export function mountIncidentReports(root,ctx){
   function setEditor(value,record=null,old=null){cancelTimer();const key=old?'legacy/'+old.id:'v2/'+value.reportId;draft={...value,title:titles[key]?.text||value.title||''};previous=record;legacy=old;step=0;editing=true;draftRevision=0;dirty=false;foreignDraftSaved=false;imported=false;editor();q('#iv-editor').scrollIntoView({block:'start',behavior:'smooth'});}
   async function saveDraft(){
     if(previous||legacy||!draft||foreignDraftSaved)return;
-    readEditor();const snapshot=normalizeReport(draft);if(!snapshot.reporterId)throw new Error('下書きの報告者を選んでください');
+    readEditor();const snapshot=normalizeReport(draft);if(!snapshot.reporterId)throw new Error('下書きの報告者を選んでください');if(!canUseStaff(snapshot.reporterId)&&!draftRevision)throw new Error('勤怠・シフト専用枠は新しい報告者に指定できません');
     const expectedId=draft.reportId,version=editVersion,initialRevision=draftRevision;status('下書きを保存中…');
     const operation=draftQueue.then(async()=>{const sameDraft=draft?.reportId===expectedId&&draft.reporterId===snapshot.reporterId;const saved=await store.saveDraft(snapshot,sameDraft?draftRevision:initialRevision,imported);if(sameDraft){draftRevision=saved.revision;if(version===editVersion)dirty=false;}status(version===editVersion?'下書き保存済み':'変更あり：次の自動保存を待っています');if(snapshot.reporterId!==user.staffId&&sameDraft){foreignDraftSaved=true;editing=false;draft=null;editor();status('報告者本人の下書きへ保存しました。以後は本人のみ開けます。');}});
     draftQueue=operation.catch(()=>{});return operation;
@@ -152,6 +153,7 @@ export function mountIncidentReports(root,ctx){
     if(action==='edit-legacy'){const old=ctx.legacy().find(r=>r.id===id);const v=fromLegacy(old,'legacy_'+id);v.reporterId=old.reporterId||old.createdById||'';v.reporterName=old.reporterName||old.createdBy||'';setEditor(v,null,old);return;}
     if(action==='submit'){
       readEditor();cancelTimer();await draftQueue;
+      if(!canAssignStaff(draft.reporterId,[previous?.owner,legacy?.reporterId,legacy?.createdById].filter(Boolean)))throw new Error('勤怠・シフト専用枠は新しい報告者に指定できません');
       const reason=q('#iv-reassign-reason')?.value||'';const confirmed=q('#iv-confirm')?.checked||false;
       await store.commit(draft,{previous,action:legacy?'migrate':imported?'import':previous?'edit':'submit',reason,confirmed,legacy,imported});editing=false;draft=null;previous=null;legacy=null;dirty=false;editor();status('保存しました。初回提出月に集計されます。');return;
     }

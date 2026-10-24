@@ -1092,9 +1092,10 @@ import {personName} from './portal-person-display.mjs?v=20261019-director';
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import { getDatabase, ref, push, set, update, remove, onValue as firebaseOnValue, get, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 import {createPageLifecycle} from './portal-page-lifecycle.mjs';
-import {loadBusinessRoster} from './portal-business-roster.mjs?v=20261019-director';
+import {canUseStaff,canAssignStaff} from './portal-staff-usage.mjs?v=20261024-usage';
+import {loadBusinessRoster} from './portal-business-roster.mjs?v=20261024-usage';
 import { startPortalAuth } from './portal-auth.js?v=labor-20261014-2';
-import {mountIncidentReports} from './incident-report-ui.mjs?v=tsuruta-reporter-id-20261019';
+import {mountIncidentReports} from './incident-report-ui.mjs?v=20261024-usage';
 import {classification} from './incident-report-core.mjs';
 import { canEditOwnIncident, ownerPayload } from './incident-owner-policy.mjs';
 
@@ -1152,7 +1153,7 @@ const NOTICE_TARGETS = {
 };
 const NOTICE_TARGET_IDS = Object.keys(NOTICE_TARGETS);
 // Keep the legacy denominator for records created before target snapshots existed.
-const currentNoticeTargets = Object.fromEntries(businessRoster.members.filter(member => member.id !== DIRECTOR_ID && member.availability !== 'stopped').map(member => [member.id, {name:member.label || member.name, role:member.role}]));
+const currentNoticeTargets = Object.fromEntries(businessRoster.members.filter(member => canUseStaff(member.id) && member.id !== DIRECTOR_ID && member.availability !== 'stopped').map(member => [member.id, {name:member.label || member.name, role:member.role}]));
 const currentNoticeTargetIds = Object.keys(currentNoticeTargets);
 function targetIdsFor(item) {
   return Array.isArray(item?.targetStaffIds) ? item.targetStaffIds : NOTICE_TARGET_IDS;

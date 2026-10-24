@@ -180,7 +180,8 @@ body.is-admin .admin-only{display:block}
 import {personName} from "./portal-person-display.mjs?v=20261019-director";
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import { getDatabase, ref, set, get, onValue } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
-import {loadBusinessRoster} from './portal-business-roster.mjs?v=20261019-director';
+import {canUseStaff,canAssignStaff} from './portal-staff-usage.mjs?v=20261024-usage';
+import {loadBusinessRoster} from './portal-business-roster.mjs?v=20261024-usage';
 import {createPageLifecycle} from './portal-page-lifecycle.mjs';
 import { startPortalAuth } from './portal-auth.js?v=labor-20261014-2';
 
@@ -367,7 +368,7 @@ async function checkPortalSkillParams() {
     // 管理者：既存 ID のまま共通名簿から候補を作成。停止者の既存記録も閲覧可能。
     const root=document.getElementById('businessStaffButtons');
     root.replaceChildren();
-    for(const member of businessRoster.members.filter(s=>!['kyosei','hanowa','guest'].includes(s.id))) {
+    for(const member of businessRoster.members.filter(s=>canUseStaff(s.id) && !['kyosei','guest'].includes(s.id))) {
       const button=document.createElement('button');
       button.className='staff-btn '+member.role.toLowerCase();
       button.textContent=member.label+(member.availability==='stopped'?'（停止・履歴）':'');

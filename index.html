@@ -1286,7 +1286,7 @@ async function buildTodayStaff(now) {
   let html = '';
 
   for (const role of ['DR','DH','DA']) {
-    const attending = businessRoster.members.filter(s=>isNormalStatisticsStaff(s.id)&&s.role===role).filter(member => {
+    const attending = businessRoster.members.filter(s=>canUseStaff(s.id) && isNormalStatisticsStaff(s.id)&&s.role===role).filter(member => {
       const sid = member.id;
       if (!sid) return false;
       const dateKey2 = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
@@ -1310,7 +1310,8 @@ async function buildTodayStaff(now) {
 // ─────────────────────────────────────────
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import { getDatabase, ref, push, remove, onValue, get, set, query, orderByChild, equalTo } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
-import {loadBusinessRoster} from './portal-business-roster.mjs?v=20261019-director';
+import {canUseStaff,canAssignStaff} from './portal-staff-usage.mjs?v=20261024-usage';
+import {loadBusinessRoster} from './portal-business-roster.mjs?v=20261024-usage';
 import {createPageLifecycle} from './portal-page-lifecycle.mjs';
 import { startPortalAuth } from './portal-auth.js?v=labor-20261014-2';
 
