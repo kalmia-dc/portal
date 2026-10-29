@@ -574,6 +574,7 @@
         </a>
         <a class="tool-item" id="laborManagementToolBtn" href="./labor-management.html" style="display:none"><span class="tool-icon">労</span><span class="tool-name">労務管理<br>入退社・利用登録</span></a>
         <a class="tool-item" id="memberManagementToolBtn" data-guest-hidden="true" href="./portal-members.html" style="display:none"><span class="tool-icon">人</span><span class="tool-name">ログイン<br>メンバー管理</span></a>
+        <a class="tool-item" id="invoiceSupplementToolBtn" data-guest-hidden="true" href="./invoice-supplement.html" style="display:none"><span class="tool-icon">書</span><span class="tool-name">インボイス<br>補足書</span></a>
         <a class="tool-item" id="terminalSetupToolBtn" data-guest-hidden="true" href="./terminal-setup.html" style="display:none;background:linear-gradient(135deg,#eef7ff,#e4f0ff);border:2px solid #9fc5f8;">
           <span class="tool-icon">PC</span><span class="tool-name">共用PC<br>端末設定</span>
         </a>
@@ -1053,6 +1054,7 @@ function updateMenuVisibility() {
   if (privateMetricsBtn) privateMetricsBtn.style.display = adminVisible ? 'block' : 'none';
   if (skillBtn) skillBtn.style.display = guest ? 'none' : 'block';
   if (terminalSetupBtn) terminalSetupBtn.style.display = authenticatedProfile?.isAdmin ? 'block' : 'none';
+  document.getElementById('invoiceSupplementToolBtn').style.display = canSwitch ? 'block' : 'none';
 
   document.querySelectorAll('[data-menu-section]').forEach(section => {
     const hasVisibleItem = [...section.querySelectorAll('.tool-item')]

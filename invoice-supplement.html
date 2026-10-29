@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>インボイス補足書 | カルミアDC</title><link rel="stylesheet" href="./invoice-supplement.css"></head>
+<body>
+<header class="screen-only topbar"><a href="./index.html">← 院内ポータル</a><span id="identity">管理者権限を確認しています</span></header>
+<main id="invoice-app" hidden>
+  <section class="screen-only intro"><p class="eyebrow">管理者専用 / 領収証に添付する書類</p><h1>インボイス補足書</h1><p>元の領収証と照合し、補足書を作成します。患者氏名は入力しません。</p></section>
+  <div class="workspace">
+    <section class="screen-only editor" aria-labelledby="input-title">
+      <div class="panel-title"><h2 id="input-title">補足書の入力</h2><span id="version" class="badge">v01</span></div>
+      <form id="invoice-form">
+        <label for="receipt-number">領収書番号 <span>必須</span></label><input id="receipt-number" name="receiptNumber" required maxlength="32" pattern="[A-Za-z0-9][A-Za-z0-9_-]{0,31}" autocomplete="off" placeholder="例：42188">
+        <div class="dates"><div><label for="transaction-date">取引年月日 <span>必須</span></label><input id="transaction-date" type="date" required min="1900-01-01" max="9999-12-31"></div><div><label for="issue-date">補足書発行日 <span>必須</span></label><input id="issue-date" type="date" required min="1900-01-01" max="9999-12-31"></div></div>
+        <p class="hint">元の領収証の日付を確認して入力してください。取引日と発行日が異なる場合は、取引年月日を修正してください。</p>
+        <label for="recipient">交付先事業者名 <span>必須</span></label><input id="recipient" required maxlength="100" autocomplete="off" placeholder="領収証に記載された事業者名">
+        <label for="content">取引内容 <span>必須</span></label><select id="content" required><option value="">選択してください</option><option>自費歯科診療費</option><option>歯科健診費</option></select>
+        <label for="amount">10％課税対象額（税込） <span>必須</span></label><div class="amount-input"><input id="amount" type="text" inputmode="numeric" required maxlength="9" pattern="[0-9]+" autocomplete="off" placeholder="例：8800"><span>円</span></div>
+        <div class="tax-summary"><span>内消費税額（10％）</span><strong id="tax-display">— 円</strong></div>
+        <p class="hint">税率ごとの税込合計額で計算し、1円未満切捨て。非課税の取引には使用しないでください。</p>
+        <div class="folder-box"><button id="choose-folder" type="button" class="secondary">保存フォルダを選択</button><p id="folder-status">未選択：事務関連 → インボイス補足書</p></div>
+        <p class="file-label">保存ファイル名</p><output id="filename">入力後に表示します</output>
+        <div class="primary-actions"><button type="submit" id="save-json">JSONを保存</button><button type="button" id="print-invoice">PDF出力・印刷</button></div>
+        <div class="secondary-actions"><button type="button" id="load-json" class="secondary">JSONを読込</button><button type="button" id="revision" class="secondary">修正版作成</button><button type="button" id="open-pdf" class="secondary">保存済みPDFを開く</button><button type="button" id="new-invoice" class="secondary">新規作成</button></div>
+      </form>
+      <p id="message" role="status" aria-live="polite">保存は手動です。最初に保存フォルダを選択してください。</p>
+      <aside class="operation-note"><strong>PDFの保存は印刷画面で行います</strong><p>「PDFに保存」を選び、表示された名前でJSONと同じフォルダへ保存してください。既存ファイルは上書きせず、保存後にPDFとJSONの両方を確認してください。複数のPCで同時に発行しないでください。</p></aside>
+      <nav class="help-links"><a href="./invoice-supplement-guide.html" target="_blank" rel="noopener">操作手順・保存上の注意</a><a href="./invoice-supplement-ledger.html" target="_blank" rel="noopener">受付用の紙台帳</a></nav>
+    </section>
+    <section class="preview" aria-label="補足書プレビュー"><p class="screen-only preview-caption">印刷プレビュー <span>A4縦・1ページ</span></p>
+      <article id="invoice-sheet" class="sheet">
+        <div class="document-top"><span>領収証添付用</span><span id="p-version">第1版</span></div>
+        <h2>インボイス補足書</h2>
+        <p class="document-subtitle">適格請求書の記載事項補足</p>
+        <div class="document-meta"><p>補足書発行日：<span id="p-issue">—</span></p><p>領収書番号：<strong id="p-receipt">—</strong></p></div>
+        <p class="recipient"><span id="p-recipient">交付先事業者名</span><span class="honorific">御中</span></p>
+        <p class="document-description">下記の領収証に係る登録番号・適用税率・消費税額等をお知らせします。</p>
+        <dl class="transaction"><div><dt>取引年月日</dt><dd id="p-transaction">—</dd></div><div><dt>取引内容</dt><dd id="p-content">—</dd></div></dl>
+        <table class="invoice-table"><thead><tr><th>適用税率</th><th>課税対象額（税込）</th><th>内消費税額</th></tr></thead><tbody><tr><td>10％</td><td id="p-amount">— 円</td><td id="p-tax">— 円</td></tr></tbody></table>
+        <p class="rounding">消費税額：10％課税対象額（税込）×10／110（1円未満切捨て）</p>
+        <section class="issuer"><p class="clinic">カルミアデンタルクリニック</p><p>発行者：杉平 亮介</p><p class="registration">登録番号：T7810234812699</p><p>〒131-0031 東京都墨田区墨田2-36-11<br>パシオス棟201</p><p>TEL：03-5631-3555</p></section>
+        <div class="document-note"><p>本書は、上記領収書番号の領収証と併せて保管してください。</p><p>本書単独では領収証として使用できません。金銭の受領を改めて証するものではありません。</p></div>
+        <p id="draft-mark" class="draft-mark">入力途中・印刷できません</p>
+      </article>
+    </section>
+  </div>
+</main>
+<p id="access-message" class="screen-only access-message" role="alert"></p>
+<script type="module" src="./invoice-supplement.mjs"></script>
+</body></html>

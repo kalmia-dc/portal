@@ -4,6 +4,7 @@ import vm from 'node:vm';
 import test from 'node:test';
 import * as lifecycle from '../portal-lifecycle-model.mjs';
 import {watchLaborBoundary} from '../labor-access-watch.mjs';
+import * as diagnostics from '../portal-auth-diagnostic.mjs';
 
 for(const stopBy of ['member','lifecycle'])test('real auth clears cached identity and visible data on '+stopBy+' stop',async()=>{
   const store=new Map(),listeners=new Map();let signouts=0,cleared=0;
@@ -21,13 +22,14 @@ for(const stopBy of ['member','lifecycle'])test('real auth clears cached identit
   const database={getDatabase:()=>({}),get:async path=>{if(path.startsWith('.info/'))throw Error('Invalid token in path');return {val:()=>path.startsWith('staffLifecycle')?null:raw}} ,ref:(db,path)=>path,serverTimestamp:()=>123,update:async()=>{},onValue:(path,next,error,options)=>{if(options?.onlyOnce){queueMicrotask(()=>next({val:()=>0}));return()=>{}}listeners.set(path,{next,error});return()=>{}}};
   const synthetic=exports=>new vm.SyntheticModule(Object.keys(exports),function(){for(const [key,value] of Object.entries(exports))this.setExport(key,value)},{context});
   const authModule=synthetic(auth),dbModule=synthetic(database),lifecycleModule=synthetic(lifecycle);
+  const diagnosticsModule=synthetic(diagnostics);
   const watcher=new vm.SourceTextModule(fs.readFileSync(new URL('../portal-session-watch.mjs',import.meta.url),'utf8'),{context});
-  await watcher.link(()=>{});
+  await watcher.link(id=>id.endsWith('portal-auth-diagnostic.mjs')?diagnosticsModule:undefined);
   const server=new vm.SourceTextModule(fs.readFileSync(new URL('../portal-server-profile.mjs',import.meta.url),'utf8'),{context});
-  await server.link(()=>{});
+  await server.link(id=>id.endsWith('portal-auth-diagnostic.mjs')?diagnosticsModule:undefined);
   const entry=new vm.SourceTextModule(fs.readFileSync(new URL('../portal-auth.js',import.meta.url),'utf8'),{context});
   const boundary=synthetic({watchLaborBoundary:options=>watchLaborBoundary({...options,schedule:(fn,ms)=>{const timer=setTimeout(fn,ms);timer.unref();return timer;}})});
-  await entry.link(id=>id.endsWith('labor-access-watch.mjs')?boundary:id.endsWith('firebase-auth.js')?authModule:id.endsWith('firebase-database.js')?dbModule:id.endsWith('portal-server-profile.mjs')?server:id.endsWith('portal-lifecycle-model.mjs')?lifecycleModule:watcher);
+  await entry.link(id=>id.endsWith('portal-auth-diagnostic.mjs')?diagnosticsModule:id.endsWith('labor-access-watch.mjs')?boundary:id.endsWith('firebase-auth.js')?authModule:id.endsWith('firebase-database.js')?dbModule:id.endsWith('portal-server-profile.mjs')?server:id.endsWith('portal-lifecycle-model.mjs')?lifecycleModule:watcher);
   await entry.evaluate();
   const profile=await entry.namespace.startPortalAuth({options:{databaseURL:'https://demo.firebasedatabase.app'}},{});
   assert.equal(profile.staffId,'tanaka');assert.ok(store.has('portalUser'));
