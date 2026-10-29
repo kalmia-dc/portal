@@ -1,7 +1,7 @@
 import {initializeApp} from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import {startPortalAuth,canManageAll} from './portal-auth.js';
 import {readServerProfile} from './portal-server-profile.mjs';
-import {ISSUER,todayJST,taxAmount,validateRecord,versionText,basename,encodeRecord,decodeRecord,nextVersion,assertNoCollision} from './invoice-supplement-core.mjs';
+import {ISSUER,todayJST,taxAmount,validateRecord,versionText,basename,encodeRecord,decodeRecord,nextVersion,assertNoCollision,assertMatchesSavedJSON} from './invoice-supplement-core.mjs';
 
 const config={apiKey:'AIzaSyDdMe7feUF6CKPHH0YIx7Suk-WnXtOYUu8',authDomain:'kalmia-shift.firebaseapp.com',databaseURL:'https://kalmia-shift-default-rtdb.asia-southeast1.firebasedatabase.app',projectId:'kalmia-shift',storageBucket:'kalmia-shift.firebasestorage.app',messagingSenderId:'714175473480',appId:'1:714175473480:web:7d6626a46e4a9dcb1fb57d'};
 const $=id=>document.getElementById(id);
@@ -64,10 +64,14 @@ async function saveJSON(){
 async function printInvoice(){
   if(!$('invoice-form').reportValidity())return;
   const record=currentRecord();await guard();const names=await listNames();
-  if(savedJSON!==encodeRecord(record))throw Error('先に現在の内容を「JSONを保存」で保存してください。読込済みの版を訂正する場合は「修正版作成」を使用してください。');
-  assertNoCollision(names,record,{ownJSON:savedJSON===encodeRecord(record)});
-  // A loaded original is never re-generated. Reissue its existing PDF instead.
-  if(loaded)throw Error('再交付には「保存済みPDFを開く」を使用してください。訂正は「修正版作成」を選んでください。');
+  const jsonName=basename(record)+'.json';
+  if(!names.some(name=>name.toLowerCase()===jsonName.toLowerCase()))throw Error('先に現在の内容を「JSONを保存」で保存してください。読込済みの版を訂正する場合は「修正版作成」を使用してください。');
+  // A saved JSON can resume its first PDF output after reload. A PDF already
+  // present in the folder is never regenerated; reissue that existing PDF.
+  assertNoCollision(names,record,{ownJSON:true});
+  const savedFile=await (await directory.getFileHandle(jsonName)).getFile();
+  if(savedFile.size>65536)throw Error('保存済みJSONが大きすぎます。ファイルを確認してください。');
+  assertMatchesSavedJSON(record,await savedFile.text());await guard();
   document.title=basename(record);document.body.dataset.printReady='true';
   try{window.print();message(`印刷画面を開きました。PDFの保存完了は自動判定しません。${basename(record)}.pdf を選択フォルダへ保存し、PDF・JSONの両方を確認してください。`);}finally{document.body.removeAttribute('data-print-ready');document.title='インボイス補足書 | カルミアDC';}
 }
@@ -100,7 +104,7 @@ try{
     $('load-json').onclick=()=>selectFile('.json,application/json',async file=>{
       if(documentDirty&&!confirm('未保存の入力を置き換えてJSONを読み込みますか？'))return;
       if(file.size>65536)throw Error('64KB以下の補足書JSONを選択してください。');
-      const record=decodeRecord(await file.text());checkActive();applyRecord(record);loaded=true;savedJSON=null;message('JSONを読み込み、税額を再計算しました。訂正は「修正版作成」、再交付は「保存済みPDFを開く」を選んでください。');
+      const record=decodeRecord(await file.text());checkActive();applyRecord(record);loaded=true;savedJSON=null;message('JSONを読み込み、税額を再計算しました。PDFが未作成なら同じ保存フォルダを選んで「PDF出力・印刷」で続行できます。訂正は「修正版作成」、再交付は「保存済みPDFを開く」を選んでください。');
     });
     $('revision').onclick=()=>void run(async()=>{
       if(!loaded)throw Error('先に訂正元のJSONを読み込んでください。');

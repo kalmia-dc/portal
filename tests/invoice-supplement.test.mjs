@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {taxAmount,validDate,todayJST,validateRecord,encodeRecord,decodeRecord,basename,existingVersions,nextVersion,assertNoCollision,ISSUER} from '../invoice-supplement-core.mjs';
+import {taxAmount,validDate,todayJST,validateRecord,encodeRecord,decodeRecord,basename,existingVersions,nextVersion,assertNoCollision,assertMatchesSavedJSON,ISSUER} from '../invoice-supplement-core.mjs';
 const example={receiptNumber:'12345',transactionDate:'2026-10-29',issueDate:'2026-10-29',recipient:'検証用事業者',content:'歯科健診費',amount:8800,version:1};
 test('tax calculation floors once using integer arithmetic',()=>{for(let n=1;n<10000;n++)assert.equal(taxAmount(n),Number(BigInt(n)/11n));assert.equal(taxAmount(8800),800);assert.equal(taxAmount(999999999),90909090);});
 test('invalid monetary values are rejected',()=>{for(const v of [0,-1,1.1,NaN,Infinity,'8800',1000000000])assert.throws(()=>taxAmount(v));});
@@ -13,3 +13,4 @@ test('scan across dates, extensions and case; exact receipt match',()=>{const na
 test('PDF-only and date-changed collisions, and missing old versions, are blocked',()=>{assert.throws(()=>assertNoCollision(['12345_20261030_v01.pdf'],example));assert.throws(()=>assertNoCollision(['12345_20261030_v03.json'],example));assert.doesNotThrow(()=>assertNoCollision([],example));});
 test('only this session saved JSON permits first PDF, never existing PDF',()=>{assert.doesNotThrow(()=>assertNoCollision(['12345_20261029_v01.json'],example,{ownJSON:true}));assert.throws(()=>assertNoCollision(['12345_20261029_v01.json','12345_20261029_v01.pdf'],example,{ownJSON:true}));assert.throws(()=>assertNoCollision(['12345_20261030_v01.json'],example,{ownJSON:true}));});
 test('revision increments source or folder maximum once',()=>{assert.equal(nextVersion([],{...example,version:7}),8);assert.throws(()=>nextVersion(['12345_20261029_v9999.pdf'],example));});
+test('first PDF may resume from identical saved JSON, never edited data',()=>{assert.doesNotThrow(()=>assertMatchesSavedJSON(example,encodeRecord(example)));for(const patch of [{amount:9900},{recipient:'別の事業者'},{content:'自費歯科診療費'},{transactionDate:'2026-10-28'}])assert.throws(()=>assertMatchesSavedJSON({...example,...patch},encodeRecord(example)));});

@@ -41,6 +41,9 @@ export function decodeRecord(text) {
   if(raw.taxRate!==10)throw Error('税率10％の補足書JSONを選択してください。');
   return validateRecord(raw);
 }
+export function assertMatchesSavedJSON(record,text){
+  if(encodeRecord(decodeRecord(text))!==encodeRecord(record))throw Error('保存済みJSONと現在の入力内容が異なります。訂正する場合は「修正版作成」で新しい版にしてください。');
+}
 export function existingVersions(names,receiptNumber) {
   const escaped=receiptNumber.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
   const pattern=new RegExp('^'+escaped+'_\\d{8}_v(\\d{2,4})\\.(?:json|pdf)$','i');
