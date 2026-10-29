@@ -1,5 +1,5 @@
 // Invoice documents are stored only in the directory chosen by the administrator.
-export const ISSUER = Object.freeze({name:'カルミアデンタルクリニック',owner:'杉平 亮介',registration:'T7810234812699',address:'〒131-0031 東京都墨田区墨田2-36-11 パシオス棟201',telephone:'03-5631-3555'});
+export const ISSUER = Object.freeze({name:'カルミアデンタルクリニック墨田　おとなこども歯科・矯正歯科',owner:'杉平 亮介',registration:'T7810234812699',address:'〒131-0031 東京都墨田区墨田2-36-11 パシオス棟201',telephone:'03-5631-3555'});
 export const CONTENTS = Object.freeze(['自費歯科診療費','歯科健診費']);
 export function todayJST(now=new Date()) {
   return new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Tokyo',year:'numeric',month:'2-digit',day:'2-digit'}).format(now);
