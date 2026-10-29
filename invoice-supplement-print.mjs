@@ -18,4 +18,3 @@ export async function prepareSavedPDFPrint(bytes,{checkActive=()=>{},title='イ�
     return {frame,dispose,print(){checkActive();if(disposed)throw Error('印刷画面を準備できませんでした。もう一度お試しください。');frame.contentWindow.focus();frame.contentWindow.print();}};
   }catch(error){frame?.remove();throw error;}finally{await task.destroy().catch(()=>{});}
 }
-
