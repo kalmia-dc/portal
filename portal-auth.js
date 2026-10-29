@@ -1,3 +1,4 @@
+import {diagnosticRead} from './portal-auth-diagnostic.mjs';
 import {watchLaborBoundary} from './labor-access-watch.mjs';
 import {effectiveMember,lifecycleApplies} from './portal-lifecycle-model.mjs';
 import {
@@ -175,8 +176,8 @@ let laborServerOffset=0,laborTimeAnchor=Date.now(),laborMonoAnchor=globalThis.pe
 const laborSetTime=ms=>{laborTimeAnchor=ms;laborMonoAnchor=globalThis.performance?.now()||0;};
 const laborServerNow=()=>laborTimeAnchor+((globalThis.performance?.now()||0)-laborMonoAnchor);
 async function loadApprovedProfile(db, user) {
-  const snapshot = await get(ref(db, `portalAccess/users/${user.uid}`));
-  const raw=snapshot.val();const state=lifecycleApplies(raw)?(await get(ref(db,'staffLifecycle/'+raw.staffId))).val():null;
+  const snapshot = await diagnosticRead('PROFILE',()=>get(ref(db, `portalAccess/users/${user.uid}`)));
+  const raw=snapshot.val();const state=lifecycleApplies(raw)?(await diagnosticRead('STAFF_STATE',()=>get(ref(db,'staffLifecycle/'+raw.staffId)))).val():null;
   return normalizeAccessProfile(user.uid,user,effectiveMember(raw,state,laborServerNow()));
 }
 

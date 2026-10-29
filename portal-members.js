@@ -1,3 +1,4 @@
+import {diagnosticRead} from './portal-auth-diagnostic.mjs';
 import {personName} from './portal-person-display.mjs?v=20261019-director';
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import { getDatabase, ref, get, onValue, runTransaction, serverTimestamp, update } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
@@ -13,7 +14,7 @@ const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 const $ = id => document.getElementById(id);
 const page = createPageLifecycle();
-const actor = await startPortalAuth(app,{pageName:'ログインアカウント一覧'});
+const actor = await diagnosticRead('AUTH_INITIAL',()=>startPortalAuth(app,{pageName:'ログインアカウント一覧'}));
 if(page.active) {
 let busy = false;
 const liveGet=async(...args)=>{page.assertActive();const result=await get(...args);page.assertActive();return result;};
@@ -97,7 +98,7 @@ async function load(success='一覧を読み込みました。') {
     const laborEnabled=(await liveGet(ref(db,'laborConfig/enabled'))).val()===true;
     if(laborEnabled){
       document.title='ログインアカウント一覧 | カルミアDC';$('pageTitle').textContent='ログインアカウント一覧';
-      const [accounts,lifecycle]=await Promise.all(['portalAccess/users','staffLifecycle'].map(path=>liveGet(ref(db,path))));
+      const [accounts,lifecycle]=await Promise.all(['portalAccess/users','staffLifecycle'].map(path=>diagnosticRead('MEMBER_LIST',()=>liveGet(ref(db,path)))));
       if(!page.active)return;
       const users=accounts.val()||{},states=lifecycle.val()||{};$('accountReviewRows').replaceChildren();
       for(const [uid,member] of Object.entries(users)){
@@ -109,7 +110,7 @@ async function load(success='一覧を読み込みました。') {
     }
     document.title='ログインメンバー管理 | カルミアDC';$('pageTitle').textContent='ログインメンバー管理';
     $('legacyManagement').hidden=false;
-    const [u,r,s]=await Promise.all(['portalAccess/users','portalAccessRequests','extra_staff'].map(path=>liveGet(ref(db,path))));
+    const [u,r,s]=await Promise.all(['portalAccess/users','portalAccessRequests','extra_staff'].map(path=>diagnosticRead('MEMBER_LIST',()=>liveGet(ref(db,path)))));
     if(!page.active)return;
     const users=u.val()||{}, requests=r.val()||{};
     const roster=new Map(defaultStaff.map(staff=>[staff.id,staff]));
