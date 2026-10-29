@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>インボイス補足書 | カルミアDC</title><link rel="stylesheet" href="./invoice-supplement.css?v=20261029-3"></head>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>インボイス補足書 | カルミアDC</title><link rel="stylesheet" href="./invoice-supplement.css?v=20261029-4"></head>
 <body>
 <header class="screen-only topbar"><a href="./index.html">← 院内ポータル</a><span id="identity">管理者権限を確認しています</span></header>
 <main id="invoice-app" hidden>
@@ -8,6 +8,7 @@
     <section class="screen-only editor" aria-labelledby="input-title">
       <div class="panel-title"><h2 id="input-title">補足書の入力</h2><span id="version" class="badge">v01</span></div>
       <form id="invoice-form">
+        <div class="folder-box"><button id="choose-folder" type="button" class="secondary">保存フォルダを選択</button><p id="folder-status">未選択：事務関連 → インボイス補足書</p></div>
         <label for="receipt-number">領収書番号 <span>必須</span></label><input id="receipt-number" name="receiptNumber" required maxlength="32" pattern="[A-Za-z0-9][A-Za-z0-9_-]{0,31}" autocomplete="off" placeholder="例：42188">
         <div class="dates"><div><label for="transaction-date">取引年月日 <span>必須</span></label><input id="transaction-date" type="date" required min="1900-01-01" max="9999-12-31"></div><div><label for="issue-date">補足書発行日 <span>必須</span></label><input id="issue-date" type="date" required min="1900-01-01" max="9999-12-31"></div></div>
         <p class="hint">元の領収証の日付を確認して入力してください。取引日と発行日が異なる場合は、取引年月日を修正してください。</p>
@@ -16,13 +17,12 @@
         <label for="amount">10％課税対象額（税込） <span>必須</span></label><div class="amount-input"><input id="amount" type="text" inputmode="numeric" required maxlength="9" pattern="[0-9]+" autocomplete="off" placeholder="例：8800"><span>円</span></div>
         <div class="tax-summary"><span>内消費税額（10％）</span><strong id="tax-display">— 円</strong></div>
         <p class="hint">税率ごとの税込合計額で計算し、1円未満切捨て。非課税の取引には使用しないでください。</p>
-        <div class="folder-box"><button id="choose-folder" type="button" class="secondary">保存フォルダを選択</button><p id="folder-status">未選択：事務関連 → インボイス補足書</p></div>
         <p class="file-label">保存ファイル名</p><output id="filename">入力後に表示します</output>
-        <div class="primary-actions"><button type="submit" id="save-json">JSONを保存</button><button type="button" id="print-invoice">PDF出力・印刷</button></div>
+        <div class="primary-actions"><button type="submit" id="issue-print">発行して印刷</button></div>
         <div class="secondary-actions"><button type="button" id="load-json" class="secondary">JSONを読込</button><button type="button" id="revision" class="secondary">修正版作成</button><button type="button" id="open-pdf" class="secondary">保存済みPDFを開く</button><button type="button" id="new-invoice" class="secondary">新規作成</button></div>
       </form>
-      <p id="message" role="status" aria-live="polite">保存は手動です。最初に保存フォルダを選択してください。</p>
-      <aside class="operation-note"><strong>PDFの保存は印刷画面で行います</strong><p>「PDFに保存」を選び、表示された名前でJSONと同じフォルダへ保存してください。既存ファイルは上書きせず、保存後にPDFとJSONの両方を確認してください。複数のPCで同時に発行しないでください。</p></aside>
+      <p id="message" role="status" aria-live="polite">最初に保存フォルダを選択してください。入力後は「発行して印刷」でJSON・PDFを自動保存します。</p>
+      <aside class="operation-note"><strong>保存してから、紙へ印刷します</strong><p>「発行して印刷」でJSON・PDFを同じフォルダに保存し、保存したPDFの印刷画面を開きます。プリンターを選んで「印刷」を押してください。PDFへの手動保存は不要です。複数のPCで同時に発行しないでください。</p></aside>
       <nav class="help-links"><a href="./invoice-supplement-guide.html" target="_blank" rel="noopener">操作手順・保存上の注意</a><a href="./invoice-supplement-ledger.html" target="_blank" rel="noopener">受付用の紙台帳</a></nav>
     </section>
     <section class="preview" aria-label="補足書プレビュー"><p class="screen-only preview-caption">印刷プレビュー <span>A4縦・1ページ</span></p>
@@ -44,5 +44,5 @@
   </div>
 </main>
 <p id="access-message" class="screen-only access-message" role="alert"></p>
-<script type="module" src="./invoice-supplement.mjs?v=20261029-3"></script>
+<script type="module" src="./invoice-supplement.mjs?v=20261029-4"></script>
 </body></html>

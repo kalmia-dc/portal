@@ -1,15 +1,18 @@
 import {initializeApp} from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import {startPortalAuth,canManageAll} from './portal-auth.js';
 import {readServerProfile} from './portal-server-profile.mjs';
-import {ISSUER,todayJST,taxAmount,validateRecord,versionText,basename,encodeRecord,decodeRecord,nextVersion,assertNoCollision,assertMatchesSavedJSON} from './invoice-supplement-core.mjs?v=20261029-3';
+import {todayJST,taxAmount,validateRecord,versionText,basename,encodeRecord,decodeRecord,nextVersion,assertMatchesSavedJSON} from './invoice-supplement-core.mjs?v=20261029-4';
+import {createInvoicePDF,preloadInvoiceFont} from './invoice-supplement-pdf.mjs?v=20261029-4';
+import {saveInvoicePair,sameBytes} from './invoice-supplement-storage.mjs?v=20261029-4';
+import {prepareSavedPDFPrint} from './invoice-supplement-print.mjs?v=20261029-4';
 
 const config={apiKey:'AIzaSyDdMe7feUF6CKPHH0YIx7Suk-WnXtOYUu8',authDomain:'kalmia-shift.firebaseapp.com',databaseURL:'https://kalmia-shift-default-rtdb.asia-southeast1.firebasedatabase.app',projectId:'kalmia-shift',storageBucket:'kalmia-shift.firebasestorage.app',messagingSenderId:'714175473480',appId:'1:714175473480:web:7d6626a46e4a9dcb1fb57d'};
 const $=id=>document.getElementById(id);
 const ids={receiptNumber:'receipt-number',transactionDate:'transaction-date',issueDate:'issue-date',recipient:'recipient',content:'content',amount:'amount'};
-let profile=null,directory=null,version=1,loaded=false,busy=false,savedJSON=null,accessLost=false,documentDirty=false;
+let profile=null,directory=null,version=1,loaded=false,busy=false,savedPair=null,printJob=null,accessLost=false,documentDirty=false;
 const yen=value=>new Intl.NumberFormat('ja-JP').format(value)+' 円';
 const dateText=value=>value?value.replace(/^(\d{4})-(\d{2})-(\d{2})$/,'$1年$2月$3日'):'—';
-function message(text,error=false){$('message').textContent=text;$('message').dataset.error=String(error);}
+function message(text,error=false){const target=$('message');if(target){target.textContent=text;target.dataset.error=String(error);}}
 function authorized(){return !accessLost&&!window.portalAccessLost&&canManageAll(profile)&&window.portalAuth?.user?.uid===profile?.uid;}
 function checkActive(){if(!authorized())throw Error('管理者権限がありません。再読み込みして確認してください。');if(!navigator.onLine)throw Error('通信が途切れています。復旧してから再試行してください。');}
 async function guard(){
@@ -18,7 +21,7 @@ async function guard(){
   checkActive();
   if(raw?.active!==true||raw?.role!=='admin'||raw?.staffId!==profile.staffId){lock();throw Error('管理者の利用許可が変更されました。');}
 }
-function lock(){accessLost=true;directory=null;savedJSON=null;document.body.removeAttribute('data-print-ready');$('invoice-app')?.setAttribute('hidden','');const msg=$('access-message');if(msg)msg.textContent='管理者の利用許可を確認できません。再読み込みしてください。';}
+function lock(){accessLost=true;directory=null;savedPair=null;printJob?.dispose();printJob=null;document.body.removeAttribute('data-print-ready');$('invoice-app')?.setAttribute('hidden','');const msg=$('access-message');if(msg)msg.textContent='管理者の利用許可を確認できません。再読み込みしてください。';}
 function rawRecord(){const data={version};for(const [key,id] of Object.entries(ids))data[key]=$(id).value;data.amount=/^[0-9]+$/.test(data.amount)?Number(data.amount):NaN;return data;}
 function currentRecord(){return validateRecord(rawRecord());}
 function updatePreview(){
@@ -32,7 +35,7 @@ function updatePreview(){
   $('draft-mark').hidden=Boolean(valid);
 }
 function applyRecord(record){for(const [key,id]of Object.entries(ids))$(id).value=record[key]??'';version=record.version;documentDirty=false;updatePreview();}
-function reset(){loaded=false;savedJSON=null;applyRecord({receiptNumber:'',transactionDate:'',issueDate:todayJST(),recipient:'',content:'',amount:'',version:1});}
+function reset(){loaded=false;savedPair=null;printJob?.dispose();printJob=null;applyRecord({receiptNumber:'',transactionDate:'',issueDate:todayJST(),recipient:'',content:'',amount:'',version:1});}
 async function listNames(){
   checkActive();if(!directory)throw Error('先に「インボイス補足書」フォルダを選択してください。');
   if(await directory.queryPermission({mode:'readwrite'})!=='granted')throw Error('保存フォルダへの読み書きが許可されていません。フォルダを選び直してください。');
@@ -45,35 +48,33 @@ function selectFile(accept,action){
   const input=document.createElement('input');input.type='file';input.accept=accept;
   input.addEventListener('change',()=>{const file=input.files?.[0];if(file)void run(async()=>{await guard();await action(file);});},{once:true});input.click();
 }
-async function saveJSON(){
+async function issueAndPrint(){
   if(!$('invoice-form').reportValidity())return;
-  const record=currentRecord();await guard();
-  if(loaded)throw Error('読込済みの版は上書きできません。「修正版作成」で次の版を作成してください。');
-  const perform=async()=>{
-    const names=await listNames();assertNoCollision(names,record);const name=basename(record)+'.json';
-    // Do not open an existing handle for writing. Recheck immediately before creation.
-    await guard();const fresh=await listNames();assertNoCollision(fresh,record);
-    const file=await directory.getFileHandle(name,{create:true});let writable;
-    try{await guard();writable=await file.createWritable();await writable.write(encodeRecord(record));checkActive();await writable.close();writable=null;}catch(error){if(writable)await writable.abort().catch(()=>{});throw error;}
-    const readback=decodeRecord(await (await file.getFile()).text());
-    if(encodeRecord(readback)!==encodeRecord(record))throw Error('保存後の照合に失敗しました。ファイルを確認し、同じ名前で再保存しないでください。');
-    savedJSON=encodeRecord(record);documentDirty=false;message(`JSONを保存し、内容を照合しました：${name}。PDFは印刷画面で同じフォルダへ保存してください。`);
+  const record=currentRecord(),key=encodeRecord(record);
+  if(!directory)throw Error('作業開始時に「保存フォルダを選択」を押してください。');
+  const save=async()=>{
+    if(savedPair?.key===key&&savedPair.directory===directory){
+      await guard();
+      const jsonFile=await(await directory.getFileHandle(savedPair.jsonName)).getFile();
+      assertMatchesSavedJSON(record,await jsonFile.text());
+      const pdfFile=await(await directory.getFileHandle(savedPair.pdfName)).getFile();
+      if(!sameBytes(new Uint8Array(await pdfFile.arrayBuffer()),savedPair.bytes))throw Error('保存済みPDFが変更されています。保存フォルダを確認してください。');
+      return;
+    }
+    const result=await saveInvoicePair({directory,input:record,createPDF:createInvoicePDF,verifyAccess:guard,checkActive,allowNew:!loaded,progress:text=>message(text)});
+    savedPair={...result,key,directory};documentDirty=false;
   };
-  if(navigator.locks)await navigator.locks.request('kalmia-invoice-save',{mode:'exclusive'},perform);else await perform();
-}
-async function printInvoice(){
-  if(!$('invoice-form').reportValidity())return;
-  const record=currentRecord();await guard();const names=await listNames();
-  const jsonName=basename(record)+'.json';
-  if(!names.some(name=>name.toLowerCase()===jsonName.toLowerCase()))throw Error('先に現在の内容を「JSONを保存」で保存してください。読込済みの版を訂正する場合は「修正版作成」を使用してください。');
-  // A saved JSON can resume its first PDF output after reload. A PDF already
-  // present in the folder is never regenerated; reissue that existing PDF.
-  assertNoCollision(names,record,{ownJSON:true});
-  const savedFile=await (await directory.getFileHandle(jsonName)).getFile();
-  if(savedFile.size>65536)throw Error('保存済みJSONが大きすぎます。ファイルを確認してください。');
-  assertMatchesSavedJSON(record,await savedFile.text());await guard();
-  document.title=basename(record);document.body.dataset.printReady='true';
-  try{window.print();message(`印刷画面を開きました。PDFの保存完了は自動判定しません。${basename(record)}.pdf を選択フォルダへ保存し、PDF・JSONの両方を確認してください。`);}finally{document.body.removeAttribute('data-print-ready');document.title='インボイス補足書 | カルミアDC';}
+  if(navigator.locks)await navigator.locks.request('kalmia-invoice-save',{mode:'exclusive'},save);else await save();
+  message('JSON・PDFを保存し、内容を照合しました。印刷画面を準備しています…');
+  try{
+    printJob?.dispose();printJob=await prepareSavedPDFPrint(savedPair.bytes,{checkActive,title:basename(record)});
+    await guard();
+    message('JSON・PDFは保存済みです。印刷画面でプリンターを選び「印刷」を押してください。印刷を取り消しても保存済みファイルは残ります。');
+    printJob.print();
+  }catch(error){
+    if(!authorized())throw error;
+    throw Error('JSON・PDFは保存済みですが、印刷画面を開けませんでした。同じ内容のまま「発行して印刷」で再試行できます。'+(error?.message||''));
+  }
 }
 function showPDF(file){
   if(!file.name.toLowerCase().endsWith('.pdf')||file.size>50*1024*1024)throw Error('50MB以下のPDFを選択してください。');
@@ -94,21 +95,21 @@ try{
   else{
     await guard();$('identity').textContent=profile.name+' さん / 管理者';$('invoice-app').hidden=false;reset();
     $('invoice-form').addEventListener('input',()=>{documentDirty=true;updatePreview();});
-    $('invoice-form').addEventListener('submit',event=>{event.preventDefault();void run(saveJSON);});
+    $('invoice-form').addEventListener('submit',event=>{event.preventDefault();void run(issueAndPrint);});
     $('choose-folder').onclick=()=>{
       // The native picker must be called in the original click gesture.
       let selection;try{checkActive();if(!window.showDirectoryPicker)throw Error('このブラウザではフォルダ保存を利用できません。PC版EdgeまたはChromeで開いてください。');selection=window.showDirectoryPicker({mode:'readwrite',id:'kalmia-invoice'});}catch(e){message(e.message,true);return;}
-      void run(async()=>{const chosen=await selection;await guard();if(chosen.name!=='インボイス補足書')throw Error('事務関連の中の「インボイス補足書」フォルダを選択してください。');directory=chosen;savedJSON=null;await listNames();$('folder-status').textContent='選択済み：'+chosen.name+'（親フォルダが「事務関連」であることをご確認ください）';message('保存フォルダを選択しました。入力後、JSON保存とPDF出力を行ってください。');});
+      void run(async()=>{const chosen=await selection;await guard();if(chosen.name!=='インボイス補足書')throw Error('事務関連の中の「インボイス補足書」フォルダを選択してください。');directory=chosen;savedPair=null;await listNames();$('folder-status').textContent='選択済み：'+chosen.name+'（親フォルダが「事務関連」であることをご確認ください）';message('保存フォルダを選択しました。入力後は「発行して印刷」だけで保存・印刷できます。');});
     };
-    $('print-invoice').onclick=()=>void run(printInvoice);
+    void preloadInvoiceFont().catch(()=>{});
     $('load-json').onclick=()=>selectFile('.json,application/json',async file=>{
       if(documentDirty&&!confirm('未保存の入力を置き換えてJSONを読み込みますか？'))return;
       if(file.size>65536)throw Error('64KB以下の補足書JSONを選択してください。');
-      const record=decodeRecord(await file.text());checkActive();applyRecord(record);loaded=true;savedJSON=null;message('JSONを読み込み、税額を再計算しました。PDFが未作成なら同じ保存フォルダを選んで「PDF出力・印刷」で続行できます。訂正は「修正版作成」、再交付は「保存済みPDFを開く」を選んでください。');
+      const record=decodeRecord(await file.text());checkActive();applyRecord(record);loaded=true;savedPair=null;message('JSONを読み込み、税額を再計算しました。PDFが未作成なら同じ保存フォルダを選んで「発行して印刷」で続行できます。訂正は「修正版作成」、再交付は「保存済みPDFを開く」を選んでください。');
     });
     $('revision').onclick=()=>void run(async()=>{
       if(!loaded)throw Error('先に訂正元のJSONを読み込んでください。');
-      const record=currentRecord();await guard();const names=await listNames();version=nextVersion(names,record);$('issue-date').value=todayJST();loaded=false;savedJSON=null;documentDirty=true;updatePreview();message('修正版 '+versionText(version)+' を準備しました。内容を訂正して、新しいJSON・PDFを保存してください。');
+      const record=currentRecord();await guard();const names=await listNames();version=nextVersion(names,record);$('issue-date').value=todayJST();loaded=false;savedPair=null;documentDirty=true;updatePreview();message('修正版 '+versionText(version)+' を準備しました。内容を訂正して「発行して印刷」を押してください。');
     });
     $('open-pdf').onclick=()=>selectFile('.pdf,application/pdf',showPDF);
     $('new-invoice').onclick=()=>void run(async()=>{await guard();if(confirm('入力内容を初期化して、新規作成しますか？保存済みファイルは変更しません。')){reset();message('新規作成に切り替えました。保存フォルダの選択は保持しています。');}});
