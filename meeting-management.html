@@ -508,7 +508,17 @@ button{cursor:pointer}
   font-size:12px;
   font-weight:900;
 }
-.reject-status{border-color:#ffb3b3;background:#fff1f1;color:var(--bad)}
+.reject-status{
+  display:block;
+  border-color:#ffb3b3;
+  background:#fff1f1;
+  color:var(--bad);
+  padding:12px 14px;
+  font-size:14px;
+  line-height:1.7;
+}
+.reject-status>strong{display:block;font-size:15px;line-height:1.5}
+.reject-status>div>div:first-child{margin-bottom:4px}
 .read-summary{
   margin-top:12px;
   padding:10px 12px;
@@ -566,6 +576,9 @@ button{cursor:pointer}
   padding:10px 11px;
   resize:vertical;
 }
+.task-other-actions{margin-top:16px;border-top:1px solid var(--line)}
+.task-other-actions summary{padding:14px 0;cursor:pointer;font-weight:700;color:var(--muted)}
+.task-other-actions summary:focus-visible{outline:3px solid var(--sky);outline-offset:2px}
 .decision-grid{
   margin-top:12px;
   display:grid;
@@ -877,7 +890,7 @@ button{cursor:pointer}
           </section>
           <section class="meeting-guide-step" aria-labelledby="meetingGuidePractice">
             <h3 id="meetingGuidePractice">② 対策を決めて実践する<span>主任・スタッフ全員</span></h3>
-            <p>全員の確認後、主任が対策を入力し、<strong>「対策を追加して開始」</strong>を押します。スタッフは、共有された対策を日々の業務で実践します。</p>
+            <p>全員の確認後、主任または院長が<strong>「取り組みを開始」</strong>を押します。対策を入力した場合は一緒に保存されます。スタッフは、共有された対策を日々の業務で実践します。</p>
           </section>
           <section class="meeting-guide-step" aria-labelledby="meetingGuideReview">
             <h3 id="meetingGuideReview">③ 毎回振り返る<span>主任・スタッフ全員</span></h3>
@@ -888,7 +901,7 @@ button{cursor:pointer}
           <section class="meeting-guide-step" aria-labelledby="meetingGuideConfirm">
             <h3 id="meetingGuideConfirm">④ 定着を確認する<span>主任・院長</span></h3>
             <p>主任が、その取り組みの「完了条件」を満たしていることを確認し、<strong>「院長へ定着確認を依頼」</strong>を押します。</p>
-            <p>院長が確認し、定着していれば<strong>「定着完了」</strong>とします。継続が必要な場合は取り組み中へ戻し、対策を見直します。</p>
+            <p>院長が確認し、定着していれば<strong>「定着完了」</strong>を押します。継続が必要な場合は<strong>「定着確認依頼を却下」</strong>から理由を添えて取り組み中へ戻し、対策を見直します。</p>
           </section>
           <p class="meeting-guide-note">「確認しました」は、内容を理解したという確認です。取り組みの完了を意味するものではありません。</p>
         </div>
@@ -914,13 +927,8 @@ button{cursor:pointer}
               <textarea id="taskDetail" required></textarea>
             </div>
             <div class="field full">
-              <label for="taskCompletion">完了条件</label>
-              <select id="taskCompletion" required>
-                <option value="" disabled selected>選択してください</option>
-                <option value="[取り組み内容] が1か月を目安に継続確認され、院長が定着を確認できたら完了">[取り組み内容] が1か月を目安に継続確認され、院長が定着を確認できたら完了</option>
-                <option value="実際に運用されている状態を1か月を目安に継続確認し、院長が定着を確認できたら完了">実際に運用されている状態を1か月を目安に継続確認し、院長が定着を確認できたら完了</option>
-                <option value="スタッフが正しく説明できる状態を1か月を目安に継続確認し、院長が定着を確認できたら完了">スタッフが正しく説明できる状態を1か月を目安に継続確認し、院長が定着を確認できたら完了</option>
-              </select>
+              <span id="taskCompletionLabel">完了条件</span>
+              <p id="taskCompletion" aria-labelledby="taskCompletionLabel">実際に運用されている状態を1か月を目安に継続確認し、院長が定着を確認できたら完了</p>
             </div>
           </div>
           <div class="form-actions">
@@ -1689,14 +1697,27 @@ function sortIncidentReports(a, b) {
   return (b.createdAt || 0) - (a.createdAt || 0);
 }
 
+const NEW_TASK_COMPLETION = '実際に運用されている状態を1か月を目安に継続確認し、院長が定着を確認できたら完了';
+let taskFormSaving = false;
+
 async function saveTask(event) {
+  event.preventDefault();
+  if (taskFormSaving) return;
+  taskFormSaving = true;
+  try {
+    await persistTask(event);
+  } finally {
+    taskFormSaving = false;
+  }
+}
+
+async function persistTask(event) {
   if (!pageLifecycle.active) return;
   event.preventDefault();
   if (!canCreateManagedItems()) return;
   const title = valueOf('taskTitle');
   const detail = valueOf('taskDetail');
-  const completion = valueOf('taskCompletion');
-  if (!title || !detail || !completion) return showToast('未入力の項目があります');
+  if (!title || !detail) return showToast('未入力の項目があります');
 
   if (routingDraft.tasks) return saveRoutedDraft('tasks');
   const existing = state.tasks.find(item => item.id === editingTaskId);
@@ -1705,7 +1726,7 @@ async function saveTask(event) {
     const images = await imagesFromInput('taskImages', existing?.images || []);
     if (!pageLifecycle.active) return;
     const payload = {
-      title, detail, completion, images,
+      title, detail, images,
       updatedAt: Date.now(),
       updatedBy: currentUser.name
     };
@@ -1717,6 +1738,7 @@ async function saveTask(event) {
       await set(push(ref(db, PATHS.tasks)), {
         ...targetSnapshot(),
         ...payload,
+        completion: NEW_TASK_COMPLETION,
         progress:'',
         status:'todo',
         createdAt: Date.now(),
@@ -1738,27 +1760,9 @@ function resetTaskForm() {
   document.getElementById('taskDraftContext').hidden = true;
   editingTaskId = null;
   document.getElementById('taskForm').reset();
-  resetTaskCompletionOptions();
+  document.getElementById('taskCompletion').textContent = NEW_TASK_COMPLETION;
   document.getElementById('taskCancelBtn').hidden = true;
   document.getElementById('taskSubmitBtn').textContent = '取り組みを登録';
-}
-
-function ensureCompletionOption(value) {
-  const completion = String(value || '').trim();
-  const select = document.getElementById('taskCompletion');
-  if (!completion || !select) return;
-  if ([...select.options].some(option => option.value === completion)) return;
-  const option = document.createElement('option');
-  option.value = completion;
-  option.textContent = completion;
-  option.dataset.legacy = 'true';
-  select.appendChild(option);
-}
-
-function resetTaskCompletionOptions() {
-  document.querySelectorAll('#taskCompletion option[data-legacy="true"]').forEach(option => option.remove());
-  const select = document.getElementById('taskCompletion');
-  if (select) select.value = '';
 }
 
 async function saveNotice(event) {
@@ -2749,6 +2753,17 @@ function parseIncidentOcrText(text, sourceFileName) {
   };
 }
 
+const taskActionSaving = new Set();
+async function runTaskAction(id, action) {
+  if (taskActionSaving.has(id)) return;
+  taskActionSaving.add(id);
+  try {
+    await action();
+  } finally {
+    taskActionSaving.delete(id);
+  }
+}
+
 async function handleActions(event) {
   if (!pageLifecycle.active) return;
   const imageBtn = event.target.closest('.image-thumb');
@@ -2770,11 +2785,11 @@ async function handleActions(event) {
 
   if (action === 'edit-task') return fillTaskForm(id);
   if (action === 'delete-task') return deleteItem(PATHS.tasks, id, '取り組み', state.tasks.find(task => task.id === id));
-  if (action === 'confirm-task') return updateTaskStatus(id, 'confirmed');
+  if (action === 'confirm-task') return runTaskAction(id, () => updateTaskStatus(id, 'confirmed'));
   if (action === 'reject-task') return rejectTaskReview(id);
-  if (action === 'task-status') return updateTaskStatus(id, btn.dataset.status);
-  if (action === 'save-progress') return saveProgress(id);
-  if (action === 'read-task') return markTaskRead(id);
+  if (action === 'task-status') return runTaskAction(id, () => updateTaskStatus(id, btn.dataset.status));
+  if (action === 'save-progress') return runTaskAction(id, () => saveProgress(id));
+  if (action === 'read-task') return runTaskAction(id, () => markTaskRead(id));
   if (action === 'create-task-manual') return openManualDraft('task', id);
   if (action === 'edit-notice') return fillNoticeForm(id);
   if (action === 'delete-notice') return deleteItem(PATHS.notices, id, 'お知らせ', state.notices.find(notice => notice.id === id));
@@ -2809,8 +2824,7 @@ function fillTaskForm(id) {
   editingTaskId = id;
   document.getElementById('taskTitle').value = item.title || '';
   document.getElementById('taskDetail').value = item.detail || '';
-  ensureCompletionOption(item.completion);
-  document.getElementById('taskCompletion').value = item.completion || '';
+  document.getElementById('taskCompletion').textContent = item.completion || '';
   document.getElementById('taskImages').value = '';
   document.getElementById('taskCancelBtn').hidden = false;
   document.getElementById('taskSubmitBtn').textContent = '取り組みを更新';
@@ -2868,7 +2882,7 @@ async function rejectTaskReview(id) {
     }
     saving = true; submit.disabled = true; error.textContent = '';
     try {
-      await updateTaskStatus(id, 'in_progress', { rejected: true, reason });
+      await runTaskAction(id, () => updateTaskStatus(id, 'in_progress', { rejected: true, reason }));
       dialog.close();
     } catch {
       error.textContent = '保存できませんでした。入力した理由は保持しています。再度お試しください。';
@@ -2942,7 +2956,11 @@ async function updateTaskStatus(id, status, options = {}) {
   });
   await update(ref(db), updates);
   if (!pageLifecycle.active) return;
-  if (progressInputToClear) progressInputToClear.value = '';
+  if (progressInputToClear) {
+    progressInputToClear.value = '';
+    const currentInput = document.querySelector(`[data-progress-id="${cssEscape(id)}"]`);
+    if (currentInput) currentInput.value = '';
+  }
   showToast('ステータスを更新しました');
 }
 
@@ -2965,6 +2983,8 @@ async function saveProgress(id) {
   });
   if (!pageLifecycle.active) return;
   input.value = '';
+  const currentInput = document.querySelector(`[data-progress-id="${cssEscape(id)}"]`);
+  if (currentInput) currentInput.value = '';
   showToast('対策を追加しました');
 }
 
@@ -3183,6 +3203,11 @@ function incidentReportSearchText(report) {
 }
 
 function renderTasks() {
+  const controls = new Map(Array.from(document.querySelectorAll('#taskList [data-task-controls]')).map(element => [element.dataset.taskControls, {
+    status:element.dataset.taskStatus,
+    progress:element.querySelector('[data-progress-id]')?.value,
+    open:element.querySelector('details')?.open
+  }]));
   renderTaskSummary();
   const stageTasks = state.taskStatusFilter === 'all'
     ? state.tasks
@@ -3222,26 +3247,37 @@ function renderTasks() {
       ${taskRejectionHtml(task)}
       ${taskReadButtonHtml(task)}
       ${taskReadSummaryHtml(task)}
-      ${leaderProgressHtml(task)}
-      ${taskActionsHtml(task)}
+      <div data-task-controls="${escAttr(task.id)}" data-task-status="${escAttr(taskStatus(task))}">
+        ${leaderProgressHtml(task)}
+        ${taskActionsHtml(task)}
+      </div>
     </article>
   `).join('');
+  document.querySelectorAll('#taskList [data-task-controls]').forEach(element => {
+    const saved = controls.get(element.dataset.taskControls);
+    if (!saved || saved.status !== element.dataset.taskStatus) return;
+    const input = element.querySelector('[data-progress-id]');
+    if (input && saved.progress !== undefined) input.value = saved.progress;
+    const details = element.querySelector('details');
+    if (details && saved.open) details.open = true;
+  });
 }
 
 function leaderProgressHtml(task) {
   const status = taskStatus(task);
-  if (!canCreateManagedItems() || status === 'confirmed') return '';
-  return `
-    <div class="progress-box">
-      <textarea data-progress-id="${escAttr(task.id)}" placeholder="今回追加する対策・取り組み内容"></textarea>
-      <div class="item-actions">
-        <button class="btn sky" type="button" data-action="save-progress" data-id="${escAttr(task.id)}">対策を追加</button>
-        ${status === 'todo' ? '<button class="btn ghost" type="button" disabled>未確認スタッフあり</button>' : ''}
-        ${status === 'all_read' ? `<button class="btn" type="button" data-action="task-status" data-status="in_progress" data-id="${escAttr(task.id)}">対策を追加して開始</button>` : ''}
-        ${status === 'in_progress' && !isDirector() ? `<button class="btn warn" type="button" data-action="task-status" data-status="review" data-id="${escAttr(task.id)}">院長へ定着確認を依頼</button>` : ''}
-      </div>
-    </div>
-  `;
+  if (status === 'confirmed') return '';
+  if (status === 'review') return isDirector()
+    ? `<div class="item-actions" aria-label="今の操作"><button class="btn primary" type="button" data-action="confirm-task" data-id="${escAttr(task.id)}">定着完了</button><button class="btn warn" type="button" data-action="reject-task" data-id="${escAttr(task.id)}">定着確認依頼を却下</button></div>`
+    : '<p class="read-status">院長の確認待ちです。</p>';
+  if (!canCreateManagedItems()) return '';
+  if (status === 'todo') return '<p class="read-status">全員の確認を待っています。未確認のスタッフへ内容を説明してください。</p>';
+  if (status === 'all_read') return `<div class="progress-box" aria-label="今の操作">${taskProgressInputHtml(task)}<p class="read-status">対策の入力は任意です。入力した対策も一緒に保存します。</p><div class="item-actions"><button class="btn primary" type="button" data-action="task-status" data-status="in_progress" data-id="${escAttr(task.id)}">取り組みを開始</button></div></div>`;
+  if (status === 'in_progress' && !isDirector()) return `<div class="item-actions" aria-label="今の操作"><button class="btn primary" type="button" data-action="task-status" data-status="review" data-id="${escAttr(task.id)}">院長へ定着確認を依頼</button></div>`;
+  return '';
+}
+
+function taskProgressInputHtml(task) {
+  return `<label for="task-progress-${escAttr(task.id)}">追加する対策・取り組み内容</label><textarea id="task-progress-${escAttr(task.id)}" data-progress-id="${escAttr(task.id)}" placeholder="今回追加する対策・取り組み内容"></textarea>`;
 }
 
 function progressLogsHtml(task) {
@@ -3285,21 +3321,25 @@ function progressLogHtml(log) {
 }
 
 function taskActionsHtml(task) {
+  if (isReadOnlyTerminal()) return '';
   const manageActions = canManageOwnItem(task) ? `
     <button class="btn" type="button" data-action="edit-task" data-id="${escAttr(task.id)}">編集</button>
-    ${isDirector() && task.status === 'review' ? `<button class="btn primary" type="button" data-action="confirm-task" data-id="${escAttr(task.id)}">定着完了にする</button>` : ''}
-    ${isDirector() && task.status === 'review' ? `<button class="btn danger" type="button" data-action="reject-task" data-id="${escAttr(task.id)}">定着確認依頼を却下</button>` : ''}
     <button class="btn danger" type="button" data-action="delete-task" data-id="${escAttr(task.id)}">削除</button>
   ` : '';
   const manualAction = canCreateManuals()
     ? `<button class="btn sky" type="button" data-action="create-task-manual" data-id="${escAttr(task.id)}">マニュアルに反映</button>`
     : '';
-  if (!manageActions && !manualAction) return '';
+  const status = taskStatus(task);
+  const progressAction = canCreateManagedItems() && !['all_read','confirmed'].includes(status)
+    ? `<div class="progress-box">${taskProgressInputHtml(task)}<div class="item-actions"><button class="btn sky" type="button" data-action="save-progress" data-id="${escAttr(task.id)}">対策を追加</button></div></div>` : '';
+  const lateReadAction = status !== 'todo' && isNoticeTarget(task) && !isReadOnlyTerminal() && !readByMap(task)[currentUser.staffId] ? taskReadActionHtml(task) : '';
+  if (!manageActions && !manualAction && !progressAction && !lateReadAction) return '';
   return `
-    <div class="item-actions">
-      ${manualAction}
-      ${manageActions}
-    </div>
+    <details class="task-other-actions"><summary>その他の操作</summary>
+      ${progressAction}
+      ${lateReadAction}
+      <div class="item-actions">${manualAction}${manageActions}</div>
+    </details>
   `;
 }
 
@@ -3314,11 +3354,15 @@ function taskRejectionHtml(task) {
 }
 
 function taskReadButtonHtml(task) {
-  if (!isNoticeTarget(task)) return '';
+  if (!isNoticeTarget(task) || isReadOnlyTerminal()) return '';
   const read = readByMap(task)[currentUser.staffId];
   if (read) {
     return `<div class="read-status">確認済み：${formatDate(read.readAt)}</div>`;
   }
+  return taskStatus(task) === 'todo' ? taskReadActionHtml(task) : '';
+}
+
+function taskReadActionHtml(task) {
   return `
     <div class="item-actions">
       <button class="btn primary" type="button" data-action="read-task" data-id="${escAttr(task.id)}">確認しました</button>
@@ -4057,7 +4101,7 @@ async function saveRoutedDraft(kind) {
     if (report.linkedTaskId || report.linkedNoticeId) throw new Error('この報告はすでに振り分け済みです');
     const title = valueOf(prefix + 'Title');
     const body = valueOf(kind === 'tasks' ? 'taskDetail' : 'noticeBody');
-    const completion = kind === 'tasks' ? valueOf('taskCompletion') : '';
+    const completion = kind === 'tasks' ? NEW_TASK_COMPLETION : '';
     if (!title || !body || (kind === 'tasks' && !completion)) throw new Error('未入力の項目があります');
     const images = await imagesFromInput(prefix + 'Images', []);
     if (!pageLifecycle.active) return;
