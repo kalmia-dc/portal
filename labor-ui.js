@@ -44,6 +44,50 @@ const roles={DR:'歯科医師',DH:'歯科衛生士',DA:'歯科助手・受付'};
 const employment={full:'常勤',part:'非常勤',spot:'スポット'};
 const onboarding=$('onboarding');
 let applications={},bindings={},roster=[],selectedApplication=null,registrationAttempt=null;
+const contractReviewKey='contract-renewal-review';
+const contractReviewTitle='契約更新未確認';
+function contractReviewText(employee){
+  const due=employee.tasks?.[contractReviewKey]?.due;
+  if(!due)return '';
+  const [year,month,day]=due.split('-').map(Number);
+  return `${contractReviewTitle}｜確認できた契約は${year}年${month}月${day}日まで`;
+}
+function drawContractReview(reset=false){
+  const panel=$('contractReview');
+  const warning=contractReviewText(data);
+  $('contractReviewWarning').textContent=warning;
+  $('contractReviewWarning').hidden=!warning;
+  panel.hidden=!current;
+  $('addContractReview').hidden=Boolean(warning);
+  $('contractReviewDate').parentElement.hidden=Boolean(warning);
+  $('clearContractReview').hidden=!warning;
+  if(reset){
+    $('contractReviewDate').value='';
+    $('contractReviewFeedback').textContent='';
+    panel.open=Boolean(warning);
+  }
+}
+function editContractReview(due){
+  if(due){
+    jstStart(due);
+    data.tasks[contractReviewKey]={title:contractReviewTitle,status:'対応中',due};
+  }else{
+    delete data.tasks[contractReviewKey];
+  }
+  drawContractReview();
+  $('contractReviewFeedback').textContent='変更を確定するには「入力内容を保存」を押してください。';
+  $('savedState').textContent='契約更新の確認・未保存';
+}
+$('addContractReview').onclick=()=>{
+  const due=$('contractReviewDate').value;
+  if(!due){
+    $('contractReviewFeedback').textContent='確認できた契約の終了日を入力してください。';
+    $('contractReviewDate').focus();
+    return;
+  }
+  void run(()=>editContractReview(due));
+};
+$('clearContractReview').onclick=()=>run(()=>editContractReview(''));
 const listStatus={...status,pending:'確認待ちの申請',complete:'登録完了',director:'院長情報登録済み',retiring:'退職予定',retired:'退職済み'};
 const employeeGroups=[
   {label:'未登録',states:['pending','draft']},
@@ -139,6 +183,8 @@ function drawEmployeeGroup(label,rows){
       if(!d.basic.fullName)button.append(el('small',' 氏名要確認','name-unconfirmed'));
       button.setAttribute('aria-current',String(d.staffId===data?.staffId));
       identity.append(button);
+      const warning=contractReviewText(d);
+      if(warning)identity.append(el('small',warning,'employee-email danger'));
       button.onclick=()=>run(async()=>{
         if(!form.hidden && !await discardEditorChanges())return;
         show(record);
@@ -380,7 +426,7 @@ async function refreshPortalUsage(employee){
   $('accountStatus').textContent=label;
   $('accountNextStep').textContent=nextStep;
 }
-function show(record){clearRead();current=record?structuredClone(record):null;data=structuredClone(record?.data||data);const displayState=recordStatus(data,today(store.now()));form.hidden=false;$('employeeTitle').textContent=employeeName(data)||'新しい職員';$('employeeTitle').tabIndex=-1;$('identity').textContent=`${data.staffId}／${listStatus[displayState]}`;$('savedState').textContent=current?`保存確認済み・版 ${current.revision}`:'未保存';for(const key of Object.keys(basic))field('basic_'+key).value=data.basic[key]??'';for(const key of ['role','type','googleEmail'])field(key).value=data[key];const p=data.periods[data.currentPeriod]||data.plannedPeriod||{};for(const k of ['startDate','endDate','contractEnd','days','hours'])field(k).value=p[k]||'';$('periods').replaceChildren(...Object.values(data.periods).map(x=>el('p',`${x.startDate}〜${x.endDate||'未定'}${x.cancelled?'（取消）':''}／契約終了 ${x.contractEnd||'未確認'}／${x.days||'所定日未確認'} ${x.hours||'所定時間未確認'}`)));$('lifecycleActions').replaceChildren();for(const [action,label]of [['retire','退職日を確定'],['cancel','入社を取り消す'],['withdraw','退職を撤回'],['rehire','再入社を確定']]){if(data.status==='draft'||action==='withdraw'&&data.status!=='retiring'||action==='rehire'&&!['retiring','cancelled'].includes(data.status))continue;const b=el('button',label);b.type='button';b.onclick=()=>run(async()=>{try{let next=transition(collect(),action,{id:id(),...Object.fromEntries(['startDate','endDate','contractEnd','days','hours'].map(k=>[k,field(k).value]))},store.now());if(!await pageAwait(async () => (confirmAction(label,`${next.basic.name}：入社 ${next.periods[next.currentPeriod].startDate}、退職 ${next.periods[next.currentPeriod].endDate||'未定'}。ポータルの利用期間とシフトの登録可能期間に反映します。`))))return;await pageAwait(async () => (save(next,true)));}catch(error){if(error?.code!=='portal/access-lost')throw error;}});$('lifecycleActions').append(b);}void refreshPortalUsage(data);for(const k of ['shiftReview','history'])$(k).replaceChildren();drawDocuments();editorBaseline=JSON.stringify(collect());drawList();}
+function show(record){clearRead();current=record?structuredClone(record):null;data=structuredClone(record?.data||data);const displayState=recordStatus(data,today(store.now()));form.hidden=false;$('employeeTitle').textContent=employeeName(data)||'新しい職員';$('employeeTitle').tabIndex=-1;$('identity').textContent=`${data.staffId}／${listStatus[displayState]}`;$('savedState').textContent=current?`保存確認済み・版 ${current.revision}`:'未保存';for(const key of Object.keys(basic))field('basic_'+key).value=data.basic[key]??'';for(const key of ['role','type','googleEmail'])field(key).value=data[key];const p=data.periods[data.currentPeriod]||data.plannedPeriod||{};for(const k of ['startDate','endDate','contractEnd','days','hours'])field(k).value=p[k]||'';$('periods').replaceChildren(...Object.values(data.periods).map(x=>el('p',`${x.startDate}〜${x.endDate||'未定'}${x.cancelled?'（取消）':''}／契約終了 ${x.contractEnd||'未確認'}／${x.days||'所定日未確認'} ${x.hours||'所定時間未確認'}`)));$('lifecycleActions').replaceChildren();for(const [action,label]of [['retire','退職日を確定'],['cancel','入社を取り消す'],['withdraw','退職を撤回'],['rehire','再入社を確定']]){if(data.status==='draft'||action==='withdraw'&&data.status!=='retiring'||action==='rehire'&&!['retiring','cancelled'].includes(data.status))continue;const b=el('button',label);b.type='button';b.onclick=()=>run(async()=>{try{let next=transition(collect(),action,{id:id(),...Object.fromEntries(['startDate','endDate','contractEnd','days','hours'].map(k=>[k,field(k).value]))},store.now());if(!await pageAwait(async () => (confirmAction(label,`${next.basic.name}：入社 ${next.periods[next.currentPeriod].startDate}、退職 ${next.periods[next.currentPeriod].endDate||'未定'}。ポータルの利用期間とシフトの登録可能期間に反映します。`))))return;await pageAwait(async () => (save(next,true)));}catch(error){if(error?.code!=='portal/access-lost')throw error;}});$('lifecycleActions').append(b);}void refreshPortalUsage(data);for(const k of ['shiftReview','history'])$(k).replaceChildren();drawDocuments();drawContractReview(true);editorBaseline=JSON.stringify(collect());drawList();}
 async function save(next=collect(),reflect=false,file=null){try{const result=await pageAwait(async () => (store.save(next,current?.revision||0,id(),{reflect,file})));records[next.staffId]=result;show(result);message('保存後の再読み込みで内容を確認しました。');}catch(error){if(error?.code!=='portal/access-lost')throw error;}}
 async function reload(){
   const result=await pageAwait(()=>Promise.all([store.list(),store.requests(),store.bindings(),store.roster()]));
