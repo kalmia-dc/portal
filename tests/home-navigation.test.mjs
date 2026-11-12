@@ -36,7 +36,7 @@ test('unavailable login/profile hides entrances; lost role returns to staff; ter
  const terminal=setup({portalRole:'terminal',isAdmin:false},'terminal');assert(terminal.field('homeFunctions').hidden);
  const start=html.indexOf('function redirectTerminalProfile()'),end=html.indexOf('async function initApp()',start);
  terminal.c.savePortalUser=x=>x;terminal.c.TERMINAL_MODE_STORAGE_KEY='mode';terminal.c.localStorage={getItem:()=> 'attendance'};let target;
- terminal.c.location={replace:v=>target=v};terminal.run(html.slice(start,end));assert.equal(terminal.run('redirectTerminalProfile()'),true);assert.equal(target,'./attendance.html');
+ terminal.c.location={replace:v=>target=v};terminal.run(html.slice(start,end));assert.equal(terminal.run('redirectTerminalProfile()'),true);assert.equal(target,'./attendance-punch.html');
  terminal.c.localStorage.getItem=()=>null;terminal.run('redirectTerminalProfile()');assert.equal(target,'./meeting-management.html');
 });
 test('updates default to latest two; expansion preserves all and staff view has no admin article links',()=>{

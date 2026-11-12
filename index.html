@@ -572,7 +572,7 @@
         <a class="tool-item" id="adminToolBtn" data-guest-hidden="true" href="#" onclick="goToShiftApp(true);return false;" style="display:none;background:linear-gradient(135deg,#fff8e0,#ffefc8);border:2px solid #ffd97a;">
           <span class="tool-icon">⚙️</span><span class="tool-name">シフト管理（管理者）</span>
         </a>
-        <a class="tool-item" data-guest-hidden="true" href="#" onclick="goToAttendanceApp();return false;" style="background:linear-gradient(135deg,#e9f8f1,#d9f1e7);border:2px solid #86c9ae;">
+        <a class="tool-item" data-guest-hidden="true" href="#" onclick="goToAttendanceApp(true);return false;" style="background:linear-gradient(135deg,#e9f8f1,#d9f1e7);border:2px solid #86c9ae;">
           <span class="tool-linked-badge">試験運用</span><span class="tool-icon">⏱️</span><span class="tool-name">院内勤怠（試験）</span>
         </a>
         <a class="tool-item" id="privateMetricsToolBtn" data-guest-hidden="true" href="#" onclick="goToPrivateMetricsApp();return false;" style="display:none;background:linear-gradient(135deg,#fff6f0,#ffe4d6);border:2px solid #ffb996;">
@@ -1127,7 +1127,7 @@ function redirectTerminalProfile() {
   currentUser = savePortalUser(authenticatedProfile);
   const mode = localStorage.getItem(TERMINAL_MODE_STORAGE_KEY);
   if (mode === 'attendance') {
-    location.replace('./attendance.html');
+    location.replace('./attendance-punch.html');
     return true;
   }
   location.replace('./meeting-management.html');
@@ -1394,10 +1394,11 @@ function startNoticeSync() {
   },()=>{_firebaseNotices={};firebaseNoticeLoadState='error';renderNotices();});
 }
 
-function goToAttendanceApp() {
+function goToAttendanceApp(openAdmin = false) {
   if (!currentUser) return;
   const params = new URLSearchParams({ sid: currentUser.staffId, name: currentUser.name });
-  window.location.href = `https://kalmia-dc.github.io/portal/attendance.html?${params}`;
+  if (openAdmin && authenticatedProfile.isAdmin === true) params.set('tab', 'admin');
+  window.location.href = `./attendance.html?${params}`;
 }
 
 function renderNotices() {

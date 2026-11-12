@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>受付打刻｜カルミアDC</title>
+  <link rel="stylesheet" href="./portal-common.css?v=20261005">
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #f3f7f5; color: #1d2d27; font-family: "Yu Gothic UI", Meiryo, sans-serif; }
+    main { width: min(960px, calc(100% - 32px)); margin: 40px auto; }
+    header { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 8px; }
+    h1 { margin: 0; color: #0f5f47; }
+    time { font-size: clamp(1.35rem, 4vw, 2rem); font-weight: 700; }
+    .buttons { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin: 28px 0; }
+    .buttons button { min-height: 96px; padding: 12px; border: 0; border-radius: 14px; background: #17795b; color: #fff; font-family: inherit; font-size: clamp(1.2rem, 4vw, 1.65rem); font-weight: 700; cursor: pointer; }
+    .buttons button[data-punch="breakStart"] { background: #90580b; }
+    .buttons button[data-punch="breakEnd"] { background: #205e95; }
+    .buttons button[data-punch="out"] { background: #64448f; }
+    .buttons button[aria-pressed="true"] { outline: 4px solid #b47b06; outline-offset: 3px; }
+    .buttons button:focus-visible { box-shadow: inset 0 0 0 4px white; }
+    .buttons button:disabled { opacity: .55; cursor: default; }
+    .reader { min-height: 140px; padding: 24px; border: 2px solid #9bc8b5; border-radius: 18px; background: white; text-align: center; }
+    .reader p { margin: 0 0 10px; }
+    #punchResult { font-size: clamp(1.15rem, 4vw, 1.55rem); font-weight: 700; }
+    #punchResult[data-error="true"] { color: #a72e2e; }
+    #managementLink { display: inline-block; margin-top: 24px; color: #0f5f47; }
+    #managementLink[hidden] { display: none; }
+    @media (max-width: 650px) { .buttons { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  </style>
+</head>
+<body>
+  <main>
+    <header><h1>受付打刻</h1><time id="punchClock"></time></header>
+    <div class="buttons" aria-label="打刻の種類">
+      <button type="button" data-punch="in" aria-pressed="false" disabled>出勤</button>
+      <button type="button" data-punch="breakStart" aria-pressed="false" disabled>休憩開始</button>
+      <button type="button" data-punch="breakEnd" aria-pressed="false" disabled>休憩終了</button>
+      <button type="button" data-punch="out" aria-pressed="false" disabled>退勤</button>
+    </div>
+    <section class="reader" role="status">
+      <p id="punchSelection"></p>
+      <div id="punchResult">受付端末に接続しています</div>
+    </section>
+    <a id="managementLink" href="./attendance.html?tab=settings" hidden>勤怠管理に戻る</a>
+  </main>
+  <script type="module" src="./attendance-punch.js"></script>
+</body>
+</html>

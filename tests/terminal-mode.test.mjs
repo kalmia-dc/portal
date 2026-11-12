@@ -20,7 +20,7 @@ function parseInlineScripts(name) {
   }
 }
 
-for (const name of ['index.html', 'attendance.html', 'meeting-management.html', 'terminal-setup.html']) {
+for (const name of ['index.html', 'attendance.html', 'attendance-punch.html', 'meeting-management.html', 'terminal-setup.html']) {
   parseInlineScripts(name);
 }
 
@@ -37,9 +37,12 @@ assert.match(setup, /data-mode="attendance"/);
 assert.match(setup, /data-mode="meeting"/);
 
 const attendance = source('attendance.html');
-assert.match(attendance, /classList\.toggle\(['"]terminal-mode['"],isTerminal\(\)\)/);
-assert.match(attendance, /class="tab staff-only" data-tab="records"/);
-assert.match(attendance, /portalTerminalMode['"]\)!==['"]attendance['"]/);
+assert.match(attendance, /portalTerminalMode['"]\) === ['"]attendance['"][\s\S]*?\.\/attendance-punch\.html/);
+assert.match(attendance, /class="tab active staff-only" data-tab="records"/);
+assert.doesNotMatch(attendance, /data-punch=/);
+const punch = source('attendance-punch.html');
+assert.deepEqual([...punch.matchAll(/<button[^>]*data-punch="([^"]+)"/g)].map(match => match[1]), ['in','breakStart','breakEnd','out']);
+new vm.SourceTextModule(source('attendance-punch.js'));
 
 const meeting = source('meeting-management.html');
 assert.match(meeting, /function isReadOnlyTerminal\(\)/);

@@ -14,6 +14,8 @@ for(const file of ['attendance.html','shift.html']){
 const fields=Object.fromEntries(['profileStaff','profileHireDate','profileEmploymentType','profileLeaveGrantType','profileWeeklyDays','profileWeeklyDaysMode','profileWeeklyHours','profileLeaveBalance','profileWeeklyHoursLabel','profileWorkHint','saveProfileButton'].map(id=>[id,{value:'',disabled:false}]));
 let stored=null,writes=0,admin=true;
 const context=vm.createContext({console,Date,Number,Math,Error,profiles:{},user:{staffId:'admin'},db:{},$:id=>fields[id],isAdmin:()=>admin,ref:(_,p)=>p,dateKey:d=>d.toISOString().slice(0,10),notify(){},audit:async()=>{},runTransaction:async(p,fn)=>{assert.equal(p,'attendance/profiles/tamiya');stored=fn(structuredClone(stored));writes++;return{committed:true,snapshot:{val:()=>structuredClone(stored)}}}});
+context.pageLifecycle={active:true};
+context.pageAwait=work=>work();
 const code=html.slice(html.indexOf('function hasProfileBalance('),html.indexOf('function attendanceRate('));vm.runInContext(code,context);
 const run=s=>vm.runInContext(s,context);
 function form(){Object.assign(fields.profileStaff,{value:'tamiya'});fields.profileHireDate.value='2025-10-01';fields.profileEmploymentType.value='flexiblePartTime';fields.profileLeaveGrantType.value='regular';fields.profileWeeklyDays.value='';fields.profileWeeklyDaysMode.value='unspecified';fields.profileWeeklyHours.value='40';fields.profileLeaveBalance.value='';}
