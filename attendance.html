@@ -33,6 +33,7 @@
 <script defer src="./portal-common.js?v=20261005"></script>
 <script src="./portal-statistics.js?v=20261021"></script>
 <script src="./portal-shift-time.js?v=20261005"></script>
+<script defer src="./vendor/sheetjs-0.20.3/xlsx.mini.min.js"></script>
 </head>
 <body>
 <div id="loginView" class="login hidden">
@@ -255,9 +256,36 @@ async function checkReaderHeartbeat(){try{if(!terminalId||!isAdmin())return;cons
 function renderAll(){if(!user)return;renderToday();renderRecords();renderCorrections();renderLeave();if(isAdmin()){renderAdmin();renderSettings()}}
 function downloadBlob(content,type,name){const blob=new Blob([content],{type}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();URL.revokeObjectURL(a.href)}
 function excelRows(sid,mk){const res=calcMonth(sid,mk);return[['スタッフ','日付','シフト','出勤','退勤','休憩(分)','実働(分)','遅刻(分)','早退(分)','所定外(分)','法定時間外(分)','状態'],...res.rows.map(r=>[staffName(sid),r.ds,r.shift.label||'',fmtTime(r.firstIn),fmtTime(r.lastOut),r.breakMin,r.work,r.late,r.early,r.scheduledOver,r.statutoryOver,r.flags.join('・')])]}
-function rowsToExcel(rows){return`<html><meta charset="utf-8"><table>${rows.map((r,i)=>`<tr>${r.map(c=>`<${i?'td':'th'}>${esc(c)}</${i?'td':'th'}>`).join('')}</tr>`).join('')}</table></html>`}
-function exportExcel(){if(!user)return;const sid=recordSid(),mk=$('recordMonth').value;downloadBlob(rowsToExcel(excelRows(sid,mk)),'application/vnd.ms-excel',`勤怠_${staffName(sid)}_${mk}.xls`)}
-function exportAllStaff(){if(!isAdmin())return;const mk=$('adminMonth').value,staff=monthStaff(mk).filter(s=>isNormalStatisticsStaff(s.id));const rows=staff.flatMap((s,i)=>excelRows(s.id,mk).slice(i?1:0));downloadBlob(rowsToExcel(rows),'application/vnd.ms-excel',`勤怠_全スタッフ_${mk}.xls`)}
+function downloadAttendanceWorkbook(rows, filename) {
+  try {
+    const xlsx = window.XLSX;
+    if (!xlsx) throw new Error('Excel library failed to load');
+    const workbook = xlsx.utils.book_new();
+    xlsx.utils.book_append_sheet(workbook, xlsx.utils.aoa_to_sheet(rows), '勤怠');
+    const contents = xlsx.write(workbook, { bookType: 'xlsx', type: 'array' });
+    downloadBlob(contents, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', filename);
+  } catch (error) {
+    console.error('勤怠のExcel出力に失敗しました', error);
+    notify('Excel出力に失敗しました。ページを再読み込みしてお試しください。', 'error');
+  }
+}
+function exportExcel() {
+  if (!user) return;
+  const sid = recordSid();
+  const month = $('recordMonth').value;
+  downloadAttendanceWorkbook(excelRows(sid, month), `勤怠_${staffName(sid)}_${month}.xlsx`);
+}
+function exportAllStaff() {
+  if (!isAdmin()) return;
+  const month = $('adminMonth').value;
+  const staff = monthStaff(month).filter(s => isNormalStatisticsStaff(s.id));
+  if (!staff.length) {
+    notify('対象月の出力対象スタッフがいません。');
+    return;
+  }
+  const rows = staff.flatMap((s, index) => excelRows(s.id, month).slice(index ? 1 : 0));
+  downloadAttendanceWorkbook(rows, `勤怠_全スタッフ_${month}.xlsx`);
+}
 function exportBackup(){if(!isAdmin())return;const mk=$('adminMonth').value,payload={version:2,exportedAt:new Date().toISOString(),month:mk,punches:Object.fromEntries(Object.entries(punches).filter(([k])=>k.startsWith(mk))),shifts:shifts[mk]||{},corrections:Object.fromEntries(Object.entries(corrections).filter(([,v])=>v.date?.startsWith(mk))),profiles,leaveTransactions:leaveTx,monthLocks:monthLocks[mk]||{}};downloadBlob(JSON.stringify(payload,null,2),'application/json',`勤怠バックアップ_${mk}.json`)}
 let jobcanPreviewRows=[];
 const JOBCAN_STAFF_IDS={api0000012:'sugihira','0019':'hokari','0041':'shinoda','0022':'tsuruta','0029':'yoshida','044':'takagi','043':'matsumoto','0001':'yamada','0010':'tamiya','0040':'tanaka','0025':'momo','0031':'furuse','0011':'koyama','0027':'iwasawa','0030':'ikegame',api005186936:'okiyama','042':'shinozuka','0032':'suzuki','0035':'kuroki'};
