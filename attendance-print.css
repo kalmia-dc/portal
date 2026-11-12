@@ -1,0 +1,78 @@
+#monthlyPrint { display: none; }
+
+@page { size: A4 landscape; margin: 9mm; }
+
+@media print {
+  body.attendance-printing {
+    margin: 0;
+    background: white;
+    color: #382719;
+  }
+
+  body.attendance-printing > :not(#monthlyPrint) { display: none !important; }
+  body.attendance-printing > #monthlyPrint {
+    display: block;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  #monthlyPrint .report-page { color: var(--report-ink); font: 9pt/1.18 "Yu Gothic", Meiryo, sans-serif; }
+  #monthlyPrint h1 {
+    margin: 0;
+    padding: 2mm 1mm;
+    background: var(--report-accent);
+    font-size: 17pt;
+    text-align: center;
+  }
+  #monthlyPrint .report-identity {
+    display: grid;
+    grid-template-columns: 1fr 2fr;
+    background: var(--report-header);
+    padding: 1.2mm 4mm;
+    font-weight: bold;
+  }
+  #monthlyPrint .report-summary {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    text-align: center;
+    margin: 1.6mm 0 1.6mm;
+    padding: 0;
+  }
+  #monthlyPrint dt { background: var(--report-header); font-weight: bold; padding: .65mm 0; }
+  #monthlyPrint dd {
+    background: var(--report-summary);
+    margin: 0;
+    padding: .7mm 0;
+    font-size: 10pt;
+    font-weight: bold;
+  }
+  #monthlyPrint .report-note { margin: 0 0 1.3mm; padding-left: 1mm; font-size: 8pt; }
+  #monthlyPrint table {
+    width: 100%;
+    min-width: 0;
+    table-layout: fixed;
+    border-collapse: collapse;
+    font-size: 8.75pt;
+    line-height: 1;
+  }
+  #monthlyPrint td, #monthlyPrint th {
+    position: static;
+    padding: .22mm 1mm;
+    border: 1px solid var(--report-line);
+    color: inherit;
+    text-align: center;
+    white-space: nowrap;
+  }
+  #monthlyPrint thead th { padding-block: 1mm; background: var(--report-accent); }
+  #monthlyPrint tr { break-inside: avoid; }
+  #monthlyPrint tfoot { display: table-row-group; }
+  #monthlyPrint .report-white { background: var(--report-white); }
+  #monthlyPrint .report-alternate { background: var(--report-alternate); }
+  #monthlyPrint .report-saturday { background: var(--report-saturday); }
+  #monthlyPrint .report-sunday { background: var(--report-sunday); }
+  #monthlyPrint tfoot th, #monthlyPrint tfoot td {
+    background: var(--report-header);
+    font-weight: bold;
+    padding-block: 1mm;
+  }
+}

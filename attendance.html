@@ -25,9 +25,9 @@
     .login{min-height:100vh;display:grid;place-items:center;padding:20px;background:linear-gradient(150deg,#0f654b,#2aa27b)}.login-card{width:min(420px,100%);padding:28px;border-radius:24px;background:white;box-shadow:0 20px 60px rgba(0,0,0,.2)}.login-card h1{margin:0;color:var(--green2)}
     .modal{position:fixed;inset:0;z-index:50;display:none;place-items:center;padding:16px;background:rgba(15,35,27,.55)}.modal.open{display:grid}.modal-box{width:min(560px,100%);max-height:90vh;overflow:auto;padding:22px;border-radius:18px;background:white}.modal-box h2{margin:0 0 14px;color:var(--green2)}
     @media(max-width:800px){.hero{grid-template-columns:1fr}.clock{text-align:left}.card,.card.third{grid-column:1/-1}.kpis{grid-template-columns:repeat(2,1fr)}header{padding:10px}.user{display:none}}
-    @media print{header,nav,.hero,.notice,.no-print,.btn{display:none!important}body{background:white}.shell{width:100%;margin:0}.panel{display:none!important}.panel.print-target{display:block!important}.card{border:0;box-shadow:none;padding:0}.table-wrap{overflow:visible;border:0}table{min-width:0;font-size:8.5pt}th,td{padding:5px 4px}.admin-only{display:block!important}@page{size:A4 landscape;margin:10mm}}
   </style>
 <link rel="stylesheet" href="./portal-common.css?v=20261005">
+<link rel="stylesheet" href="./attendance-print.css?v=20261112-paid-print">
 <script defer src="./portal-common.js?v=20261005"></script>
 <script src="./portal-statistics.js?v=20261021"></script>
 <script src="./portal-shift-time.js?v=20261005"></script>
@@ -52,7 +52,7 @@
       </div>
     </section>
 
-    <section id="panel-records" class="panel print-target active"><article class="card full"><div class="row no-print"><div class="field admin-only"><label>スタッフ</label><select id="recordStaff"></select></div><div class="field"><label>対象月</label><input id="recordMonth" type="month"></div><button class="btn secondary" onclick="moveMonth(-1)">前月</button><button class="btn secondary" onclick="moveMonth(1)">翌月</button><button class="btn" onclick="exportExcel()">Excel出力</button><button class="btn" onclick="printMonthly()">PDF・印刷</button></div><h2 id="recordTitle" style="margin-top:18px">月次勤怠</h2><div id="monthSummary" class="kpis" style="margin-bottom:14px"></div><div class="table-wrap"><table><thead><tr><th>日付</th><th>シフト</th><th>出勤</th><th>退勤</th><th>休憩</th><th>実働</th><th>遅刻</th><th>早退</th><th>所定外</th><th>法定時間外</th><th>状態</th></tr></thead><tbody id="recordsBody"></tbody></table></div></article></section>
+    <section id="panel-records" class="panel active"><article class="card full"><div class="row no-print"><div class="field admin-only"><label>スタッフ</label><select id="recordStaff"></select></div><div class="field"><label>対象月</label><input id="recordMonth" type="month"></div><button class="btn secondary" onclick="moveMonth(-1)">前月</button><button class="btn secondary" onclick="moveMonth(1)">翌月</button><button class="btn" onclick="exportExcel()">Excel出力</button><button class="btn" onclick="printMonthly()">PDF・印刷</button></div><h2 id="recordTitle" style="margin-top:18px">月次勤怠</h2><div id="monthSummary" class="kpis" style="margin-bottom:14px"></div><div class="table-wrap"><table><thead><tr><th>日付</th><th>シフト</th><th>出勤</th><th>退勤</th><th>休憩</th><th>実働</th><th>遅刻</th><th>早退</th><th>所定外</th><th>法定時間外</th><th>状態</th></tr></thead><tbody id="recordsBody"></tbody></table></div></article></section>
 
     <section id="panel-requests" class="panel"><div class="grid"><article class="card"><h2>打刻修正を申請</h2><div class="field"><label>対象日</label><input id="correctionDate" type="date"></div><div class="row"><div class="field"><label>打刻種別</label><select id="correctionType"><option value="in">出勤</option><option value="breakStart">休憩開始</option><option value="breakEnd">休憩終了</option><option value="out">退勤</option></select></div><div class="field"><label>正しい時刻</label><input id="correctionTime" type="time"></div></div><div class="field"><label>理由</label><textarea id="correctionReason" placeholder="打刻忘れ、時刻の選択間違いなど"></textarea></div><button class="btn" onclick="submitCorrection()">申請する</button></article><article class="card"><h2>自分の申請履歴</h2><div id="myCorrections" class="list"></div></article></div></section>
 
@@ -64,10 +64,12 @@
   </main>
 </div>
 
+<section id="monthlyPrint" aria-hidden="true"></section>
 <div id="confirmModal" class="modal"><div class="modal-box"><h2 id="confirmTitle">確認</h2><div id="confirmBody"></div><div class="row" style="justify-content:flex-end;margin-top:18px"><button class="btn secondary" onclick="closeModal()">閉じる</button><button id="confirmAction" class="btn">実行</button></div></div></div>
 
 <script type="module">
-import { createAttendanceWorkbook } from "./attendance-workbook.mjs";
+import { createAttendanceWorkbook } from "./attendance-workbook.mjs?v=20261112-paid-print";
+import { buildAttendanceReport, indexFullDayPaidLeave, renderAttendancePrint } from "./attendance-report.mjs?v=20261112-paid-print";
 import {personName} from './portal-person-display.mjs?v=20261019-director';
 
 import {createPageLifecycle} from './portal-page-lifecycle.mjs';
@@ -150,24 +152,50 @@ async function bootstrap() {
 function bindUI(){document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>showTab(b.dataset.tab));$('recordMonth').onchange=async()=>{try{if(!isAdmin())await pageAwait(async () => (loadPersonalPunchMonth($('recordMonth').value)));renderRecords()}catch(error){if(error?.code!=='portal/access-lost')throw error;}};$('recordStaff').onchange=renderRecords;$('adminMonth').onchange=renderAdmin;$('profileStaff').onchange=loadProfileForm;$('profileEmploymentType').onchange=updateProfileWorkFields;$('profileWeeklyDaysMode').onchange=updateProfileWorkFields;window.addEventListener('online',()=>{if(!attendanceClosed)setConnection(true)});window.addEventListener('offline',()=>{if(!attendanceClosed)setConnection(false)});attendanceTimers.add(setInterval(renderClock,1000));attendanceTimers.add(setInterval(checkReaderHeartbeat,15000))}
 function showTab(name){document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active',x.dataset.tab===name));document.querySelectorAll('.panel').forEach(x=>x.classList.toggle('active',x.id===`panel-${name}`));if(name==='records')renderRecords();if(name==='admin')renderAdmin();if(name==='settings')renderSettings()}
 function setConnection(ok,error=false){$('syncDot').className=`dot${error?' err':ok?'':' off'}`;$('syncText').textContent=error?'同期エラー':ok?'同期済み':'オフライン'}
-async function loadPersonalPunchMonth(month){try{const [year,monthNumber]=month.split('-').map(Number),days=new Date(year,monthNumber,0).getDate(),sid=user.staffId;for(let day=1;day<=days;day++){const date=`${month}-${String(day).padStart(2,'0')}`,snapshot=await pageAwait(async () => (get(ref(db,`attendance/punches/${date}/${sid}`))));if(snapshot.exists()){punches[date] ||= {};punches[date][sid]=snapshot.val()}else if(punches[date])delete punches[date][sid]}}catch(error){if(error?.code!=='portal/access-lost')throw error;}}
+async function loadPersonalPunchMonth(month) {
+  personalReportMonths.delete(month);
+  const [year, monthNumber] = month.split('-').map(Number);
+  const days = new Date(year, monthNumber, 0).getDate();
+  const sid = user.staffId;
+  for (let day = 1; day <= days; day++) {
+    const date = `${month}-${String(day).padStart(2, '0')}`;
+    const snapshot = await pageAwait(() => get(ref(db, `attendance/punches/${date}/${sid}`)));
+    if (attendanceClosed) return;
+    if (snapshot.exists()) {
+      punches[date] ||= {};
+      punches[date][sid] = snapshot.val();
+    } else if (punches[date]) {
+      delete punches[date][sid];
+    }
+  }
+  personalReportMonths.add(month);
+}
+const syncedReportSources = new Set();
+const personalReportMonths = new Set();
+function subscribeReportData(key, target, receive) {
+  onValue(target, snapshot => {
+    receive(snapshot.val() || {});
+    syncedReportSources.add(key);
+    renderAll();
+  }, () => syncedReportSources.delete(key));
+}
 function bindFirebase(){
   const lifecyclePath=isAdmin()?'staffLifecycle':'staffLifecycle/'+user.staffId;
   onValue(ref(db,lifecyclePath),s=>{lifecycleStates=isAdmin()?s.val()||{}:{[user.staffId]:s.val()};lifecycleReady=true;initSelects();},()=>{lifecycleReady=false;initSelects();notify('在籍状態を確認できません。通常候補の操作を停止しています。','error');});
-  onValue(ref(db,'extra_staff'),s=>{extraStaff=Object.values(s.val()||{});initSelects()});
-  if(isAdmin())onValue(ref(db,'attendance/punches'),s=>{punches=s.val()||{};renderAll()});
+  subscribeReportData('staff',ref(db,'extra_staff'),value=>{extraStaff=Object.values(value);initSelects()});
+  if(isAdmin())subscribeReportData('punches',ref(db,'attendance/punches'),value=>{punches=value});
   else onValue(ref(db,`attendance/punches/${dateKey(new Date())}/${user.staffId}`),s=>{const ds=dateKey(new Date());punches[ds] ||= {};punches[ds][user.staffId]=s.val()||{};renderAll()});
-  onValue(ref(db,'shifts'),s=>{shifts=s.val()||{};renderAll()});
+  subscribeReportData('shifts',ref(db,'shifts'),value=>{shifts=value});
   const staffScoped=path=>isAdmin()?ref(db,path):query(ref(db,path),orderByChild('staffId'),equalTo(user.staffId));
   onValue(staffScoped('attendance/corrections'),s=>{corrections=s.val()||{};renderAll()});
   if(isAdmin())onValue(ref(db,'attendance/profiles'),s=>{profiles=s.val()||{};renderAll()});
   else onValue(ref(db,`attendance/profiles/${user.staffId}`),s=>{profiles={[user.staffId]:s.val()||{}};renderAll()});
-  onValue(staffScoped('attendance/leaveTransactions'),s=>{leaveTx=s.val()||{};renderAll()});
+  subscribeReportData('leave',staffScoped('attendance/leaveTransactions'),value=>{leaveTx=value});
   if(isAdmin())onValue(ref(db,'attendance/cards'),s=>{cards=s.val()||{};renderSettings()});
   if(terminalId&&isAdmin())onValue(ref(db,`attendance/terminals/${terminalId}/registration`),s=>{registration=s.val();renderCardRegistration()});
   onValue(ref(db,'attendance/monthLocks'),s=>{monthLocks=s.val()||{};renderAll()});
-  onValue(staffScoped('requests'),s=>{shiftRequests=s.val()||{};renderAll()});
-  onValue(ref(db,'attendance/settings'),s=>{settings={...settings,...(s.val()||{})};renderSettings()});
+  subscribeReportData('requests',staffScoped('requests'),value=>{shiftRequests=value});
+  subscribeReportData('settings',ref(db,'attendance/settings'),value=>{settings={...settings,...value}});
 }
 function dayEvents(ds,sid){return Object.values(punches?.[ds]?.[sid]||{}).filter(e=>PUNCH_LABEL[e?.type]&&!e.voided).sort((a,b)=>String(a.occurredAt).localeCompare(String(b.occurredAt)))}
 function calcDay(ds,sid){const ev=dayEvents(ds,sid),by=t=>ev.filter(e=>e.type===t).map(e=>parseTs(e.occurredAt)),ins=by('in'),outs=by('out'),bs=by('breakStart'),be=by('breakEnd'),firstIn=ins[0]||null,lastOut=outs.at(-1)||null,jobcan=punches?.[ds]?.[sid]?._jobcanSummary;let breakMin=0;for(let i=0;i<Math.min(bs.length,be.length);i++)breakMin+=minutesBetween(bs[i],be[i]);const elapsed=minutesBetween(firstIn,lastOut);let work=Math.max(0,elapsed-breakMin);if(jobcan?.source==='jobcan-import'){if(jobcan.breakMinutes!==null&&Number.isFinite(Number(jobcan.breakMinutes)))breakMin=Number(jobcan.breakMinutes);if(jobcan.workMinutes!==null&&Number.isFinite(Number(jobcan.workMinutes)))work=Number(jobcan.workMinutes)}const mk=ds.slice(0,7),shiftKey=shifts?.[mk]?.[sid]?.[ds]||'',sd=PortalShiftTime.resolve(shifts[mk],sid,ds,SHIFT_DEF);const start=sd.start?new Date(`${ds}T${sd.start}:00`):null,end=sd.end?new Date(`${ds}T${sd.end}:00`):null;const late=firstIn&&start?Math.max(0,minutesBetween(start,firstIn)):0,early=lastOut&&end?Math.max(0,minutesBetween(lastOut,end)):0,scheduledOver=Math.max(0,work-(sd.workMinutes||0));const flags=[];if(firstIn&&!lastOut&&ds<dateKey(new Date()))flags.push('退勤未打刻');if(!firstIn&&sd.workMinutes>0&&ds<=dateKey(new Date()))flags.push('出勤未打刻');if(!jobcan&&bs.length!==be.length)flags.push('休憩打刻不整合');if(ev.length&&(!firstIn||!lastOut))flags.push('打刻不足');if(jobcan?.jobcanError)flags.push('Jobcan要確認');return{ds,sid,ev,firstIn,lastOut,breakMin,work,shiftKey,shift:sd,late,early,scheduledOver,flags,statutoryOver:0}}
@@ -177,7 +205,12 @@ function renderClock(){const d=new Date();$('clockDate').textContent=d.toLocaleD
 function renderToday(){if(!user)return;const ds=dateKey(new Date()),r=calcDay(ds,user.staffId);$('todayIn').textContent=fmtTime(r.firstIn);$('todayOut').textContent=fmtTime(r.lastOut);$('todayWork').textContent=fmtMin(r.work);$('todayBreak').textContent=fmtMin(r.breakMin);$('heroShift').textContent=`今日のシフト：${r.shift.label||'未設定'}${r.shift.start?` ${r.shift.start}〜${r.shift.end}`:''}`;$('todayFlags').innerHTML=r.flags.length?r.flags.map(x=>`<div class="item"><span class="flag err">要確認</span> ${esc(x)}</div>`).join(''):'<div class="empty">確認事項はありません</div>'}
 function recordSid(){return isAdmin()?($('recordStaff').value||user.staffId):user.staffId}
 function renderRecords(){if(!pageLifecycle.active)return;if(!user)return;const sid=recordSid(),mk=$('recordMonth').value||monthKey(new Date()),res=calcMonth(sid,mk);$('recordTitle').textContent=`${staffName(sid)}さん ${mk.replace('-','年')}月 勤怠`;$('monthSummary').innerHTML=[['実働',fmtMin(res.totals.work)],['所定外',fmtMin(res.totals.scheduledOver)],['法定時間外',fmtMin(res.totals.statutoryOver)],['要確認',`${res.totals.missing}日`]].map(x=>`<div class="kpi"><span>${x[0]}</span><b>${x[1]}</b></div>`).join('');$('recordsBody').innerHTML=res.rows.map(r=>`<tr><td>${r.ds.slice(8)}日</td><td>${esc(r.shift.label||'未設定')}</td><td>${fmtTime(r.firstIn)}</td><td>${fmtTime(r.lastOut)}</td><td>${fmtMin(r.breakMin)}</td><td>${fmtMin(r.work)}</td><td>${fmtMin(r.late)}</td><td>${fmtMin(r.early)}</td><td>${fmtMin(r.scheduledOver)}</td><td>${fmtMin(r.statutoryOver)}</td><td>${r.flags.length?'<span class="flag err">要確認</span>':'<span class="flag ok">OK</span>'}</td></tr>`).join('')}
-function moveMonth(delta){const [y,m]=$('recordMonth').value.split('-').map(Number),d=new Date(y,m-1+delta,1);$('recordMonth').value=monthKey(d);renderRecords()}
+function moveMonth(delta) {
+  const [year, month] = selectedRecordMonth().split('-').map(Number);
+  const field = $('recordMonth');
+  field.value = monthKey(new Date(year, month - 1 + delta, 1));
+  field.dispatchEvent(new Event('change'));
+}
 function renderCorrections(){if(!user)return;const mine=Object.entries(corrections).filter(([,r])=>r.staffId===user.staffId).sort((a,b)=>String(b[1].submittedAt).localeCompare(String(a[1].submittedAt)));$('myCorrections').innerHTML=mine.length?mine.map(([id,r])=>`<div class="item"><div class="item-head"><b>${r.date} ${PUNCH_LABEL[r.type]} → ${r.requestedTime}</b><span class="flag ${r.status==='approved'?'ok':r.status==='rejected'?'err':'pending'}">${r.status==='approved'?'承認済み':r.status==='rejected'?'差し戻し':'承認待ち'}</span></div><small>${esc(r.reason)}${r.reviewComment?`／${esc(r.reviewComment)}`:''}</small></div>`).join(''):'<div class="empty">申請はありません</div>'}
 async function submitCorrection(){try{if(!user)return;const date=$('correctionDate').value,type=$('correctionType').value,time=$('correctionTime').value,reason=$('correctionReason').value.trim();if(!date||!time||!reason){notify('日付・時刻・理由を入力してください','error');return}const node=push(ref(db,'attendance/corrections'));await pageAwait(async () => (set(node,{id:node.key,staffId:user.staffId,date,type,requestedTime:time,reason,status:'pending',submittedAt:new Date().toISOString()})));$('correctionReason').value='';notifyManagers(`⏱️ 打刻修正申請\n${user.name}さん：${date} ${PUNCH_LABEL[type]} → ${time}\n勤怠管理で確認してください。`);$('correctionReason').value='';notify('修正申請を送信しました')}catch(error){if(error?.code!=='portal/access-lost')throw error;}}
 function leaveTransactions(sid){return Object.values(leaveTx).filter(x=>x.staffId===sid).sort((a,b)=>String(b.date||b.createdAt).localeCompare(String(a.date||a.createdAt)))}
@@ -286,18 +319,44 @@ async function saveTerminal(){try{if(!isAdmin())return;terminalId=$('terminalId'
 async function checkReaderHeartbeat(){try{if(!terminalId||!isAdmin())return;const s=await pageAwait(async () => (get(ref(db,`attendance/terminals/${terminalId}/heartbeat`)))),v=s.val(),alive=v&&Date.now()-new Date(v).getTime()<60000;$('readerHeartbeat').textContent=alive?'読取ツール：接続中':'読取ツール：未接続（セットアップ手順を確認）';$('readerHeartbeat').style.borderColor=alive?'#9bc8b5':'#efb2b2'}catch(error){if(error?.code!=='portal/access-lost')throw error;}}
 function renderAll(){if(!user)return;renderToday();renderRecords();renderCorrections();renderLeave();if(isAdmin()){renderAdmin();renderSettings()}}
 function downloadBlob(content,type,name){const blob=new Blob([content],{type}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();URL.revokeObjectURL(a.href)}
-function attendanceReport(staffId, month) {
-  const { rows, totals } = calcMonth(staffId, month);
-  return {
-    name: staffName(staffId), totals,
-    rows: rows.map(row => ({ ...row, inTime: fmtTime(row.firstIn), outTime: fmtTime(row.lastOut) }))
-  };
+function reportSourcesReady() {
+  return ['shifts', 'leave', 'requests', 'settings', 'staff'].every(key => syncedReportSources.has(key)) &&
+    (!isAdmin() || (syncedReportSources.has('punches') && lifecycleReady));
 }
-async function downloadAttendanceWorkbook(reports, month, filename) {
+function attendanceReport(staffId, month, paidDates) {
+  return buildAttendanceReport(staffName(staffId), month, calcMonth(staffId, month), paidDates.get(staffId), fmtTime);
+}
+function selectedRecordMonth() {
+  return $('recordMonth').value || monthKey(new Date());
+}
+function selectedAttendanceReport(month, staffId) {
+  return attendanceReport(staffId, month, indexFullDayPaidLeave(shiftRequests, leaveTx, month));
+}
+async function prepareAttendanceReport() {
+  if (!user || attendanceClosed) return null;
+  if (!reportSourcesReady()) {
+    notify('勤怠データを確認できていません。読み込み後にもう一度お試しください。', 'error');
+    return null;
+  }
+  const month = selectedRecordMonth();
+  const staffId = recordSid();
+  if (!isAdmin() && !personalReportMonths.has(month)) {
+    try {
+      await loadPersonalPunchMonth(month);
+      if (attendanceClosed) return null;
+    } catch (error) {
+      if (error?.code !== 'portal/access-lost') notify('打刻を読み込めませんでした。もう一度お試しください。', 'error');
+      return null;
+    }
+  }
+  if (attendanceClosed || !reportSourcesReady() || selectedRecordMonth() !== month || recordSid() !== staffId) return null;
+  return { month, report: selectedAttendanceReport(month, staffId) };
+}
+async function downloadAttendanceWorkbook(reports, filename) {
   try {
     const Workbook = window.ExcelJS?.Workbook;
     if (!Workbook) throw new Error('Excel library failed to load');
-    const workbook = createAttendanceWorkbook(Workbook, reports, month);
+    const workbook = createAttendanceWorkbook(Workbook, reports);
     const contents = await workbook.xlsx.writeBuffer();
     pageLifecycle.assertActive();
     downloadBlob(contents, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', filename);
@@ -307,23 +366,27 @@ async function downloadAttendanceWorkbook(reports, month, filename) {
     notify('Excel出力に失敗しました。ページを再読み込みしてお試しください。', 'error');
   }
 }
-function exportExcel() {
-  if (!user) return;
-  const sid = recordSid();
-  const month = $('recordMonth').value || monthKey(new Date());
-  const report = attendanceReport(sid, month);
-  return downloadAttendanceWorkbook([report], month, `勤怠_${report.name}_${month}.xlsx`);
+async function exportExcel() {
+  const selection = await prepareAttendanceReport();
+  if (!selection) return;
+  const { month, report } = selection;
+  return downloadAttendanceWorkbook([report], `勤怠_${report.name}_${month}.xlsx`);
 }
 function exportAllStaff() {
-  if (!isAdmin()) return;
+  if (!isAdmin() || attendanceClosed) return;
+  if (!reportSourcesReady()) {
+    notify('勤怠データを確認できていません。読み込み後にもう一度お試しください。', 'error');
+    return;
+  }
   const month = $('adminMonth').value || monthKey(new Date());
   const staff = monthStaff(month).filter(s => isNormalStatisticsStaff(s.id));
   if (!staff.length) {
     notify('対象月の出力対象スタッフがいません。');
     return;
   }
-  const reports = staff.map(member => attendanceReport(member.id, month));
-  return downloadAttendanceWorkbook(reports, month, `勤怠_全スタッフ_${month}.xlsx`);
+  const paidDates = indexFullDayPaidLeave(shiftRequests, leaveTx, month);
+  const reports = staff.map(member => attendanceReport(member.id, month, paidDates));
+  return downloadAttendanceWorkbook(reports, `勤怠_全スタッフ_${month}.xlsx`);
 }
 let jobcanPreviewRows=[];
 const JOBCAN_STAFF_IDS={api0000012:'sugihira','0019':'hokari','0041':'shinoda','0022':'tsuruta','0029':'yoshida','044':'takagi','043':'matsumoto','0001':'yamada','0010':'tamiya','0040':'tanaka','0025':'momo','0031':'furuse','0011':'koyama','0027':'iwasawa','0030':'ikegame',api005186936:'okiyama','042':'shinozuka','0032':'suzuki','0035':'kuroki'};
@@ -349,7 +412,27 @@ async function readJobcanLeave(){try{
 }catch(error){if(error?.code!=='portal/access-lost')throw error;}}
 async function previewJobcanLeave(){try{try{jobcanLeavePreviewData=await pageAwait(async () => (readJobcanLeave()));const d=jobcanLeavePreviewData,dates=[...d.uses.map(x=>x.date),...d.grants.map(x=>x.date)].sort();$('jobcanLeavePreview').textContent=`取込可能：有休使用${d.uses.length}件／自動付与${d.grants.length}件／基準残高${d.balances.length}名。履歴期間：${dates[0]||'-'}～${dates.at(-1)||'-'}。基準日：${[...new Set(d.balances.map(x=>x.date))].join('、')}`}catch(e){if (pageLifecycle.active) {jobcanLeavePreviewData=null;$('jobcanLeavePreview').textContent=e.message}}}catch(error){if(error?.code!=='portal/access-lost')throw error;}}
 async function importJobcanLeave(){try{if(!isAdmin())return;if(!jobcanLeavePreviewData)await pageAwait(async () => (previewJobcanLeave()));const d=jobcanLeavePreviewData;if(!d||!confirm(`有休使用${d.uses.length}件、自動付与${d.grants.length}件、基準残高${d.balances.length}名を取り込みますか？`))return;const updates={},importedAt=new Date().toISOString();for(const x of [...d.uses,...d.grants])updates[`attendance/leaveTransactions/${x.id}`]={...x,importedAt,createdAt:importedAt};for(const x of d.balances){updates[`attendance/profiles/${x.staffId}/staffId`]=x.staffId;updates[`attendance/profiles/${x.staffId}/leaveBalanceBaseline`]=x.days;updates[`attendance/profiles/${x.staffId}/leaveBalanceBaselineDate`]=x.date;updates[`attendance/profiles/${x.staffId}/leaveBalanceBaselineAt`]=importedAt;updates[`attendance/profiles/${x.staffId}/leaveBalanceSource`]='jobcan';updates[`attendance/profiles/${x.staffId}/updatedBy`]=user.staffId;updates[`attendance/profiles/${x.staffId}/updatedAt`]=importedAt}await pageAwait(async () => (update(ref(db),updates)));audit('jobcanLeaveImport','migration',`${d.uses.length}/${d.grants.length}/${d.balances.length}`);notify(`有休履歴${d.uses.length+d.grants.length}件と基準残高${d.balances.length}名を取り込みました`)}catch(error){if(error?.code!=='portal/access-lost')throw error;}}
-function printMonthly(){document.querySelectorAll('.panel').forEach(x=>x.classList.toggle('print-target',x.id==='panel-records'));window.print()}
+function showMonthlyPrint(report) {
+  $('monthlyPrint').innerHTML = renderAttendancePrint(report);
+  document.body.classList.add('attendance-printing');
+}
+async function printMonthly() {
+  const selection = await prepareAttendanceReport();
+  if (!selection) return;
+  showMonthlyPrint(selection.report);
+  window.print();
+}
+window.addEventListener('beforeprint', () => {
+  if (!user || attendanceClosed || !reportSourcesReady() || $('monthlyPrint').hasChildNodes()) return;
+  const month = selectedRecordMonth();
+  if (isAdmin() || personalReportMonths.has(month)) showMonthlyPrint(selectedAttendanceReport(month, recordSid()));
+});
+function clearMonthlyPrint() {
+  $('monthlyPrint').replaceChildren();
+  document.body.classList.remove('attendance-printing');
+}
+window.addEventListener('afterprint', clearMonthlyPrint);
+window.addEventListener('portalAccessLost', clearMonthlyPrint);
 function closeModal(){$('confirmModal').classList.remove('open')}
 async function notifyManagers(text){try{if(PILOT_MODE){console.info('パイロット中のため通知を停止:',text);return}try{await pageAwait(async () => (fetch('https://kalmia-notify.chibakenmin-sugihey.workers.dev',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text})})))}catch(e){if (pageLifecycle.active) {console.warn('LINE WORKS通知に失敗しました',e)}}}catch(error){if(error?.code!=='portal/access-lost')throw error;}}
 Object.assign(window,{submitCorrection,moveMonth,exportExcel,exportAllStaff,previewJobcan,importJobcan,previewJobcanLeave,importJobcanLeave,printMonthly,renderAdmin,lockMonth,saveSettings,saveProfile,registerCard,startCardRegistration,confirmCardRegistration,cancelCardRegistration,saveTerminal,closeModal});
