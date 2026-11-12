@@ -1,4 +1,4 @@
-import {draftEmployee,recordUpdate,lifecycleProjection,removeReviewedShifts,key,text,canonical} from './labor-model.mjs?v=20261024-retirement';
+import {draftEmployee,recordUpdate,lifecycleProjection,removeReviewedShifts,key,text,canonical} from './labor-model.mjs?v=20261112-full-names';
 import {approvalUpdates} from './portal-join-model.mjs';
 import {joinNameKey} from './portal-join-model.mjs';
 import {lifecycleProtection} from './portal-lifecycle-model.mjs';

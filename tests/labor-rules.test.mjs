@@ -23,6 +23,18 @@ async function submitApplication(uid,name) {
   await set(ref(db(uid),'portalJoinRequests/'+uid),applicationChange({user,current:null,name,jobRole:'DH',timestamp:serverTimestamp()}));
   return (await get(ref(db('momo'),'portalJoinRequests/'+uid))).val();
 }
+test('confirmed full name is private, audited, and independent of the roster name',async()=>{
+  const s=store();
+  const original=transition({...draft(),basic:{...draft().basic,name:'架空'}},'confirm',{id:'existing-period',startDate:'2099-02-01'});
+  await s.save(original,0,'old-name');
+  assert.equal((await s.list()).s.data.basic.fullName,undefined);
+  const data={...original,basic:{...original.basic,fullName:'架空 花子'}};
+  const saved=await s.save(data,1,'confirmed-name');
+  assert.equal(saved.data.basic.fullName,'架空 花子');
+  assert.equal((await s.history('s'))['confirmed-name'].after.basic.fullName,'架空 花子');
+  assert.equal((await s.roster()).find(row=>row.id==='s').name,'架空');
+  await assertFails(get(ref(db('admin'),'laborRecords/s/data/basic/fullName')));
+});
 test('onboarding commits the staff, access and approval together and rejects duplicate registration',async()=>{
   const request=await submitApplication('applicant','架空 新入');
   const data=transition({...draftEmployee({id:'new-hire',name:request.name,role:'DH',type:'part'}),googleEmail:request.email},'confirm',{id:'new-period',startDate:'2099-01-01'});

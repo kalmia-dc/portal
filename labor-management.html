@@ -1,4 +1,4 @@
-<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>労務管理 | カルミアDC</title><link rel="stylesheet" href="portal-common.css"><link rel="stylesheet" href="labor.css?v=20261112-onboarding"></head><body>
+<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>労務管理 | カルミアDC</title><link rel="stylesheet" href="portal-common.css"><link rel="stylesheet" href="labor.css?v=20261112-full-names"></head><body>
 <header><a href="index.html">ポータルへ</a><h1>労務管理（入退社・利用登録）</h1><p>職員情報・Googleアカウント・手続き・書類</p><span id="environment"></span></header>
 <p id="message" role="status" aria-live="polite">利用許可を確認しています…</p>
 <main id="app" hidden><article>
@@ -15,6 +15,7 @@
   <form id="onboarding" hidden>
     <h3 id="applicationTitle" tabindex="-1">入社を確定</h3>
     <p id="applicationIdentity"></p>
+    <label>確認した氏名（姓・名）<input id="registrationFullName" maxlength="60" autocomplete="off" required></label>
     <label>登録先<select id="registrationTarget" required></select></label>
     <div id="employmentFields" class="grid">
       <label>雇用形態<select id="registrationType"><option value="">選んでください</option><option value="full">常勤</option><option value="part">非常勤</option><option value="spot">スポット</option></select></label>
@@ -35,7 +36,7 @@
 </section>
 <section id="overview"><h2>期限一覧</h2><div id="deadlines"></div></section>
 <form id="editor" hidden><h2 id="employeeTitle">職員詳細</h2><p id="identity"></p><div class="actions"><button type="submit">入力内容を保存</button><span id="savedState"></span></div>
-<section><h3>基本情報</h3><div class="grid" id="basicFields"></div></section>
+<section><h3>基本情報</h3><p id="fullNameHelp">本人申請や正式な名簿で確認した姓・名を入力してください。</p><div class="grid" id="basicFields"></div></section>
 <section><h3>雇用・入退社</h3><div class="grid"><label>職種<select name="role"><option value="">未確認</option><option value="DR">歯科医師</option><option value="DH">歯科衛生士</option><option value="DA">歯科助手・受付</option></select></label><label>雇用形態<select name="type"><option value="">未確認</option><option value="full">常勤</option><option value="part">非常勤</option><option value="spot">スポット</option></select></label><label>Googleアカウントのメール（任意）<input name="googleEmail" type="email"><small>ポータルアカウントなしの場合は空欄。在籍・退職の登録だけではアカウントを作成・許可しません。</small></label><label>入社日<input name="startDate" type="date"></label><label>退職日<input name="endDate" type="date"></label><label>契約終了日<input name="contractEnd" type="date"></label><label>所定勤務日<input name="days"></label><label>所定勤務時間<input name="hours"></label></div><div class="actions" id="lifecycleActions"></div><div id="periods"></div><p>退職・取消の確定後も過去の勤務履歴を保持します。解除済みシフトは再入社や撤回で復元しません。</p><button type="button" id="reviewShifts">退職後・取消対象シフトを確認</button><div id="shiftReview"></div></section>
 <section><h3>ポータル利用設定</h3><p id="accountStatus"></p><a href="./portal-members.html">ログインアカウント一覧（確認専用）</a></section>
 <section><h3>給与条件の履歴</h3><div id="salaries"></div><div class="grid"><label>適用開始日<input name="salaryDate" type="date"></label><label>基本給（円）<input name="salaryBase" type="number" min="0"></label><label>時給（円）<input name="salaryHourly" type="number" min="0"></label><label>手当（1行につき 名称=金額）<textarea name="salaryAllowances"></textarea></label></div><button id="addSalary" type="button">条件を入力内容に追加</button><p>給与計算・給与明細の作成は今回の対象外です。</p></section>
@@ -48,4 +49,4 @@
   <label>退社時（1行1項目）<textarea id="offboardTemplate"></textarea></label>
   <button type="button" id="saveTemplates">テンプレートを保存</button>
 </details></article></main>
-<dialog id="confirmation"><h2 id="confirmTitle"></h2><p id="confirmText"></p><div class="actions"><button id="confirmYes">確認して実行</button><button id="confirmNo">戻る</button></div></dialog><script src="portal-common.js"></script><script type="module" src="labor-ui.js?v=20261112-onboarding"></script></body></html>
+<dialog id="confirmation"><h2 id="confirmTitle"></h2><p id="confirmText"></p><div class="actions"><button id="confirmYes">確認して実行</button><button id="confirmNo">戻る</button></div></dialog><script src="portal-common.js"></script><script type="module" src="labor-ui.js?v=20261112-full-names"></script></body></html>

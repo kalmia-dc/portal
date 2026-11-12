@@ -841,6 +841,21 @@
                 }
               }
             },
+            "fullName": {
+              ".validate": "(newData.isString() && newData.val().length <= 60) && (newData.hasChildren() || newData.val() === newData.parent().parent().parent().parent().parent().child('laborHistory').child($sid).child(newData.parent().parent().parent().parent().parent().child('laborRecords').child($sid).child('operationId').val()).child('after').child(\"basic\").child(\"fullName\").val())",
+              "$k2": {
+                ".validate": "(true) && (newData.hasChildren() || newData.val() === newData.parent().parent().parent().parent().parent().parent().child('laborHistory').child($sid).child(newData.parent().parent().parent().parent().parent().parent().child('laborRecords').child($sid).child('operationId').val()).child('after').child(\"basic\").child(\"fullName\").child($k2).val())",
+                "$k3": {
+                  ".validate": "(true) && (newData.hasChildren() || newData.val() === newData.parent().parent().parent().parent().parent().parent().parent().child('laborHistory').child($sid).child(newData.parent().parent().parent().parent().parent().parent().parent().child('laborRecords').child($sid).child('operationId').val()).child('after').child(\"basic\").child(\"fullName\").child($k2).child($k3).val())",
+                  "$k4": {
+                    ".validate": "(true) && (newData.hasChildren() || newData.val() === newData.parent().parent().parent().parent().parent().parent().parent().parent().child('laborHistory').child($sid).child(newData.parent().parent().parent().parent().parent().parent().parent().parent().child('laborRecords').child($sid).child('operationId').val()).child('after').child(\"basic\").child(\"fullName\").child($k2).child($k3).child($k4).val())",
+                    "$k5": {
+                      ".validate": "(true) && (newData.hasChildren() || newData.val() === newData.parent().parent().parent().parent().parent().parent().parent().parent().parent().child('laborHistory').child($sid).child(newData.parent().parent().parent().parent().parent().parent().parent().parent().parent().child('laborRecords').child($sid).child('operationId').val()).child('after').child(\"basic\").child(\"fullName\").child($k2).child($k3).child($k4).child($k5).val()) && !newData.hasChildren()"
+                    }
+                  }
+                }
+              }
+            },
             "kana": {
               ".validate": "(newData.isString() && newData.val().length <= 2000) && (newData.hasChildren() || newData.val() === newData.parent().parent().parent().parent().parent().child('laborHistory').child($sid).child(newData.parent().parent().parent().parent().parent().child('laborRecords').child($sid).child('operationId').val()).child('after').child(\"basic\").child(\"kana\").val())",
               "$k2": {

@@ -37,6 +37,7 @@ export function period(input, id) {
 }
 export function validateEmployee(data) {
   key(data.staffId); if(!text(data.basic?.name))throw Error('氏名を入力してください。');
+  if(data.basic.fullName!=null && (typeof data.basic.fullName!=='string' || data.basic.fullName.length>60))throw Error('氏名（姓・名）は60文字以内で入力してください。');
   if(data.basic.birthDate)jstStart(data.basic.birthDate);
   if(data.googleEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.googleEmail))throw Error('Googleメールアドレスを確認してください。');
   if(!['draft','confirmed','retiring','cancelled'].includes(data.status))throw Error('在籍状態を確認してください。');
