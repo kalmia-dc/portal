@@ -4,8 +4,10 @@ import {ref,set,get,update,serverTimestamp,runTransaction} from 'firebase/databa
 import {localRules} from '../tools/build-labor-rule-candidate.mjs';import {createLaborStore} from '../labor-store.mjs';import {draftEmployee,transition} from '../labor-model.mjs';
 import {prepareFile} from '../labor-documents.mjs';import {applicationChange} from '../portal-join-model.mjs';
 import {createMockUserToken} from '@firebase/util';
+import {readFileSync} from 'node:fs';
+const testPort=Number(process.env.LABOR_TEST_PORT||9026);
 let env;const actor={uid:'momo',portalRole:'admin',staffId:'office'},staff={id:'s',name:'架空 花子',role:'DH',type:'part'};
-before(async()=>{env=await initializeTestEnvironment({projectId:'demo-labor',database:{host:'127.0.0.1',port:9026,rules:JSON.stringify(localRules())}});});after(async()=>env?.cleanup());
+before(async()=>{env=await initializeTestEnvironment({projectId:'demo-labor',database:{host:'127.0.0.1',port:testPort,rules:process.env.LABOR_TEST_DEPLOY_RULES?readFileSync(process.env.LABOR_TEST_DEPLOY_RULES,'utf8'):JSON.stringify(localRules())}});});after(async()=>env?.cleanup());
 const db=uid=>uid?env.authenticatedContext(uid,{email:uid+'@example.test',email_verified:true,firebase:{sign_in_provider:'google.com'}}).database():env.unauthenticatedContext().database();
 const store=()=>{const d=db('momo');return createLaborStore({read:async p=>(await get(ref(d,p))).val(),update:u=>update(ref(d),u),timestamp:serverTimestamp,now:Date.now,transaction:(p,fn)=>runTransaction(ref(d,p),fn,{applyLocally:false})},actor,[staff]);};
 const draft=()=>({...draftEmployee(staff),googleEmail:'person@example.test'});
@@ -16,9 +18,41 @@ test('file budget and metadata commit together, immutable bytes, simultaneous ca
 test('direct edits cannot diverge audit snapshot; ordinary admin cannot create HR staff or bind accounts',async()=>{await store().save(draft(),0,'first');const d=draft();d.basic.address='new';await assertFails(update(ref(db('momo')),{'laborRecords/s':{data:d,revision:2,operationId:'bad',updatedBy:'momo',updatedAt:serverTimestamp()},'laborHistory/s/bad':{after:draft(),previousOperationId:'first',by:'momo',at:serverTimestamp()}}));await assertFails(set(ref(db('admin'),'extra_staff/new'),{id:'new',name:'X',role:'DH'}));await assertFails(set(ref(db('person'),'laborConfig/owners/person'),true));});
 test('date-aware shift writes and lock reject out-of-period edits and deletion',async()=>{const d=transition(draft(),'confirm',{id:'p',startDate:'2099-01-10',endDate:'2099-01-20'});await store().save(d,0,'confirm');const client=db('admin');await assertSucceeds(update(ref(client),{'shifts/2099-01/s/2099-01-10':'early','shifts/2099-01/__laborPeriods/s/2099-01-10':'p'}));await assertFails(update(ref(client),{'shifts/2099-01/s/2099-01-21':'early','shifts/2099-01/__laborPeriods/s/2099-01-21':'p'}));await set(ref(client,'shift_locks/2099_01'),true);await assertFails(set(ref(client,'shifts/2099-01/s/2099-01-10'),null));});
 test('verified Google request matches one confirmed staff and rejects mismatches',async()=>{const d=transition({...draft(),googleEmail:'new@example.test'},'confirm',{id:'p',startDate:'2099-01-01'});await store().save(d,0,'confirm');const u={uid:'new',email:'new@example.test',emailVerified:true,providerData:[{providerId:'google.com'}]};await set(ref(db('new'),'portalJoinRequests/new'),applicationChange({user:u,current:null,name:'架空 花子',jobRole:'DH',timestamp:serverTimestamp()}));const request=(await get(ref(db('momo'),'portalJoinRequests/new'))).val();await assert.rejects(store().matchAccount(d,{...request,email:'wrong@example.test'}));await env.withSecurityRulesDisabled(c=>set(ref(c.database(),'portalAccess/users/person'),null));await store().matchAccount(d,request);assert.equal((await get(ref(db('new'),'portalAccess/users/new'))).val().staffId,'s');await assertFails(get(ref(db('new'),'tasks')));});
+async function submitApplication(uid,name) {
+  const user={uid,email:uid+'@example.test',emailVerified:true,providerData:[{providerId:'google.com'}]};
+  await set(ref(db(uid),'portalJoinRequests/'+uid),applicationChange({user,current:null,name,jobRole:'DH',timestamp:serverTimestamp()}));
+  return (await get(ref(db('momo'),'portalJoinRequests/'+uid))).val();
+}
+test('onboarding commits the staff, access and approval together and rejects duplicate registration',async()=>{
+  const request=await submitApplication('applicant','架空 新入');
+  const data=transition({...draftEmployee({id:'new-hire',name:request.name,role:'DH',type:'part'}),googleEmail:request.email},'confirm',{id:'new-period',startDate:'2099-01-01'});
+  const s=store();
+  await assert.rejects(s.save(data,0,'no-application'));
+  assert.equal((await s.list())['new-hire'],undefined);
+  await assert.rejects(s.save(data,0,'wrong',{request:{...request,revision:request.revision+1}}),/更新/);
+  const results=await Promise.allSettled([s.save(data,0,'first',{request}),s.save({...data,staffId:'new-hire-duplicate'},0,'second',{request})]);
+  assert.equal(results.filter(result=>result.status==='fulfilled').length,1);
+  const winner=results.find(result=>result.status==='fulfilled').value;
+  assert.equal((await s.checkRegistration(winner.data.staffId,winner.operationId,request)).revision,1);
+  assert.equal(Object.keys(await s.list()).length,1);
+  assert.equal((await get(ref(db('applicant'),'portalJoinRequests/applicant'))).val().state,'approved');
+  assert.equal((await s.bindings())[winner.data.staffId],request.uid);
+  await assertFails(get(ref(db('applicant'),'tasks')));
+});
+test('onboarding reuses the existing labor record and employment period',async()=>{
+  const s=store();
+  const request=await submitApplication('existing-applicant',staff.name);
+  const data=transition({...draft(),googleEmail:''},'confirm',{id:'existing-period',startDate:'2099-02-01'});
+  await s.save(data,0,'old');
+  await env.withSecurityRulesDisabled(c=>set(ref(c.database(),'portalAccess/users/person'),null));
+  const result=await s.save({...data,googleEmail:request.email},1,'bind',{request});
+  assert.equal(result.data.currentPeriod,'existing-period');
+  assert.equal((await s.bindings()).s,request.uid);
+  assert.equal(Object.keys(await s.list()).length,1);
+});
 test('concurrent staff updates yield one committed revision and no overwrite',async()=>{await store().save(draft(),0,'first');const a=draft(),b=draft();a.basic.address='A';b.basic.address='B';const r=await Promise.allSettled([store().save(a,1,'a'),store().save(b,1,'b')]);assert.equal(r.filter(x=>x.status==='fulfilled').length,1);assert.equal((await store().list()).s.revision,2);});
 test('two simultaneous file saves cannot overspend one remaining file slot',async()=>{const f=await prepareFile(new File(['%PDF-fixture'],'x.pdf',{type:'application/pdf'}),'a');await env.withSecurityRulesDisabled(c=>set(ref(c.database(),'laborConfig/maxEncodedBytes'),f.base64.length));const make=(sid,doc)=>{const d=draft();d.staffId=sid;d.documents[doc]={name:f.name,size:f.size,mime:f.mime,hash:f.hash,category:'contract',completedDate:'',holdReason:''};return d;};const results=await Promise.allSettled([store().save(make('s1','a'),0,'op-a',{file:f}),store().save(make('s2','b'),0,'op-b',{file:{...f,id:'b'}})]);assert.equal(results.filter(x=>x.status==='fulfilled').length,1);assert.equal((await get(ref(db('momo'),'laborFileBudget/used'))).val(),f.base64.length);});
 test('retirement gates server access while history is preserved and rehire waits until new period',async()=>{const s=store();let d=transition(draft(),'confirm',{id:'p',startDate:'2000-01-01',endDate:'2000-12-31'});d.status='retiring';await s.save(d,0,'retired');await assertFails(get(ref(db('person'),'tasks')));d=transition(d,'rehire',{id:'p2',startDate:'2099-01-01'});await s.save(d,1,'rehired');await assertFails(get(ref(db('person'),'tasks')));assert.equal(Object.keys((await s.list()).s.data.periods).length,2);await assertFails(update(ref(db('momo')),{'staffLifecycle/s/periods/p2/startDate':'1999-01-01'}));});
 test('protected staff and forged staffId do not confer owner access',async()=>{await env.withSecurityRulesDisabled(c=>set(ref(c.database(),'portalAccess/users/forged'),{staffId:'office',role:'admin',active:true}));await assertFails(get(ref(db('forged'),'laborRecords')));const d=transition({...draft(),staffId:'term'},'confirm',{id:'p',startDate:'2099-01-01'});await assert.rejects(store().save(d,0,'protected'));});
 test('reviewed removal is atomic across months and preserves unrelated staff/manual history',async()=>{const s=store();let d=transition(draft(),'confirm',{id:'p',startDate:'2000-01-01'});d=transition(d,'retire',{endDate:'2099-01-20'});await s.save(d,0,'retire');await env.withSecurityRulesDisabled(c=>set(ref(c.database(),'shifts'),{'2099-01':{s:{'2099-01-19':'early','2099-01-21':'late'},other:{'2099-01-21':'early'},__manualTimes:{s:{'2099-01-21':{start:'09:00',end:'17:00',breakMinutes:60}}}},'2099-02':{s:{'2099-02-01':'early'}}}));const rows=[{month:'2099-01',date:'2099-01-21',value:'late',manual:{start:'09:00',end:'17:00',breakMinutes:60}},{month:'2099-02',date:'2099-02-01',value:'early',manual:null}];await set(ref(db('admin'),'shift_locks/2099_02'),true);await assert.rejects(s.removeShifts(d,rows),/確定済み/);assert.equal((await s.shifts())['2099-01'].s['2099-01-21'],'late');await set(ref(db('admin'),'shift_locks/2099_02'),false);await s.removeShifts(d,rows);const out=await s.shifts();assert.equal(out['2099-01'].s['2099-01-19'],'early');assert.equal(out['2099-01'].other['2099-01-21'],'early');assert.equal(out['2099-01'].s['2099-01-21'],undefined);assert.equal(out['2099-02'].s,undefined);});
-test('REST path has the same private-data boundary as SDK; no role/staffId bypass',async()=>{await store().save(draft(),0,'rest');for(const uid of ['momo','admin','person','terminal','service',null]){const url=new URL('http://127.0.0.1:9026/laborRecords/s.json?ns=demo-labor');if(uid)url.searchParams.set('auth',createMockUserToken({sub:uid,email:uid+'@example.test',email_verified:true,firebase:{sign_in_provider:'google.com'}},'demo-labor'));const result=await fetch(url);if(uid==='momo'){assert.equal(result.status,200);assert.equal((await result.json()).revision,1);}else assert.ok([401,403].includes(result.status),uid+': '+result.status);}});
+test('REST path has the same private-data boundary as SDK; no role/staffId bypass',async()=>{await store().save(draft(),0,'rest');for(const uid of ['momo','admin','person','terminal','service',null]){const url=new URL('http://127.0.0.1:'+testPort+'/laborRecords/s.json?ns=demo-labor');if(uid)url.searchParams.set('auth',createMockUserToken({sub:uid,email:uid+'@example.test',email_verified:true,firebase:{sign_in_provider:'google.com'}},'demo-labor'));const result=await fetch(url);if(uid==='momo'){assert.equal(result.status,200);assert.equal((await result.json()).revision,1);}else assert.ok([401,403].includes(result.status),uid+': '+result.status);}});

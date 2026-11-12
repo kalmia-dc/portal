@@ -10,11 +10,28 @@ export function createLaborStore(port, actor, defaults=[]) {
   async function authorize(){if(!actor?.uid||await read('laborConfig/owners/'+actor.uid)!==true||await read('laborConfig/enabled')!==true)throw Error('労務管理の利用許可を確認できません。');}
   async function list(){await authorize();return Object.fromEntries(Object.entries(await read('laborRecords')||{}).map(([id,r])=>[id,hydrate(r)]));}
   async function roster(){const entries=new Map(defaults.map(x=>[x.id,x]));for(const s of Object.values(await read('extra_staff')||{}))entries.set(s.id,s);return [...entries.values()];}
-  async function save(data, expectedRevision, operationId, {reflect=false,file=null}={}) {
+  async function verifyRegistration(saved, staffId, operationId, request) {
+    if(!request)return true;
+    if(!saved || (saved.operationId!==operationId && !await read('laborHistory/'+staffId+'/'+key(operationId))))return false;
+    const [application, member, binding]=await Promise.all([
+      read('portalJoinRequests/'+request.uid),read('portalAccess/users/'+request.uid),read('laborAccountBindings/'+staffId),
+    ]);
+    return application?.state==='approved' && application.approval?.staffId===staffId &&
+      binding===request.uid && member?.staffId===staffId &&
+      member?.email===request.email && member?.active===true;
+  }
+  async function checkRegistration(staffId, operationId, request) {
+    await authorize();
+    const saved=await read('laborRecords/'+key(staffId));
+    return await verifyRegistration(saved,staffId,operationId,request)?hydrate(saved):null;
+  }
+  async function save(data, expectedRevision, operationId, {reflect=false,file=null,request=null}={}) {
     reflect=reflect||data.status!=='draft';
+    if(request && data.status!=='confirmed' && data.status!=='retiring')throw Error('入社を確定できる職員情報を選択してください。');
     await authorize();key(data.staffId);key(operationId);
     const path='laborRecords/'+data.staffId,current=await read(path);
-    if(current?.operationId===operationId)return hydrate(current);
+    const verified=saved=>verifyRegistration(saved,data.staffId,operationId,request);
+    if(current?.operationId===operationId && await verified(current))return hydrate(current);
     const timestamp=port.timestamp();
     const next=recordUpdate(current,data,actor,operationId,timestamp,expectedRevision);
     const updates={[path]:next,['laborHistory/'+data.staffId+'/'+operationId]:{previousOperationId:current?.operationId||'',after:data,by:actor.uid,at:timestamp}};
@@ -27,6 +44,21 @@ export function createLaborStore(port, actor, defaults=[]) {
       const oldRoster=all.find(s=>s.id===data.staffId)||{};
       updates['extra_staff/'+data.staffId]={id:data.staffId,name:data.basic.name,role:data.role,type:data.type,schedulePeriods:Object.values(data.periods).filter(p=>!p.cancelled).map(p=>({start:p.startDate,end:p.endDate||'9999-12-31'})),...(oldRoster.satFixed?{satFixed:true}:{}),...(oldRoster.uketsuke?{uketsuke:true}:{})};
       updates['laborNameClaims/'+joinNameKey(data.basic.name)]=data.staffId;
+      if(request){
+        const target=all.find(s=>s.id===data.staffId);
+        if(request.email!==data.googleEmail || request.jobRole!==data.role)throw Error('申請のメールアドレスと職種を確認してください。');
+        if(staffNameKey(request.name)!==staffNameKey(data.basic.name) && current?.data.googleEmail?.toLowerCase()!==request.email.toLowerCase())throw Error('申請の氏名と職員情報を確認してください。');
+        if(current?.data.googleEmail && current.data.googleEmail.toLowerCase()!==request.email.toLowerCase())throw Error('職員情報に保存済みのGoogleメールと一致しません。');
+        if(Object.entries(users).some(([uid,member])=>uid!==request.uid && (member.staffId===data.staffId || member.email?.toLowerCase()===request.email.toLowerCase())))throw Error('別のアカウントで登録済みです。既存の職員情報を確認してください。');
+        const fresh=await read('portalJoinRequests/'+request.uid);
+        const profile=updates['extra_staff/'+data.staffId];
+        const selection={mode:target?'existing':'new',staffId:data.staffId,name:profile.name,role:profile.role,type:profile.type};
+        const approval=approvalUpdates({actor,expected:request,current:fresh,selection,roster:all,member:users[request.uid],timestamp});
+        if(!approval)throw Error('この申請は承認済みです。一覧を再読み込みしてください。');
+        Object.assign(updates,approval);
+        updates['extra_staff/'+data.staffId]=profile;
+        updates['laborAccountBindings/'+data.staffId]=request.uid;
+      }
     }
     if(file){
       if(await read('laborConfig/uploadsEnabled')!==true)throw Error('本番の無料枠確認前のため書類保存は無効です。');
@@ -38,10 +70,23 @@ export function createLaborStore(port, actor, defaults=[]) {
     }
     try {await port.update(updates);} catch(error) {
       // Lost acknowledgement is not a failed commit: confirm by the same operation ID.
-      const saved=await read(path).catch(()=>null);if(saved?.operationId===operationId)return hydrate(saved);
+      try {
+        const saved=await read(path);
+        if((request || saved?.operationId===operationId) && await verified(saved))return hydrate(saved);
+        if(request && !saved && error?.code!=='PERMISSION_DENIED' && error?.code!=='permission_denied')throw registrationUnconfirmed();
+      } catch(checkError) {
+        if(request)throw registrationUnconfirmed();
+      }
       throw error;
     }
-    const saved=await read(path);if(saved?.operationId!==operationId)throw Error('保存結果を確認できません。再読み込みしてください。');return hydrate(saved);
+    try {
+      const saved=await read(path);
+      if((!request && saved?.operationId!==operationId) || !await verified(saved))throw Error('保存結果を確認できません。再読み込みしてください。');
+      return hydrate(saved);
+    } catch(error) {
+      if(request)throw registrationUnconfirmed();
+      throw error;
+    }
   }
   async function importStaff(){await authorize();const existing=await list();let count=0;for(const s of await roster()){if(!canImportStaff(s)||existing[s.id])continue;const data=draftEmployee({...s,imported:true});await save(data,0,'import-'+s.id);count++;}return count;}
   async function matchAccount(data, request) {
@@ -71,7 +116,11 @@ export function createLaborStore(port, actor, defaults=[]) {
     try{await port.update(updates);}catch(e){if(await verify().catch(()=>false))return;throw e;}
     if(!await verify())throw Error('解除結果を確認できません。対象一覧を再確認してください。');
   }
-  return {actor,authorize,list,roster,save,importStaff,matchAccount,removeShifts,
+  return {actor,authorize,list,roster,save,importStaff,matchAccount,removeShifts,checkRegistration,
+    bindings:()=>read('laborAccountBindings'),
     requests:()=>read('portalJoinRequests'),shifts:()=>read('shifts'),history:sid=>read('laborHistory/'+key(sid)),shiftHistory:sid=>read('laborShiftHistory/'+key(sid)),file:async id=>{await authorize();return read('laborFiles/'+key(id));},
     templates:()=>read('laborTemplates'),saveTemplates:async value=>{await authorize();await port.update({laborTemplates:value});const saved=await read('laborTemplates');if(['onboard','offboard'].some(k=>JSON.stringify(saved?.[k])!==JSON.stringify(value[k])))throw Error('テンプレートの保存を再確認してください。');},now:port.now};
+}
+function registrationUnconfirmed() {
+  return Object.assign(Error('登録結果を確認できません。入力内容を保持しています。「一覧を再読み込み」で申請と職員の状態を確認してください。'),{code:'labor/registration-unconfirmed'});
 }
