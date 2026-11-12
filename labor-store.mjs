@@ -1,7 +1,7 @@
-import {draftEmployee,recordUpdate,lifecycleProjection,removeReviewedShifts,key,text,canonical} from './labor-model.mjs?v=20261112-without-checklists';
+import {draftEmployee,recordUpdate,lifecycleProjection,removeReviewedShifts,key,text,canonical,today} from './labor-model.mjs?v=20261112-without-checklists';
 import {approvalUpdates} from './portal-join-model.mjs';
 import {joinNameKey} from './portal-join-model.mjs';
-import {lifecycleProtection} from './portal-lifecycle-model.mjs';
+import {effectiveMember,lifecycleApplies,lifecycleProtection,linkedAccounts} from './portal-lifecycle-model.mjs';
 import {staffNameKey} from './portal-roster-model.mjs';
 import {canImportStaff} from './labor-import-policy.mjs';
 export function hydrate(record) {if(!record)return null;const data=record.data;for(const k of ['periods','salaries','insurance','tasks','documents'])data[k]??={};return record;}
@@ -9,6 +9,24 @@ export function createLaborStore(port, actor, defaults=[]) {
   const read=async path=>await port.read(path);
   async function authorize(){if(!actor?.uid||await read('laborConfig/owners/'+actor.uid)!==true||await read('laborConfig/enabled')!==true)throw Error('労務管理の利用許可を確認できません。');}
   async function list(){await authorize();return Object.fromEntries(Object.entries(await read('laborRecords')||{}).map(([id,r])=>[id,hydrate(r)]));}
+  async function portalUsage(staffId) {
+    await authorize();
+    key(staffId);
+    const accounts=linkedAccounts(await read('portalAccess/users'),staffId);
+    if(!accounts.length)return {status:'unregistered'};
+    const [member]=accounts;
+    if(accounts.length!==1 || !['staff','trainingAdmin','admin'].includes(member.role) || typeof member.active!=='boolean'){
+      return {status:'unknown'};
+    }
+    if(!member.active)return {status:'stopped'};
+    const lifecycle=lifecycleApplies(member)?await read('staffLifecycle/'+staffId):null;
+    const now=port.now();
+    if(effectiveMember(member,lifecycle,now).active)return {status:'active',administrator:member.role==='admin'};
+    if(lifecycle?.hrManaged===true && lifecycle.state!=='stopped' && !lifecycle.currentCancelled && lifecycle.startAt>now){
+      return {status:'scheduled',startDate:today(lifecycle.startAt)};
+    }
+    return {status:'stopped'};
+  }
   async function roster(){const entries=new Map(defaults.map(x=>[x.id,x]));for(const s of Object.values(await read('extra_staff')||{}))entries.set(s.id,s);return [...entries.values()];}
   async function verifyRegistration(saved, staffId, operationId, request) {
     if(!request)return true;
@@ -116,7 +134,7 @@ export function createLaborStore(port, actor, defaults=[]) {
     try{await port.update(updates);}catch(e){if(await verify().catch(()=>false))return;throw e;}
     if(!await verify())throw Error('解除結果を確認できません。対象一覧を再確認してください。');
   }
-  return {actor,authorize,list,roster,save,importStaff,matchAccount,removeShifts,checkRegistration,
+  return {actor,authorize,list,roster,save,importStaff,matchAccount,removeShifts,checkRegistration,portalUsage,
     bindings:()=>read('laborAccountBindings'),
     requests:()=>read('portalJoinRequests'),shifts:()=>read('shifts'),history:sid=>read('laborHistory/'+key(sid)),shiftHistory:sid=>read('laborShiftHistory/'+key(sid)),file:async id=>{await authorize();return read('laborFiles/'+key(id));},
     now:port.now};

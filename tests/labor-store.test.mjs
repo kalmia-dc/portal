@@ -1,4 +1,28 @@
 import test from 'node:test';import assert from 'node:assert/strict';import {createLaborStore} from '../labor-store.mjs';import {draftEmployee} from '../labor-model.mjs';
+test('portal usage respects saved accounts and Japan-time access boundaries',async()=>{
+  const startAt=Date.parse('2026-11-12T00:00:00+09:00'),endAt=Date.parse('2026-11-13T00:00:00+09:00');
+  let now=startAt-1;
+  const users={
+    admin:{staffId:'director',role:'admin',active:true},
+    active:{staffId:'employee',role:'staff',active:true},
+    disabled:{staffId:'former',role:'staff',active:false},
+    duplicate1:{staffId:'duplicate',role:'staff',active:true},
+    duplicate2:{staffId:'duplicate',role:'staff',active:false},
+  };
+  const lifecycle={hrManaged:true,state:'active',currentCancelled:false,startAt,endAt};
+  const port={now:()=>now,read:async path=>path.startsWith('laborConfig/')?true:
+    path==='portalAccess/users'?users:path==='staffLifecycle/employee'?lifecycle:null};
+  const store=createLaborStore(port,{uid:'owner'});
+  assert.deepEqual(await store.portalUsage('director'),{status:'active',administrator:true});
+  assert.deepEqual(await store.portalUsage('former'),{status:'stopped'});
+  assert.deepEqual(await store.portalUsage('duplicate'),{status:'unknown'});
+  assert.deepEqual(await store.portalUsage('new'),{status:'unregistered'});
+  assert.deepEqual(await store.portalUsage('employee'),{status:'scheduled',startDate:'2026-11-12'});
+  now=startAt;
+  assert.deepEqual(await store.portalUsage('employee'),{status:'active',administrator:false});
+  now=endAt;
+  assert.deepEqual(await store.portalUsage('employee'),{status:'stopped'});
+});
 test('roster import excludes shared slots, preserves existing data and is repeatable',async()=>{
   const roster=[{id:'s',name:'架空'},...['test','hanowa','kyosei'].map(id=>({id,name:id}))];
   const original={extra_staff:Object.fromEntries(roster.map(s=>[s.id,s])),shifts:{'2099-01':{hanowa:{'2099-01-01':'day'}}},portalAccess:{users:{u:{staffId:'s',active:true}}}};
