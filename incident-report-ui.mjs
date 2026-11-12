@@ -11,6 +11,9 @@ export function reporterGroup(report, fallbackName=''){
   if(!id&&report.createdById==='tsuruta'&&name==='鶴田'&&String(report.createdBy||'').trim()==='鶴田')id='tsuruta';
   if(id==='sugihira'||(!id&&['院長','杉平'].includes(name)))return {key:'sugihira',name:'院長'};
   if(id==='tamiya'||(!id&&name==='田宮'))return {key:'tamiya',name:'田宮'};
+  const reportedName=String(report.reporterName||'').trim();
+  if(!id&&reportedName==='百々')id='momo';
+  if(!id&&reportedName==='嶋中')id='shimanaka';
   return {key:id||`legacy-name:${name}`,name};
 }
 

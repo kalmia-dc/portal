@@ -40,3 +40,22 @@ test('Tsuruta fallback preserves explicit other IDs, proxies and unverified lega
  assert.equal(reporterGroup({reporterName:'鶴田'}).key,'legacy-name:鶴田');
  assert.equal(reporterGroup({createdById:'tsuruta'},'鶴田').key,'legacy-name:鶴田');
 });
+
+test('verified Momo and Shimanaka legacy reports join their staff ID totals',()=>{
+ const rows=[
+  ...Array.from({length:5},()=>({reporterName:'百々'})),
+  {reporterId:'momo',reporterName:'百々'},
+  {reporterName:'嶋中'},
+  ...Array.from({length:2},()=>({reporterId:'shimanaka',reporterName:'嶋中'})),
+  {reporterName:'保刈（院長代筆）',createdById:'sugihira'}
+ ];
+ const original=JSON.stringify(rows),totals=new Map();
+ for(const row of rows){const {key}=reporterGroup(row);totals.set(key,(totals.get(key)||0)+1);}
+ assert.deepEqual([...totals],[['momo',6],['shimanaka',3],['legacy-name:保刈（院長代筆）',1]]);
+ assert.equal([...totals.values()].reduce((sum,count)=>sum+count,0),rows.length);
+ assert.equal(JSON.stringify(rows),original);
+ for(const name of ['百々','嶋中']){
+  assert.equal(reporterGroup({reporterId:'other-person',reporterName:name}).key,'other-person');
+  assert.equal(reporterGroup({createdBy:name},name).key,`legacy-name:${name}`);
+ }
+});
