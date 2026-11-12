@@ -192,6 +192,13 @@ function focusApprovalFromUrl(){
  const node=Array.from(document.querySelectorAll('[data-approval-id]')).find(el=>el.dataset.approvalId===id&&el.dataset.approvalKind===kind);
  if(node){approvalFocused=true;node.style.outline='3px solid var(--portal-accent)';node.focus({preventScroll:true});node.scrollIntoView({block:'center'});}
 }
+function formatPaidLeaveDate(value) {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return '取得日を確認できません';
+  const date = new Date(`${value}T00:00:00Z`);
+  if (!Number.isFinite(date.getTime()) || date.toISOString().slice(0, 10) !== value) return '取得日を確認できません';
+  const weekday = '日月火水木金土'[date.getUTCDay()];
+  return `${value.replaceAll('-', '/')}（${weekday}）`;
+}
 function renderAdmin(){
   if(!user||!isAdmin())return;
   const corr=Object.values(corrections).filter(r=>r.status==='pending');
@@ -199,7 +206,7 @@ function renderAdmin(){
   const queue=[...corr.map(r=>({kind:'correction',...r})),...paid.map(r=>({kind:'paid',...r}))].sort((a,b)=>String(a.submittedAt).localeCompare(String(b.submittedAt)));
   const leaveAlerts=allStaff().map(s=>({staff:s,alert:leaveCompliance(s.id)})).filter(x=>x.alert&&x.alert.level!=='ok');
   const alertHtml=leaveAlerts.map(x=>`<div class="item"><span class="flag ${x.alert.level}">有給</span> <b>${esc(personName(x.staff.name,x.staff.id))}</b>：${esc(x.alert.text)}</div>`).join('');
-  const queueHtml=queue.length?queue.map(r=>`<div class="item" data-approval-id="${esc(r.id)}" data-approval-kind="${r.kind}" tabindex="-1"><div class="item-head"><div><b>${staffName(r.staffId)}｜${r.kind==='paid'?'有給申請':`${r.date} ${PUNCH_LABEL[r.type]} ${r.requestedTime}`}</b><br><small>${esc(r.comment||r.reason||'')}</small></div><div class="row"><button class="btn" onclick="approveItem('${r.kind}','${r.id}')">承認</button><button class="btn danger" onclick="rejectItem('${r.kind}','${r.id}')">差し戻し</button></div></div></div>`).join(''):'<div class="empty">承認待ちはありません</div>';
+  const queueHtml=queue.length?queue.map(r=>`<div class="item" data-approval-id="${esc(r.id)}" data-approval-kind="${r.kind}" tabindex="-1"><div class="item-head"><div><b>${staffName(r.staffId)}｜${r.kind==='paid'?`有給申請｜${formatPaidLeaveDate(r.date)}`:`${r.date} ${PUNCH_LABEL[r.type]} ${r.requestedTime}`}</b><br><small>${esc(r.comment||r.reason||'')}</small></div><div class="row"><button class="btn" onclick="approveItem('${r.kind}','${r.id}')">承認</button><button class="btn danger" onclick="rejectItem('${r.kind}','${r.id}')">差し戻し</button></div></div></div>`).join(''):'<div class="empty">承認待ちはありません</div>';
   $('adminQueue').innerHTML=alertHtml+queueHtml;
   focusApprovalFromUrl();
   const mk=$('adminMonth').value||monthKey(new Date());
