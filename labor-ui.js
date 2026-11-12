@@ -59,12 +59,17 @@ function drawList(){
   const employees=Object.values(records).map(record=>{
     const d=record.data;
     const name=employeeName(d);
-    return {record,name,state:recordStatus(d,employeeListDate),search:[name,d.basic.name,d.basic.kana,d.staffId]};
+    const startDate=d.periods[d.currentPeriod]?.startDate||d.plannedPeriod?.startDate||'';
+    return {record,name,startDate,state:recordStatus(d,employeeListDate),search:[name,d.basic.name,d.basic.kana,d.staffId]};
   });
   const pending=Object.values(applications).filter(request=>request.state==='pending').map(request=>({
-    request,name:request.name,state:'pending',search:[request.name],
+    request,name:request.name,startDate:'',state:'pending',search:[request.name],
   }));
-  const rows=[...employees,...pending].sort((a,b)=>a.name.localeCompare(b.name,'ja'));
+  const rows=[...employees,...pending].sort((a,b)=>
+    Number(!a.startDate)-Number(!b.startDate) ||
+    a.startDate.localeCompare(b.startDate) ||
+    a.name.localeCompare(b.name,'ja')
+  );
   const filter=$('employeeFilter');
   const selected=filter.value||'all';
   const visibleByDefault=rows.filter(row=>row.state!=='cancelled');
@@ -105,7 +110,7 @@ function drawEmployeeGroup(label,rows){
   }
   thead.append(head);
   table.append(thead,body);
-  for(const {record,request,name,state} of rows){
+  for(const {record,request,name,startDate,state} of rows){
     const row=el('tr'),identity=el('div');
     const button=el('button',name);
     button.type='button';
@@ -132,8 +137,7 @@ function drawEmployeeGroup(label,rows){
         form.scrollIntoView({block:'start'});
       });
     }
-    const start=d?.periods[d.currentPeriod]?.startDate||d?.plannedPeriod?.startDate;
-    [identity,roles[request?.jobRole||d?.role],employment[d?.type],start,listStatus[state]].forEach((value,index)=>{
+    [identity,roles[request?.jobRole||d?.role],employment[d?.type],startDate,listStatus[state]].forEach((value,index)=>{
       const cell=el('td');
       cell.dataset.label=columns[index];
       cell.append(value||'未確認');
