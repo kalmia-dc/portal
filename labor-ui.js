@@ -4,17 +4,17 @@ import {DIRECTOR_STAFF_ID,personName} from './portal-person-display.mjs?v=202610
 import {createPageLifecycle} from './portal-page-lifecycle.mjs';
 const pageLifecycle=createPageLifecycle();
 async function pageAwait(work){pageLifecycle.assertActive();let result;try{result=await work();}catch(error){pageLifecycle.assertActive();throw error;}pageLifecycle.assertActive();return result;}
-import {connectLabor} from './labor-runtime.js?v=20261112-without-salary';
-import {draftEmployee,transition,period,retirementShifts,retention,INSURANCES,ENROLLMENTS,PROGRESS,today} from './labor-model.mjs?v=20261112-without-salary';
+import {connectLabor} from './labor-runtime.js?v=20261112-saved-documents';
+import {draftEmployee,transition,period,retirementShifts,retention,INSURANCES,ENROLLMENTS,PROGRESS,today,jstStart} from './labor-model.mjs?v=20261112-without-salary';
 import {prepareFile,readDocument,extractCandidates} from './labor-documents.mjs?v=20261112-without-salary';
 const $=id=>document.getElementById(id),form=$('editor'),field=name=>form.elements.namedItem(name),id=()=>crypto.randomUUID();
-let readerController,editorBaseline;let store,records={},current=null,data=null,busy=false;const urls=new Set();
+let readerController,readingKey,editorBaseline;let store,records={},current=null,data=null,busy=false;const urls=new Set();
 $('registrationUrl').value=new URL('./google-account-register.html',location.href).href.split('?')[0];
 $('copyRegistrationUrl').onclick=async()=>{try{try{await pageAwait(async () => (navigator.clipboard.writeText($('registrationUrl').value)));$('copyRegistrationStatus').textContent='申請URLをコピーしました。本人へ渡してください。';}catch{if (pageLifecycle.active) {$('registrationUrl').focus();$('registrationUrl').select();$('copyRegistrationStatus').textContent='申請URLを選択しました。コピーして本人へ渡してください。';}}}catch(error){if(error?.code!=='portal/access-lost')throw error;}};
 const status={draft:'下書き',confirmed:'入社確定',retiring:'退職日設定済み',cancelled:'入社取消'};
 function el(tag,text,cls){const e=document.createElement(tag);if(text!=null)e.textContent=text;if(cls)e.className=cls;return e;}
 function message(text,error=false){if(!pageLifecycle.active)return;const box=$('message');if(!box)return;box.textContent=text;box.classList.toggle('error',error);}
-async function run(fn){try{if(busy||!pageLifecycle.active)return;busy=true;const buttons=[...document.querySelectorAll('button,input,select,textarea')],disabled=buttons.map(b=>b.disabled);buttons.forEach(b=>b.disabled=true);try{await pageAwait(async () => (fn()));}catch(e){if (pageLifecycle.active) {if($('documentState')?.textContent.includes('解析中'))$('documentState').textContent='読取に失敗しました。手入力で続けられます。';message(e.message||'処理を確認できません。',true);}}finally{if (pageLifecycle.active) {busy=false;buttons.forEach((b,i)=>b.disabled=disabled[i]);}}}catch(error){if(error?.code!=='portal/access-lost')throw error;}}
+async function run(fn){try{if(busy||!pageLifecycle.active)return;busy=true;const buttons=[...document.querySelectorAll('button,input,select,textarea')],disabled=buttons.map(b=>b.disabled);buttons.forEach(b=>b.disabled=true);try{await pageAwait(async () => (fn()));}catch(e){if (pageLifecycle.active) {message(e.message||'処理を確認できません。',true);}}finally{if (pageLifecycle.active) {busy=false;buttons.forEach((b,i)=>b.disabled=disabled[i]);}}}catch(error){if(error?.code!=='portal/access-lost')throw error;}}
 function confirmAction(title,text){$('confirmTitle').textContent=title;$('confirmText').textContent=text;const d=$('confirmation');d.showModal();$('confirmYes').disabled=false;$('confirmNo').disabled=false;return new Promise(resolve=>{const done=value=>{d.close();resolve(value);};pageLifecycle.add(()=>done(false));$('confirmYes').onclick=()=>done(true);$('confirmNo').onclick=()=>done(false);d.oncancel=()=>resolve(false);});}
 function input(label,value,type='text'){const l=el('label',label),i=el('input');i.type=type;i.value=value??'';l.append(i);return {label:l,input:i};}
 function select(label,value,options){const l=el('label',label),s=el('select');for(const v of options){const o=el('option',v);o.value=v;s.append(o);}s.value=value;l.append(s);return {label:l,input:s};}
@@ -29,7 +29,16 @@ for(const [key,label]of Object.entries(basic)){
   $('basicFields').append(f.label);
 }
 function collect(){const next=structuredClone(data);for(const key of Object.keys(basic))next.basic[key]=field('basic_'+key).value.trim();for(const key of ['role','type','googleEmail'])next[key]=field(key).value.trim();next.plannedPeriod=Object.fromEntries(['startDate','endDate','contractEnd','days','hours'].map(k=>[k,field(k).value]));return next;}
-function clearRead(){readerController?.abort();for(const u of urls)URL.revokeObjectURL(u);urls.clear();if(!$('documentFile'))return;$('ocrText').value='';$('candidates').replaceChildren();$('ocr').hidden=true;$('documentPreview').replaceChildren();$('documentFile').value='';$('documentState').textContent='未選択';}
+function clearDocumentReading(){
+  readerController?.abort();
+  readingKey=null;
+  if(!$('ocr'))return;
+  $('ocrText').value='';
+  $('candidates').replaceChildren();
+  $('ocr').hidden=true;
+  $('ocrStatus').textContent='';
+}
+function clearRead(){clearDocumentReading();for(const u of urls)URL.revokeObjectURL(u);urls.clear();if(!$('documentFile'))return;$('documentPreview').replaceChildren();$('documentFile').value='';$('documentState').textContent='未選択';$('documentResult').textContent='';$('deletedDocuments').open=false;}
 
 const roles={DR:'歯科医師',DH:'歯科衛生士',DA:'歯科助手・受付'};
 const employment={full:'常勤',part:'非常勤',spot:'スポット'};
@@ -244,7 +253,91 @@ onboarding.onsubmit=event=>{
 };
 
 function drawInsurance(){const box=$('insurance');box.replaceChildren();for(const name of INSURANCES){data.insurance[name]??={enrollment:'未確認',progress:'未着手'};const row=el('div',null,'grid');row.append(el('strong',name));for(const [k,label,opts]of [['enrollment','加入状況',ENROLLMENTS],['progress','進捗',PROGRESS]]){const s=select(label,data.insurance[name][k],opts);s.input.onchange=()=>data.insurance[name][k]=s.input.value;row.append(s.label);}box.append(row);}}
-function drawDocuments(){const box=$('documents');box.replaceChildren();for(const [key,d]of Object.entries(data.documents)){const row=el('div',null,'entry'),r=retention(d);row.append(el('strong',d.name),el('p',`保存済み · ${d.size.toLocaleString()}バイト／${r.date||'期限未確定'} ${r.label}`));const b=el('button','保存コピーを開く');b.type='button';b.onclick=()=>run(async()=>{try{const file=await pageAwait(async () => (store.file(key)));if(!file)throw Error('書類を取得できません。');const bytes=Uint8Array.from(atob(file.base64),c=>c.charCodeAt(0));const hash=[...new Uint8Array(await pageAwait(async () => (crypto.subtle.digest('SHA-256',bytes))))].map(x=>x.toString(16).padStart(2,'0')).join('');if(hash!==d.hash||bytes.length!==d.size)throw Error('保存コピーの照合に失敗しました。');const url=URL.createObjectURL(new Blob([bytes],{type:file.mime}));urls.add(url);const a=el('a','コピーを表示');a.href=url;a.target='_blank';a.rel='noopener';row.append(a);a.click();}catch(error){if(error?.code!=='portal/access-lost')throw error;}});row.append(b);for(const [key,label,type]of [['completedDate','起算日','date'],['holdReason','継続保管理由','text'],['originalLocation','原本の保管場所','text'],['versionLabel','版・書類の日付メモ','text']]){const f=input(label,d[key],type);f.input.oninput=()=>{d[key]=f.input.value;};row.append(f.label);}const category=el('select');category.setAttribute('aria-label','保存書類の区分');for(const option of field('documentCategory').options)category.append(option.cloneNode(true));category.value=d.category;category.onchange=()=>d.category=category.value;row.append(category);const submitted=select('提出状況',d.submissionStatus||'未確認',['未確認','未提出','提出済み','確認済み','差戻し']);submitted.input.onchange=()=>d.submissionStatus=submitted.input.value;row.append(submitted.label);box.append(row);}}
+function documentButton(label,action){
+  const button=el('button',label);
+  button.type='button';
+  button.onclick=()=>run(action);
+  return button;
+}
+async function savedDocumentFile(key,document){
+  const file=await pageAwait(()=>store.file(key));
+  if(!file)throw Error('書類を取得できません。');
+  const bytes=Uint8Array.from(atob(file.base64),c=>c.charCodeAt(0));
+  const hash=[...new Uint8Array(await pageAwait(()=>crypto.subtle.digest('SHA-256',bytes)))].map(x=>x.toString(16).padStart(2,'0')).join('');
+  if(hash!==document.hash||bytes.length!==document.size||file.mime!==document.mime||file.staffId!==data.staffId)throw Error('保存コピーの照合に失敗しました。');
+  return new File([bytes],document.name,{type:document.mime});
+}
+async function changeDocumentDeletion(key,document,deleted){
+  const action=deleted?'削除':'復元';
+  const detail=deleted?'削除済み一覧から復元できます。':'添付済み書類の一覧に戻します。';
+  if(!await pageAwait(()=>confirmAction('添付書類を'+action,`${document.name} を${action}します。${detail}`)))return;
+  const result=await pageAwait(()=>store.setDocumentDeleted(data.staffId,key,deleted,current.revision,id()));
+  current=result;
+  records[data.staffId]=result;
+  const baseline=JSON.parse(editorBaseline);
+  for(const entry of [document,baseline.documents[key]]){
+    if(deleted)entry.deleted=true;
+    else delete entry.deleted;
+  }
+  editorBaseline=JSON.stringify(baseline);
+  const hasEdits=JSON.stringify(collect())!==editorBaseline;
+  $('savedState').textContent=hasEdits?'入力に未保存の変更があります':`保存確認済み・版 ${current.revision}`;
+  if(deleted && readingKey===key)clearDocumentReading();
+  $('history').replaceChildren();
+  drawDocuments();
+  drawList();
+  $('documentResult').textContent=`${document.name} を${action}しました。`;
+}
+function drawDocuments(){
+  const box=$('documents'),removed=$('deletedDocumentList');
+  box.replaceChildren();
+  removed.replaceChildren();
+  for(const [key,d] of Object.entries(data.documents)){
+    const row=el('div',null,'entry');
+    row.append(el('strong',d.name));
+    if(d.deleted){
+      const actions=el('div',null,'actions');
+      actions.append(documentButton('復元',()=>changeDocumentDeletion(key,d,false)));
+      row.append(actions);
+      removed.append(row);
+      continue;
+    }
+    const r=retention(d),actions=el('div',null,'actions');
+    row.append(el('p',`保存済み · ${d.size.toLocaleString()}バイト／${r.date||'期限未確定'} ${r.label}`),actions);
+    actions.append(documentButton('保存コピーを開く',async()=>{
+      const file=await pageAwait(()=>savedDocumentFile(key,d));
+      const url=URL.createObjectURL(file);
+      urls.add(url);
+      const link=el('a','コピーを表示');
+      link.href=url;link.target='_blank';link.rel='noopener';
+      actions.append(link);
+      link.click();
+    }));
+    const read=documentButton('この書類を読み取る',()=>readContract(d.name,()=>savedDocumentFile(key,d),key));
+    read.hidden=d.category!=='contract';
+    const remove=documentButton('削除',()=>changeDocumentDeletion(key,d,true));
+    remove.classList.add('danger');
+    actions.append(read,remove);
+    for(const [key,label,type] of [['completedDate','起算日','date'],['holdReason','継続保管理由','text'],['originalLocation','原本の保管場所','text'],['versionLabel','版・書類の日付メモ','text']]){
+      const f=input(label,d[key],type);
+      f.input.oninput=()=>{d[key]=f.input.value;};
+      row.append(f.label);
+    }
+    const category=el('select');
+    category.setAttribute('aria-label','保存書類の区分');
+    for(const option of field('documentCategory').options)category.append(option.cloneNode(true));
+    category.value=d.category;
+    category.onchange=()=>{d.category=category.value;read.hidden=d.category!=='contract';};
+    row.append(category);
+    const submitted=select('提出状況',d.submissionStatus||'未確認',['未確認','未提出','提出済み','確認済み','差戻し']);
+    submitted.input.onchange=()=>d.submissionStatus=submitted.input.value;
+    row.append(submitted.label);
+    box.append(row);
+  }
+  if(!box.childElementCount)box.append(el('p','添付済みの書類はありません。'));
+  $('deletedDocuments').hidden=!removed.childElementCount;
+  $('deletedDocumentSummary').textContent=`削除済み（${removed.childElementCount}件）`;
+}
 let portalUsageRequest=0;
 function pendingApplicationFor(employee){
   const email=employee.googleEmail?.trim().toLowerCase();
@@ -315,10 +408,80 @@ async function reload(){
 form.onsubmit=e=>{e.preventDefault();void run(async()=>{try{const next=collect();if(next.currentPeriod){const p=next.periods[next.currentPeriod];if(next.plannedPeriod.startDate!==p.startDate||next.plannedPeriod.endDate!==p.endDate)throw Error('入社日・退職日は、対応する確定ボタンで反映してください。');next.periods[p.id]={...period({...p,...Object.fromEntries(['contractEnd','days','hours'].map(k=>[k,field(k).value]))},p.id),cancelled:p.cancelled};}await pageAwait(async () => (save(next)));}catch(error){if(error?.code!=='portal/access-lost')throw error;}});};$('search').oninput=drawList;$('employeeFilter').onchange=drawList;$('reload').onclick=()=>run(reload);
 $('import').onclick=()=>run(async()=>{try{if(!await pageAwait(async () => (confirmAction('既存名簿の取り込み','既存の職員IDを維持して下書きを作ります。test・ハノワ・矯正医は取り込みません。既存名簿やシフトは残し、取込済みの労務情報も上書きしません。'))))return;const n=await pageAwait(async () => (store.importStaff()));await pageAwait(async () => (reload()));message(`${n}人を下書きとして取り込みました。`);}catch(error){if(error?.code!=='portal/access-lost')throw error;}});
 $('reviewShifts').onclick=()=>run(async()=>{try{if(!current||!['retiring','cancelled'].includes(current.data.status))throw Error('先に退職日または入社取消を確定してください。');const rows=retirementShifts(await pageAwait(async () => (store.shifts())),data.staffId,current.data);$('shiftReview').replaceChildren(...rows.map(r=>el('p',`${r.date}：${r.value}${r.manual?'（手入力時間あり）':''}`)));if(!rows.length){$('shiftReview').append(el('p','解除対象はありません。'));return;}const b=el('button',`${rows.length}件を確認して解除`);b.type='button';b.onclick=()=>run(async()=>{try{if(!await pageAwait(async () => (confirmAction('未来シフトの解除',`${current.data.basic.name} の表示中 ${rows.length}件を解除します。解除済みシフトは復元されません。`))))return;await pageAwait(async () => (store.removeShifts(current.data,rows)));$('shiftReview').replaceChildren(el('p','解除を確認しました。'));message('対象シフトを解除しました。');}catch(error){if(error?.code!=='portal/access-lost')throw error;}});$('shiftReview').append(b);}catch(error){if(error?.code!=='portal/access-lost')throw error;}});
-$('documentFile').onchange=()=>{$('ocrText').value='';$('candidates').replaceChildren();$('ocr').hidden=true;const box=$('documentPreview');box.replaceChildren();const file=$('documentFile').files[0];$('documentState').textContent=file?'未保存（ファイルを選択済み）':'未選択';if(file&&['application/pdf','image/png','image/jpeg'].includes(file.type)){const url=URL.createObjectURL(file);urls.add(url);const preview=el(file.type==='application/pdf'?'iframe':'img');preview.src=url;preview.title='選択した原本のプレビュー';preview.alt='選択した原本のプレビュー';preview.style.width='100%';preview.style.maxHeight='420px';preview.style.objectFit='contain';if(file.type==='application/pdf')preview.style.height='420px';box.append(preview);}};
+$('documentFile').onchange=()=>{clearDocumentReading();const box=$('documentPreview');box.replaceChildren();const file=$('documentFile').files[0];$('documentState').textContent=file?'未保存（ファイルを選択済み）':'未選択';if(file&&['application/pdf','image/png','image/jpeg'].includes(file.type)){const url=URL.createObjectURL(file);urls.add(url);const preview=el(file.type==='application/pdf'?'iframe':'img');preview.src=url;preview.title='選択した原本のプレビュー';preview.alt='選択した原本のプレビュー';preview.style.width='100%';preview.style.maxHeight='420px';preview.style.objectFit='contain';if(file.type==='application/pdf')preview.style.height='420px';box.append(preview);}};
 $('saveDocument').onclick=()=>run(async()=>{try{const file=$('documentFile').files[0];if(!file)throw Error('書類を選んでください。');const prepared=await pageAwait(async () => (prepareFile(file,id()))),next=collect();next.documents[prepared.id]={name:prepared.name,size:prepared.size,mime:prepared.mime,hash:prepared.hash,category:field('documentCategory').value,completedDate:field('documentCompleted').value,holdReason:field('documentHold').value,originalLocation:'事務関連',versionLabel:'',submissionStatus:'未確認'};retention(next.documents[prepared.id]);if(!await pageAwait(async () => (confirmAction('書類コピーの保存',`${file.name} を ${next.basic.name} の書類として保存します。番号・口座情報が除去されていることを確認してください。`))))return;try{await pageAwait(async () => (save(next,false,prepared)));$('documentState').textContent='保存済み（再読み込みで確認）';}catch(e){if (pageLifecycle.active) {$('documentState').textContent='未保存・保存結果を確認してください。原本は事務関連に保持してください。';throw e;}}}catch(error){if(error?.code!=='portal/access-lost')throw error;}});
-$('readDocument').onclick=()=>run(async()=>{try{const file=$('documentFile').files[0];if(!file)throw Error('書類を選んでください。');if(field('documentCategory').value!=='contract')throw Error('読取対象は雇用契約書・労働条件通知書です。');$('documentState').textContent='端末内で解析中…';await pageAwait(async () => (prepareFile(file,id())));readerController=new AbortController();const source=await pageAwait(async () => (readDocument(file,p=>{const node=$('documentState');if(node)node.textContent=`端末内で解析中 ${p}`;},readerController.signal)));$('ocrText').value=source;$('ocr').hidden=false;$('candidates').replaceChildren();for(const c of extractCandidates(source)){const l=el('label'),check=el('input');check.type='checkbox';check.dataset.key=c.field;const v=el('input');v.value=c.value;v.setAttribute('aria-label',c.label);l.append(check,el('span',c.label),v);$('candidates').append(l);}$('documentState').textContent='読取完了・未保存。候補を確認してください。';}catch(error){if(error?.code!=='portal/access-lost')throw error;}});
-$('applyCandidates').onclick=()=>{for(const l of $('candidates').children){const c=l.querySelector('input[type=checkbox]');if(!c.checked)continue;const target={name:'basic_name',startDate:'startDate',contractEnd:'contractEnd',role:'role',type:'type',days:'days',hours:'hours'}[c.dataset.key];const value=l.querySelector('input:not([type=checkbox])').value;if(target)field(target).value=c.dataset.key==='role'?({'歯科医師':'DR','歯科衛生士':'DH','歯科助手':'DA','受付':'DA'}[value]||''):c.dataset.key==='type'?({'常勤':'full','非常勤':'part','パート':'part','スポット':'spot'}[value]||''):value;}$('savedState').textContent='候補を反映・未保存';};
+const candidateFields={name:'basic_fullName',startDate:'startDate',contractEnd:'contractEnd',role:'role',type:'type',days:'days',hours:'hours'};
+const candidateCodes={role:{'歯科医師':'DR','歯科衛生士':'DH','歯科助手':'DA','受付':'DA','歯科助手・受付':'DA'},type:{'常勤':'full','非常勤':'part','パート':'part','スポット':'spot'}};
+function showCandidates(source){
+  for(const candidate of extractCandidates(source)){
+    const row=el('div',null,'entry'),check=el('input'),label=el('label'),value=el('input');
+    const target=field(candidateFields[candidate.field]);
+    const shownValue=target.selectedOptions?.[0]?.textContent||target.value||(candidate.field==='name'?field('basic_name').value:'');
+    check.type='checkbox';
+    check.dataset.key=candidate.field;
+    label.append(check,el('span',candidate.label));
+    value.value=candidate.value;
+    value.setAttribute('aria-label',candidate.label+'の読取候補');
+    row.append(label,el('small','現在の入力値　'+(shownValue||'未入力')),value);
+    if(candidate.field==='startDate' && data.currentPeriod){
+      check.disabled=value.disabled=true;
+      row.append(el('small','確定済みの入社日は比較用に表示しています。'));
+    }
+    $('candidates').append(row);
+  }
+  $('applyCandidates').hidden=!$('candidates').querySelector('input[type=checkbox]:enabled');
+}
+async function readContract(name,getFile,key=null){
+  clearDocumentReading();
+  readingKey=key;
+  const status=$('ocrStatus');
+  const controller=readerController=new AbortController();
+  status.textContent=`${name} を端末内で読み取り中…`;
+  status.focus();
+  try{
+    const file=await pageAwait(getFile);
+    const source=await pageAwait(()=>readDocument(file,progress=>{
+      if(!controller.signal.aborted)status.textContent=`${name} を端末内で読み取り中… ${progress}`;
+    },controller.signal));
+    $('ocrText').value=source;
+    showCandidates(source);
+    $('ocr').hidden=false;
+    status.textContent=$('candidates').childElementCount
+      ?`${name} の読み取りが完了しました。現在の入力値と候補を確認してください。`
+      :`${name} から反映できる項目を検出できませんでした。原文を確認してください。`;
+  }catch(error){
+    if(pageLifecycle.active)status.textContent=`${name} の読み取りに失敗しました。${error.message||''}`;
+    throw error;
+  }
+}
+$('readDocument').onclick=()=>run(async()=>{
+  const file=$('documentFile').files[0];
+  if(!file)throw Error('書類を選んでください。');
+  if(field('documentCategory').value!=='contract')throw Error('読取対象は雇用契約書・労働条件通知書です。');
+  await readContract(file.name,async()=>{await prepareFile(file,id());return file;});
+});
+$('applyCandidates').onclick=()=>run(()=>{
+  const selected=[];
+  for(const check of $('candidates').querySelectorAll('input[type=checkbox]:checked')){
+    const key=check.dataset.key,input=check.closest('.entry').querySelector('input:not([type=checkbox])');
+    if(key==='startDate' && data.currentPeriod)continue;
+    const value=input.value.trim();
+    const converted=candidateCodes[key]?Object.hasOwn(candidateCodes[key],value)&&candidateCodes[key][value]:value;
+    if(!converted || key==='name' && value.length>60)throw Error(input.getAttribute('aria-label')+'を確認してください。');
+    if(key==='startDate'||key==='contractEnd')jstStart(converted);
+    selected.push([key,converted]);
+  }
+  if(!selected.length){
+    $('ocrStatus').textContent='反映する項目にチェックを入れてください。';
+    return;
+  }
+  for(const [key,value] of selected){
+    field(candidateFields[key]).value=value;
+    if(key==='name' && !field('basic_name').value.trim())field('basic_name').value=value;
+  }
+  $('savedState').textContent='候補を反映・未保存';
+  $('ocrStatus').textContent='選んだ候補を入力欄に反映しました。内容を確認し、「入力内容を保存」を押してください。';
+});
 function visibleHistory(snapshot){
   if(!snapshot)return null;
   const fields={...snapshot};

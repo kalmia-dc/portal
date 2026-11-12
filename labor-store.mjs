@@ -43,14 +43,23 @@ export function createLaborStore(port, actor, defaults=[]) {
     const saved=await read('laborRecords/'+key(staffId));
     return await verifyRegistration(saved,staffId,operationId,request)?hydrate(saved):null;
   }
-  async function save(data, expectedRevision, operationId, {reflect=false,file=null,request=null}={}) {
-    reflect=reflect||data.status!=='draft';
-    if(request && data.status!=='confirmed' && data.status!=='retiring')throw Error('入社を確定できる職員情報を選択してください。');
+  async function save(data, expectedRevision, operationId, {reflect=false,file=null,request=null,documentChange=null}={}) {
     await authorize();key(data.staffId);key(operationId);
     const path='laborRecords/'+data.staffId,current=await read(path);
     const verified=saved=>verifyRegistration(saved,data.staffId,operationId,request);
     if(current?.operationId===operationId && await verified(current))return hydrate(current);
     const timestamp=port.timestamp();
+    if(documentChange){
+      if(current?.revision!==expectedRevision)throw Error('別の画面で更新されました。職員を開き直してください。');
+      data=structuredClone(current.data);
+      const document=data.documents?.[key(documentChange.id)];
+      if(!document || Boolean(document.deleted)===documentChange.deleted)throw Error('書類の状態を確認できません。職員を開き直してください。');
+      if(documentChange.deleted)document.deleted=true;
+      else delete document.deleted;
+    }else{
+      reflect=reflect||data.status!=='draft';
+    }
+    if(request && data.status!=='confirmed' && data.status!=='retiring')throw Error('入社を確定できる職員情報を選択してください。');
     const next=recordUpdate(current,data,actor,operationId,timestamp,expectedRevision);
     const updates={[path]:next,['laborHistory/'+data.staffId+'/'+operationId]:{previousOperationId:current?.operationId||'',after:data,by:actor.uid,at:timestamp}};
     if(reflect){
@@ -134,7 +143,8 @@ export function createLaborStore(port, actor, defaults=[]) {
     try{await port.update(updates);}catch(e){if(await verify().catch(()=>false))return;throw e;}
     if(!await verify())throw Error('解除結果を確認できません。対象一覧を再確認してください。');
   }
-  return {actor,authorize,list,roster,save,importStaff,matchAccount,removeShifts,checkRegistration,portalUsage,
+  const setDocumentDeleted=(staffId,id,deleted,revision,operationId)=>save({staffId},revision,operationId,{documentChange:{id,deleted}});
+  return {actor,authorize,list,roster,save,setDocumentDeleted,importStaff,matchAccount,removeShifts,checkRegistration,portalUsage,
     bindings:()=>read('laborAccountBindings'),
     requests:()=>read('portalJoinRequests'),shifts:()=>read('shifts'),history:sid=>read('laborHistory/'+key(sid)),shiftHistory:sid=>read('laborShiftHistory/'+key(sid)),file:async id=>{await authorize();return read('laborFiles/'+key(id));},
     now:port.now};
