@@ -77,11 +77,6 @@ export function applicablePeriod(state, date) {
   const ms=jstStart(date);return Object.entries(state.periods||{}).find(([,p])=>!p.cancelled&&p.startAt<=ms&&ms<p.endAt)?.[0]||null;
 }
 export function accessAt(state, ms=Date.now()) {return state?.state!=='stopped'&&(!state?.hrManaged||(!state.currentCancelled&&state.startAt<=ms&&ms<state.endAt)||(state.previousStartAt<=ms&&ms<state.previousEndAt));}
-export function salaryEntry(input,id) {
-  key(id);jstStart(input.effectiveDate);
-  const amount=v=>{if(v===''||v==null)return null;const n=Number(v);if(!Number.isFinite(n)||n<0)throw Error('給与金額は0以上の数値で入力してください。');return n;};
-  return {id,effectiveDate:input.effectiveDate,base:amount(input.base),hourly:amount(input.hourly),allowances:(input.allowances||[]).map(x=>({name:text(x.name),amount:amount(x.amount)})).filter(x=>x.name)};
-}
 export function retirementShifts(shifts, staffId, data) {
   const p=data.periods[data.currentPeriod];if(!p)throw Error('在籍期間を確認してください。');
   return Object.entries(shifts||{}).flatMap(([month,entries])=>Object.entries(entries?.[staffId]||{}).filter(([date])=>/^\d{4}-\d{2}-\d{2}$/.test(date)&&(p.cancelled?jstStart(date)>=p.startAt:p.endDate&&jstStart(date)>=p.endAt)).map(([date,value])=>({month,date,value,manual:entries.__manualTimes?.[staffId]?.[date]??null}))).sort((a,b)=>a.date.localeCompare(b.date));

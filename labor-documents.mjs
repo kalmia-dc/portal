@@ -13,19 +13,16 @@ export async function prepareFile(file,id) {
 export function extractCandidates(source) {
   // OCR inserts spaces inside Japanese labels. Normalize only known labels and
   // explicit date notation; keep names and original text untouched in the UI.
-  for(const word of ['雇用開始日','契約終了日','契約期間終了','所定勤務日数','所定労働日数','所定勤務時間','所定労働時間','歯科衛生士','歯科医師','歯科助手','雇用形態','非常勤','常勤','スポット','基本給','入社日','雇入日','職種','時給','手当'])source=source.replace(new RegExp(word.split('').join('[ \\t]*'),'gu'),word);
-  source=source.replace(/([\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]+)[ \t]+手当/gu,'$1手当');
+  for(const word of ['雇用開始日','契約終了日','契約期間終了','所定勤務日数','所定労働日数','所定勤務時間','所定労働時間','歯科衛生士','歯科医師','歯科助手','雇用形態','非常勤','常勤','スポット','入社日','雇入日','職種'])source=source.replace(new RegExp(word.split('').join('[ \\t]*'),'gu'),word);
   source=source.replace(/(\d{4})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日/gu,'$1年$2月$3日');
   const result=[];const add=(field,label,re)=>{const m=source.match(re);if(m)result.push({field,label,value:m[1].trim(),evidence:m[0]});};
   add('name','氏名',/(?:氏名|労働者名)\s*[:：]?\s*([^\n\r]{2,40})/u);
   add('startDate','入社日',/(?:入社日|雇入日|雇用開始日)\s*[:：]?\s*(\d{4}[-/年]\d{1,2}[-/月]\d{1,2}日?)/u);
   add('contractEnd','契約終了日',/(?:契約終了日|契約期間終了)\s*[:：]?\s*(\d{4}[-/年]\d{1,2}[-/月]\d{1,2}日?)/u);
-  add('base','基本給',/基本給\s*[:：]?\s*([\d,]+)\s*円/u);add('hourly','時給',/時給\s*[:：]?\s*([\d,]+)\s*円/u);
   add('role','職種',/職種\s*[:：]?\s*(歯科医師|歯科衛生士|歯科助手|受付)/u);
   add('type','雇用形態',/雇用形態\s*[:：]?\s*(常勤|非常勤|パート|スポット)/u);
   add('days','所定勤務日数',/(?:所定勤務日数|所定労働日数)\s*[:：]?\s*([^\n\r]{1,25})/u);add('hours','所定勤務時間',/(?:所定勤務時間|所定労働時間)\s*[:：]?\s*([^\n\r]{1,25})/u);
-  for(const m of source.matchAll(/([^\s\n：:]{1,15}手当)\s*[:：]?\s*([\d,]+)\s*円/gu))result.push({field:'allowance',label:m[1],value:m[2].replaceAll(',',''),evidence:m[0]});
-  return result.map(x=>({...x,value:['startDate','contractEnd'].includes(x.field)?x.value.replace(/年|月|\//g,'-').replace('日','').split('-').map((v,i)=>i?v.padStart(2,'0'):v).join('-'):['base','hourly'].includes(x.field)?x.value.replaceAll(',',''):x.value}));
+  return result.map(x=>({...x,value:['startDate','contractEnd'].includes(x.field)?x.value.replace(/年|月|\//g,'-').replace('日','').split('-').map((v,i)=>i?v.padStart(2,'0'):v).join('-'):x.value}));
 }
 export async function readDocument(file, progress=()=>{}, signal) {
   const {default:{createWorker}}=await import('./assets/labor/tesseract.esm.min.js');let worker,loadingTask;

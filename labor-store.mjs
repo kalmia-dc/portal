@@ -1,4 +1,4 @@
-import {draftEmployee,recordUpdate,lifecycleProjection,removeReviewedShifts,key,text,canonical,today} from './labor-model.mjs?v=20261112-without-checklists';
+import {draftEmployee,recordUpdate,lifecycleProjection,removeReviewedShifts,key,text,canonical,today} from './labor-model.mjs?v=20261112-without-salary';
 import {approvalUpdates} from './portal-join-model.mjs';
 import {joinNameKey} from './portal-join-model.mjs';
 import {effectiveMember,lifecycleApplies,lifecycleProtection,linkedAccounts} from './portal-lifecycle-model.mjs';
