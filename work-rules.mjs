@@ -9,6 +9,14 @@ GlobalWorkerOptions.workerSrc=new URL('./assets/labor/pdf.worker.mjs',import.met
 const lifecycle=createPageLifecycle();
 const app=initializeApp(firebaseConfig);
 const $=id=>document.getElementById(id);
+const isPartTime=new URLSearchParams(location.search).get('document')==='part-time';
+const documentKey=isPartTime?'partTimeRules202204':'workRules202508';
+if(isPartTime){
+  document.querySelector('.version').textContent='パートタイム従業員就業規則 · 2022年4月1日施行（第1版）';
+  $('revisionNote').hidden=false;
+  $('savePdf').download='パートタイム従業員就業規則_2022年4月版.pdf';
+  $('pdfCanvas').setAttribute('aria-label','パートタイム従業員就業規則のページ画像');
+}
 let objectUrl;
 let pdfDocument,loadingTask,pageNumber=1,rendering=false;
 async function renderPage(){
@@ -56,7 +64,7 @@ try{
     const params=new URLSearchParams();
     if(profile.staffId)params.set('staff',profile.staffId);
     $('home').href='./index.html?'+params;
-    const snapshot=await get(ref(getDatabase(app),'clinicDocuments/workRules202508'));
+    const snapshot=await get(ref(getDatabase(app),'clinicDocuments/'+documentKey));
     lifecycle.assertActive();
     const data=snapshot.val();
     if(!data||data.mimeType!=='application/pdf'||typeof data.base64!=='string'||data.base64.length>2000000)throw Error('invalid document');
