@@ -1,17 +1,22 @@
-<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>労務管理 | カルミアDC</title><link rel="stylesheet" href="portal-common.css"><link rel="stylesheet" href="labor.css?v=20261112-full-names"></head><body>
+<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>労務管理 | カルミアDC</title><link rel="stylesheet" href="portal-common.css"><link rel="stylesheet" href="labor.css?v=20261112-employee-order"></head><body>
 <header><a href="index.html">ポータルへ</a><h1>労務管理（入退社・利用登録）</h1><p>職員情報・Googleアカウント・手続き・書類</p><span id="environment"></span></header>
 <p id="message" role="status" aria-live="polite">利用許可を確認しています…</p>
 <main id="app" hidden><article>
 <section id="registrationGuide">
   <h2>新入社員登録</h2>
-  <p>本人に申請URLを渡してください。申請が届いたら「確認待ちの申請」から入社を確定します。</p>
+  <p>本人に申請URLを渡してください。申請が届いたら、職員一覧の「未登録」から開いて入社を確定します。</p>
   <div class="actions"><button type="button" id="copyRegistrationUrl">本人用の申請URLをコピー</button><button type="button" id="reload">一覧を再読み込み</button></div>
   <label>本人用の申請URL<input id="registrationUrl" readonly type="url"></label>
   <p id="copyRegistrationStatus" role="status"></p>
 </section>
-<section aria-labelledby="pendingTitle">
-  <h2 id="pendingTitle">確認待ちの申請</h2>
-  <div id="pendingApplications"></div>
+<section aria-labelledby="employeeListTitle">
+  <h2 id="employeeListTitle">職員一覧</h2>
+  <div class="grid">
+    <label>職員検索<input id="search" type="search" placeholder="氏名・職員ID"></label>
+    <label>登録状態<select id="employeeFilter"></select></label>
+  </div>
+  <p id="employeeCount" role="status"></p>
+  <div id="employees"></div>
   <form id="onboarding" hidden>
     <h3 id="applicationTitle" tabindex="-1">入社を確定</h3>
     <p id="applicationIdentity"></p>
@@ -24,15 +29,6 @@
     <p id="registrationStatus" role="status"></p>
     <div class="actions"><button type="submit" id="completeRegistration">入社を確定</button><button type="button" id="closeRegistration">閉じる</button></div>
   </form>
-</section>
-<section aria-labelledby="employeeListTitle">
-  <h2 id="employeeListTitle">職員一覧</h2>
-  <div class="grid">
-    <label>職員検索<input id="search" type="search" placeholder="氏名・職員ID"></label>
-    <label>登録状態<select id="employeeFilter"></select></label>
-  </div>
-  <p id="employeeCount" role="status"></p>
-  <div id="employees"></div>
 </section>
 <section id="overview"><h2>期限一覧</h2><div id="deadlines"></div></section>
 <form id="editor" hidden><h2 id="employeeTitle">職員詳細</h2><p id="identity"></p><div class="actions"><button type="submit">入力内容を保存</button><span id="savedState"></span></div>
@@ -49,4 +45,4 @@
   <label>退社時（1行1項目）<textarea id="offboardTemplate"></textarea></label>
   <button type="button" id="saveTemplates">テンプレートを保存</button>
 </details></article></main>
-<dialog id="confirmation"><h2 id="confirmTitle"></h2><p id="confirmText"></p><div class="actions"><button id="confirmYes">確認して実行</button><button id="confirmNo">戻る</button></div></dialog><script src="portal-common.js"></script><script type="module" src="labor-ui.js?v=20261112-full-names"></script></body></html>
+<dialog id="confirmation"><h2 id="confirmTitle"></h2><p id="confirmText"></p><div class="actions"><button id="confirmYes">確認して実行</button><button id="confirmNo">戻る</button></div></dialog><script src="portal-common.js"></script><script type="module" src="labor-ui.js?v=20261112-employee-order"></script></body></html>

@@ -20,3 +20,7 @@
 }
 
 #employees .name-unconfirmed{display:block;color:#594b22;font-weight:400;margin-top:3px}
+
+#employees .employee-group+.employee-group{margin-top:24px}
+#employees .employee-group h3{margin:0 0 8px}
+#employees .employee-email{display:block;margin-top:3px;overflow-wrap:anywhere}

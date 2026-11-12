@@ -35,53 +35,113 @@ const roles={DR:'歯科医師',DH:'歯科衛生士',DA:'歯科助手・受付'};
 const employment={full:'常勤',part:'非常勤',spot:'スポット'};
 const onboarding=$('onboarding');
 let applications={},bindings={},roster=[],selectedApplication=null,registrationAttempt=null;
-const recordStatus=d=>d.status==='confirmed' && bindings[d.staffId]?'complete':d.status;
-const listStatus={...status,complete:'登録完了'};
+const listStatus={...status,pending:'確認待ちの申請',complete:'登録完了',retiring:'退職予定',retired:'退職済み'};
+const employeeGroups=[
+  {label:'未登録',states:['pending','draft']},
+  {label:'登録済み',states:['complete','confirmed','retiring']},
+  {label:'退職済み',states:['retired']},
+  {label:'入社取消',states:['cancelled']},
+];
 const employeeName=d=>d.basic.fullName || personName(d.basic.name,d.staffId);
+let employeeListDate;
+function recordStatus(d,date){
+  if(d.status==='retiring'){
+    const endDate=d.periods[d.currentPeriod]?.endDate;
+    if(endDate && endDate<date)return 'retired';
+  }
+  return d.status==='confirmed' && bindings[d.staffId]?'complete':d.status;
+}
 function drawList(){
+  employeeListDate=today(store.now());
   const query=staffNameKey($('search').value);
   const box=$('employees');
-  const rows=Object.values(records).sort((a,b)=>employeeName(a.data).localeCompare(employeeName(b.data),'ja'));
-  const filter=$('employeeFilter');
-  const selected=filter.value;
-  const filters={all:'すべて',...listStatus};
-  filter.replaceChildren(...Object.entries(filters).map(([key,label])=>{
-    const option=el('option',label+'（'+(key==='all'?rows.length:rows.filter(r=>recordStatus(r.data)===key).length)+'）');
-    option.value=key;return option;
-  }));
-  filter.value=selected||'all';
-  const matches=rows.filter(({data:d})=>{
-    const names=[employeeName(d),d.basic.name,d.basic.kana,d.staffId];
-    return names.some(name=>staffNameKey(name).includes(query)) && (filter.value==='all'||recordStatus(d)===filter.value);
+  const employees=Object.values(records).map(record=>{
+    const d=record.data;
+    const name=employeeName(d);
+    return {record,name,state:recordStatus(d,employeeListDate),search:[name,d.basic.name,d.basic.kana,d.staffId]};
   });
-  $('employeeCount').textContent=matches.length+'件表示／全'+rows.length+'件';
+  const pending=Object.values(applications).filter(request=>request.state==='pending').map(request=>({
+    request,name:request.name,state:'pending',search:[request.name],
+  }));
+  const rows=[...employees,...pending].sort((a,b)=>a.name.localeCompare(b.name,'ja'));
+  const filter=$('employeeFilter');
+  const selected=filter.value||'all';
+  const visibleByDefault=rows.filter(row=>row.state!=='cancelled');
+  const states=employeeGroups.flatMap(group=>group.states);
+  const filters=[['all','通常表示',visibleByDefault.length],...states.map(state=>[
+    state,listStatus[state],rows.filter(row=>row.state===state).length,
+  ])];
+  filter.replaceChildren(...filters.map(([key,label,count])=>{
+    const option=el('option',label+'（'+count+'件）');
+    option.value=key;
+    return option;
+  }));
+  filter.value=selected;
+  const candidates=selected==='all'?visibleByDefault:rows.filter(row=>row.state===selected);
+  const matches=candidates.filter(row=>row.search.some(name=>staffNameKey(name).includes(query)));
+  $('employeeCount').textContent=matches.length+'件表示／全'+candidates.length+'件';
   box.replaceChildren();
   if(!matches.length){
-    box.append(el('p',rows.length?'検索・絞り込みに該当する職員はいません。':'労務管理に登録された職員はいません。'));
+    box.append(el('p',rows.length?'検索・絞り込みに該当する職員はいません。':'職員情報と確認待ちの申請はありません。'));
     return;
   }
+  for(const {label,states} of employeeGroups){
+    const groupRows=matches.filter(row=>states.includes(row.state));
+    if(groupRows.length)box.append(drawEmployeeGroup(label,groupRows));
+  }
+}
+function drawEmployeeGroup(label,rows){
+  const group=el('div',null,'employee-group');
   const columns=['氏名','職種','雇用形態','入社日','登録状態'];
   const table=el('table'),thead=el('thead'),head=el('tr'),body=el('tbody');
-  for(const label of columns){const th=el('th',label);th.scope='col';head.append(th);}
-  thead.append(head);table.append(thead,body);
-  for(const record of matches){
-    const d=record.data,row=el('tr');
-    const button=el('button',employeeName(d));
-    if(!d.basic.fullName)button.append(el('small',' 氏名要確認','name-unconfirmed'));
-    button.type='button';button.setAttribute('aria-current',String(d.staffId===data?.staffId));
-    button.onclick=()=>run(async()=>{
-      if(!form.hidden && !await discardEditorChanges())return;
-      show(record);
-      $('employeeTitle').focus();
-      form.scrollIntoView({block:'start'});
-    });
-    const start=d.periods[d.currentPeriod]?.startDate||d.plannedPeriod?.startDate;
-    [button,roles[d.role],employment[d.type],start,listStatus[recordStatus(d)]].forEach((value,index)=>{
-      const cell=el('td');cell.dataset.label=columns[index];cell.append(value||'未確認');row.append(cell);
+  const title=el('h3',label+'（'+rows.length+'件）');
+  title.id='employee-group-'+rows[0].state;
+  table.setAttribute('aria-labelledby',title.id);
+  for(const label of columns){
+    const th=el('th',label);
+    th.scope='col';
+    head.append(th);
+  }
+  thead.append(head);
+  table.append(thead,body);
+  for(const {record,request,name,state} of rows){
+    const row=el('tr'),identity=el('div');
+    const button=el('button',name);
+    button.type='button';
+    const d=record?.data;
+    if(request){
+      button.setAttribute('aria-label',name+' の申請を開く');
+      identity.append(button,el('small',request.email,'employee-email'));
+      button.onclick=()=>run(async()=>{
+        if(selectedApplication?.uid===request.uid && selectedApplication.revision===request.revision && !onboarding.hidden){
+          $('applicationTitle').focus();
+          return;
+        }
+        if(!onboarding.hidden && !await pageAwait(()=>confirmAction('申請を切り替える','表示中の申請を閉じますか？')))return;
+        openApplication(request);
+      });
+    }else{
+      if(!d.basic.fullName)button.append(el('small',' 氏名要確認','name-unconfirmed'));
+      button.setAttribute('aria-current',String(d.staffId===data?.staffId));
+      identity.append(button);
+      button.onclick=()=>run(async()=>{
+        if(!form.hidden && !await discardEditorChanges())return;
+        show(record);
+        $('employeeTitle').focus();
+        form.scrollIntoView({block:'start'});
+      });
+    }
+    const start=d?.periods[d.currentPeriod]?.startDate||d?.plannedPeriod?.startDate;
+    [identity,roles[request?.jobRole||d?.role],employment[d?.type],start,listStatus[state]].forEach((value,index)=>{
+      const cell=el('td');
+      cell.dataset.label=columns[index];
+      cell.append(value||'未確認');
+      row.append(cell);
     });
     body.append(row);
   }
-  box.append(table);
+  group.append(title,table);
+  return group;
 }
 function discardEditorChanges(){
   return !data || JSON.stringify(collect())===editorBaseline ||
@@ -90,24 +150,6 @@ function discardEditorChanges(){
 function registrationFeedback(value,error=false){
   $('registrationStatus').textContent=value;
   $('registrationStatus').classList.toggle('error',error);
-}
-function drawApplications(){
-  const box=$('pendingApplications');
-  box.replaceChildren();
-  const pending=Object.values(applications).filter(r=>r.state==='pending').sort((a,b)=>a.name.localeCompare(b.name,'ja'));
-  $('pendingTitle').textContent='確認待ちの申請（'+pending.length+'件）';
-  if(!pending.length)box.append(el('p','確認待ちの申請はありません。'));
-  for(const request of pending){
-    const row=el('div',null,'entry'),button=el('button',request.name+' の申請を開く');
-    button.type='button';
-    button.onclick=()=>run(async()=>{
-      if(selectedApplication?.uid===request.uid && selectedApplication.revision===request.revision && !onboarding.hidden){$('applicationTitle').focus();return;}
-      if(!onboarding.hidden && !await pageAwait(()=>confirmAction('申請を切り替える','表示中の申請を閉じますか？')))return;
-      openApplication(request);
-    });
-    row.append(el('p',request.name+'／'+(roles[request.jobRole]||request.jobRole)+'／'+request.email),button);
-    box.append(row);
-  }
 }
 function openApplication(request){
   selectedApplication=request;registrationAttempt=null;
@@ -155,7 +197,7 @@ function completeApplication(result){
   registrationFeedback(employeeName(d)+'さんの職員登録とポータル利用設定が完了しました。');
   message(employeeName(d)+'さんの登録が完了しました。');
   if(current?.data.staffId===d.staffId && JSON.stringify(collect())===editorBaseline)show(result);
-  drawApplications();drawList();drawDeadlines();
+  drawList();drawDeadlines();
 }
 onboarding.onsubmit=event=>{
   event.preventDefault();
@@ -207,7 +249,7 @@ async function save(next=collect(),reflect=false,file=null){try{const result=awa
 async function reload(){
   const result=await pageAwait(()=>Promise.all([store.list(),store.requests(),store.bindings(),store.roster()]));
   [records,applications,bindings,roster]=[result[0],result[1]||{},result[2]||{},result[3]];
-  drawList();drawApplications();drawDeadlines();
+  drawList();drawDeadlines();
   if(registrationAttempt){
     const {staffId,operationId,request}=registrationAttempt;
     const saved=await pageAwait(()=>store.checkRegistration(staffId,operationId,request));
@@ -237,4 +279,4 @@ $('applyCandidates').onclick=()=>{for(const l of $('candidates').children){const
 $('loadHistory').onclick=()=>run(async()=>{try{const h=await pageAwait(async () => (store.history(data.staffId)));$('history').replaceChildren();for(const entry of Object.values(h||{}).sort((a,b)=>b.at-a.at)){const d=el('details');d.append(el('summary',`${new Date(entry.at).toLocaleString('ja-JP',{timeZone:'Asia/Tokyo'})}／${entry.by}`),el('pre',JSON.stringify({変更前:h[entry.previousOperationId]?.after??null,変更後:entry.after},null,2)));$('history').append(d);}const shifts=await pageAwait(async () => (store.shiftHistory(data.staffId)));for(const entry of Object.values(shifts||{}).sort((a,b)=>b.at-a.at)){const d=el('details');d.append(el('summary',`シフト解除 ${new Date(entry.at).toLocaleString('ja-JP',{timeZone:'Asia/Tokyo'})}／${entry.by}`),el('pre',JSON.stringify(entry.months,null,2)));$('history').append(d);}}catch(error){if(error?.code!=='portal/access-lost')throw error;}});
 $('saveTemplates').onclick=()=>run(async()=>{try{const value={onboard:$('onboardTemplate').value.split('\n').map(x=>x.trim()).filter(Boolean),offboard:$('offboardTemplate').value.split('\n').map(x=>x.trim()).filter(Boolean)};if(!value.onboard.length||!value.offboard.length)throw Error('各テンプレートに1項目以上入力してください。');await pageAwait(async () => (store.saveTemplates(value)));templates=value;message('テンプレートを保存しました。以後の新規手続きに使用します。');}catch(error){if(error?.code!=='portal/access-lost')throw error;}});
 window.addEventListener('pagehide',clearRead);window.addEventListener('portalAccessLost',()=>{clearRead();current=null;data=null;records={};applications={};bindings={};roster=[];selectedApplication=null;registrationAttempt=null;});window.addEventListener('laborAccessLost',()=>{pageLifecycle.stop();clearRead();current=null;data=null;records={};applications={};bindings={};roster=[];selectedApplication=null;registrationAttempt=null;});
-try{store=await pageAwait(async () => (connectLabor()));templates=await pageAwait(async () => (store.templates()))||templates;$('onboardTemplate').value=templates.onboard.join('\n');$('offboardTemplate').value=templates.offboard.join('\n');$('app').hidden=false;await pageAwait(async () => (reload()));}catch(e){if (pageLifecycle.active) {message(e.message,true);$('app').hidden=true;}}
+try{store=await pageAwait(async () => (connectLabor()));templates=await pageAwait(async () => (store.templates()))||templates;$('onboardTemplate').value=templates.onboard.join('\n');$('offboardTemplate').value=templates.offboard.join('\n');$('app').hidden=false;await pageAwait(async () => (reload()));pageLifecycle.interval(()=>{if(employeeListDate!==today(store.now()))drawList();},1000*60);}catch(e){if (pageLifecycle.active) {message(e.message,true);$('app').hidden=true;}}
