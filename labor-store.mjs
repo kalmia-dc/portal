@@ -1,4 +1,4 @@
-import {draftEmployee,recordUpdate,lifecycleProjection,removeReviewedShifts,key,text,canonical} from './labor-model.mjs?v=20261112-full-names';
+import {draftEmployee,recordUpdate,lifecycleProjection,removeReviewedShifts,key,text,canonical} from './labor-model.mjs?v=20261112-without-checklists';
 import {approvalUpdates} from './portal-join-model.mjs';
 import {joinNameKey} from './portal-join-model.mjs';
 import {lifecycleProtection} from './portal-lifecycle-model.mjs';
@@ -119,7 +119,7 @@ export function createLaborStore(port, actor, defaults=[]) {
   return {actor,authorize,list,roster,save,importStaff,matchAccount,removeShifts,checkRegistration,
     bindings:()=>read('laborAccountBindings'),
     requests:()=>read('portalJoinRequests'),shifts:()=>read('shifts'),history:sid=>read('laborHistory/'+key(sid)),shiftHistory:sid=>read('laborShiftHistory/'+key(sid)),file:async id=>{await authorize();return read('laborFiles/'+key(id));},
-    templates:()=>read('laborTemplates'),saveTemplates:async value=>{await authorize();await port.update({laborTemplates:value});const saved=await read('laborTemplates');if(['onboard','offboard'].some(k=>JSON.stringify(saved?.[k])!==JSON.stringify(value[k])))throw Error('テンプレートの保存を再確認してください。');},now:port.now};
+    now:port.now};
 }
 function registrationUnconfirmed() {
   return Object.assign(Error('登録結果を確認できません。入力内容を保持しています。「一覧を再読み込み」で申請と職員の状態を確認してください。'),{code:'labor/registration-unconfirmed'});

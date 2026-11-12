@@ -4,8 +4,6 @@ export const OPEN_END = 253402268400000;
 export const INSURANCES = ['健康保険','厚生年金','雇用保険'];
 export const ENROLLMENTS = ['未確認','加入中','未加入','対象外','資格喪失済み'];
 export const PROGRESS = ['未着手','対応中','完了','対象外'];
-export const ONBOARD = ['職員基本情報の確認','雇用契約書の確認','給与条件の確認','保険の加入状況・手続き確認','ポータル利用確認','シフト反映確認'];
-export const OFFBOARD = ['退職日の確認','退職関連書類の確認','保険の手続き確認','ポータル利用停止確認','退職日より後のシフト解除確認'];
 export function key(value) { if(typeof value!=='string'||!value||/[.#$\[\]/\u0000-\u001f\u007f]/u.test(value)||value.length>128)throw Error('識別情報が不正です。');return value; }
 export const text = value => String(value??'').trim();
 export function canonical(value){const sort=v=>Array.isArray(v)?v.map(sort):v&&typeof v==='object'?Object.fromEntries(Object.keys(v).sort().map(k=>[k,sort(v[k])])):v;return JSON.stringify(sort(value));}
@@ -16,18 +14,11 @@ export function jstStart(value) {
   return ms;
 }
 export const today = (ms=Date.now())=>new Date(ms+9*3600000).toISOString().slice(0,10);
-export function dueState(item, date=today()) {
-  if(['完了','対象外'].includes(item.status))return item.status;
-  if(!item.due)return '期限未設定';
-  const remaining=(jstStart(item.due)-jstStart(date))/DAY;
-  return remaining<0?'期限超過':remaining<=7?'期限間近':'予定';
-}
-export function checklist(labels, prefix='in') {return Object.fromEntries(labels.map((title,i)=>[prefix+i,{title,owner:'百々',due:'',status:'未着手'}]));}
 export function draftEmployee(staff, now=today()) {
   key(staff.id);
   return {staffId:staff.id, imported:!!staff.imported, basic:{name:text(staff.name),kana:'',birthDate:'',address:'',phone:'',email:'',emergency:''},
     role:staff.role||'',type:['full','part','spot'].includes(staff.type)?staff.type:'',googleEmail:'',status:'draft',currentPeriod:'',plannedPeriod:{startDate:'',endDate:'',contractEnd:'',days:'',hours:''},periods:{},salaries:{},
-    insurance:Object.fromEntries(INSURANCES.map(name=>[name,{enrollment:'未確認',progress:'未着手'}])),tasks:checklist(ONBOARD),documents:{},createdDate:now};
+    insurance:Object.fromEntries(INSURANCES.map(name=>[name,{enrollment:'未確認',progress:'未着手'}])),tasks:{},documents:{},createdDate:now};
 }
 export function period(input, id) {
   key(id); const startDate=text(input.startDate),endDate=text(input.endDate),startAt=jstStart(startDate),endAt=endDate?jstStart(endDate)+DAY:OPEN_END;
@@ -56,15 +47,12 @@ export function transition(employee, action, input={}, now=Date.now()) {
     const p=period(input,key(input.id));
     if(Object.values(data.periods).some(old=>!old.cancelled&&p.startAt<old.endAt&&p.endAt>old.startAt))throw Error('以前の在籍期間と重複しています。');
     data.periods[p.id]=p;data.currentPeriod=p.id;data.status=p.endDate?'retiring':'confirmed';
-    if(action==='rehire')data.tasks={...data.tasks,...checklist(input.onboard||ONBOARD,'in-'+p.id+'-')};
-    if(p.endDate)data.tasks={...data.tasks,...checklist(input.offboard||OFFBOARD,'out-'+p.id+'-')};
   } else {
     const p=data.periods[data.currentPeriod];if(!p)throw Error('先に入社を確定してください。');
     if(action==='retire') {
       if(data.status==='cancelled')throw Error('入社取消済みです。');
       data.periods[p.id]=period({...p,endDate:input.endDate},p.id);data.status='retiring';
       if(!input.endDate)throw Error('退職日を入力してください。');
-      data.tasks={...data.tasks,...Object.fromEntries(Object.entries(checklist(input.offboard||OFFBOARD,'out-'+p.id+'-')).filter(([id])=>!data.tasks[id]))};
     } else if(action==='cancel') {
       if(now>=p.startAt||data.status==='cancelled')throw Error('入社前のみ取消できます。');
       p.cancelled=true;data.status='cancelled';
