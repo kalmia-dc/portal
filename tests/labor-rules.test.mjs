@@ -5,9 +5,11 @@ import {localRules} from '../tools/build-labor-rule-candidate.mjs';import {creat
 import {prepareFile} from '../labor-documents.mjs';import {applicationChange} from '../portal-join-model.mjs';
 import {createMockUserToken} from '@firebase/util';
 import {readFileSync} from 'node:fs';
+import {buildOnboardingRules} from '../tools/build-onboarding-rule-candidate.mjs';
+import {buildOnboardingAccessRules} from '../tools/build-onboarding-access-rules.mjs';
 const testPort=Number(process.env.LABOR_TEST_PORT||9026);
 let env;const actor={uid:'momo',portalRole:'admin',staffId:'office'},staff={id:'s',name:'架空 花子',role:'DH',type:'part'};
-before(async()=>{env=await initializeTestEnvironment({projectId:'demo-labor',database:{host:'127.0.0.1',port:testPort,rules:process.env.LABOR_TEST_DEPLOY_RULES?readFileSync(process.env.LABOR_TEST_DEPLOY_RULES,'utf8'):JSON.stringify(localRules())}});});after(async()=>env?.cleanup());
+before(async()=>{env=await initializeTestEnvironment({projectId:'demo-labor',database:{host:'127.0.0.1',port:testPort,rules:process.env.LABOR_TEST_DEPLOY_RULES?readFileSync(process.env.LABOR_TEST_DEPLOY_RULES,'utf8'):JSON.stringify(buildOnboardingAccessRules(buildOnboardingRules(localRules())))}});});after(async()=>env?.cleanup());
 const db=uid=>uid?env.authenticatedContext(uid,{email:uid+'@example.test',email_verified:true,firebase:{sign_in_provider:'google.com'}}).database():env.unauthenticatedContext().database();
 const store=()=>{const d=db('momo');return createLaborStore({read:async p=>(await get(ref(d,p))).val(),update:u=>update(ref(d),u),timestamp:serverTimestamp,now:Date.now,transaction:(p,fn)=>runTransaction(ref(d,p),fn,{applyLocally:false})},actor,[staff]);};
 const draft=()=>({...draftEmployee(staff),googleEmail:'person@example.test'});
@@ -69,7 +71,26 @@ test('onboarding commits the staff, access and approval together and rejects dup
   assert.equal(Object.keys(await s.list()).length,1);
   assert.equal((await get(ref(db('applicant'),'portalJoinRequests/applicant'))).val().state,'approved');
   assert.equal((await s.bindings())[winner.data.staffId],request.uid);
+  assert.deepEqual((await get(ref(db('applicant'),'onboardingAccess/applicant'))).val(),{staff:winner.data.staffId,period:'new-period',pending:true});
   await assertFails(get(ref(db('applicant'),'tasks')));
+});
+test('active staff can use portal data only after onboarding is completed by the server',async()=>{
+  const client=db('person');
+  const marker={staff:'s',period:'p',pending:true};
+  const setAccess=state=>env.withSecurityRulesDisabled(c=>set(ref(c.database(),'onboardingAccess/person'),state));
+  await assertSucceeds(get(ref(client,'tasks')));
+  await setAccess(marker);
+  await assertSucceeds(get(ref(client,'onboardingAccess/person')));
+  await assertSucceeds(get(ref(client,'portalAccess/users/person')));
+  await assertSucceeds(get(ref(client,'staffLifecycle/s')));
+  await assertFails(get(ref(client,'tasks/example')));
+  await assertFails(set(ref(client,'tasks/example'),2));
+  await assertFails(set(ref(client,'onboardingAccess/person/pending'),false));
+  await assertSucceeds(get(ref(db('momo'),'tasks')));
+  await setAccess({...marker,pending:false});
+  await assertSucceeds(get(ref(client,'tasks')));
+  await setAccess(marker);
+  await assertFails(get(ref(client,'tasks')));
 });
 test('onboarding reuses the existing labor record and employment period',async()=>{
   const s=store();

@@ -14,6 +14,9 @@ const options={region:'asia-southeast1',maxInstances:2,minInstances:0,memory:'51
 const key=v=>{if(typeof v!=='string'||!/^[-_a-zA-Z0-9]{1,100}$/.test(v))throw Error('識別番号が不正です。');return v;};
 async function member(req){
   if(!req.auth)throw new HttpsError('unauthenticated','ログインしてください。');
+  if((await getDatabase().ref('onboardingAccess/'+req.auth.uid+'/pending').get()).val()===true) {
+    throw new HttpsError('permission-denied','入社手続きが完了してからご利用ください。');
+  }
   const user=await getAuth().getUser(req.auth.uid);
   if(user.disabled||req.auth.token.firebase?.sign_in_provider==='anonymous'||(user.tokensValidAfterTime&&req.auth.token.auth_time*1000<Date.parse(user.tokensValidAfterTime)))throw new HttpsError('permission-denied','再ログインしてください。');
   if((await getDatabase().ref('serviceAccess/notifications/uid').get()).val()===req.auth.uid)throw new HttpsError('permission-denied','個人アカウントを使用してください。');

@@ -1,6 +1,6 @@
 import {initializeApp} from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import {getFunctions,httpsCallable} from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-functions.js';
-import {startPortalAuth} from './portal-auth.js?v=labor-20261014-2';
+import {startPortalAuth} from './portal-auth.js?v=onboarding-access-20261112';
 
 export async function connectOnboarding() {
   const app = initializeApp({apiKey:'AIzaSyDdMe7feUF6CKPHH0YIx7Suk-WnXtOYUu8',

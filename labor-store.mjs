@@ -85,6 +85,9 @@ export function createLaborStore(port, actor, defaults=[]) {
         Object.assign(updates,approval);
         updates['extra_staff/'+data.staffId]=profile;
         updates['laborAccountBindings/'+data.staffId]=request.uid;
+        if (current?.data.currentPeriod !== data.currentPeriod || data.periods[data.currentPeriod]?.startAt > port.now()) {
+          updates['onboardingAccess/'+request.uid]={staff:data.staffId,period:data.currentPeriod,pending:true};
+        }
       }
     }
     if(file){
@@ -126,7 +129,14 @@ export function createLaborStore(port, actor, defaults=[]) {
     if(Object.entries(users).some(([uid,m])=>uid!==request.uid&&m.staffId===data.staffId))throw Error('別のGoogleアカウントと紐付いています。対応の確認が必要です。');
     if(Object.entries(users).some(([uid,m])=>uid!==request.uid&&m.email?.toLowerCase()===request.email.toLowerCase()))throw Error('別のアカウントで登録済みのメールです。');
     const updates=approvalUpdates({actor,expected:request,current,selection:{mode:'existing',staffId:data.staffId,name:stored.data.basic.name,role:stored.data.role},roster:all,member,timestamp:port.timestamp()});
-    if(updates){updates['laborAccountBindings/'+data.staffId]=request.uid;await port.update(updates);}
+    if(updates){
+      updates['laborAccountBindings/'+data.staffId]=request.uid;
+      const period=stored.data.currentPeriod;
+      if(stored.data.periods[period]?.startAt>port.now()) {
+        updates['onboardingAccess/'+request.uid]={staff:data.staffId,period,pending:true};
+      }
+      await port.update(updates);
+    }
     const saved=await read('portalAccess/users/'+request.uid);if(saved?.staffId!==data.staffId)throw Error('アカウントの紐付けを確認できません。');
   }
   async function removeShifts(data,rows){

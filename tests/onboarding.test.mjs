@@ -88,3 +88,22 @@ test('番号画像は指定2名のみ閲覧でき、差し戻しと削除で画�
   config.vaultEnabled=false;
   assert.equal((await service(people.doctor,self('status'))).items.myNumber.available,false);
 });
+import {onboardingIsComplete} from '../onboarding-functions/onboarding-access.mjs';
+import {roleDocuments} from '../onboarding-functions/catalog.mjs';
+
+test('入社制限は必要書類の確認で解除され、差し戻しと追加依頼で再適用される', async () => {
+  const records=new Map(roleDocuments('DH').filter(([,doc])=>!doc.optional).map(([key])=>[key,{state:'accepted'}]));
+  const check=()=>onboardingIsComplete({staff:'fixture',period:'p1',role:'DH',metadata:async ({key})=>records.get(key)});
+  assert.equal(await check(),true);
+  records.set('myNumber',{state:'purged'});
+  records.set('license',{state:'exempt'});
+  assert.equal(await check(),true);
+  records.set('drivingLicense',{state:'draft',required:true});
+  assert.equal(await check(),false);
+  records.set('drivingLicense',{state:'submitted',required:true});
+  assert.equal(await check(),false);
+  records.set('drivingLicense',{state:'accepted',required:true});
+  assert.equal(await check(),true);
+  records.set('bank',{state:'returned'});
+  assert.equal(await check(),false);
+});

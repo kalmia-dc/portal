@@ -8,6 +8,7 @@ import {defineString} from 'firebase-functions/params';
 import {createOnboardingService, OnboardingError, safeKey} from './service.mjs';
 import {ROLES} from './catalog.mjs';
 import {onboardingDatabaseAuth} from './database-identity.mjs';
+import {changesOnboardingStatus,onboardingIsComplete} from './onboarding-access.mjs';
 
 initializeApp({
   databaseURL:'https://kalmia-shift-default-rtdb.asia-southeast1.firebasedatabase.app',
@@ -44,8 +45,16 @@ async function authenticate(request, read) {
   if(user.disabled || !request.auth.token.email_verified || !Number.isInteger(request.auth.token.auth_time) ||
      (user.tokensValidAfterTime && request.auth.token.auth_time*1000<Date.parse(user.tokensValidAfterTime)) ||
      uid===notification || member?.active!==true || !safeKey(member.staffId) ||
-     !['staff','trainingAdmin','admin'].includes(member.role) ||
-     !active(await read('staffLifecycle/'+member.staffId),Date.now())) {
+     !['staff','trainingAdmin','admin'].includes(member.role)) {
+    throw new OnboardingError('permission-denied','このアカウントは入社手続きを利用できません。');
+  }
+  const lifecycle=await read('staffLifecycle/'+member.staffId);
+  if(!active(lifecycle,Date.now())) {
+    if(request.data?.action==='status' && request.data.mode!=='review' && lifecycle?.hrManaged===true &&
+       lifecycle.state==='active' && lifecycle.currentCancelled!==true && lifecycle.startAt>Date.now() &&
+       (await read('onboardingAccess/'+uid))?.pending===true) {
+      throw new OnboardingError('failed-precondition','受付開始待ちです。入社日以降に労務担当が手続きを開始すると提出できます。');
+    }
     throw new OnboardingError('permission-denied','このアカウントは入社手続きを利用できません。');
   }
   return {uid,staffId:member.staffId,reviewer:reviewer===true && enabled===true};
@@ -124,8 +133,9 @@ export const staffOnboarding = onCall(options,async request=>{
     if(config?.vaultEnabled===true && Object.values(config.vaultReaders||{}).filter(v=>v===true).length!==2) {
       throw new OnboardingError('failed-precondition','画像の取扱担当者の設定を確認してください。');
     }
+    const documents = storage(config||{});
     const service = createOnboardingService({
-      ...storage(config||{}),config:async()=>config,now:Date.now,
+      ...documents,config:async()=>config,now:Date.now,
       candidate:async staff=>{
         const [record,uid] = await Promise.all([read('laborRecords/'+staff),read('laborAccountBindings/'+staff)]);
         const candidate=employment(record);
@@ -154,7 +164,42 @@ export const staffOnboarding = onCall(options,async request=>{
       },
       audit,
     });
-    return await service(actor,request.data||{});
+    const input=request.data||{};
+    const review=input.mode==='review';
+    const mutating=changesOnboardingStatus(input.action);
+    if((review && !actor.reviewer) || (!mutating && input.action!=='status')) return await service(actor,input);
+    const staff=review?input.staff:actor.staffId;
+    if(!safeKey(staff)) return await service(actor,input);
+    const uid=review?await read('laborAccountBindings/'+staff):actor.uid;
+    if(!safeKey(uid)) return await service(actor,input);
+    const access=getDatabase().ref('onboardingAccess/'+uid);
+    const current=(await access.get()).val();
+    if(current?.staff!==staff || !safeKey(current.period) || (review && current.period!==input.period) ||
+       (!mutating && (current.pending!==true || current.lockUntil>Date.now()))) return await service(actor,input);
+    const enrollment=(await root.child(`cases/${staff}/${current.period}`).get()).val();
+    if(!enrollment || !Object.hasOwn(ROLES,enrollment.role)) return await service(actor,input);
+    const operation=randomUUID();
+    const lockUntil=Date.now()+120000;
+    const relock=review && (input.action==='return' || input.action==='require');
+    const lock=await access.transaction(value=>{
+      if(value?.staff!==staff || value.period!==current.period || value.lockUntil>Date.now()) return;
+      return {...value,pending:value.pending||relock,operation,lockUntil};
+    });
+    if(!lock.committed) {
+      if(!mutating) return await service(actor,input);
+      throw new OnboardingError('aborted','別の操作を処理中です。少し待ってからやり直してください。');
+    }
+    let complete=false;
+    try {
+      return await service(actor,input);
+    } finally {
+      try {
+        complete=await onboardingIsComplete({staff,period:current.period,role:enrollment.role,metadata:documents.metadata});
+      } finally {
+        await access.transaction(value=>value?.operation===operation
+          ? {staff,period:current.period,pending:!complete} : undefined);
+      }
+    }
   } catch(error) {
     if(error instanceof OnboardingError) throw new HttpsError(error.code,error.message);
     console.error('staffOnboarding: backend request failed', {code:typeof error?.code==='number'?error.code:'internal'});

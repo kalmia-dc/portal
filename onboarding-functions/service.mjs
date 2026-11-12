@@ -88,7 +88,7 @@ export function createOnboardingService(port) {
       await port.assign(staff,period,{role:candidate.role,openedAt:port.now(),openedBy:actor.uid});
       return {ok:true};
     }
-    if(!enrollment || !Object.hasOwn(ROLES,enrollment.role)) fail('failed-precondition','労務担当が入社手続きを開始すると提出できます。');
+    if(!enrollment || !Object.hasOwn(ROLES,enrollment.role)) fail('failed-precondition','受付開始待ちです。労務担当が入社手続きを開始すると提出できます。');
     if(own && (candidate?.period !== period || candidate.uid !== actor.uid)) deny();
     const keys = roleDocuments(enrollment.role);
     if(input.action==='status') {

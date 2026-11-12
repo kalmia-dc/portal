@@ -6,7 +6,7 @@ import * as lifecycle from '../portal-lifecycle-model.mjs';
 import {watchLaborBoundary} from '../labor-access-watch.mjs';
 import * as diagnostics from '../portal-auth-diagnostic.mjs';
 
-for(const stopBy of ['member','lifecycle'])test('real auth clears cached identity and visible data on '+stopBy+' stop',async()=>{
+for(const stopBy of ['member','lifecycle','onboarding','initial-onboarding'])test('real auth enforces '+stopBy+' restriction',async()=>{
   const store=new Map(),listeners=new Map();let signouts=0,cleared=0;
   const raw={staffId:'tanaka',name:'田中',role:'staff',active:true};
   const user={uid:'u',email:'test@example.test',providerData:[{providerId:'google.com'}],getIdToken:async()=>'test-token'};
@@ -15,8 +15,9 @@ for(const stopBy of ['member','lifecycle'])test('real auth clears cached identit
   const storage={setItem:(k,v)=>store.set(k,v),removeItem:k=>store.delete(k)};
   const page={style:{visibility:''},inert:false,value:'未保存の入力'};
   const document={addEventListener(){},removeEventListener(){},title:'test',head:el(),body:{children:[page],append(){},replaceChildren(){cleared++}},createElement:el,getElementById:id=>elements.get(id),querySelectorAll:()=>[]};
-  let serverResolve;
-  const context=vm.createContext({document,sessionStorage:storage,localStorage:storage,window:{addEventListener(){},removeEventListener(){},dispatchEvent(){}},CustomEvent:class{},location:{reload(){throw Error('Unexpected reload')},assign(){}},console,setTimeout,clearTimeout,URL,AbortController,fetch:()=>new Promise(resolve=>{serverResolve=resolve})});
+  let serverResolve, redirect;
+  const href='https://kalmia-dc.github.io/portal/attendance.html';
+  const context=vm.createContext({document,sessionStorage:storage,localStorage:storage,window:{addEventListener(){},removeEventListener(){},dispatchEvent(){}},CustomEvent:class{},location:{href,pathname:new URL(href).pathname,replace(path){redirect=path},reload(){throw Error('Unexpected reload')},assign(){}},console,setTimeout,clearTimeout,URL,AbortController,fetch:url=>url.includes('/onboardingAccess/')?Promise.resolve({ok:true,json:async()=>stopBy==='initial-onboarding'?{pending:true}:null}):new Promise(resolve=>{serverResolve=resolve})});
   const auth={getAuth:()=>({}),GoogleAuthProvider:class{},browserLocalPersistence:'local',getRedirectResult:async()=>null,
     onAuthStateChanged:(a,fn)=>{queueMicrotask(()=>fn(user));return()=>{}},setPersistence:async()=>{},signInWithPopup:async()=>{},signInWithRedirect:async()=>{},signOut:async()=>{signouts++}};
   const database={getDatabase:()=>({}),get:async path=>{if(path.startsWith('.info/'))throw Error('Invalid token in path');return {val:()=>path.startsWith('staffLifecycle')?null:raw}} ,ref:(db,path)=>path,serverTimestamp:()=>123,update:async()=>{},onValue:(path,next,error,options)=>{if(options?.onlyOnce){queueMicrotask(()=>next({val:()=>0}));return()=>{}}listeners.set(path,{next,error});return()=>{}}};
@@ -27,12 +28,25 @@ for(const stopBy of ['member','lifecycle'])test('real auth clears cached identit
   await watcher.link(id=>id.endsWith('portal-auth-diagnostic.mjs')?diagnosticsModule:undefined);
   const server=new vm.SourceTextModule(fs.readFileSync(new URL('../portal-server-profile.mjs',import.meta.url),'utf8'),{context});
   await server.link(id=>id.endsWith('portal-auth-diagnostic.mjs')?diagnosticsModule:undefined);
-  const entry=new vm.SourceTextModule(fs.readFileSync(new URL('../portal-auth.js',import.meta.url),'utf8'),{context});
+  const entry=new vm.SourceTextModule(fs.readFileSync(new URL('../portal-auth.js',import.meta.url),'utf8'),{context,initializeImportMeta(meta){meta.url='https://kalmia-dc.github.io/portal/portal-auth.js'}});
   const boundary=synthetic({watchLaborBoundary:options=>watchLaborBoundary({...options,schedule:(fn,ms)=>{const timer=setTimeout(fn,ms);timer.unref();return timer;}})});
   await entry.link(id=>id.endsWith('portal-auth-diagnostic.mjs')?diagnosticsModule:id.endsWith('labor-access-watch.mjs')?boundary:id.endsWith('firebase-auth.js')?authModule:id.endsWith('firebase-database.js')?dbModule:id.endsWith('portal-server-profile.mjs')?server:id.endsWith('portal-lifecycle-model.mjs')?lifecycleModule:watcher);
   await entry.evaluate();
-  const profile=await entry.namespace.startPortalAuth({options:{databaseURL:'https://demo.firebasedatabase.app'}},{});
+  const loading=entry.namespace.startPortalAuth({options:{databaseURL:'https://demo.firebasedatabase.app'}},{});
+  if(stopBy==='initial-onboarding') {
+    await new Promise(setImmediate);
+    assert.equal(redirect,'/portal/staff-onboarding.html');
+    assert.equal(store.has('portalUser'),false);
+    return;
+  }
+  const profile=await loading;
   assert.equal(profile.staffId,'tanaka');assert.ok(store.has('portalUser'));
+  if(stopBy==='onboarding') {
+    listeners.get('onboardingAccess/u').next({val:()=>({pending:true})});
+    assert.equal(redirect,'/portal/staff-onboarding.html');
+    assert.equal(store.has('portalUser'),false);
+    return;
+  }
   listeners.get('portalAccess/users/u').next({val:()=>raw});listeners.get('staffLifecycle/tanaka').next({val:()=>null});
   listeners.get('.info/connected').next({val:()=>false});
   assert.equal(signouts,0);assert.equal(page.inert,true);assert.equal(page.style.visibility,'hidden');

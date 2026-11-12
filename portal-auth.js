@@ -175,10 +175,16 @@ async function recordAccessRequest(db, user, pageName) {
 let laborServerOffset=0,laborTimeAnchor=Date.now(),laborMonoAnchor=globalThis.performance?.now()||0;
 const laborSetTime=ms=>{laborTimeAnchor=ms;laborMonoAnchor=globalThis.performance?.now()||0;};
 const laborServerNow=()=>laborTimeAnchor+((globalThis.performance?.now()||0)-laborMonoAnchor);
-async function loadApprovedProfile(db, user) {
+function effectivePortalMember(raw,state,restricted) {
+  const now=laborServerNow();
+  if(restricted && raw?.active===true && state?.hrManaged===true && state.state==='active' &&
+     state.currentCancelled!==true && state.startAt>now) return raw;
+  return effectiveMember(raw,state,now);
+}
+async function loadApprovedProfile(db, user, restricted) {
   const snapshot = await diagnosticRead('PROFILE',()=>get(ref(db, `portalAccess/users/${user.uid}`)));
   const raw=snapshot.val();const state=lifecycleApplies(raw)?(await diagnosticRead('STAFF_STATE',()=>get(ref(db,'staffLifecycle/'+raw.staffId)))).val():null;
-  return normalizeAccessProfile(user.uid,user,effectiveMember(raw,state,laborServerNow()));
+  return normalizeAccessProfile(user.uid,user,effectivePortalMember(raw,state,restricted));
 }
 
 export async function startPortalAuth(app, { pageName = document.title } = {}) {
@@ -220,9 +226,14 @@ export async function startPortalAuth(app, { pageName = document.title } = {}) {
 
   laborServerOffset=await new Promise((resolve,reject)=>onValue(ref(db,'.info/serverTimeOffset'),s=>resolve(s.val()||0),reject,{onlyOnce:true}));laborSetTime(Date.now()+(typeof laborServerOffset==='number'?laborServerOffset:0));
   const offServerClock=onValue(ref(db,'.info/serverTimeOffset'),s=>{laborServerOffset=s.val()||0;laborSetTime(Date.now()+(typeof laborServerOffset==='number'?laborServerOffset:0));});
-  let profile;
+  let profile, onboardingOnly;
+  const accessPath = 'onboardingAccess/'+user.uid;
+  const ownOnboardingPage = new URL('./staff-onboarding.html',import.meta.url).pathname;
+  const isOnboarding = location.pathname === ownOnboardingPage && new URL(location.href).searchParams.get('mode') !== 'review';
+  const redirectToOnboarding = () => location.replace(ownOnboardingPage);
   try {
-    profile = await loadApprovedProfile(db, user);
+    onboardingOnly=(await readServerProfile({databaseURL:app.options.databaseURL,user,path:accessPath}))?.pending===true;
+    profile=await loadApprovedProfile(db,user,onboardingOnly);
   } catch (error) {
     offServerClock();
     clearPortalProfile();
@@ -242,10 +253,36 @@ export async function startPortalAuth(app, { pageName = document.title } = {}) {
     return new Promise(() => {});
   }
 
+  if(onboardingOnly && !isOnboarding) {
+    offServerClock();
+    clearPortalProfile();
+    redirectToOnboarding();
+    return new Promise(()=>{});
+  }
   savePortalProfile(profile);
   window.portalAuth = Object.freeze({ auth, user, profile });
   window.portalSignOut = signOutPortal;
   document.getElementById(OVERLAY_ID)?.remove();
+  const showAccess = pending => {
+    const wasPending=onboardingOnly;
+    onboardingOnly=pending;
+    if(isOnboarding) {
+      document.getElementById('back')?.toggleAttribute('hidden', pending);
+      const message=document.getElementById('portalAccessMessage');
+      if(message && (pending || wasPending)) {
+        message.hidden=false;
+        message.textContent=pending?'必要書類の確認が終わると、ポータルのほかの機能を利用できます。':'入社手続きが完了しました。ポータルのほかの機能を利用できます。';
+      }
+    }
+    else if(pending) {
+      window.portalAccessLost=true;
+      window.dispatchEvent(new CustomEvent('portalAccessLost'));
+      clearPortalProfile();
+      redirectToOnboarding();
+    }
+  };
+  showAccess(onboardingOnly);
+  const offOnboarding=onValue(ref(db,accessPath),snap=>showAccess(snap.val()?.pending===true),()=>location.reload());
 
   const lockedElements = new Map();
   const lockForConnection = () => {
@@ -262,13 +299,13 @@ export async function startPortalAuth(app, { pageName = document.title } = {}) {
   watchPortalSession({
     userId:user.uid, initial:profile,
     normalize:raw => normalizeAccessProfile(user.uid, user, raw),
-    subscribe:(next,error)=>{let raw=null,state=null,gotRaw=false,gotState=!['staff','trainingAdmin'].includes(profile.portalRole);const emit=()=>{if(gotRaw&&gotState)next(effectiveMember(raw,state,laborServerNow()));};const off=onValue(ref(db,`portalAccess/users/${user.uid}`),snap=>{raw=snap.val();gotRaw=true;emit();},error);const offState=gotState?()=>{}:onValue(ref(db,'staffLifecycle/'+profile.staffId),snap=>{state=snap.val();gotState=true;emit();},error);const offClock=watchLaborBoundary({readState:()=>state,emit,clock:laborServerNow,listenResume:cb=>{document.addEventListener('visibilitychange',cb);window.addEventListener('pageshow',cb);return ()=>{document.removeEventListener('visibilitychange',cb);window.removeEventListener('pageshow',cb);};}});return ()=>{off();offState();offClock();};},
+    subscribe:(next,error)=>{let raw=null,state=null,gotRaw=false,gotState=!['staff','trainingAdmin'].includes(profile.portalRole);const emit=()=>{if(gotRaw&&gotState)next(effectivePortalMember(raw,state,onboardingOnly));};const off=onValue(ref(db,`portalAccess/users/${user.uid}`),snap=>{raw=snap.val();gotRaw=true;emit();},error);const offState=gotState?()=>{}:onValue(ref(db,'staffLifecycle/'+profile.staffId),snap=>{state=snap.val();gotState=true;emit();},error);const offClock=watchLaborBoundary({readState:()=>state,emit,clock:laborServerNow,listenResume:cb=>{document.addEventListener('visibilitychange',cb);window.addEventListener('pageshow',cb);return ()=>{document.removeEventListener('visibilitychange',cb);window.removeEventListener('pageshow',cb);};}});return ()=>{off();offState();offClock();};},
     subscribeAuth:next => onAuthStateChanged(auth, next),
     subscribeConnection:next => onValue(ref(db, '.info/connected'), snap => next(snap.val() === true)),
     subscribeResume:next=>{const wake=()=>{if(document.visibilityState!=='hidden')next();};document.addEventListener('visibilitychange',wake);window.addEventListener('pageshow',wake);return ()=>{document.removeEventListener('visibilitychange',wake);window.removeEventListener('pageshow',wake);};},
     suspend:lockForConnection,
     verifying:() => showCard('利用許可を再確認しています','<p>サーバーに接続しています。確認が完了するまで入力内容を保持してお待ちください。</p>'),
-    verify:async()=>{const raw=await readServerProfile({databaseURL:app.options.databaseURL,user,onServerTime:laborSetTime});const state=lifecycleApplies(raw)?await readServerProfile({databaseURL:app.options.databaseURL,user,path:'staffLifecycle/'+raw.staffId,onServerTime:laborSetTime}):null;return effectiveMember(raw,state,laborServerNow());},
+    verify:async()=>{const raw=await readServerProfile({databaseURL:app.options.databaseURL,user,onServerTime:laborSetTime});const state=lifecycleApplies(raw)?await readServerProfile({databaseURL:app.options.databaseURL,user,path:'staffLifecycle/'+raw.staffId,onServerTime:laborSetTime}):null;return effectivePortalMember(raw,state,onboardingOnly);},
     resume:() => {
       for(const [child,previous] of lockedElements){child.inert=previous.inert;child.style.visibility=previous.visibility;}
       lockedElements.clear();
@@ -278,6 +315,7 @@ export async function startPortalAuth(app, { pageName = document.title } = {}) {
     invalidate:() => {
       window.portalAccessLost = true;
       offServerClock();
+      offOnboarding();
       window.dispatchEvent(new CustomEvent('portalAccessLost'));
       clearPortalProfile();
       window.portalAuth = undefined;

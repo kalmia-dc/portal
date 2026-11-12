@@ -4,7 +4,7 @@ import {DIRECTOR_STAFF_ID,personName} from './portal-person-display.mjs?v=202610
 import {createPageLifecycle} from './portal-page-lifecycle.mjs';
 const pageLifecycle=createPageLifecycle();
 async function pageAwait(work){pageLifecycle.assertActive();let result;try{result=await work();}catch(error){pageLifecycle.assertActive();throw error;}pageLifecycle.assertActive();return result;}
-import {connectLabor} from './labor-runtime.js?v=20261112-saved-documents';
+import {connectLabor} from './labor-runtime.js?v=onboarding-access-20261112';
 import {draftEmployee,transition,period,retirementShifts,retention,today,jstStart} from './labor-model.mjs?v=20261112-without-salary';
 import {prepareFile,readDocument,extractCandidates} from './labor-documents.mjs?v=20261112-without-salary';
 const $=id=>document.getElementById(id),form=$('editor'),field=name=>form.elements.namedItem(name),id=()=>crypto.randomUUID();
