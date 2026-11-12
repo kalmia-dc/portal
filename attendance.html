@@ -31,7 +31,7 @@
 <script defer src="./portal-common.js?v=20261005"></script>
 <script src="./portal-statistics.js?v=20261021"></script>
 <script src="./portal-shift-time.js?v=20261005"></script>
-<script defer src="./vendor/sheetjs-0.20.3/xlsx.mini.min.js"></script>
+<script defer src="./vendor/exceljs-4.4.0/exceljs.min.js"></script>
 </head>
 <body>
 <div id="loginView" class="login hidden">
@@ -67,6 +67,7 @@
 <div id="confirmModal" class="modal"><div class="modal-box"><h2 id="confirmTitle">確認</h2><div id="confirmBody"></div><div class="row" style="justify-content:flex-end;margin-top:18px"><button class="btn secondary" onclick="closeModal()">閉じる</button><button id="confirmAction" class="btn">実行</button></div></div></div>
 
 <script type="module">
+import { createAttendanceWorkbook } from "./attendance-workbook.mjs";
 import {personName} from './portal-person-display.mjs?v=20261019-director';
 
 import {createPageLifecycle} from './portal-page-lifecycle.mjs';
@@ -285,16 +286,23 @@ async function saveTerminal(){try{if(!isAdmin())return;terminalId=$('terminalId'
 async function checkReaderHeartbeat(){try{if(!terminalId||!isAdmin())return;const s=await pageAwait(async () => (get(ref(db,`attendance/terminals/${terminalId}/heartbeat`)))),v=s.val(),alive=v&&Date.now()-new Date(v).getTime()<60000;$('readerHeartbeat').textContent=alive?'読取ツール：接続中':'読取ツール：未接続（セットアップ手順を確認）';$('readerHeartbeat').style.borderColor=alive?'#9bc8b5':'#efb2b2'}catch(error){if(error?.code!=='portal/access-lost')throw error;}}
 function renderAll(){if(!user)return;renderToday();renderRecords();renderCorrections();renderLeave();if(isAdmin()){renderAdmin();renderSettings()}}
 function downloadBlob(content,type,name){const blob=new Blob([content],{type}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();URL.revokeObjectURL(a.href)}
-function excelRows(sid,mk){const res=calcMonth(sid,mk);return[['スタッフ','日付','シフト','出勤','退勤','休憩(分)','実働(分)','遅刻(分)','早退(分)','所定外(分)','法定時間外(分)','状態'],...res.rows.map(r=>[staffName(sid),r.ds,r.shift.label||'',fmtTime(r.firstIn),fmtTime(r.lastOut),r.breakMin,r.work,r.late,r.early,r.scheduledOver,r.statutoryOver,r.flags.join('・')])]}
-function downloadAttendanceWorkbook(rows, filename) {
+function attendanceReport(staffId, month) {
+  const { rows, totals } = calcMonth(staffId, month);
+  return {
+    name: staffName(staffId), totals,
+    rows: rows.map(row => ({ ...row, inTime: fmtTime(row.firstIn), outTime: fmtTime(row.lastOut) }))
+  };
+}
+async function downloadAttendanceWorkbook(reports, month, filename) {
   try {
-    const xlsx = window.XLSX;
-    if (!xlsx) throw new Error('Excel library failed to load');
-    const workbook = xlsx.utils.book_new();
-    xlsx.utils.book_append_sheet(workbook, xlsx.utils.aoa_to_sheet(rows), '勤怠');
-    const contents = xlsx.write(workbook, { bookType: 'xlsx', type: 'array' });
+    const Workbook = window.ExcelJS?.Workbook;
+    if (!Workbook) throw new Error('Excel library failed to load');
+    const workbook = createAttendanceWorkbook(Workbook, reports, month);
+    const contents = await workbook.xlsx.writeBuffer();
+    pageLifecycle.assertActive();
     downloadBlob(contents, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', filename);
   } catch (error) {
+    if (error?.code === 'portal/access-lost') return;
     console.error('勤怠のExcel出力に失敗しました', error);
     notify('Excel出力に失敗しました。ページを再読み込みしてお試しください。', 'error');
   }
@@ -302,19 +310,20 @@ function downloadAttendanceWorkbook(rows, filename) {
 function exportExcel() {
   if (!user) return;
   const sid = recordSid();
-  const month = $('recordMonth').value;
-  downloadAttendanceWorkbook(excelRows(sid, month), `勤怠_${staffName(sid)}_${month}.xlsx`);
+  const month = $('recordMonth').value || monthKey(new Date());
+  const report = attendanceReport(sid, month);
+  return downloadAttendanceWorkbook([report], month, `勤怠_${report.name}_${month}.xlsx`);
 }
 function exportAllStaff() {
   if (!isAdmin()) return;
-  const month = $('adminMonth').value;
+  const month = $('adminMonth').value || monthKey(new Date());
   const staff = monthStaff(month).filter(s => isNormalStatisticsStaff(s.id));
   if (!staff.length) {
     notify('対象月の出力対象スタッフがいません。');
     return;
   }
-  const rows = staff.flatMap((s, index) => excelRows(s.id, month).slice(index ? 1 : 0));
-  downloadAttendanceWorkbook(rows, `勤怠_全スタッフ_${month}.xlsx`);
+  const reports = staff.map(member => attendanceReport(member.id, month));
+  return downloadAttendanceWorkbook(reports, month, `勤怠_全スタッフ_${month}.xlsx`);
 }
 let jobcanPreviewRows=[];
 const JOBCAN_STAFF_IDS={api0000012:'sugihira','0019':'hokari','0041':'shinoda','0022':'tsuruta','0029':'yoshida','044':'takagi','043':'matsumoto','0001':'yamada','0010':'tamiya','0040':'tanaka','0025':'momo','0031':'furuse','0011':'koyama','0027':'iwasawa','0030':'ikegame',api005186936:'okiyama','042':'shinozuka','0032':'suzuki','0035':'kuroki'};
