@@ -23,6 +23,7 @@ for(const stopBy of ['member','lifecycle','onboarding','initial-onboarding'])tes
   const database={getDatabase:()=>({}),get:async path=>{if(path.startsWith('.info/'))throw Error('Invalid token in path');return {val:()=>path.startsWith('staffLifecycle')?null:raw}} ,ref:(db,path)=>path,serverTimestamp:()=>123,update:async()=>{},onValue:(path,next,error,options)=>{if(options?.onlyOnce){queueMicrotask(()=>next({val:()=>0}));return()=>{}}listeners.set(path,{next,error});return()=>{}}};
   const synthetic=exports=>new vm.SyntheticModule(Object.keys(exports),function(){for(const [key,value] of Object.entries(exports))this.setExport(key,value)},{context});
   const authModule=synthetic(auth),dbModule=synthetic(database),lifecycleModule=synthetic(lifecycle);
+  const functionsModule=synthetic({getFunctions:()=>({}),httpsCallable:()=>async()=>{}});
   const diagnosticsModule=synthetic(diagnostics);
   const watcher=new vm.SourceTextModule(fs.readFileSync(new URL('../portal-session-watch.mjs',import.meta.url),'utf8'),{context});
   await watcher.link(id=>id.endsWith('portal-auth-diagnostic.mjs')?diagnosticsModule:undefined);
@@ -30,7 +31,7 @@ for(const stopBy of ['member','lifecycle','onboarding','initial-onboarding'])tes
   await server.link(id=>id.endsWith('portal-auth-diagnostic.mjs')?diagnosticsModule:undefined);
   const entry=new vm.SourceTextModule(fs.readFileSync(new URL('../portal-auth.js',import.meta.url),'utf8'),{context,initializeImportMeta(meta){meta.url='https://kalmia-dc.github.io/portal/portal-auth.js'}});
   const boundary=synthetic({watchLaborBoundary:options=>watchLaborBoundary({...options,schedule:(fn,ms)=>{const timer=setTimeout(fn,ms);timer.unref();return timer;}})});
-  await entry.link(id=>id.endsWith('portal-auth-diagnostic.mjs')?diagnosticsModule:id.endsWith('labor-access-watch.mjs')?boundary:id.endsWith('firebase-auth.js')?authModule:id.endsWith('firebase-database.js')?dbModule:id.endsWith('portal-server-profile.mjs')?server:id.endsWith('portal-lifecycle-model.mjs')?lifecycleModule:watcher);
+  await entry.link(id=>id.endsWith('portal-auth-diagnostic.mjs')?diagnosticsModule:id.endsWith('labor-access-watch.mjs')?boundary:id.endsWith('firebase-auth.js')?authModule:id.endsWith('firebase-database.js')?dbModule:id.endsWith('firebase-functions.js')?functionsModule:id.endsWith('portal-server-profile.mjs')?server:id.endsWith('portal-lifecycle-model.mjs')?lifecycleModule:watcher);
   await entry.evaluate();
   const loading=entry.namespace.startPortalAuth({options:{databaseURL:'https://demo.firebasedatabase.app'}},{});
   if(stopBy==='initial-onboarding') {

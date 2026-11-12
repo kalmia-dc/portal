@@ -92,6 +92,13 @@ async function loadCase() {
     const required=doc.optional && !item.required && item.state==='draft'?'（該当する場合）':'';
     row.append(element('small',doc.contract && item.stage!=='released' ? '準備中' : item.available ? states[item.state]+required : '準備中'));
     const restricted=doc.restricted && review && !current.vault;
+    if(doc.restricted && current.canEnablePrehireVault) {
+      button(row,'入社前の画像受付を開始',async()=>{
+        if(!window.confirm('雇用が確定していることを確認し、マイナンバー画像の受付を開始しますか？')) return;
+        try {await request('enable-prehire-vault',{confirm:true});if(selected===target) await loadCase();}
+        catch(error) {notice('message',error.message,true);}
+      });
+    }
     if(item.available && !restricted) {
       const label=review?'開く':['draft','returned'].includes(item.state)?'入力・添付':'確認する';
       button(row,label,()=>showItem(key).catch(error=>notice('message',error.message,true)));

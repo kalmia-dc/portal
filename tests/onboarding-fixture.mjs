@@ -13,7 +13,7 @@ export const people = {
 };
 export const png = {type:'image/png',data:'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+W8h0AAAAASUVORK5CYII='};
 
-export function fixture({preopened=true}={}) {
+export function fixture({preopened=true,startsAt}={}) {
   const config={enabled:true,vaultEnabled:true,vaultReaders:{director:true,payroll:true}};
   const enrolled=new Map(preopened?Object.entries(staff).map(([id,c])=>[id+'/'+c.period,{role:c.role}]):[]);
   const records=new Map();
@@ -22,9 +22,10 @@ export function fixture({preopened=true}={}) {
   const service=createOnboardingService({
     config:async()=>config,now:()=>Date.now(),
     eligible:async()=>Object.entries(staff).map(([key,c])=>({staff:key,period:c.period,role:c.role,name:c.name,opened:enrolled.has(key+'/'+c.period)})),
-    candidate:async key=>staff[key]||null,
+    candidate:async key=>staff[key]?{...staff[key],startAt:startsAt}:null,
     enrollment:async (key,period)=>enrolled.get(key+'/'+period),
     assign:async (key,period,data)=>{if(!enrolled.has(key+'/'+period)) enrolled.set(key+'/'+period,data);},
+    enablePrehireVault:async (key,period,by)=>{enrolled.get(key+'/'+period).prehireVault={by};},
     metadata:async path=>records.get(id(path))?.metadata||null,
     body:async (path,record)=>record?structuredClone(records.get(id(path)).body):{},
     write:async (path,record,metadata,body)=>{

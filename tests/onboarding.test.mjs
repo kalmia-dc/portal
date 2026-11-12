@@ -2,10 +2,39 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {fixture,people,png} from './onboarding-fixture.mjs';
 import {documents, VERSION} from '../onboarding-functions/catalog.mjs';
+import {onboardingEmployment,prehireAccess,onboardingAccessPending} from '../onboarding-functions/onboarding-access.mjs';
 
 const self=(action,extra={})=>({action,mode:'self',...extra});
 const review=(action,extra={})=>({action,mode:'review',staff:'doctor',period:'p1',...extra});
 const mutation=(item,revision,operation,extra={})=>({item,revision,operation,version:VERSION,...extra});
+
+test('入社前に受付と書類提出ができ、番号画像には担当者の確認が必要',async()=>{
+  const {service}=fixture({preopened:false,startsAt:Date.now()+3600000});
+  await service(people.hr,review('open'));
+  assert.equal((await service(people.doctor,self('status'))).items.myNumber.available,false);
+  await service(people.doctor,self('submit',mutation('identity',0,'prehire-id',{files:[png]})));
+  await service(people.hr,review('accept',mutation('identity',1,'prehire-check')));
+  await assert.rejects(service(people.hr,review('enable-prehire-vault',{confirm:true})),{code:'permission-denied'});
+  await assert.rejects(service(people.director,review('enable-prehire-vault')),{code:'permission-denied'});
+  await service(people.director,review('enable-prehire-vault',{confirm:true}));
+  await service(people.doctor,self('submit',mutation('myNumber',0,'prehire-image',{files:[png,png]})));
+  await service(people.payroll,review('accept',mutation('myNumber',1,'prehire-image-check')));
+});
+
+test('入社前に確認を終えても通常機能は入社日時まで制限される',()=>{
+  const lifecycle={hrManaged:true,state:'active',currentPeriod:'p1',startAt:200,endAt:300};
+  const access={pending:true,staff:'doctor',period:'p1'};
+  const record={data:{status:'confirmed',role:'DR',currentPeriod:'p1',periods:{p1:{startAt:200,endAt:300}}}};
+  assert.equal(onboardingEmployment(record,199).period,'p1');
+  assert.equal(onboardingEmployment(record,300),null);
+  assert.equal(prehireAccess(lifecycle,access,'doctor',199),true);
+  assert.equal(prehireAccess(lifecycle,access,'someone-else',199),false);
+  assert.equal(prehireAccess({...lifecycle,currentCancelled:true},access,'doctor',199),false);
+  assert.equal(onboardingAccessPending(true,lifecycle,'p1',199),true);
+  assert.equal(onboardingAccessPending(false,lifecycle,'p1',200),true);
+  assert.equal(onboardingAccessPending(true,lifecycle,'p1',200),false);
+  assert.equal(onboardingAccessPending(true,{...lifecycle,state:'stopped'},'p1',200),true);
+});
 
 test('職員用受付は個人アカウントと対象の雇用期間に限定する',async()=>{
   const {service}=fixture({preopened:false});

@@ -8,7 +8,7 @@ import {defineString} from 'firebase-functions/params';
 import {createOnboardingService, OnboardingError, safeKey} from './service.mjs';
 import {ROLES} from './catalog.mjs';
 import {onboardingDatabaseAuth} from './database-identity.mjs';
-import {changesOnboardingStatus,onboardingIsComplete} from './onboarding-access.mjs';
+import {changesOnboardingStatus,onboardingIsComplete,onboardingEmployment,prehireAccess,onboardingAccessPending} from './onboarding-access.mjs';
 
 initializeApp({
   databaseURL:'https://kalmia-shift-default-rtdb.asia-southeast1.firebasedatabase.app',
@@ -23,14 +23,6 @@ function active(life, now) {
   if(life?.hrManaged!==true) return true;
   return (!life.currentCancelled && life.startAt<=now && now<life.endAt) ||
     (life.previousStartAt<=now && now<life.previousEndAt);
-}
-
-function employment(record) {
-  const data = record?.data;
-  const period = data?.periods?.[data.currentPeriod];
-  if(!data || !['confirmed','retiring'].includes(data.status) || !safeKey(data.currentPeriod) ||
-     !Object.hasOwn(ROLES,data.role) || !period || period.cancelled || !(period.startAt<=Date.now() && Date.now()<period.endAt)) return null;
-  return {period:data.currentPeriod,role:data.role,name:data.basic?.fullName||data.basic?.name||''};
 }
 
 async function authenticate(request, read) {
@@ -50,10 +42,8 @@ async function authenticate(request, read) {
   }
   const lifecycle=await read('staffLifecycle/'+member.staffId);
   if(!active(lifecycle,Date.now())) {
-    if(request.data?.action==='status' && request.data.mode!=='review' && lifecycle?.hrManaged===true &&
-       lifecycle.state==='active' && lifecycle.currentCancelled!==true && lifecycle.startAt>Date.now() &&
-       (await read('onboardingAccess/'+uid))?.pending===true) {
-      throw new OnboardingError('failed-precondition','受付開始待ちです。入社日以降に労務担当が手続きを開始すると提出できます。');
+    if(request.data?.mode!=='review' && prehireAccess(lifecycle,await read('onboardingAccess/'+uid),member.staffId,Date.now())) {
+      return {uid,staffId:member.staffId,reviewer:false};
     }
     throw new OnboardingError('permission-denied','このアカウントは入社手続きを利用できません。');
   }
@@ -138,17 +128,19 @@ export const staffOnboarding = onCall(options,async request=>{
       ...documents,config:async()=>config,now:Date.now,
       candidate:async staff=>{
         const [record,uid] = await Promise.all([read('laborRecords/'+staff),read('laborAccountBindings/'+staff)]);
-        const candidate=employment(record);
+        const candidate=onboardingEmployment(record,Date.now());
         return candidate && safeKey(uid) ? {...candidate,uid} : null;
       },
       enrollment:async (staff,period)=>(await root.child(`cases/${staff}/${period}`).get()).val(),
       assign:async (staff,period,data)=>root.child(`cases/${staff}/${period}`).transaction(old=>old||data),
+      enablePrehireVault:async (staff,period,uid)=>root.child(`cases/${staff}/${period}`).transaction(old=>
+        old && !old.prehireVault ? {...old,prehireVault:{by:uid,at:Date.now()}} : undefined),
       eligible:async ()=>{
         const [records,assignments,bindings] = await Promise.all([
           read('laborRecords'),read('onboardingV1/cases'),read('laborAccountBindings'),
         ]);
         const result=Object.entries(records||{}).flatMap(([staff,record])=>{
-          const candidate=employment(record);
+          const candidate=onboardingEmployment(record,Date.now());
           return candidate && safeKey(bindings?.[staff]) ? [{staff,...candidate,opened:!!assignments?.[staff]?.[candidate.period]}] : [];
         });
         const listed=new Set(result.map(item=>item.staff+'/'+item.period));
@@ -189,15 +181,16 @@ export const staffOnboarding = onCall(options,async request=>{
       if(!mutating) return await service(actor,input);
       throw new OnboardingError('aborted','別の操作を処理中です。少し待ってからやり直してください。');
     }
-    let complete=false;
+    let pending=true;
     try {
       return await service(actor,input);
     } finally {
       try {
-        complete=await onboardingIsComplete({staff,period:current.period,role:enrollment.role,metadata:documents.metadata});
+        const complete=await onboardingIsComplete({staff,period:current.period,role:enrollment.role,metadata:documents.metadata});
+        pending=onboardingAccessPending(complete,await read('staffLifecycle/'+staff),current.period,Date.now());
       } finally {
         await access.transaction(value=>value?.operation===operation
-          ? {staff,period:current.period,pending:!complete} : undefined);
+          ? {staff,period:current.period,pending} : undefined);
       }
     }
   } catch(error) {

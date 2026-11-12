@@ -90,20 +90,29 @@ export function createOnboardingService(port) {
     }
     if(!enrollment || !Object.hasOwn(ROLES,enrollment.role)) fail('failed-precondition','受付開始待ちです。労務担当が入社手続きを開始すると提出できます。');
     if(own && (candidate?.period !== period || candidate.uid !== actor.uid)) deny();
+    const beforeStart=candidate?.period===period && candidate.startAt>port.now();
+    const vaultAvailable=config.vaultEnabled===true && (!beforeStart || !!enrollment.prehireVault);
+    if(input.action==='enable-prehire-vault') {
+      if(own || !vault || !beforeStart || !config.vaultEnabled || input.confirm!==true) deny();
+      await port.enablePrehireVault(staff,period,actor.uid);
+      return {ok:true};
+    }
     const keys = roleDocuments(enrollment.role);
     if(input.action==='status') {
       const items = await Promise.all(keys.map(async ([key,doc])=>{
-        if(doc.restricted && config.vaultEnabled !== true) return [key,{available:false}];
+        if(doc.restricted && !vaultAvailable) return [key,{available:false}];
         const record = await port.metadata({staff,period,key,restricted:!!doc.restricted});
         return [key,{...summary(record,!!doc.restricted,vault||own),available:!doc.contract || !own || record?.stage==='released', ...(doc.contract?{stage:record?.stage||'preparing'}:{})}];
       }));
-      return {role:enrollment.role,staff,period,items:Object.fromEntries(items),vault,signerName:own?candidate.name:'',...(!own?{contractPresets:config.contractPresets||[]}:{} )};
+      return {role:enrollment.role,staff,period,items:Object.fromEntries(items),vault,signerName:own?candidate.name:'',
+        ...(beforeStart?{startAt:candidate.startAt}:{}),
+        ...(!own?{contractPresets:config.contractPresets||[],canEnablePrehireVault:vault && beforeStart && config.vaultEnabled===true && !vaultAvailable}:{} )};
     }
 
     const doc = keys.find(([key])=>key===input.item)?.[1];
     if(!doc) deny();
     const restricted = !!doc.restricted;
-    if(restricted && (config.vaultEnabled!==true || (!own&&!vault))) deny();
+    if(restricted && (!vaultAvailable || (!own&&!vault))) deny();
     const key = input.item;
     const path = {staff,period,key,restricted};
     const record = await port.metadata(path);
