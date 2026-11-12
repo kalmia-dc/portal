@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>入社手続き | カルミアDC</title>
+  <link rel="stylesheet" href="portal-common.css">
+  <link rel="stylesheet" href="staff-onboarding.css">
+</head>
+<body>
+  <main>
+    <a id="back" href="index.html">ポータルへ戻る</a>
+    <h1 id="title">入社手続き</h1>
+    <p id="message" role="status" aria-live="polite">利用許可を確認しています…</p>
+    <section id="casePicker" hidden>
+      <label for="staff">職員を選ぶ</label>
+      <select id="staff"></select>
+      <button id="openCase" type="button" hidden>この職員の入社手続きを開始</button>
+    </section>
+    <section id="case" hidden aria-labelledby="caseTitle">
+      <h2 id="caseTitle"></h2>
+      <div id="items"></div>
+    </section>
+    <dialog id="detail" aria-labelledby="detailTitle">
+      <form id="form">
+        <h2 id="detailTitle"></h2>
+        <p id="detailMessage" role="status" aria-live="polite"></p>
+        <div id="fields"></div>
+        <div id="actions"></div>
+      </form>
+    </dialog>
+  </main>
+  <script type="module" src="staff-onboarding.js"></script>
+</body>
+</html>

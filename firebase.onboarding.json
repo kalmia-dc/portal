@@ -1,0 +1,9 @@
+{
+  "functions": [
+    {
+      "source": "onboarding-functions",
+      "codebase": "staff-onboarding",
+      "ignore": ["node_modules", "*.log"]
+    }
+  ]
+}
