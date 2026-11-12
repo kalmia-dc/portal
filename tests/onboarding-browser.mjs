@@ -1,14 +1,16 @@
 import assert from 'node:assert/strict';
-import {readFile} from 'node:fs/promises';
+import {readFile,writeFile} from 'node:fs/promises';
+import {termFields} from '../onboarding-functions/contract-terms.mjs';
 import {createRequire} from 'node:module';
 import {fixture,people,png} from './onboarding-fixture.mjs';
 
 const require=createRequire(import.meta.url);
 const {chromium}=require(process.env.ONBOARDING_PLAYWRIGHT||'playwright');
-const {service}=fixture();
-const mime={html:'text/html',css:'text/css',js:'text/javascript',mjs:'text/javascript'};
+const {service,config,records}=fixture();
+config.contractPresets=[{label:'検証用非常勤',kind:'hourlyCommission',insuranceRate:20,privateRate:20,raises:'昇給は契約更新時に評価。賞与なし。退職金なし。',rows:[{label:'経験4年以上',hourly:5000}]}];
+const mime={ttf:'application/octet-stream',html:'text/html',css:'text/css',js:'text/javascript',mjs:'text/javascript'};
 const pages = new Set(['/staff-onboarding.html','/staff-onboarding.css','/staff-onboarding.js',
-  '/portal-common.css','/onboarding-functions/catalog.mjs','/onboarding-functions/approved-documents.mjs','/staff-identity-form.html']);
+  '/staff-contract.js','/contract-pdf.mjs','/onboarding-functions/contract-terms.mjs','/assets/invoice/pdf-lib-1.17.1.mjs','/assets/invoice/fontkit-1.1.1.mjs','/assets/invoice/KalmiaInvoiceSerif-Regular.ttf','/portal-common.css','/onboarding-functions/catalog.mjs','/onboarding-functions/approved-documents.mjs','/staff-identity-form.html']);
 const base='http://127.0.0.1:10674';
 const headers={'Content-Security-Policy':"default-src 'self'; connect-src 'self'; img-src 'self' blob:; style-src 'self' 'unsafe-inline'; object-src 'none'"};
 async function serve(route) {
@@ -91,6 +93,42 @@ try {
     await print.pdf({path:process.env.ONBOARDING_PREVIEW+'/staff-identity-form-local.pdf',preferCSSPageSize:true});
     await print.close();
   }
+  await open(reviewer,'雇用契約書');
+  await reviewer.getByLabel('契約書の版',{exact:true}).fill('fixture-v1');
+  for(const [key,label] of termFields) {
+    if(key==='notes')continue;
+    await reviewer.getByLabel(label,{exact:true}).fill(label+'：架空の検証用条件。本人と医院で合意した内容を記載します。');
+  }
+  await reviewer.getByLabel('給与基準',{exact:true}).selectOption('0');
+  await reviewer.getByRole('button',{name:'選択した給与基準を適用',exact:true}).click();
+  assert.match(await reviewer.getByLabel('賃金・歩合・手当',{exact:true}).inputValue(),/5,000円/);
+  await click(reviewer,'PDFプレビューを作成');
+  await reviewer.getByRole('link',{name:'作成した契約書PDFを開く',exact:true}).waitFor({timeout:30000});
+  assert.ok(await reviewer.locator('dialog').evaluate(el=>el.scrollWidth<=el.clientWidth));
+  await click(reviewer,'入力条件から準備状態で保存');
+  await reviewer.locator('dialog').waitFor({state:'hidden',timeout:30000});
+  assert.equal((await service(people.doctor,{action:'status',mode:'self'})).items.contract.available,false);
+  if(process.env.ONBOARDING_PREVIEW) {
+    await writeFile(process.env.ONBOARDING_PREVIEW+'/generated-contract.pdf',Buffer.from(records.get('doctor/p1/contract').body.files[0].data,'base64'));
+  }
+  await open(reviewer,'雇用契約書');
+  assert.equal(await reviewer.getByLabel('契約書の版',{exact:true}).inputValue(),'fixture-v1');
+  await reviewer.getByLabel('契約条件・就業規則の適用と交付可能な正式版であることを確認しました').check();
+  await click(reviewer,'本人の確認受付を開始');
+  await reviewer.locator('dialog').waitFor({state:'hidden'});
+  await employee.reload();await employee.locator('#case').waitFor();
+  await open(employee,'雇用契約書');
+  await employee.getByRole('link',{name:'契約書PDFを保存',exact:true}).waitFor();
+  if(process.env.ONBOARDING_PREVIEW) await employee.screenshot({path:process.env.ONBOARDING_PREVIEW+'/contract-mobile.png',fullPage:true});
+  await employee.getByLabel('この契約書をポータルで受け取り、PDFを保存する方法に同意します。').check();
+  await employee.getByLabel('表示された契約書の全文と労働条件を確認し、本人として同意します。').check();
+  await click(employee,'契約内容に同意する');
+  await state(employee,'雇用契約書','確認待ち');
+  await reviewer.reload();await reviewer.getByLabel('職員を選ぶ').selectOption({label:'架空 医師（歯科医師）・受付開始済み'});
+  await open(reviewer,'雇用契約書');
+  await reviewer.getByText('同意者：架空 医師',{exact:true}).waitFor();
+  await click(reviewer,'本人の同意を確認済みにする');
+  await state(reviewer,'雇用契約書','確認済み');
   const bank='給与口座振込依頼書';
   await open(employee,bank);
   for(const [label,value] of Object.entries({'金融機関名':'架空銀行','支店名':'架空支店','預金種別':'普通','口座番号':'0012345','口座名義（カナ）':'カクウ','振込開始月':'2026-11'})) {

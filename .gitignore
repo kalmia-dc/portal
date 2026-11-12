@@ -1,4 +1,5 @@
 node_modules/
+onboarding-functions/.env*
 .labor-local/
 *-debug.log
 outputs/labor/

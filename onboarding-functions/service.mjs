@@ -1,3 +1,4 @@
+import {handleContract} from './contract.mjs';
 import {createHash} from 'node:crypto';
 import {consentBlocks, documents, requiredChecks, roleDocuments, ROLES, VERSION} from './catalog.mjs';
 
@@ -94,9 +95,9 @@ export function createOnboardingService(port) {
       const items = await Promise.all(keys.map(async ([key,doc])=>{
         if(doc.restricted && config.vaultEnabled !== true) return [key,{available:false}];
         const record = await port.metadata({staff,period,key,restricted:!!doc.restricted});
-        return [key,{...summary(record,!!doc.restricted,vault||own),available:true}];
+        return [key,{...summary(record,!!doc.restricted,vault||own),available:!doc.contract || !own || record?.stage==='released', ...(doc.contract?{stage:record?.stage||'preparing'}:{})}];
       }));
-      return {role:enrollment.role,staff,period,items:Object.fromEntries(items),vault,signerName:own?candidate.name:''};
+      return {role:enrollment.role,staff,period,items:Object.fromEntries(items),vault,signerName:own?candidate.name:'',...(!own?{contractPresets:config.contractPresets||[]}:{} )};
     }
 
     const doc = keys.find(([key])=>key===input.item)?.[1];
@@ -106,6 +107,7 @@ export function createOnboardingService(port) {
     const key = input.item;
     const path = {staff,period,key,restricted};
     const record = await port.metadata(path);
+    if(doc.contract) return handleContract({port,actor,input,path,record,own,fail});
     const old = record || {state:'draft',revision:0};
     if(!states.has(old.state)) fail('failed-precondition','保存状態を確認してください。');
     if(input.action==='detail') {

@@ -1,3 +1,4 @@
+import {showContract} from './staff-contract.js';
 import {consentBlocks, documents, roleDocuments, ROLES, VERSION} from './onboarding-functions/catalog.mjs';
 import {connectOnboarding} from './staff-onboarding-runtime.js';
 
@@ -84,11 +85,12 @@ async function loadCase() {
   list.replaceChildren();
   for(const [key,doc] of roleDocuments(current.role)) {
     const item=current.items[key];
+    if(!item) continue;
     const row=element('div');
     row.className='item';
     row.append(element('strong',doc.label));
     const required=doc.optional && !item.required && item.state==='draft'?'（該当する場合）':'';
-    row.append(element('small',item.available ? states[item.state]+required : '準備中'));
+    row.append(element('small',doc.contract && item.stage!=='released' ? '準備中' : item.available ? states[item.state]+required : '準備中'));
     const restricted=doc.restricted && review && !current.vault;
     if(item.available && !restricted) {
       const label=review?'開く':['draft','returned'].includes(item.state)?'入力・添付':'確認する';
@@ -166,6 +168,13 @@ function renderFiles(files,doc) {
 
 async function showItem(key) {
   if(dialog.open) return;
+  if(documents[key].contract) {
+    const snapshot=current;
+    const saved=await request('detail',{item:key});
+    if(!active || current!==snapshot || dialog.open) return;
+    wipe();
+    return showContract({saved,review,dialog,fields,actions,element,input,button,notice,request,readFile,closeDetail,loadCase,urls,signerName:review?selected.name:current.signerName,presets:current.contractPresets||[]});
+  }
   const snapshot=current;
   const item=snapshot.items[key], doc=documents[key];
   const editable=!review && ['draft','returned'].includes(item.state);

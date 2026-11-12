@@ -4,6 +4,7 @@ export const VERSION = '2026-11-12.2';
 export const ROLES = {DR:'歯科医師', DH:'歯科衛生士', DA:'歯科助手'};
 
 export const documents = {
+  contract: {label:'雇用契約書', contract:true},
   identity: {label:'身元確認書', file:true, help:'確認者本人が紙に記入・署名し、書類全体を撮影してください。'},
   pledge: {label:'採用時誓約書', approved:approvedDocuments.pledge},
   secrecy: {label:'機密保持誓約書', approved:approvedDocuments.secrecy},
