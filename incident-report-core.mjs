@@ -81,6 +81,10 @@ export function parseHTML(html,Parser=globalThis.DOMParser){
   return r;
 }
 export function fromLegacy(old,id=globalThis.crypto.randomUUID()){
-  const r=newReport(id);r.reporterName=old.reporterName||'';r.occurredDate=old.occurredDate||'';r.occurredTime=old.occurredTime||'';r.place=old.occurredPlace||'';r.work=old.workContent||'';r.details=old.details||'';r.handoff=old.handoff||'';
-  r.supplement=[old.eventImpact&&`旧形式の影響欄（実際・潜在の区別は未確認）：${old.eventImpact}`,old.goodPoint&&`旧形式の防止理由：${old.goodPoint}`,old.causeHuman&&`旧形式の人・行動欄：${old.causeHuman}`,old.causeEnvironment&&`旧形式の環境・連携欄：${old.causeEnvironment}`].filter(Boolean).join('\n');return normalizeReport(r);
+  const r=newReport(id);r.reporterName=old.reporterName||'';r.occurredDate=old.occurredDate||'';r.place=old.occurredPlace||'';r.work=old.workContent||'';r.details=old.details||'';r.handoff=old.handoff||'';
+  const originalTime=String(old.occurredTime||'').trim();
+  const clock=originalTime.normalize('NFKC').match(/^([01]?\d|2[0-3]):([0-5]\d)\s*(?:ごろ|頃)?$/);
+  r.occurredTime=clock?`${clock[1].padStart(2,'0')}:${clock[2]}`:'';
+  const timeNote=originalTime&&originalTime!==r.occurredTime?`旧形式の発生時刻：${originalTime}`:'';
+  r.supplement=[timeNote,old.eventImpact&&`旧形式の影響欄（実際・潜在の区別は未確認）：${old.eventImpact}`,old.goodPoint&&`旧形式の防止理由：${old.goodPoint}`,old.causeHuman&&`旧形式の人・行動欄：${old.causeHuman}`,old.causeEnvironment&&`旧形式の環境・連携欄：${old.causeEnvironment}`].filter(Boolean).join('\n');return normalizeReport(r);
 }

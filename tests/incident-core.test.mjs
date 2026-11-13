@@ -13,6 +13,14 @@ test('unknowns remain unknown, mixed impacts rejected, imported extra privileges
  for(const k of ['review','actor','submittedAt','rawText'])assert.equal(k in v,false);
  assert.equal(fromLegacy({details:'旧事例',type:'accident',level:'A'},'test-core-002').impact,'unknown');
 });
+test('legacy times fit the time field and retain approximate or unknown wording',()=>{
+ for(const [original,expected] of [['12:30ごろ','12:30'],['午前',''],['午後',''],['不明',''],['09:15','09:15'],['','']]){
+  const report=fromLegacy({occurredTime:original,eventImpact:'旧記録'},'test-legacy-time');
+  assert.equal(report.occurredTime,expected);
+  assert.equal(report.supplement.includes('旧形式の発生時刻：'+original),Boolean(original&&original!==report.occurredTime));
+  assert.ok(report.supplement.includes('旧記録'));
+ }
+});
 test('HTML is inert, printable, and timestamps use JST boundary',()=>{
  const r={...newReport('test-core-003'),details:'<img src=x onerror=alert(1)> </script>',reporterName:'架空'};
  const html=toHTML(r);assert.ok(!html.includes('<img'));assert.ok(html.includes('\\u003c/script>'));assert.ok(html.includes('incident-visible'));

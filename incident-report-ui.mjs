@@ -1,6 +1,6 @@
 import {canUseStaff,canAssignStaff} from './portal-staff-usage.mjs?v=20261024-usage';
 import {personName} from './portal-person-display.mjs?v=20261021-director';
-import {OPTIONS,IMPACT,SOURCE,newReport,normalizeReport,classification,reportText,toHTML,parseHTML,fromLegacy,escapeHtml as esc,monthKey} from './incident-report-core.mjs?v=semantic-title-20261019';
+import {OPTIONS,IMPACT,SOURCE,newReport,normalizeReport,classification,reportText,toHTML,parseHTML,fromLegacy,escapeHtml as esc,monthKey} from './incident-report-core.mjs?v=legacy-time-20261113';
 import {createIncidentStore,decodeRecord} from './incident-report-store.mjs?v=semantic-title-20261019';
 
 export function reporterGroup(report, fallbackName=''){
