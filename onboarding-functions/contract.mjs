@@ -72,6 +72,7 @@ export async function handleContract({port,actor,input,path,record,own,fail,reci
     content={...body,review:{uid:actor.uid,at:next.updatedAt}};
     next.state='accepted';
   }
+  if(path.renewal && input.action==='contract-prepare' && !record)await port.registerRenewal(path);
   await port.write(path,record,next,content);
   return {revision:next.revision};
 }

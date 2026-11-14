@@ -15,6 +15,7 @@ export function renewalFixture(){
     employee:async id=>id===staff?{name:'架空 太郎',uid:state.uid,eligible:true,current:{startDate:'2024-04-01',type:'full'},
       get applied(){return null;}}:null,
     presets:async()=>[],
+    registerRenewal:async()=>{},
     renewals:async()=>[...state.items.entries()].map(([id,v])=>({id,...v.record})),
     metadata:async ({key})=>state.items.get(key)?.record,
     body:async ({key})=>state.items.get(key)?.body||{},

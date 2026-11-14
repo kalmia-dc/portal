@@ -65,17 +65,6 @@ function storage(config) {
     generation ? {generation} : undefined,
   );
   return {
-    async renewals(staff){
-      const [files]=await bucketFor({restricted:false}).getFiles({prefix:`onboarding/${staff}/renewals/contracts/`,delimiter:'/'});
-      const records=files.map(file=>{
-        const id=file.name.split('/').at(-1).replace(/\.json$/,'');
-        if(!safeKey(id)||!file.name.endsWith('.json'))return null;
-        const raw=file.metadata?.metadata?.record;
-        const record=raw?JSON.parse(raw):null;
-        return record&&{...record,id};
-      });
-      return records.filter(Boolean).sort((a,b)=>b.updatedAt-a.updatedAt);
-    },
     async metadata(path) {
       try {
         const [objectMeta] = await object(path).getMetadata();
@@ -83,6 +72,7 @@ function storage(config) {
         return {...JSON.parse(metadata.record),generation};
       } catch(error) {
         if(error.code===404 && error.errors?.some(e=>e.reason==='notFound')) {
+          if(path.renewal)return null;
           // A missing bucket and a missing object both return 404.
           await bucketFor(path).getMetadata();
           return null;
@@ -142,6 +132,19 @@ export const staffOnboarding = onCall(options,async request=>{
       if(config?.enabled!==true) throw new OnboardingError('failed-precondition','契約更新は準備中です。');
       const renew=createRenewalService({
         ...documents,now:Date.now,
+        registerRenewal:async ({staff,key})=>{
+          const registry=root.child(`cases/${staff}/contract-renewals`);
+          await registry.transaction(old=>({...old,renewals:{...old?.renewals,[key]:true}}));
+        },
+        renewals:async staff=>{
+          const snapshot=await root.child(`cases/${staff}/contract-renewals`).get();
+          const ids=Object.keys(snapshot.val()?.renewals||{}).filter(safeKey);
+          const records=await Promise.all(ids.map(async id=>{
+            const entry=await documents.metadata({staff,period:'renewals',key:id,renewal:true});
+            return entry&&{...entry,id};
+          }));
+          return records.filter(Boolean).sort((a,b)=>b.updatedAt-a.updatedAt);
+        },
         presets:async()=>config.contractPresets||[],
         employee:async (staff,requestedUid,renewalId)=>{
           const [record,binding,life]=await Promise.all([read('laborRecords/'+staff),read('laborAccountBindings/'+staff),read('staffLifecycle/'+staff)]);
