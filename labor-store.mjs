@@ -154,7 +154,15 @@ export function createLaborStore(port, actor, defaults=[]) {
     if(!await verify())throw Error('解除結果を確認できません。対象一覧を再確認してください。');
   }
   const setDocumentDeleted=(staffId,id,deleted,revision,operationId)=>save({staffId},revision,operationId,{documentChange:{id,deleted}});
+  async function renewalContext(staffId){
+    await authorize();
+    key(staffId);
+    const [record,users]=await Promise.all([read('laborRecords/'+staffId),read('portalAccess/users')]);
+    const accounts=linkedAccounts(users,staffId).filter(m=>m.active===true && ['staff','trainingAdmin','admin'].includes(m.role));
+    return {record:hydrate(record),uid:accounts.length===1?accounts[0].uid:undefined};
+  }
   return {actor,authorize,list,roster,save,setDocumentDeleted,importStaff,matchAccount,removeShifts,checkRegistration,portalUsage,
+    renewalContext,
     bindings:()=>read('laborAccountBindings'),
     requests:()=>read('portalJoinRequests'),shifts:()=>read('shifts'),history:sid=>read('laborHistory/'+key(sid)),shiftHistory:sid=>read('laborShiftHistory/'+key(sid)),file:async id=>{await authorize();return read('laborFiles/'+key(id));},
     now:port.now};

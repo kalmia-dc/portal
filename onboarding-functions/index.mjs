@@ -6,6 +6,7 @@ import {getStorage} from 'firebase-admin/storage';
 import {onCall, HttpsError} from 'firebase-functions/v2/https';
 import {defineString} from 'firebase-functions/params';
 import {createOnboardingService, OnboardingError, safeKey} from './service.mjs';
+import {createRenewalService} from './contract-renewal.mjs';
 import {ROLES} from './catalog.mjs';
 import {onboardingDatabaseAuth} from './database-identity.mjs';
 import {changesOnboardingStatus,onboardingIsComplete,onboardingEmployment,prehireAccess,onboardingAccessPending} from './onboarding-access.mjs';
@@ -42,7 +43,7 @@ async function authenticate(request, read) {
   }
   const lifecycle=await read('staffLifecycle/'+member.staffId);
   if(!active(lifecycle,Date.now())) {
-    if(request.data?.mode!=='review' && prehireAccess(lifecycle,await read('onboardingAccess/'+uid),member.staffId,Date.now())) {
+    if(request.data?.scope!=='renewals' && request.data?.mode!=='review' && prehireAccess(lifecycle,await read('onboardingAccess/'+uid),member.staffId,Date.now())) {
       return {uid,staffId:member.staffId,reviewer:false};
     }
     throw new OnboardingError('permission-denied','このアカウントは入社手続きを利用できません。');
@@ -59,10 +60,22 @@ function storage(config) {
     return getStorage().bucket(name);
   }
   const object = (path,generation) => bucketFor(path).file(
-    `onboarding/${path.staff}/${path.period}/${path.key}.json`,
+    path.renewal?`onboarding/${path.staff}/renewals/contracts/${path.key}.json`:
+      `onboarding/${path.staff}/${path.period}/${path.key}.json`,
     generation ? {generation} : undefined,
   );
   return {
+    async renewals(staff){
+      const [files]=await bucketFor({restricted:false}).getFiles({prefix:`onboarding/${staff}/renewals/contracts/`,delimiter:'/'});
+      const records=files.map(file=>{
+        const id=file.name.split('/').at(-1).replace(/\.json$/,'');
+        if(!safeKey(id)||!file.name.endsWith('.json'))return null;
+        const raw=file.metadata?.metadata?.record;
+        const record=raw?JSON.parse(raw):null;
+        return record&&{...record,id};
+      });
+      return records.filter(Boolean).sort((a,b)=>b.updatedAt-a.updatedAt);
+    },
     async metadata(path) {
       try {
         const [objectMeta] = await object(path).getMetadata();
@@ -124,6 +137,28 @@ export const staffOnboarding = onCall(options,async request=>{
       throw new OnboardingError('failed-precondition','画像の取扱担当者の設定を確認してください。');
     }
     const documents = storage(config||{});
+    const input=request.data||{};
+    if(input.scope==='renewals'){
+      if(config?.enabled!==true) throw new OnboardingError('failed-precondition','契約更新は準備中です。');
+      const renew=createRenewalService({
+        ...documents,now:Date.now,
+        presets:async()=>config.contractPresets||[],
+        employee:async (staff,requestedUid,renewalId)=>{
+          const [record,binding,life]=await Promise.all([read('laborRecords/'+staff),read('laborAccountBindings/'+staff),read('staffLifecycle/'+staff)]);
+          const uid=binding||requestedUid;
+          const account=safeKey(uid)?await read('portalAccess/users/'+uid):null;
+          const data=record?.data;
+          if(!data)return null;
+          const current=data.periods?.[data.currentPeriod]||data.plannedPeriod||{};
+          return {uid,name:data.basic?.fullName||data.basic?.name||'',
+            eligible:account?.active===true && account.staffId===staff && ['staff','trainingAdmin','admin'].includes(account.role) &&
+              active(life,Date.now()) && ['draft','confirmed','retiring'].includes(data.status) && !!current.startDate && !current.cancelled,
+            current:{startDate:current.startDate||'',endDate:current.contractEnd||'',type:data.type||'',days:current.days||'',hours:current.hours||''},
+            applied:safeKey(renewalId)?data.tasks?.['contract-renewal-applied-'+renewalId]:null};
+        },
+      },(code,message)=>{throw new OnboardingError(code,message);});
+      return await renew(actor,input);
+    }
     const service = createOnboardingService({
       ...documents,config:async()=>config,now:Date.now,
       candidate:async staff=>{
@@ -156,7 +191,6 @@ export const staffOnboarding = onCall(options,async request=>{
       },
       audit,
     });
-    const input=request.data||{};
     const review=input.mode==='review';
     const mutating=changesOnboardingStatus(input.action);
     if((review && !actor.reviewer) || (!mutating && input.action!=='status')) return await service(actor,input);

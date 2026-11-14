@@ -35,6 +35,7 @@
 <p id="contractReviewWarning" class="danger" role="status" hidden></p>
 <section><h3>基本情報</h3><p id="fullNameHelp">本人申請や正式な名簿で確認した姓・名を入力してください。</p><div class="grid" id="basicFields"></div></section>
 <section><h3>雇用・入退社</h3><div class="grid"><label>職種<select name="role"><option value="">未確認</option><option value="DR">歯科医師</option><option value="DH">歯科衛生士</option><option value="DA">歯科助手・受付</option></select></label><label>雇用形態<select name="type"><option value="">未確認</option><option value="full">常勤</option><option value="part">非常勤</option><option value="spot">スポット</option></select></label><label>Googleアカウントのメール（任意）<input name="googleEmail" type="email"><small>ポータルアカウントなしの場合は空欄。在籍・退職の登録だけではアカウントを作成・許可しません。</small></label><label>入社日<input name="startDate" type="date"></label><label>退職日<input name="endDate" type="date"></label><label>契約終了日<input name="contractEnd" type="date"></label><label>所定勤務日<input name="days"></label><label>所定勤務時間<input name="hours"></label></div><div class="actions" id="lifecycleActions"></div><div id="periods"></div>
+<p><a id="openContractRenewals" href="./staff-renewals.html" hidden>契約を更新</a></p>
 <details id="contractReview" hidden>
   <summary>契約更新の確認</summary>
   <label>確認できた契約の終了日<input type="date" id="contractReviewDate"></label>
@@ -57,4 +58,4 @@
 <section><h3>変更履歴</h3><button type="button" id="loadHistory">履歴を表示</button><div id="history"></div></section></form><details class="labor-settings"><summary>既存名簿の取り込み</summary>
   <button type="button" id="import">既存名簿を取り込む</button>
 </details></article></main>
-<dialog id="confirmation"><h2 id="confirmTitle"></h2><p id="confirmText"></p><div class="actions"><button id="confirmYes">確認して実行</button><button id="confirmNo">戻る</button></div></dialog><script src="portal-common.js"></script><script type="module" src="labor-ui.js?v=onboarding-access-20261112"></script></body></html>
+<dialog id="confirmation"><h2 id="confirmTitle"></h2><p id="confirmText"></p><div class="actions"><button id="confirmYes">確認して実行</button><button id="confirmNo">戻る</button></div></dialog><script src="portal-common.js"></script><script type="module" src="labor-ui.js?v=20261114-renewal"></script></body></html>

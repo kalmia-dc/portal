@@ -10,7 +10,7 @@ const {service,config,records}=fixture();
 config.contractPresets=[{label:'検証用非常勤',kind:'hourlyCommission',insuranceRate:20,privateRate:20,raises:'昇給は契約更新時に評価。賞与なし。退職金なし。',rows:[{label:'経験4年以上',hourly:5000}]}];
 const mime={ttf:'application/octet-stream',html:'text/html',css:'text/css',js:'text/javascript',mjs:'text/javascript'};
 const pages = new Set(['/staff-onboarding.html','/staff-onboarding.css','/staff-onboarding.js',
-  '/staff-contract.js','/contract-pdf.mjs','/onboarding-functions/contract-terms.mjs','/assets/invoice/pdf-lib-1.17.1.mjs','/assets/invoice/fontkit-1.1.1.mjs','/assets/invoice/KalmiaInvoiceSerif-Regular.ttf','/portal-common.css','/onboarding-functions/catalog.mjs','/onboarding-functions/approved-documents.mjs','/staff-identity-form.html']);
+  '/staff-contract.js','/contract-pdf.mjs','/onboarding-functions/contract-terms.mjs','/onboarding-functions/contract-renewal-terms.mjs','/assets/invoice/pdf-lib-1.17.1.mjs','/assets/invoice/fontkit-1.1.1.mjs','/assets/invoice/KalmiaInvoiceSerif-Regular.ttf','/portal-common.css','/onboarding-functions/catalog.mjs','/onboarding-functions/approved-documents.mjs','/staff-identity-form.html']);
 const base='http://127.0.0.1:10674';
 const headers={'Content-Security-Policy':"default-src 'self'; connect-src 'self'; img-src 'self' blob:; style-src 'self' 'unsafe-inline'; object-src 'none'"};
 async function serve(route) {
