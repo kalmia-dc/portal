@@ -10,6 +10,7 @@ import {draftEmployee,transition,period,retirementShifts,retention,today,jstStar
 import {prepareFile,readDocument,extractCandidates} from './labor-documents.mjs?v=20261112-without-salary';
 const $=id=>document.getElementById(id),form=$('editor'),field=name=>form.elements.namedItem(name),id=()=>crypto.randomUUID();
 let readerController,readingKey,editorBaseline;let store,records={},current=null,data=null,busy=false;const urls=new Set();
+let employeeListReturn=null;
 $('registrationUrl').value=new URL('./google-account-register.html',location.href).href.split('?')[0];
 $('copyRegistrationUrl').onclick=async()=>{try{try{await pageAwait(async () => (navigator.clipboard.writeText($('registrationUrl').value)));$('copyRegistrationStatus').textContent='申請URLをコピーしました。本人へ渡してください。';}catch{if (pageLifecycle.active) {$('registrationUrl').focus();$('registrationUrl').select();$('copyRegistrationStatus').textContent='申請URLを選択しました。コピーして本人へ渡してください。';}}}catch(error){if(error?.code!=='portal/access-lost')throw error;}};
 const status={draft:'下書き',confirmed:'入社確定',retiring:'退職日設定済み',cancelled:'入社取消'};
@@ -190,11 +191,13 @@ function drawEmployeeGroup(label,rows){
         openApplication(request);
       });
     }else{
+      button.dataset.staffId=d.staffId;
       if(!d.basic.fullName)button.append(el('small',' 氏名要確認','name-unconfirmed'));
       button.setAttribute('aria-current',String(d.staffId===data?.staffId));
       identity.append(button);
       button.onclick=()=>run(async()=>{
         if(!form.hidden && !await discardEditorChanges())return;
+        employeeListReturn={staffId:d.staffId,scrollY:window.scrollY,search:$('search').value,filter:$('employeeFilter').value};
         show(record);
         $('employeeTitle').focus();
         form.scrollIntoView({block:'start'});
@@ -253,9 +256,25 @@ function drawEmployeeGroup(label,rows){
   group.append(title,table);
   return group;
 }
-function discardEditorChanges(){
-  return !data || JSON.stringify(collect())===editorBaseline ||
-    pageAwait(()=>confirmAction('職員を切り替える','保存前の入力があります。入力を破棄して切り替えますか？'));
+function discardEditorChanges(title='職員を切り替える'){
+  return !data || (JSON.stringify(collect())===editorBaseline && !$('documentFile').files?.length) ||
+    pageAwait(()=>confirmAction(title,'保存前の入力や書類の選択があります。保存せずに移動しますか？'));
+}
+for(const button of document.querySelectorAll('[data-back-to-employees]')){
+  button.onclick=()=>run(async()=>{
+    if(!await discardEditorChanges('職員一覧へ戻る'))return;
+    clearRead();++portalUsageRequest;
+    current=null;data=null;editorBaseline=null;form.hidden=true;
+    if(employeeListReturn){$('search').value=employeeListReturn.search;$('employeeFilter').value=employeeListReturn.filter;}
+    drawList();
+    requestAnimationFrame(()=>{
+      if(!pageLifecycle.active)return;
+      const origin=[...$('employees').querySelectorAll('button[data-staff-id]')].find(button=>button.dataset.staffId===employeeListReturn?.staffId);
+      const target=origin||$('employeeListTitle');
+      target.tabIndex=origin?0:-1;target.focus({preventScroll:true});
+      window.scrollTo({top:employeeListReturn?.scrollY??$('employees').getBoundingClientRect().top+window.scrollY,behavior:'instant'});
+    });
+  });
 }
 function drawLaborInformationReview(){
   const visible=data?.status==='draft';

@@ -31,7 +31,7 @@
     <div class="actions"><button type="submit" id="completeRegistration">入社を確定</button><button type="button" id="closeRegistration">閉じる</button></div>
   </form>
 </section>
-<form id="editor" hidden><h2 id="employeeTitle">職員詳細</h2><p id="identity"></p><div class="actions"><button type="submit">入力内容を保存</button><span id="savedState"></span></div>
+<form id="editor" hidden><button type="button" data-back-to-employees>職員一覧へ戻る</button><h2 id="employeeTitle">職員詳細</h2><p id="identity"></p><div class="actions"><button type="submit">入力内容を保存</button><span id="savedState"></span></div>
 <section id="laborInformationReview" hidden aria-labelledby="laborInformationReviewTitle">
   <h3 id="laborInformationReviewTitle">労務情報の確認</h3>
   <p>氏名・職種・雇用形態・入社日を、正式な名簿や契約書と照合してください。修正する場合は、この下の入力欄で変更できます。</p>
@@ -63,7 +63,7 @@
 <details id="deletedDocuments" hidden><summary id="deletedDocumentSummary">削除済み</summary><div id="deletedDocumentList"></div></details>
 <p id="ocrStatus" role="status" tabindex="-1"></p>
 <div id="ocr" hidden><h4>原文と読取候補の確認</h4><p>反映する項目にチェックを入れ、必要に応じて候補を修正してください。</p><div class="grid"><textarea id="ocrText" readonly aria-label="読み取った原文"></textarea><div id="candidates"></div></div><button type="button" id="applyCandidates">選択候補を入力欄へ反映</button></div></section>
-<section><h3>変更履歴</h3><button type="button" id="loadHistory">履歴を表示</button><div id="history"></div></section></form><details class="labor-settings"><summary>既存名簿の取り込み</summary>
+<section><h3>変更履歴</h3><button type="button" id="loadHistory">履歴を表示</button><div id="history"></div></section><div class="actions"><button type="button" data-back-to-employees>職員一覧へ戻る</button></div></form><details class="labor-settings"><summary>既存名簿の取り込み</summary>
   <button type="button" id="import">既存名簿を取り込む</button>
 </details></article></main>
-<dialog id="confirmation"><h2 id="confirmTitle"></h2><p id="confirmText"></p><div class="actions"><button id="confirmYes">確認して実行</button><button id="confirmNo">戻る</button></div></dialog><script src="portal-common.js"></script><script type="module" src="labor-ui.js?v=20261120-missing-information"></script></body></html>
+<dialog id="confirmation"><h2 id="confirmTitle"></h2><p id="confirmText"></p><div class="actions"><button id="confirmYes">確認して実行</button><button id="confirmNo">戻る</button></div></dialog><script src="portal-common.js"></script><script type="module" src="labor-ui.js?v=20261120-list-return"></script></body></html>
