@@ -224,8 +224,8 @@ export const staffOnboarding = onCall(options,async request=>{
       return await service(actor,input);
     } finally {
       try {
-        const complete=await onboardingIsComplete({staff,period:current.period,role:enrollment.role,metadata:documents.metadata});
-        pending=onboardingAccessPending(complete||exception,await read('staffLifecycle/'+staff),current.period,Date.now());
+        const complete=exception || await onboardingIsComplete({staff,period:current.period,role:enrollment.role,metadata:documents.metadata});
+        pending=onboardingAccessPending(complete,await read('staffLifecycle/'+staff),current.period,Date.now());
       } finally {
         await access.transaction(value=>value?.operation===operation
           ? {staff,period:current.period,pending} : undefined);
