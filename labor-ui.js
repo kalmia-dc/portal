@@ -288,10 +288,10 @@ function completeApplication(result){
   delete applications[selectedApplication.uid];
   registrationAttempt=null;
   $('completeRegistration').hidden=true;
-  registrationFeedback(employeeName(d)+'さんの職員登録とポータル利用設定が完了しました。');
-  message(employeeName(d)+'さんの登録が完了しました。');
+  registrationFeedback(employeeName(d)+'さんの職員情報とGoogleアカウントの対応を保存しました。利用状況は職員一覧で確認してください。');
+  message(employeeName(d)+'さんの職員情報を保存しました。続けてポータル利用状況を確認してください。');
   if(current?.data.staffId===d.staffId && JSON.stringify(collect())===editorBaseline)show(result);
-  drawList();
+  void refreshPortalUsages();
 }
 onboarding.onsubmit=event=>{
   event.preventDefault();
