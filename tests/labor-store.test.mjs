@@ -1,6 +1,23 @@
 import test from 'node:test';import assert from 'node:assert/strict';import {createLaborStore} from '../labor-store.mjs';import {draftEmployee} from '../labor-model.mjs';
 import {loadPortalUsages} from '../onboarding-functions/portal-usage.mjs';
 import {fixture,people} from './onboarding-fixture.mjs';
+import {laborInformationConfirmed} from '../labor-model.mjs';
+
+test('existing staff labor confirmation persists through the audited save and leaves access data intact',async()=>{
+  const data=draftEmployee({id:'office',name:'架空',role:'DH',type:'part',imported:true});
+  data.basic.fullName='架空 花子';data.plannedPeriod.startDate='2020-04-01';
+  let record={data,revision:1,operationId:'seed'},allowed=true;
+  const updates=[];
+  const port={read:async p=>p.startsWith('laborConfig/')?allowed:p==='laborRecords/office'?record:null,
+    timestamp:()=>123,now:()=>123,update:async update=>{updates.push(update);record=update['laborRecords/office'];}};
+  const store=createLaborStore(port,{uid:'owner',staffId:'office',portalRole:'admin'});
+  const saved=await store.confirmInformation(data,1,'confirm-labor');
+  assert.equal(laborInformationConfirmed(saved.data),true);assert.equal(saved.revision,2);
+  assert.deepEqual(Object.keys(updates[0]),['laborRecords/office','laborHistory/office/confirm-labor']);
+  await store.confirmInformation(data,1,'confirm-labor');assert.equal(updates.length,1);
+  await assert.rejects(store.confirmInformation(data,1,'stale'),/別の画面/);
+  allowed=false;await assert.rejects(store.confirmInformation(data,2,'denied'),/利用許可/);
+});
 
 test('roster opens only the selected current employment through the existing reviewer service',async()=>{
   const {service}=fixture({preopened:false});

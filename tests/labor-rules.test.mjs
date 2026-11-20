@@ -15,6 +15,18 @@ const store=()=>{const d=db('momo');return createLaborStore({read:async p=>(awai
 const draft=()=>({...draftEmployee(staff),googleEmail:'person@example.test'});
 beforeEach(async()=>env.withSecurityRulesDisabled(c=>set(ref(c.database()),{laborConfig:{enabled:true,owners:{momo:true},uploadsEnabled:true,maxFileBytes:5242880,maxEncodedBytes:52428800,protectedStaff:{office:true,term:true}},laborFileBudget:{used:0,revision:0},portalAccess:{users:{momo:{staffId:'office',role:'admin',active:true},admin:{staffId:'boss',role:'admin',active:true},person:{staffId:'s',role:'staff',active:true},terminal:{staffId:'term',role:'terminal',active:true},service:{staffId:'svc',role:'staff',active:false}}},serviceAccess:{notifications:{uid:'service',active:false}},extra_staff:{s:staff},tasks:{example:1}})));
 test('private records restricted to allowlisted owner and permit atomic audited save',async()=>{await store().save(draft(),0,'op1');assert.equal((await store().list()).s.revision,1);for(const u of ['person','admin','terminal','service',null])for(const p of ['laborRecords','laborHistory','laborFiles/doc'])await assertFails(get(ref(db(u),p)));await assertFails(set(ref(db('admin'),'laborConfig/owners/admin'),true));await assertFails(set(ref(db('momo'),'laborRecords/s/revision'),2));await assertFails(set(ref(db('momo'),'laborHistory/s/op1'),{bad:true}));});
+test('existing staff labor confirmation is allowed by the published audited rules',async()=>{
+  const s=store(),data=draft();data.imported=true;data.basic.fullName='架空 花子';data.plannedPeriod.startDate='2020-04-01';
+  await s.save(data,0,'seed-review');
+  const before=(await get(ref(db('momo'),'portalAccess/users'))).val();
+  const saved=await s.confirmInformation(data,1,'confirm-review');
+  assert.equal(saved.data.tasks['labor-information-review'].status,'完了');
+  assert.equal(saved.data.tasks['labor-information-review'].checkedBy,'momo');
+  assert.equal((await get(ref(db('momo'),'laborHistory/s/confirm-review/after/tasks/labor-information-review/status'))).val(),'完了');
+  assert.deepEqual((await get(ref(db('momo'),'portalAccess/users'))).val(),before);
+  assert.equal((await get(ref(db('momo'),'staffLifecycle/s'))).val(),null);
+  await assertFails(get(ref(db('person'),'laborRecords/s')));
+});
 test('confirmation atomically projects dates, gates ordinary access and prevents stale updates',async()=>{const s=store();const d=transition(draft(),'confirm',{id:'p',startDate:'2099-01-01'});await s.save(d,0,'confirm',{reflect:true});await assertFails(get(ref(db('person'),'tasks')));await assertSucceeds(get(ref(db('momo'),'tasks')));await assert.rejects(s.save(d,0,'stale'));await assertFails(set(ref(db('admin'),'staffLifecycle/s'),{state:'active'}));});
 test('file budget and metadata commit together, immutable bytes, simultaneous capacity rejection',async()=>{const s=store(),d=draft(),f=await prepareFile(new File(['%PDF-fixture'],'contract.pdf',{type:'application/pdf'}),'doc1');d.documents.doc1={name:f.name,size:f.size,mime:f.mime,hash:f.hash,category:'contract',completedDate:'',holdReason:''};await s.save(d,0,'file1',{file:f});assert.equal((await s.file('doc1')).base64,f.base64);assert.equal((await get(ref(db('momo'),'laborFileBudget'))).val().used,f.base64.length);await assertFails(set(ref(db('momo'),'laborFiles/doc1/base64'),'bad'));await env.withSecurityRulesDisabled(c=>set(ref(c.database(),'laborConfig/maxEncodedBytes'),f.base64.length+1));const f2={...f,id:'doc2'},next=structuredClone(d);next.documents.doc2={...d.documents.doc1};await assert.rejects(s.save(next,1,'file2',{file:f2}),/容量不足/);assert.equal((await s.file('doc2')),null);});
 test('deleting and restoring a confirmed employee document changes only audited metadata',async()=>{

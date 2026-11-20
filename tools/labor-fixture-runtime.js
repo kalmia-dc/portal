@@ -11,6 +11,12 @@ if(fixtureQuery.has('onboarding')){
   seed.laborRecords={[staff.id]:{revision:1,operationId:'fixture-existing',data:previous}};
 }
 let db=structuredClone(seed);
+if(fixtureQuery.has('labor-review')){
+  const data=draftEmployee({...staff,imported:true});
+  data.basic.fullName='架空 花子';data.plannedPeriod.startDate='2020-04-01';
+  db.laborRecords={[staff.id]:{revision:1,operationId:'seed-labor-review',data}};
+  db.portalJoinRequests={'fixture-new':{uid:'fixture-new',email:'fixture-new@example.test',name:'架空 新入',jobRole:'DH',revision:1,submittedAt:1,state:'pending'}};
+}
 if(fixtureQuery.has('usage')){
   db.laborRecords={};db.staffLifecycle={};db.onboardingAccess={};db.onboardingV1={cases:{}};
   const names={active:'架空 利用可能',opening:'架空 受付待ち',documents:'架空 書類待ち',start:'架空 入社日待ち',stopped:'架空 停止',unregistered:'架空 未登録',unknown:'架空 確認失敗'};

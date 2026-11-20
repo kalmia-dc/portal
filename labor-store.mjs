@@ -1,4 +1,4 @@
-import {draftEmployee,recordUpdate,lifecycleProjection,removeReviewedShifts,key,text,canonical} from './labor-model.mjs?v=20261112-without-salary';
+import {draftEmployee,recordUpdate,lifecycleProjection,removeReviewedShifts,key,text,canonical,confirmLaborInformation} from './labor-model.mjs?v=20261120-labor-confirm';
 import {approvalUpdates} from './portal-join-model.mjs';
 import {joinNameKey} from './portal-join-model.mjs';
 import {lifecycleProtection,linkedAccounts} from './portal-lifecycle-model.mjs';
@@ -9,6 +9,10 @@ export function createLaborStore(port, actor, defaults=[]) {
   const read=async path=>await port.read(path);
   async function authorize(){if(!actor?.uid||await read('laborConfig/owners/'+actor.uid)!==true||await read('laborConfig/enabled')!==true)throw Error('労務管理の利用許可を確認できません。');}
   async function list(){await authorize();return Object.fromEntries(Object.entries(await read('laborRecords')||{}).map(([id,r])=>[id,hydrate(r)]));}
+  async function confirmInformation(data,revision,operationId){
+    await authorize();
+    return await save(confirmLaborInformation(data,actor,port.timestamp()),revision,operationId);
+  }
   async function portalUsage(staffId) {
     key(staffId);
     return (await portalUsages())[staffId]||{status:'unregistered'};
@@ -163,7 +167,7 @@ export function createLaborStore(port, actor, defaults=[]) {
     const accounts=linkedAccounts(users,staffId).filter(m=>m.active===true && ['staff','trainingAdmin','admin'].includes(m.role));
     return {record:hydrate(record),uid:accounts.length===1?accounts[0].uid:undefined};
   }
-  return {actor,authorize,list,roster,save,setDocumentDeleted,importStaff,matchAccount,removeShifts,checkRegistration,portalUsage,portalUsages,openOnboarding,
+  return {actor,authorize,list,roster,save,setDocumentDeleted,importStaff,matchAccount,removeShifts,checkRegistration,portalUsage,portalUsages,openOnboarding,confirmInformation,
     renewalContext,
     bindings:()=>read('laborAccountBindings'),
     requests:()=>read('portalJoinRequests'),shifts:()=>read('shifts'),history:sid=>read('laborHistory/'+key(sid)),shiftHistory:sid=>read('laborShiftHistory/'+key(sid)),file:async id=>{await authorize();return read('laborFiles/'+key(id));},

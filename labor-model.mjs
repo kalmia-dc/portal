@@ -6,6 +6,33 @@ export const ENROLLMENTS = ['未確認','加入中','未加入','対象外','資
 export const PROGRESS = ['未着手','対応中','完了','対象外'];
 export function key(value) { if(typeof value!=='string'||!value||/[.#$\[\]/\u0000-\u001f\u007f]/u.test(value)||value.length>128)throw Error('識別情報が不正です。');return value; }
 export const text = value => String(value??'').trim();
+const laborReviewKey='labor-information-review';
+export function laborConfirmationFields(data){
+  const employment=data.periods?.[data.currentPeriod]||data.plannedPeriod||{};
+  return {fullName:text(data.basic?.fullName),role:text(data.role),type:text(data.type),startDate:text(employment.startDate)};
+}
+export function laborConfirmationIssues(data){
+  const fields=laborConfirmationFields(data),missing=[];
+  if(!fields.fullName)missing.push('氏名（姓・名）');
+  if(!['DR','DH','DA'].includes(fields.role))missing.push('職種');
+  if(!['full','part','spot'].includes(fields.type))missing.push('雇用形態');
+  try{jstStart(fields.startDate);}catch{missing.push('入社日');}
+  return missing;
+}
+export function laborInformationConfirmed(data){
+  const review=data.tasks?.[laborReviewKey];
+  return review?.status==='完了' && canonical(review.confirmedFields)===canonical(laborConfirmationFields(data));
+}
+export function confirmLaborInformation(employee,actor,timestamp){
+  if(employee.status!=='draft')throw Error('労務情報の確認対象を開き直してください。');
+  validateEmployee(employee);key(actor.uid);
+  const missing=laborConfirmationIssues(employee);
+  if(missing.length)throw Error(missing.join('・')+'を入力・確認してください。');
+  const data=structuredClone(employee);
+  data.tasks??={};
+  data.tasks[laborReviewKey]={title:'労務情報の確認',status:'完了',confirmedFields:laborConfirmationFields(data),checkedBy:actor.uid,checkedAt:timestamp};
+  return data;
+}
 export function canonical(value){const sort=v=>Array.isArray(v)?v.map(sort):v&&typeof v==='object'?Object.fromEntries(Object.keys(v).sort().map(k=>[k,sort(v[k])])):v;return JSON.stringify(sort(value));}
 export function jstStart(value) {
   if(!/^\d{4}-\d{2}-\d{2}$/.test(value))throw Error('日付を入力してください。');

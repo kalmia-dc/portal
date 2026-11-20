@@ -5,8 +5,8 @@ import {DIRECTOR_STAFF_ID,personName} from './portal-person-display.mjs?v=202610
 import {createPageLifecycle} from './portal-page-lifecycle.mjs';
 const pageLifecycle=createPageLifecycle();
 async function pageAwait(work){pageLifecycle.assertActive();let result;try{result=await work();}catch(error){pageLifecycle.assertActive();throw error;}pageLifecycle.assertActive();return result;}
-import {connectLabor} from './labor-runtime.js?v=20261120-document-progress';
-import {draftEmployee,transition,period,retirementShifts,retention,today,jstStart} from './labor-model.mjs?v=20261112-without-salary';
+import {connectLabor} from './labor-runtime.js?v=20261120-labor-confirm';
+import {draftEmployee,transition,period,retirementShifts,retention,today,jstStart,laborConfirmationFields,laborConfirmationIssues,laborInformationConfirmed} from './labor-model.mjs?v=20261120-labor-confirm';
 import {prepareFile,readDocument,extractCandidates} from './labor-documents.mjs?v=20261112-without-salary';
 const $=id=>document.getElementById(id),form=$('editor'),field=name=>form.elements.namedItem(name),id=()=>crypto.randomUUID();
 let readerController,readingKey,editorBaseline;let store,records={},current=null,data=null,busy=false;const urls=new Set();
@@ -95,9 +95,11 @@ $('addContractReview').onclick=()=>{
   void run(()=>editContractReview(due));
 };
 $('clearContractReview').onclick=()=>run(()=>editContractReview(''));
-const listStatus={...status,pending:'確認待ちの申請',director:'院長情報登録済み',retiring:'退職予定',retired:'退職済み'};
+const listStatus={...status,draft:'労務情報の確認待ち',laborReviewed:'労務情報確認済み',pending:'新入社員の申請確認待ち',director:'院長情報登録済み',retiring:'退職予定',retired:'退職済み'};
 const employeeGroups=[
-  {label:'入社情報の確認待ち',states:['pending','draft']},
+  {label:'新入社員の申請確認待ち',states:['pending']},
+  {label:'労務情報の確認待ち',states:['draft']},
+  {label:'労務情報確認済み',states:['laborReviewed']},
   {label:'入社確定・在籍中',states:['confirmed','director','retiring']},
   {label:'退職済み',states:['retired']},
   {label:'入社取消',states:['cancelled']},
@@ -105,6 +107,7 @@ const employeeGroups=[
 const employeeName=d=>d.basic.fullName || personName(d.basic.name,d.staffId);
 let employeeListDate;
 function recordStatus(d,date){
+  if(d.status==='draft' && laborInformationConfirmed(d))return 'laborReviewed';
   if(d.status==='draft' && d.staffId===DIRECTOR_STAFF_ID && d.basic.fullName?.trim())return 'director';
   if(d.status==='retiring'){
     const endDate=d.periods[d.currentPeriod]?.endDate;
@@ -190,6 +193,10 @@ function drawEmployeeGroup(label,rows){
       if(!d.basic.fullName)button.append(el('small',' 氏名要確認','name-unconfirmed'));
       button.setAttribute('aria-current',String(d.staffId===data?.staffId));
       identity.append(button);
+      if(d.status==='draft' && !laborInformationConfirmed(d)){
+        const missing=laborConfirmationIssues(d);
+        identity.append(el('small',missing.length?'入力・確認する項目：'+missing.join('、'):'氏名を押して4項目を照合し、労務情報を確定してください。','employee-email'));
+      }
       const warning=contractReviewText(d);
       if(warning)identity.append(el('small',warning,'employee-email danger'));
       button.onclick=()=>run(async()=>{
@@ -244,6 +251,30 @@ function discardEditorChanges(){
   return !data || JSON.stringify(collect())===editorBaseline ||
     pageAwait(()=>confirmAction('職員を切り替える','保存前の入力があります。入力を破棄して切り替えますか？'));
 }
+function drawLaborInformationReview(){
+  const visible=data?.status==='draft';
+  $('laborInformationReview').hidden=!visible;
+  if(!visible)return;
+  const next=collect(),fields=laborConfirmationFields(next),missing=laborConfirmationIssues(next);
+  const labels={fullName:'氏名（姓・名）',role:'職種',type:'雇用形態',startDate:'入社日'};
+  $('laborInformationFields').replaceChildren(...Object.entries(fields).map(([key,value])=>
+    el('li',labels[key]+'　'+({role:roles,type:employment}[key]?.[value]||value||'未入力'))));
+  const confirmed=laborInformationConfirmed(next);
+  $('laborInformationReviewState').textContent=confirmed?'この4項目は確認済みです。':missing.length?'入力・確認が必要です。'+missing.join('、')+'を下の欄で入力してください。':'4項目を照合したら「労務情報を確定」を押してください。';
+  $('confirmLaborInformation').hidden=confirmed;
+  $('confirmLaborInformation').disabled=busy || missing.length>0;
+}
+form.addEventListener('input',drawLaborInformationReview);
+form.addEventListener('change',drawLaborInformationReview);
+$('confirmLaborInformation').onclick=()=>run(async()=>{
+  const next=collect(),fields=laborConfirmationFields(next),missing=laborConfirmationIssues(next);
+  if(missing.length)throw Error(missing.join('・')+'を入力・確認してください。');
+  if(!await pageAwait(()=>confirmAction('労務情報を確定',`${fields.fullName}さんの氏名、${roles[fields.role]}、${employment[fields.type]}、入社日 ${fields.startDate}を正式な名簿や契約書と照合し、確認済みとして記録しますか？`)))return;
+  const saved=await pageAwait(()=>store.confirmInformation(next,current.revision,id()));
+  records[next.staffId]=saved;
+  show(saved);
+  message(fields.fullName+'さんの労務情報を確認済みとして記録しました。');
+});
 function registrationFeedback(value,error=false){
   $('registrationStatus').textContent=value;
   $('registrationStatus').classList.toggle('error',error);
@@ -445,8 +476,8 @@ function describePortalUsage(employee,usage){
       const state=recordStatus(employee,today(store.now()));
       if(state==='retired'||state==='cancelled')return ['アカウント未登録','この職員に紐付いたアカウントはありません。'];
       const pending=pendingApplicationFor(employee);
-      if(pending===1)return ['申請確認待ち','職員一覧の「未登録」から新入職員の申請を開き、内容を確認してください。'];
-      if(pending===0)return ['アカウント未登録','職員一覧の上にある「本人用の申請URLをコピー」からURLを新入職員に渡してください。'];
+      if(pending===1)return ['申請確認待ち','職員一覧の「新入社員の申請確認待ち」から申請を開き、内容を確認してください。'];
+      if(pending===0)return ['アカウント未登録','この職員がポータルを利用する場合は「本人用の申請URLをコピー」から登録用URLを渡してください。'];
       break;
     }
   }
@@ -517,7 +548,7 @@ async function refreshPortalUsages(){
     $('accountChecklist').replaceChildren();appendChecklist($('accountChecklist'),usages[data.staffId],data);
   }
 }
-function show(record){clearRead();current=record?structuredClone(record):null;data=structuredClone(record?.data||data);const displayState=recordStatus(data,today(store.now()));form.hidden=false;$('employeeTitle').textContent=employeeName(data)||'新しい職員';$('employeeTitle').tabIndex=-1;$('identity').textContent=`${data.staffId}／${listStatus[displayState]}`;$('savedState').textContent=current?`保存確認済み・版 ${current.revision}`:'未保存';for(const key of Object.keys(basic))field('basic_'+key).value=data.basic[key]??'';for(const key of ['role','type','googleEmail'])field(key).value=data[key];const p=data.periods[data.currentPeriod]||data.plannedPeriod||{};for(const k of ['startDate','endDate','contractEnd','days','hours'])field(k).value=p[k]||'';$('periods').replaceChildren(...Object.values(data.periods).map(x=>el('p',`${x.startDate}〜${x.endDate||'未定'}${x.cancelled?'（取消）':''}／契約終了 ${x.contractEnd||'未確認'}／${x.days||'所定日未確認'} ${x.hours||'所定時間未確認'}`)));$('lifecycleActions').replaceChildren();for(const [action,label]of [['retire','退職日を確定'],['cancel','入社を取り消す'],['withdraw','退職を撤回'],['rehire','再入社を確定']]){if(data.status==='draft'||action==='withdraw'&&data.status!=='retiring'||action==='rehire'&&!['retiring','cancelled'].includes(data.status))continue;const b=el('button',label);b.type='button';b.onclick=()=>run(async()=>{try{let next=transition(collect(),action,{id:id(),...Object.fromEntries(['startDate','endDate','contractEnd','days','hours'].map(k=>[k,field(k).value]))},store.now());if(!await pageAwait(async () => (confirmAction(label,`${next.basic.name}：入社 ${next.periods[next.currentPeriod].startDate}、退職 ${next.periods[next.currentPeriod].endDate||'未定'}。ポータルの利用期間とシフトの登録可能期間に反映します。`))))return;await pageAwait(async () => (save(next,true)));}catch(error){if(error?.code!=='portal/access-lost')throw error;}});$('lifecycleActions').append(b);}void refreshPortalUsage(data);for(const k of ['shiftReview','history'])$(k).replaceChildren();drawDocuments();drawContractReview(true);editorBaseline=JSON.stringify(collect());drawList();}
+function show(record){clearRead();current=record?structuredClone(record):null;data=structuredClone(record?.data||data);const displayState=recordStatus(data,today(store.now()));form.hidden=false;$('employeeTitle').textContent=employeeName(data)||'新しい職員';$('employeeTitle').tabIndex=-1;$('identity').textContent=`${data.staffId}／${listStatus[displayState]}`;$('savedState').textContent=current?`保存確認済み・版 ${current.revision}`:'未保存';for(const key of Object.keys(basic))field('basic_'+key).value=data.basic[key]??'';for(const key of ['role','type','googleEmail'])field(key).value=data[key];const p=data.periods[data.currentPeriod]||data.plannedPeriod||{};for(const k of ['startDate','endDate','contractEnd','days','hours'])field(k).value=p[k]||'';$('periods').replaceChildren(...Object.values(data.periods).map(x=>el('p',`${x.startDate}〜${x.endDate||'未定'}${x.cancelled?'（取消）':''}／契約終了 ${x.contractEnd||'未確認'}／${x.days||'所定日未確認'} ${x.hours||'所定時間未確認'}`)));$('lifecycleActions').replaceChildren();for(const [action,label]of [['retire','退職日を確定'],['cancel','入社を取り消す'],['withdraw','退職を撤回'],['rehire','再入社を確定']]){if(data.status==='draft'||action==='withdraw'&&data.status!=='retiring'||action==='rehire'&&!['retiring','cancelled'].includes(data.status))continue;const b=el('button',label);b.type='button';b.onclick=()=>run(async()=>{try{let next=transition(collect(),action,{id:id(),...Object.fromEntries(['startDate','endDate','contractEnd','days','hours'].map(k=>[k,field(k).value]))},store.now());if(!await pageAwait(async () => (confirmAction(label,`${next.basic.name}：入社 ${next.periods[next.currentPeriod].startDate}、退職 ${next.periods[next.currentPeriod].endDate||'未定'}。ポータルの利用期間とシフトの登録可能期間に反映します。`))))return;await pageAwait(async () => (save(next,true)));}catch(error){if(error?.code!=='portal/access-lost')throw error;}});$('lifecycleActions').append(b);}void refreshPortalUsage(data);for(const k of ['shiftReview','history'])$(k).replaceChildren();drawDocuments();drawContractReview(true);drawLaborInformationReview();editorBaseline=JSON.stringify(collect());drawList();}
 async function save(next=collect(),reflect=false,file=null){try{const result=await pageAwait(async () => (store.save(next,current?.revision||0,id(),{reflect,file})));records[next.staffId]=result;show(result);message('保存後の再読み込みで内容を確認しました。');}catch(error){if(error?.code!=='portal/access-lost')throw error;}}
 async function reload(){
   const result=await pageAwait(()=>Promise.all([store.list(),store.requests(),store.bindings(),store.roster()]));
