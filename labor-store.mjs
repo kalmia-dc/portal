@@ -20,6 +20,15 @@ export function createLaborStore(port, actor, defaults=[]) {
     if(!usages || typeof usages!=='object' || Array.isArray(usages))throw Error('ポータルの利用状況を取得できません。');
     return usages;
   }
+  async function openOnboarding(staffId) {
+    await authorize();
+    key(staffId);
+    const record=await read('laborRecords/'+staffId);
+    const period=record?.data?.currentPeriod;
+    if(!period || !['confirmed','retiring'].includes(record.data.status))throw Error('入社情報を確認してから受付を開始してください。');
+    key(period);
+    await port.openOnboarding({staff:staffId,period});
+  }
   async function roster(){const entries=new Map(defaults.map(x=>[x.id,x]));for(const s of Object.values(await read('extra_staff')||{}))entries.set(s.id,s);return [...entries.values()];}
   async function verifyRegistration(saved, staffId, operationId, request) {
     if(!request)return true;
@@ -154,7 +163,7 @@ export function createLaborStore(port, actor, defaults=[]) {
     const accounts=linkedAccounts(users,staffId).filter(m=>m.active===true && ['staff','trainingAdmin','admin'].includes(m.role));
     return {record:hydrate(record),uid:accounts.length===1?accounts[0].uid:undefined};
   }
-  return {actor,authorize,list,roster,save,setDocumentDeleted,importStaff,matchAccount,removeShifts,checkRegistration,portalUsage,portalUsages,
+  return {actor,authorize,list,roster,save,setDocumentDeleted,importStaff,matchAccount,removeShifts,checkRegistration,portalUsage,portalUsages,openOnboarding,
     renewalContext,
     bindings:()=>read('laborAccountBindings'),
     requests:()=>read('portalJoinRequests'),shifts:()=>read('shifts'),history:sid=>read('laborHistory/'+key(sid)),shiftHistory:sid=>read('laborShiftHistory/'+key(sid)),file:async id=>{await authorize();return read('laborFiles/'+key(id));},

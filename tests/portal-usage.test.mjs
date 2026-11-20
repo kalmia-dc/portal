@@ -1,6 +1,17 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {loadPortalUsages} from '../onboarding-functions/portal-usage.mjs';
+import {onboardingException,onboardingAccessPending} from '../onboarding-functions/onboarding-access.mjs';
+
+test('individual exceptions match the exact account and employment and preserve the start-date gate',()=>{
+  const config={portalExceptions:{s:{p:{uid:'u',waiveDocuments:true,source:'explicit-user-request',approvedAt:1}}}};
+  assert.equal(onboardingException(config,'s','p','u'),true);
+  for(const args of [['other','p','u'],['s','other','u'],['s','p','other']])assert.equal(onboardingException(config,...args),false);
+  const life={hrManaged:true,state:'active',currentPeriod:'p',startAt:100,endAt:200};
+  assert.equal(onboardingAccessPending(true,life,'p',99),true);
+  assert.equal(onboardingAccessPending(true,life,'p',100),false);
+  assert.equal(onboardingAccessPending(true,life,'p',200),true);
+});
 
 test('onboarding states follow the actual gate, required documents and Japan-time start boundary',async()=>{
   const startAt=Date.parse('2026-11-21T00:00:00+09:00'),endAt=startAt+86400000;

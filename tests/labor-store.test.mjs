@@ -1,5 +1,22 @@
 import test from 'node:test';import assert from 'node:assert/strict';import {createLaborStore} from '../labor-store.mjs';import {draftEmployee} from '../labor-model.mjs';
 import {loadPortalUsages} from '../onboarding-functions/portal-usage.mjs';
+import {fixture,people} from './onboarding-fixture.mjs';
+
+test('roster opens only the selected current employment through the existing reviewer service',async()=>{
+  const {service}=fixture({preopened:false});
+  let allowed=true,period='p1';
+  const port={read:async path=>path.startsWith('laborConfig/')?allowed:path==='laborRecords/doctor'?{data:{status:'confirmed',currentPeriod:period}}:null,
+    openOnboarding:target=>service(people.hr,{action:'open',mode:'review',...target})};
+  const store=createLaborStore(port,people.hr);
+  await store.openOnboarding('doctor');
+  await store.openOnboarding('doctor');
+  assert.equal((await service(people.doctor,{action:'status'})).role,'DR');
+  await assert.rejects(service(people.assistant,{action:'status'}),/受付開始待ち/);
+  period='old';
+  await assert.rejects(store.openOnboarding('doctor'));
+  allowed=false;
+  await assert.rejects(store.openOnboarding('doctor'),/利用許可/);
+});
 test('portal usage respects saved accounts and Japan-time access boundaries',async()=>{
   const startAt=Date.parse('2026-11-12T00:00:00+09:00'),endAt=Date.parse('2026-11-13T00:00:00+09:00');
   let now=startAt-1;

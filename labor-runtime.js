@@ -1,7 +1,7 @@
 import {initializeApp} from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import {getDatabase,ref,update,runTransaction,onValue,serverTimestamp} from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 import {startPortalAuth} from './portal-auth.js?v=labor-20261014-2';
-import {createLaborStore} from './labor-store.mjs?v=20261120-portal-usage-2';
+import {createLaborStore} from './labor-store.mjs?v=20261120-open-onboarding';
 import {onboardingApi} from './staff-onboarding-runtime.js';
 import {defaultStaff} from './portal-default-staff.mjs';
 import {readServerProfile} from './portal-server-profile.mjs';
@@ -18,6 +18,7 @@ export async function connectLabor(){
   const callOnboarding=onboardingApi(app);
   const port={read:p=>wait(()=>readServerProfile({databaseURL:app.options.databaseURL,user:window.portalAuth.user,path:p})),timestamp:serverTimestamp,now:()=>Date.now()+offset,
     portalUsages:uids=>wait(async()=>(await callOnboarding({action:'portal-usage',mode:'review',uids})).usages),
+    openOnboarding:target=>wait(()=>callOnboarding({action:'open',mode:'review',...target})),
     update:updates=>wait(()=>{if(!connected)throw Error('通信を確認してから保存してください。');return update(ref(db),updates);}),
     transaction:async(p,fn)=>{lifecycle.assertActive();if(!connected)throw Error('通信を確認してください。');let off,release;try{
       await wait(()=>new Promise((resolve,reject)=>{release=lifecycle.add(()=>reject(Error('労務管理の利用が終了しました。')));off=watch(p,resolve,reject);}));

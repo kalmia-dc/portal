@@ -1,4 +1,4 @@
-import {onboardingIsComplete,prehireAccess} from './onboarding-access.mjs';
+import {onboardingIsComplete,prehireAccess,onboardingException} from './onboarding-access.mjs';
 import {ROLES} from './catalog.mjs';
 import {safeKey} from './service.mjs';
 
@@ -10,7 +10,7 @@ export function employmentActive(life,now) {
 }
 
 // Only access states leave the service. Document bodies and individual metadata stay private.
-export async function loadPortalUsages({read,metadata,now,uids}) {
+export async function loadPortalUsages({read,metadata,now,uids,config}) {
   const members=await Promise.all([...new Set(uids)].map(async uid=>[uid,await read('portalAccess/users/'+uid)]));
   const users=Object.fromEntries(members.filter(([,member])=>member));
   const staffIds=[...new Set(Object.values(users||{}).map(member=>member?.staffId).filter(safeKey))];
@@ -32,7 +32,8 @@ export async function loadPortalUsages({read,metadata,now,uids}) {
       if(!active && !prehireAccess(lifecycle,access,staff,now)) {
         return [staff,beforeStart?{status:'scheduled',startDate:date(lifecycle.startAt)}:{status:'stopped'}];
       }
-      if(access?.pending!==true)return [staff,{status:'active',administrator:member.role==='admin'}];
+      if(access?.pending!==true)return [staff,{status:'active',administrator:member.role==='admin',
+        ...(access?.staff===staff && onboardingException(config,staff,access.period,member.uid)?{exception:true}:{})}];
       if(access.staff!==staff || !safeKey(access.period) ||
         (lifecycle?.hrManaged===true && lifecycle.currentPeriod!==access.period))return [staff,{status:'unknown'}];
       const enrollment=await read('onboardingV1/cases/'+staff+'/'+access.period);

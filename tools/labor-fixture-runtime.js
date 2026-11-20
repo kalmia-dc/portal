@@ -41,11 +41,14 @@ export async function connectLabor(){document.getElementById('environment').text
   return structuredClone(pathGet(p));
 },portalUsages:async()=>{
   if(fixtureQuery.has('usage-failure'))throw Error('Fixture usage unavailable');
-  const usage={opening:{status:'opening'},documents:{status:'documents'},start:{status:'start',startDate:'2099-01-01'},unknown:{status:'unknown'}};
+  const usage={opening:{status:db.onboardingV1?.cases?.['fixture-opening']?.p?'documents':'opening'},documents:{status:'documents'},start:{status:'start',startDate:'2099-01-01'},unknown:{status:'unknown'}};
   return Object.fromEntries(Object.entries(db.portalAccess.users).map(([uid,member])=>[
     member.staffId,usage[member.staffId.replace('fixture-','')]||
       (member.active?db.onboardingAccess?.[uid]?.pending?{status:'opening'}:{status:'active',administrator:member.role==='admin'}:{status:'stopped'}),
   ]));
+},openOnboarding:async({staff,period})=>{
+  if(fixtureQuery.has('opening-failure'))throw Error('受付を開始できませんでした。もう一度お試しください。');
+  db.onboardingV1??={cases:{}};db.onboardingV1.cases??={};db.onboardingV1.cases[staff]??={};db.onboardingV1.cases[staff][period]??={role:'DH'};
 },timestamp:()=>Date.now(),now:()=>Date.now(),update:async updates=>{const registration=Object.keys(updates).some(p=>p.startsWith('portalJoinRequests/'));
 if(registration && fixtureQuery.has('deny'))throw Object.assign(Error('保存できませんでした。'),{code:'PERMISSION_DENIED'});
 for(const [p,v]of Object.entries(updates))set(p,v);

@@ -30,6 +30,12 @@ export function onboardingAccessPending(complete, lifecycle, period, now) {
     !(lifecycle.startAt<=now && now<lifecycle.endAt);
 }
 
+export function onboardingException(config,staff,period,uid) {
+  const grant=config?.portalExceptions?.[staff]?.[period];
+  return grant?.uid===uid && grant?.waiveDocuments===true &&
+    grant.source==='explicit-user-request' && Number.isFinite(grant.approvedAt);
+}
+
 export async function onboardingIsComplete({staff, period, role, metadata}) {
   const documents = roleDocuments(role);
   if (!documents.length) return false;

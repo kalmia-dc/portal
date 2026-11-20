@@ -9,7 +9,7 @@ import {createOnboardingService, OnboardingError, safeKey} from './service.mjs';
 import {createRenewalService} from './contract-renewal.mjs';
 import {ROLES} from './catalog.mjs';
 import {onboardingDatabaseAuth} from './database-identity.mjs';
-import {changesOnboardingStatus,onboardingIsComplete,onboardingEmployment,prehireAccess,onboardingAccessPending} from './onboarding-access.mjs';
+import {changesOnboardingStatus,onboardingIsComplete,onboardingEmployment,prehireAccess,onboardingAccessPending,onboardingException} from './onboarding-access.mjs';
 import {employmentActive as active,loadPortalUsages} from './portal-usage.mjs';
 
 initializeApp({
@@ -126,7 +126,7 @@ export const staffOnboarding = onCall(options,async request=>{
       if(input.mode!=='review' || !actor.reviewer)throw new OnboardingError('permission-denied','労務管理の利用許可を確認できません。');
       if(config?.enabled!==true)throw new OnboardingError('failed-precondition','入社手続きは準備中です。');
       if(!Array.isArray(input.uids) || input.uids.some(uid=>!safeKey(uid)))throw new OnboardingError('invalid-argument','アカウント一覧を読み直してください。');
-      return {usages:await loadPortalUsages({read,metadata:documents.metadata,now:Date.now(),uids:input.uids})};
+      return {usages:await loadPortalUsages({read,metadata:documents.metadata,now:Date.now(),uids:input.uids,config})};
     }
     if(input.scope==='renewals'){
       if(config?.enabled!==true) throw new OnboardingError('failed-precondition','契約更新は準備中です。');
@@ -209,7 +209,8 @@ export const staffOnboarding = onCall(options,async request=>{
     if(!enrollment || !Object.hasOwn(ROLES,enrollment.role)) return await service(actor,input);
     const operation=randomUUID();
     const lockUntil=Date.now()+120000;
-    const relock=review && (input.action==='return' || input.action==='require');
+    const exception=onboardingException(config,staff,current.period,uid);
+    const relock=review && !exception && (input.action==='return' || input.action==='require');
     const lock=await access.transaction(value=>{
       if(value?.staff!==staff || value.period!==current.period || value.lockUntil>Date.now()) return;
       return {...value,pending:value.pending||relock,operation,lockUntil};
@@ -224,7 +225,7 @@ export const staffOnboarding = onCall(options,async request=>{
     } finally {
       try {
         const complete=await onboardingIsComplete({staff,period:current.period,role:enrollment.role,metadata:documents.metadata});
-        pending=onboardingAccessPending(complete,await read('staffLifecycle/'+staff),current.period,Date.now());
+        pending=onboardingAccessPending(complete||exception,await read('staffLifecycle/'+staff),current.period,Date.now());
       } finally {
         await access.transaction(value=>value?.operation===operation
           ? {staff,period:current.period,pending} : undefined);
