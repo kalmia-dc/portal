@@ -18,6 +18,7 @@ test('production adapter blocks disconnected writes, uses authenticated REST, an
     './portal-auth.js':{startPortalAuth:async()=>actor},
     './labor-store.mjs':{createLaborStore:p=>{port=p;return {authorize:async()=>{authorized++;}};}},
     './portal-default-staff.mjs':{defaultStaff:[]},
+    './staff-onboarding-runtime.js':{onboardingApi:()=>async()=>({usages:{synthetic:{status:'opening'}}})},
     './portal-server-profile.mjs':{readServerProfile:async args=>{reads.push(args);return {synthetic:true};}},
     './portal-page-lifecycle.mjs':{createPageLifecycle:()=>createPageLifecycle({target:window})}
   };
@@ -27,6 +28,7 @@ test('production adapter blocks disconnected writes, uses authenticated REST, an
   await assert.rejects(port.update({a:1}),/通信/);assert.equal(writes.length,0);
   listeners.get('.info/connected').next({val:()=>true});await port.update({a:1});assert.equal(writes.length,1);
   await port.read('laborRecords');assert.equal(reads[0].user,user);assert.equal(reads[0].path,'laborRecords');
+  assert.equal((await port.portalUsages()).synthetic.status,'opening');
   listeners.get('.info/connected').next({val:()=>false});await assert.rejects(port.update({a:2}),/通信/);assert.equal(writes.length,1);
   listeners.get('laborConfig/owners/'+user.uid).next({val:()=>false});assert.equal(cleared,1);assert.deepEqual(events,['laborAccessLost']);
   listeners.get('laborConfig/enabled').error();assert.equal(cleared,1);

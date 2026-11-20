@@ -4,7 +4,7 @@ import {DIRECTOR_STAFF_ID,personName} from './portal-person-display.mjs?v=202610
 import {createPageLifecycle} from './portal-page-lifecycle.mjs';
 const pageLifecycle=createPageLifecycle();
 async function pageAwait(work){pageLifecycle.assertActive();let result;try{result=await work();}catch(error){pageLifecycle.assertActive();throw error;}pageLifecycle.assertActive();return result;}
-import {connectLabor} from './labor-runtime.js?v=20261114-renewal';
+import {connectLabor} from './labor-runtime.js?v=20261120-portal-usage';
 import {draftEmployee,transition,period,retirementShifts,retention,today,jstStart} from './labor-model.mjs?v=20261112-without-salary';
 import {prepareFile,readDocument,extractCandidates} from './labor-documents.mjs?v=20261112-without-salary';
 const $=id=>document.getElementById(id),form=$('editor'),field=name=>form.elements.namedItem(name),id=()=>crypto.randomUUID();
@@ -44,6 +44,7 @@ const roles={DR:'歯科医師',DH:'歯科衛生士',DA:'歯科助手・受付'};
 const employment={full:'常勤',part:'非常勤',spot:'スポット'};
 const onboarding=$('onboarding');
 let applications={},bindings={},roster=[],selectedApplication=null,registrationAttempt=null;
+let portalUsages=null,portalUsagesRequest=0;
 const contractReviewKey='contract-renewal-review';
 const contractReviewTitle='契約更新未確認';
 function contractReviewText(employee){
@@ -154,7 +155,7 @@ function drawList(){
 }
 function drawEmployeeGroup(label,rows){
   const group=el('div',null,'employee-group');
-  const columns=['氏名','職種','雇用形態','入社日','登録状態'];
+  const columns=['氏名','職種','雇用形態','入社日','登録状態','ポータル利用状況'];
   const table=el('table'),thead=el('thead'),head=el('tr'),body=el('tbody');
   const title=el('h3',label+'（'+rows.length+'件）');
   title.id='employee-group-'+rows[0].state;
@@ -195,7 +196,11 @@ function drawEmployeeGroup(label,rows){
         form.scrollIntoView({block:'start'});
       });
     }
-    [identity,roles[request?.jobRole||d?.role],employment[d?.type],startDate,listStatus[state]].forEach((value,index)=>{
+    const usage=el('div');
+    const [usageLabel,nextStep]=request?['申請確認待ち','申請を開き、内容を確認してください。']:
+      describePortalUsage(d,portalUsages===null?{status:'loading'}:portalUsages[d.staffId]||{status:'unregistered'});
+    usage.append(el('strong',usageLabel),el('small',nextStep,'employee-email'));
+    [identity,roles[request?.jobRole||d?.role],employment[d?.type],startDate,listStatus[state],usage].forEach((value,index)=>{
       const cell=el('td');
       cell.dataset.label=columns[index];
       cell.append(value||'未確認');
@@ -397,6 +402,11 @@ function pendingApplicationFor(employee){
 }
 function describePortalUsage(employee,usage){
   switch(usage.status){
+    case 'loading': return ['確認中…',''];
+    case 'opening': return ['入社手続きのみ・受付開始待ち','労務担当が「入社書類の提出状況を確認する」から受付を開始してください。'];
+    case 'documents': return ['入社手続きのみ・書類確認待ち','必要書類の提出と労務担当の確認を完了してください。'];
+    case 'start': return ['入社手続きのみ・入社日待ち','書類確認済み。'+usage.startDate+'から通常機能を利用できます。'];
+    case 'activation': return ['入社手続きのみ・利用制限解除待ち','書類確認済み。新入職員が入社手続き画面を開き直し、利用制限の解除を確認してください。'];
     case 'active': return ['利用可能',usage.administrator?'既存の管理者アカウントでログインできます。':'登録済みのGoogleアカウントでログインできます。'];
     case 'scheduled': return ['利用開始前',usage.startDate+'から、登録済みのGoogleアカウントでログインできます。'];
     case 'stopped': return ['利用停止中','現在、この職員のアカウントではログインできません。'];
@@ -404,10 +414,10 @@ function describePortalUsage(employee,usage){
       const confirmedApplication=Object.values(applications).some(r=>r.state==='approved' && r.approval?.staffId===employee.staffId);
       if(bindings[employee.staffId] || confirmedApplication)break;
       const state=recordStatus(employee,today(store.now()));
-      if(state==='retired'||state==='cancelled')return ['利用アカウントなし','この職員に紐付いたアカウントはありません。'];
+      if(state==='retired'||state==='cancelled')return ['アカウント未登録','この職員に紐付いたアカウントはありません。'];
       const pending=pendingApplicationFor(employee);
-      if(pending===1)return ['管理者の確認待ち','職員一覧の「未登録」から本人の申請を開き、内容を確認してください。'];
-      if(pending===0)return ['本人の申請待ち','職員一覧の上にある「本人用の申請URLをコピー」からURLを本人に渡してください。'];
+      if(pending===1)return ['申請確認待ち','職員一覧の「未登録」から新入職員の申請を開き、内容を確認してください。'];
+      if(pending===0)return ['アカウント未登録','職員一覧の上にある「本人用の申請URLをコピー」からURLを新入職員に渡してください。'];
       break;
     }
   }
@@ -428,6 +438,28 @@ async function refreshPortalUsage(employee){
   const [label,nextStep]=describePortalUsage(employee,usage);
   $('accountStatus').textContent=label;
   $('accountNextStep').textContent=nextStep;
+  if(portalUsages){portalUsages[employee.staffId]=usage;drawList();}
+}
+async function refreshPortalUsages(){
+  const request=++portalUsagesRequest;
+  portalUsages=null;
+  drawList();
+  let usages;
+  try {
+    usages=await pageAwait(()=>store.portalUsages());
+  }catch(error){
+    if(error?.code==='portal/access-lost')return;
+    usages=Object.fromEntries(Object.keys(records).map(staff=>[staff,{status:'unknown'}]));
+  }
+  if(!pageLifecycle.active || request!==portalUsagesRequest)return;
+  portalUsages=usages;
+  drawList();
+  if(data){
+    ++portalUsageRequest;
+    const [label,nextStep]=describePortalUsage(data,usages[data.staffId]||{status:'unregistered'});
+    $('accountStatus').textContent=label;
+    $('accountNextStep').textContent=nextStep;
+  }
 }
 function show(record){clearRead();current=record?structuredClone(record):null;data=structuredClone(record?.data||data);const displayState=recordStatus(data,today(store.now()));form.hidden=false;$('employeeTitle').textContent=employeeName(data)||'新しい職員';$('employeeTitle').tabIndex=-1;$('identity').textContent=`${data.staffId}／${listStatus[displayState]}`;$('savedState').textContent=current?`保存確認済み・版 ${current.revision}`:'未保存';for(const key of Object.keys(basic))field('basic_'+key).value=data.basic[key]??'';for(const key of ['role','type','googleEmail'])field(key).value=data[key];const p=data.periods[data.currentPeriod]||data.plannedPeriod||{};for(const k of ['startDate','endDate','contractEnd','days','hours'])field(k).value=p[k]||'';$('periods').replaceChildren(...Object.values(data.periods).map(x=>el('p',`${x.startDate}〜${x.endDate||'未定'}${x.cancelled?'（取消）':''}／契約終了 ${x.contractEnd||'未確認'}／${x.days||'所定日未確認'} ${x.hours||'所定時間未確認'}`)));$('lifecycleActions').replaceChildren();for(const [action,label]of [['retire','退職日を確定'],['cancel','入社を取り消す'],['withdraw','退職を撤回'],['rehire','再入社を確定']]){if(data.status==='draft'||action==='withdraw'&&data.status!=='retiring'||action==='rehire'&&!['retiring','cancelled'].includes(data.status))continue;const b=el('button',label);b.type='button';b.onclick=()=>run(async()=>{try{let next=transition(collect(),action,{id:id(),...Object.fromEntries(['startDate','endDate','contractEnd','days','hours'].map(k=>[k,field(k).value]))},store.now());if(!await pageAwait(async () => (confirmAction(label,`${next.basic.name}：入社 ${next.periods[next.currentPeriod].startDate}、退職 ${next.periods[next.currentPeriod].endDate||'未定'}。ポータルの利用期間とシフトの登録可能期間に反映します。`))))return;await pageAwait(async () => (save(next,true)));}catch(error){if(error?.code!=='portal/access-lost')throw error;}});$('lifecycleActions').append(b);}void refreshPortalUsage(data);for(const k of ['shiftReview','history'])$(k).replaceChildren();drawDocuments();drawContractReview(true);editorBaseline=JSON.stringify(collect());drawList();}
 async function save(next=collect(),reflect=false,file=null){try{const result=await pageAwait(async () => (store.save(next,current?.revision||0,id(),{reflect,file})));records[next.staffId]=result;show(result);message('保存後の再読み込みで内容を確認しました。');}catch(error){if(error?.code!=='portal/access-lost')throw error;}}
@@ -435,7 +467,7 @@ async function reload(){
   const result=await pageAwait(()=>Promise.all([store.list(),store.requests(),store.bindings(),store.roster()]));
   [records,applications,bindings,roster]=[result[0],result[1]||{},result[2]||{},result[3]];
   drawList();
-  if(data)void refreshPortalUsage(records[data.staffId]?.data||data);
+  await refreshPortalUsages();
   if(registrationAttempt){
     const {staffId,operationId,request}=registrationAttempt;
     const saved=await pageAwait(()=>store.checkRegistration(staffId,operationId,request));
@@ -539,4 +571,4 @@ function visibleHistory(snapshot){
 }
 $('loadHistory').onclick=()=>run(async()=>{try{const h=await pageAwait(async () => (store.history(data.staffId)));$('history').replaceChildren();for(const entry of Object.values(h||{}).sort((a,b)=>b.at-a.at)){const d=el('details');d.append(el('summary',`${new Date(entry.at).toLocaleString('ja-JP',{timeZone:'Asia/Tokyo'})}／${entry.by}`),el('pre',JSON.stringify({変更前:visibleHistory(h[entry.previousOperationId]?.after),変更後:visibleHistory(entry.after)},null,2)));$('history').append(d);}const shifts=await pageAwait(async () => (store.shiftHistory(data.staffId)));for(const entry of Object.values(shifts||{}).sort((a,b)=>b.at-a.at)){const d=el('details');d.append(el('summary',`シフト解除 ${new Date(entry.at).toLocaleString('ja-JP',{timeZone:'Asia/Tokyo'})}／${entry.by}`),el('pre',JSON.stringify(entry.months,null,2)));$('history').append(d);}}catch(error){if(error?.code!=='portal/access-lost')throw error;}});
 window.addEventListener('pagehide',clearRead);window.addEventListener('portalAccessLost',()=>{clearRead();current=null;data=null;records={};applications={};bindings={};roster=[];selectedApplication=null;registrationAttempt=null;});window.addEventListener('laborAccessLost',()=>{pageLifecycle.stop();clearRead();current=null;data=null;records={};applications={};bindings={};roster=[];selectedApplication=null;registrationAttempt=null;});
-try{store=await pageAwait(async () => (connectLabor()));$('app').hidden=false;await pageAwait(async () => (reload()));pageLifecycle.interval(()=>{if(employeeListDate!==today(store.now())){drawList();if(data)void refreshPortalUsage(data);}},1000*60);}catch(e){if (pageLifecycle.active) {message(e.message,true);$('app').hidden=true;}}
+try{store=await pageAwait(async () => (connectLabor()));$('app').hidden=false;await pageAwait(async () => (reload()));pageLifecycle.interval(()=>{void refreshPortalUsages();},1000*60);}catch(e){if (pageLifecycle.active) {message(e.message,true);$('app').hidden=true;}}

@@ -10,6 +10,23 @@ if(fixtureQuery.has('onboarding')){
   seed.laborRecords={[staff.id]:{revision:1,operationId:'fixture-existing',data:previous}};
 }
 let db=structuredClone(seed);
+if(fixtureQuery.has('usage')){
+  db.laborRecords={};db.staffLifecycle={};db.onboardingAccess={};db.onboardingV1={cases:{}};
+  const names={active:'架空 利用可能',opening:'架空 受付待ち',documents:'架空 書類待ち',start:'架空 入社日待ち',stopped:'架空 停止',unregistered:'架空 未登録',unknown:'架空 確認失敗'};
+  for(const [state,name] of Object.entries(names)){
+    const id='fixture-'+state,d=draftEmployee({id,name,role:'DH',type:'part'});
+    d.basic.fullName=name;d.status='confirmed';d.currentPeriod='p';
+    d.periods={p:{startDate:state==='start'?'2099-01-01':'2026-01-01'}};
+    db.laborRecords[id]={revision:1,data:d};
+    if(state==='unregistered')continue;
+    db.portalAccess.users[id]={staffId:id,role:'staff',active:state!=='stopped'};
+    if(['opening','documents','start'].includes(state)){
+      db.onboardingAccess[id]={staff:id,period:'p',pending:true};
+      if(state!=='opening')db.onboardingV1.cases[id]={p:{role:'DH'}};
+    }
+    if(state==='start')db.staffLifecycle[id]={hrManaged:true,state:'active',startAt:Date.parse('2099-01-01T00:00:00+09:00'),endAt:Date.parse('2100-01-01T00:00:00+09:00'),currentPeriod:'p'};
+  }
+}
 let failVerification=false;
 
 const fixtureTools=document.createElement('details');fixtureTools.append(Object.assign(document.createElement('summary'),{textContent:'ローカル検証用の架空書類'}));
@@ -22,6 +39,13 @@ export async function connectLabor(){document.getElementById('environment').text
     throw Error('Fixture read temporarily unavailable');
   }
   return structuredClone(pathGet(p));
+},portalUsages:async()=>{
+  if(fixtureQuery.has('usage-failure'))throw Error('Fixture usage unavailable');
+  const usage={opening:{status:'opening'},documents:{status:'documents'},start:{status:'start',startDate:'2099-01-01'},unknown:{status:'unknown'}};
+  return Object.fromEntries(Object.entries(db.portalAccess.users).map(([uid,member])=>[
+    member.staffId,usage[member.staffId.replace('fixture-','')]||
+      (member.active?db.onboardingAccess?.[uid]?.pending?{status:'opening'}:{status:'active',administrator:member.role==='admin'}:{status:'stopped'}),
+  ]));
 },timestamp:()=>Date.now(),now:()=>Date.now(),update:async updates=>{const registration=Object.keys(updates).some(p=>p.startsWith('portalJoinRequests/'));
 if(registration && fixtureQuery.has('deny'))throw Object.assign(Error('保存できませんでした。'),{code:'PERMISSION_DENIED'});
 for(const [p,v]of Object.entries(updates))set(p,v);

@@ -1,4 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';import {createLaborStore} from '../labor-store.mjs';import {draftEmployee} from '../labor-model.mjs';
+import {loadPortalUsages} from '../onboarding-functions/portal-usage.mjs';
 test('portal usage respects saved accounts and Japan-time access boundaries',async()=>{
   const startAt=Date.parse('2026-11-12T00:00:00+09:00'),endAt=Date.parse('2026-11-13T00:00:00+09:00');
   let now=startAt-1;
@@ -12,6 +13,7 @@ test('portal usage respects saved accounts and Japan-time access boundaries',asy
   const lifecycle={hrManaged:true,state:'active',currentCancelled:false,startAt,endAt};
   const port={now:()=>now,read:async path=>path.startsWith('laborConfig/')?true:
     path==='portalAccess/users'?users:path==='staffLifecycle/employee'?lifecycle:null};
+  port.portalUsages=()=>loadPortalUsages({read:port.read,metadata:async()=>null,now});
   const store=createLaborStore(port,{uid:'owner'});
   assert.deepEqual(await store.portalUsage('director'),{status:'active',administrator:true});
   assert.deepEqual(await store.portalUsage('former'),{status:'stopped'});

@@ -10,6 +10,7 @@ import {createRenewalService} from './contract-renewal.mjs';
 import {ROLES} from './catalog.mjs';
 import {onboardingDatabaseAuth} from './database-identity.mjs';
 import {changesOnboardingStatus,onboardingIsComplete,onboardingEmployment,prehireAccess,onboardingAccessPending} from './onboarding-access.mjs';
+import {employmentActive as active,loadPortalUsages} from './portal-usage.mjs';
 
 initializeApp({
   databaseURL:'https://kalmia-shift-default-rtdb.asia-southeast1.firebasedatabase.app',
@@ -18,13 +19,6 @@ initializeApp({
 const serviceAccount=defineString('ONBOARDING_SERVICE_ACCOUNT');
 const options = {region:'asia-southeast1',maxInstances:2,minInstances:0,concurrency:8,memory:'512MiB',timeoutSeconds:60,
   cors:['https://kalmia-dc.github.io'],serviceAccount};
-
-function active(life, now) {
-  if(life?.state==='stopped') return false;
-  if(life?.hrManaged!==true) return true;
-  return (!life.currentCancelled && life.startAt<=now && now<life.endAt) ||
-    (life.previousStartAt<=now && now<life.previousEndAt);
-}
 
 async function authenticate(request, read) {
   const uid = request.auth?.uid;
@@ -128,6 +122,11 @@ export const staffOnboarding = onCall(options,async request=>{
     }
     const documents = storage(config||{});
     const input=request.data||{};
+    if(input.action==='portal-usage') {
+      if(input.mode!=='review' || !actor.reviewer)throw new OnboardingError('permission-denied','労務管理の利用許可を確認できません。');
+      if(config?.enabled!==true)throw new OnboardingError('failed-precondition','入社手続きは準備中です。');
+      return {usages:await loadPortalUsages({read,metadata:documents.metadata,now:Date.now()})};
+    }
     if(input.scope==='renewals'){
       if(config?.enabled!==true) throw new OnboardingError('failed-precondition','契約更新は準備中です。');
       const renew=createRenewalService({
