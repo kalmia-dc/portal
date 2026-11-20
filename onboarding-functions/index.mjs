@@ -125,7 +125,8 @@ export const staffOnboarding = onCall(options,async request=>{
     if(input.action==='portal-usage') {
       if(input.mode!=='review' || !actor.reviewer)throw new OnboardingError('permission-denied','労務管理の利用許可を確認できません。');
       if(config?.enabled!==true)throw new OnboardingError('failed-precondition','入社手続きは準備中です。');
-      return {usages:await loadPortalUsages({read,metadata:documents.metadata,now:Date.now()})};
+      if(!Array.isArray(input.uids) || input.uids.some(uid=>!safeKey(uid)))throw new OnboardingError('invalid-argument','アカウント一覧を読み直してください。');
+      return {usages:await loadPortalUsages({read,metadata:documents.metadata,now:Date.now(),uids:input.uids})};
     }
     if(input.scope==='renewals'){
       if(config?.enabled!==true) throw new OnboardingError('failed-precondition','契約更新は準備中です。');

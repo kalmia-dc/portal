@@ -10,8 +10,9 @@ export function employmentActive(life,now) {
 }
 
 // Only access states leave the service. Document bodies and individual metadata stay private.
-export async function loadPortalUsages({read,metadata,now}) {
-  const users=await read('portalAccess/users');
+export async function loadPortalUsages({read,metadata,now,uids}) {
+  const members=await Promise.all([...new Set(uids)].map(async uid=>[uid,await read('portalAccess/users/'+uid)]));
+  const users=Object.fromEntries(members.filter(([,member])=>member));
   const staffIds=[...new Set(Object.values(users||{}).map(member=>member?.staffId).filter(safeKey))];
   const entries=await Promise.all(staffIds.map(async staff=>{
     try {

@@ -15,7 +15,8 @@ export function createLaborStore(port, actor, defaults=[]) {
   }
   async function portalUsages() {
     await authorize();
-    const usages=await port.portalUsages();
+    const users=await read('portalAccess/users');
+    const usages=await port.portalUsages(Object.keys(users||{}));
     if(!usages || typeof usages!=='object' || Array.isArray(usages))throw Error('ポータルの利用状況を取得できません。');
     return usages;
   }

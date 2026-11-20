@@ -12,8 +12,8 @@ test('portal usage respects saved accounts and Japan-time access boundaries',asy
   };
   const lifecycle={hrManaged:true,state:'active',currentCancelled:false,startAt,endAt};
   const port={now:()=>now,read:async path=>path.startsWith('laborConfig/')?true:
-    path==='portalAccess/users'?users:path==='staffLifecycle/employee'?lifecycle:null};
-  port.portalUsages=()=>loadPortalUsages({read:port.read,metadata:async()=>null,now});
+    path==='portalAccess/users'?users:path.startsWith('portalAccess/users/')?users[path.split('/')[2]]:path==='staffLifecycle/employee'?lifecycle:null};
+  port.portalUsages=uids=>loadPortalUsages({read:port.read,metadata:async()=>null,now,uids});
   const store=createLaborStore(port,{uid:'owner'});
   assert.deepEqual(await store.portalUsage('director'),{status:'active',administrator:true});
   assert.deepEqual(await store.portalUsage('former'),{status:'stopped'});
