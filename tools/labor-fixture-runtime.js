@@ -14,6 +14,7 @@ let db=structuredClone(seed);
 if(fixtureQuery.has('labor-review')){
   const data=draftEmployee({...staff,imported:true});
   data.basic.fullName='架空 花子';data.plannedPeriod.startDate='2020-04-01';
+  if(fixtureQuery.has('missing')){data.basic.fullName='';data.type='';data.plannedPeriod.startDate='';}
   db.laborRecords={[staff.id]:{revision:1,operationId:'seed-labor-review',data}};
   db.portalJoinRequests={'fixture-new':{uid:'fixture-new',email:'fixture-new@example.test',name:'架空 新入',jobRole:'DH',revision:1,submittedAt:1,state:'pending'}};
 }

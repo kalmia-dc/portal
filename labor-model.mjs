@@ -23,6 +23,14 @@ export function laborInformationConfirmed(data){
   const review=data.tasks?.[laborReviewKey];
   return review?.status==='完了' && canonical(review.confirmedFields)===canonical(laborConfirmationFields(data));
 }
+export function laborConfirmationPending(data){
+  if(data.status!=='draft')return [];
+  const labels={fullName:'氏名（姓・名）',role:'職種',type:'雇用形態',startDate:'入社日'};
+  const fields=laborConfirmationFields(data),missing=new Set(laborConfirmationIssues(data));
+  const review=data.tasks?.[laborReviewKey];
+  return Object.entries(labels).filter(([key,label])=>!missing.has(label) &&
+    (review?.status!=='完了' || review.confirmedFields?.[key]!==fields[key])).map(([,label])=>label);
+}
 export function confirmLaborInformation(employee,actor,timestamp){
   if(employee.status!=='draft')throw Error('労務情報の確認対象を開き直してください。');
   validateEmployee(employee);key(actor.uid);

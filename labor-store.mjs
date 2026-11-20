@@ -1,4 +1,4 @@
-import {draftEmployee,recordUpdate,lifecycleProjection,removeReviewedShifts,key,text,canonical,confirmLaborInformation} from './labor-model.mjs?v=20261120-labor-confirm';
+import {draftEmployee,recordUpdate,lifecycleProjection,removeReviewedShifts,key,text,canonical,confirmLaborInformation} from './labor-model.mjs?v=20261120-missing-information';
 import {approvalUpdates} from './portal-join-model.mjs';
 import {joinNameKey} from './portal-join-model.mjs';
 import {lifecycleProtection,linkedAccounts} from './portal-lifecycle-model.mjs';

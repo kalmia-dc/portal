@@ -1,21 +1,27 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import {draftEmployee,transition,lifecycleProjection,applicablePeriod,accessAt,jstStart,retention,retirementShifts,removeReviewedShifts,recordUpdate} from '../labor-model.mjs';
-import {confirmLaborInformation,laborConfirmationIssues,laborInformationConfirmed} from '../labor-model.mjs';
+import {confirmLaborInformation,laborConfirmationIssues,laborInformationConfirmed,laborConfirmationPending} from '../labor-model.mjs';
 import {extractCandidates,prepareFile} from '../labor-documents.mjs';
 const draft=()=>({...draftEmployee({id:'s',name:'架空',role:'DH',type:'part'}),googleEmail:'test@example.test'});
 test('labor information requires the four reviewed fields and invalidates only when they change',()=>{
   const data=draft();data.imported=true;
   assert.deepEqual(laborConfirmationIssues(data),['氏名（姓・名）','入社日']);
+  assert.deepEqual(laborConfirmationPending(data),['職種','雇用形態']);
   assert.throws(()=>confirmLaborInformation(data,{uid:'owner'},1),/氏名/);
   data.basic.fullName='架空 花子';data.plannedPeriod.startDate='2020-04-01';
   const saved=confirmLaborInformation(data,{uid:'owner'},123);
   assert.equal(laborInformationConfirmed(saved),true);assert.equal(laborInformationConfirmed(data),false);
+  assert.deepEqual(laborConfirmationPending(saved),[]);
   assert.equal(saved.tasks['labor-information-review'].checkedBy,'owner');
   assert.equal(saved.tasks['labor-information-review'].checkedAt,123);
   for(const change of [d=>d.basic.fullName='別の 氏名',d=>d.role='DR',d=>d.type='full',d=>d.plannedPeriod.startDate='2020-04-02']){
     const edited=structuredClone(saved);change(edited);assert.equal(laborInformationConfirmed(edited),false);
   }
   saved.basic.phone='変更した電話番号';assert.equal(laborInformationConfirmed(saved),true);
+  const changed=structuredClone(saved);changed.plannedPeriod.startDate='2020-04-02';
+  assert.deepEqual(laborConfirmationPending(changed),['入社日']);
+  changed.type='';assert.deepEqual(laborConfirmationIssues(changed),['雇用形態']);
+  assert.deepEqual(laborConfirmationPending(changed),['入社日']);
   data.plannedPeriod.startDate='2020-02-31';assert.throws(()=>confirmLaborInformation(data,{uid:'owner'},1),/入社日/);
 });
 test('employment changes do not create checklists and preserve previous records',()=>{
