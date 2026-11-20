@@ -1,10 +1,11 @@
 
 import {staffNameKey} from './portal-roster-model.mjs';
+import {documents} from './onboarding-functions/catalog.mjs';
 import {DIRECTOR_STAFF_ID,personName} from './portal-person-display.mjs?v=20261021-director';
 import {createPageLifecycle} from './portal-page-lifecycle.mjs';
 const pageLifecycle=createPageLifecycle();
 async function pageAwait(work){pageLifecycle.assertActive();let result;try{result=await work();}catch(error){pageLifecycle.assertActive();throw error;}pageLifecycle.assertActive();return result;}
-import {connectLabor} from './labor-runtime.js?v=20261120-open-onboarding';
+import {connectLabor} from './labor-runtime.js?v=20261120-document-progress';
 import {draftEmployee,transition,period,retirementShifts,retention,today,jstStart} from './labor-model.mjs?v=20261112-without-salary';
 import {prepareFile,readDocument,extractCandidates} from './labor-documents.mjs?v=20261112-without-salary';
 const $=id=>document.getElementById(id),form=$('editor'),field=name=>form.elements.namedItem(name),id=()=>crypto.randomUUID();
@@ -202,7 +203,9 @@ function drawEmployeeGroup(label,rows){
     const [usageLabel,nextStep]=request?['申請確認待ち','申請を開き、内容を確認してください。']:
       describePortalUsage(d,portalUsages===null?{status:'loading'}:portalUsages[d.staffId]||{status:'unregistered'});
     usage.append(el('strong',usageLabel),el('small',nextStep,'employee-email'));
-    if(d && portalUsages?.[d.staffId]?.status==='opening'){
+    const progress=d && portalUsages?.[d.staffId];
+    if(d)appendChecklist(usage,progress,d);
+    if(d && (progress?.status==='opening' || progress?.checklist?.opened===false)){
       const start=el('button',openingStaff===d.staffId?'受付を開始しています…':'書類提出の受付を開始');
       start.type='button';start.disabled=busy;
       start.setAttribute('aria-label',name+'さんの書類提出の受付を開始');
@@ -433,7 +436,7 @@ function describePortalUsage(employee,usage){
     case 'documents': return ['入社手続きのみ・書類確認待ち','必要書類の提出と労務担当の確認を完了してください。'];
     case 'start': return ['入社手続きのみ・入社日待ち','書類確認済み。'+usage.startDate+'から通常機能を利用できます。'];
     case 'activation': return ['入社手続きのみ・利用制限解除待ち','書類確認済み。新入職員が入社手続き画面を開き直し、利用制限の解除を確認してください。'];
-    case 'active': return ['入社手続き完了・通常機能利用可能',usage.exception?'今回の院長指示による個別解除です。':usage.administrator?'既存の管理者アカウントでログインできます。':'登録済みのGoogleアカウントで通常機能を利用できます。'];
+    case 'active': return [usage.exception?'通常機能利用可能（個別許可）':usage.checklist?.complete?'入社手続き完了・通常機能利用可能':'通常機能利用可能',usage.exception?'院長の個別許可による利用です。書類の残りは下に表示しています。':usage.administrator?'既存の管理者アカウントでログインできます。':'登録済みのGoogleアカウントで通常機能を利用できます。'];
     case 'scheduled': return ['利用開始前',usage.startDate+'から、登録済みのGoogleアカウントでログインできます。'];
     case 'stopped': return ['利用停止中','現在、この職員のアカウントではログインできません。'];
     case 'unregistered': {
@@ -448,6 +451,31 @@ function describePortalUsage(employee,usage){
     }
   }
   return ['利用状況を確認できません','一覧を再読み込みするか、ログインアカウント一覧で確認してください。'];
+}
+function appendChecklist(parent,usage,employee){
+  const checklist=usage?.checklist;
+  if(!checklist)return;
+  if(checklist.unknown){parent.append(el('p','書類の提出・確認状況を取得できません。再読み込みしてください。','danger'));return;}
+  const finished=new Set(['accepted','exempt','purged']);
+  const missing=checklist.items.filter(item=>item.required && !finished.has(item.state));
+  parent.append(el('p',checklist.complete?'必要書類の確認済み':'入社手続きは未完了'+(checklist.opened?'':'（書類受付未開始）')));
+  const states={draft:'未提出',submitted:'労務担当の確認待ち',returned:'差し戻し',accepted:'確認済み',exempt:'対象外',purged:'確認済み・画像削除済み'};
+  if(missing.length){
+    const details=el('details'),list=el('ul');details.open=true;
+    details.append(el('summary','未完了の必須書類 '+missing.length+'件'));
+    for(const item of missing)list.append(el('li',(documents[item.key]?.label||item.key)+' — '+(states[item.state]||'未確認')));
+    details.append(list);parent.append(details);
+  }
+  const conditional=checklist.items.filter(item=>!item.required && !finished.has(item.state));
+  if(conditional.length){
+    const details=el('details'),list=el('ul');
+    details.append(el('summary','該当する場合に必要な書類 '+conditional.length+'件'));
+    for(const item of conditional)list.append(el('li',(documents[item.key]?.label||item.key)+' — '+(item.state==='draft'?'要否・提出状況を確認':states[item.state]||'未確認')));
+    details.append(list);parent.append(details);
+  }
+  const review=el('a','この職員の書類を提出・確認する');
+  review.href='./staff-onboarding.html?'+new URLSearchParams({mode:'review',staff:employee.staffId});
+  parent.append(review);
 }
 async function refreshPortalUsage(employee){
   const request=++portalUsageRequest;
@@ -464,6 +492,7 @@ async function refreshPortalUsage(employee){
   const [label,nextStep]=describePortalUsage(employee,usage);
   $('accountStatus').textContent=label;
   $('accountNextStep').textContent=nextStep;
+  $('accountChecklist').replaceChildren();appendChecklist($('accountChecklist'),usage,employee);
   if(portalUsages){portalUsages[employee.staffId]=usage;drawList();}
 }
 async function refreshPortalUsages(){
@@ -485,6 +514,7 @@ async function refreshPortalUsages(){
     const [label,nextStep]=describePortalUsage(data,usages[data.staffId]||{status:'unregistered'});
     $('accountStatus').textContent=label;
     $('accountNextStep').textContent=nextStep;
+    $('accountChecklist').replaceChildren();appendChecklist($('accountChecklist'),usages[data.staffId],data);
   }
 }
 function show(record){clearRead();current=record?structuredClone(record):null;data=structuredClone(record?.data||data);const displayState=recordStatus(data,today(store.now()));form.hidden=false;$('employeeTitle').textContent=employeeName(data)||'新しい職員';$('employeeTitle').tabIndex=-1;$('identity').textContent=`${data.staffId}／${listStatus[displayState]}`;$('savedState').textContent=current?`保存確認済み・版 ${current.revision}`:'未保存';for(const key of Object.keys(basic))field('basic_'+key).value=data.basic[key]??'';for(const key of ['role','type','googleEmail'])field(key).value=data[key];const p=data.periods[data.currentPeriod]||data.plannedPeriod||{};for(const k of ['startDate','endDate','contractEnd','days','hours'])field(k).value=p[k]||'';$('periods').replaceChildren(...Object.values(data.periods).map(x=>el('p',`${x.startDate}〜${x.endDate||'未定'}${x.cancelled?'（取消）':''}／契約終了 ${x.contractEnd||'未確認'}／${x.days||'所定日未確認'} ${x.hours||'所定時間未確認'}`)));$('lifecycleActions').replaceChildren();for(const [action,label]of [['retire','退職日を確定'],['cancel','入社を取り消す'],['withdraw','退職を撤回'],['rehire','再入社を確定']]){if(data.status==='draft'||action==='withdraw'&&data.status!=='retiring'||action==='rehire'&&!['retiring','cancelled'].includes(data.status))continue;const b=el('button',label);b.type='button';b.onclick=()=>run(async()=>{try{let next=transition(collect(),action,{id:id(),...Object.fromEntries(['startDate','endDate','contractEnd','days','hours'].map(k=>[k,field(k).value]))},store.now());if(!await pageAwait(async () => (confirmAction(label,`${next.basic.name}：入社 ${next.periods[next.currentPeriod].startDate}、退職 ${next.periods[next.currentPeriod].endDate||'未定'}。ポータルの利用期間とシフトの登録可能期間に反映します。`))))return;await pageAwait(async () => (save(next,true)));}catch(error){if(error?.code!=='portal/access-lost')throw error;}});$('lifecycleActions').append(b);}void refreshPortalUsage(data);for(const k of ['shiftReview','history'])$(k).replaceChildren();drawDocuments();drawContractReview(true);editorBaseline=JSON.stringify(collect());drawList();}

@@ -332,6 +332,9 @@ async function init() {
     finally {el('openCase').disabled=false;}
   });
   el('casePicker').hidden=false;
+  const requestedStaff=new URLSearchParams(location.search).get('staff');
+  const requestedIndex=candidates.findIndex(candidate=>candidate.staff===requestedStaff && !candidate.archived);
+  if(requestedIndex>=0){select.value=String(requestedIndex);selected=candidates[requestedIndex];}
   await loadCase();
 }
 init().catch(error=>notice('message',error.message,true));

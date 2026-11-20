@@ -1,4 +1,4 @@
-import {onboardingIsComplete,prehireAccess,onboardingException} from './onboarding-access.mjs';
+import {onboardingChecklist,prehireAccess,onboardingException} from './onboarding-access.mjs';
 import {ROLES} from './catalog.mjs';
 import {safeKey} from './service.mjs';
 
@@ -32,16 +32,23 @@ export async function loadPortalUsages({read,metadata,now,uids,config}) {
       if(!active && !prehireAccess(lifecycle,access,staff,now)) {
         return [staff,beforeStart?{status:'scheduled',startDate:date(lifecycle.startAt)}:{status:'stopped'}];
       }
-      if(access?.pending!==true)return [staff,{status:'active',administrator:member.role==='admin',
-        ...(access?.staff===staff && onboardingException(config,staff,access.period,member.uid)?{exception:true}:{})}];
+      const usage={status:'active',administrator:member.role==='admin'};
+      if(!access)return [staff,usage];
       if(access.staff!==staff || !safeKey(access.period) ||
         (lifecycle?.hrManaged===true && lifecycle.currentPeriod!==access.period))return [staff,{status:'unknown'}];
+      if(onboardingException(config,staff,access.period,member.uid))usage.exception=true;
       const enrollment=await read('onboardingV1/cases/'+staff+'/'+access.period);
-      if(!enrollment)return [staff,{status:'opening'}];
-      if(!Object.hasOwn(ROLES,enrollment.role))return [staff,{status:'unknown'}];
-      const complete=await onboardingIsComplete({staff,period:access.period,role:enrollment.role,metadata});
-      if(!complete)return [staff,{status:'documents'}];
-      return [staff,beforeStart?{status:'start',startDate:date(lifecycle.startAt)}:{status:'activation'}];
+      const role=enrollment?.role||member.staffRole;
+      let checklist;
+      try {
+        checklist=Object.hasOwn(ROLES,role)?await onboardingChecklist({staff,period:access.period,role,metadata}):{unknown:true};
+      }catch{checklist={unknown:true};}
+      const progress={checklist:{...checklist,opened:!!enrollment}};
+      if(access.pending!==true)return [staff,{...usage,...progress}];
+      if(!enrollment)return [staff,{status:'opening',...progress}];
+      if(checklist.unknown)return [staff,{status:'unknown',...progress}];
+      if(!checklist.complete)return [staff,{status:'documents',...progress}];
+      return [staff,{...(beforeStart?{status:'start',startDate:date(lifecycle.startAt)}:{status:'activation'}),...progress}];
     } catch {
       return [staff,{status:'unknown'}];
     }

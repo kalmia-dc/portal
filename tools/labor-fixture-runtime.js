@@ -1,5 +1,6 @@
 import {createLaborStore} from '../labor-store.mjs';
 import {draftEmployee} from '../labor-model.mjs';
+import {roleDocuments} from '../onboarding-functions/catalog.mjs';
 const actor={uid:'fixture-momo',staffId:'fixture-office',portalRole:'admin'};
 const staff={id:'fixture-staff',name:'架空 花子',role:'DH',type:'part'};
 const seed={laborConfig:{enabled:true,owners:{'fixture-momo':true},uploadsEnabled:true,maxFileBytes:5242880,maxEncodedBytes:52428800},laborFileBudget:{used:0,revision:0},portalAccess:{users:{'fixture-momo':{staffId:'fixture-office',role:'admin',active:true}}},extra_staff:{'fixture-staff':staff}};
@@ -42,6 +43,9 @@ export async function connectLabor(){document.getElementById('environment').text
 },portalUsages:async()=>{
   if(fixtureQuery.has('usage-failure'))throw Error('Fixture usage unavailable');
   const usage={opening:{status:db.onboardingV1?.cases?.['fixture-opening']?.p?'documents':'opening'},documents:{status:'documents'},start:{status:'start',startDate:'2099-01-01'},unknown:{status:'unknown'}};
+  usage.opening.checklist={opened:!!db.onboardingV1?.cases?.['fixture-opening']?.p,complete:false,
+    items:roleDocuments('DR').map(([key,doc])=>({key,required:!doc.optional,state:'draft'}))};
+  if(fixtureQuery.has('exception')){usage.opening.status='active';usage.opening.exception=true;}
   return Object.fromEntries(Object.entries(db.portalAccess.users).map(([uid,member])=>[
     member.staffId,usage[member.staffId.replace('fixture-','')]||
       (member.active?db.onboardingAccess?.[uid]?.pending?{status:'opening'}:{status:'active',administrator:member.role==='admin'}:{status:'stopped'}),

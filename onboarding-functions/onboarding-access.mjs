@@ -37,11 +37,14 @@ export function onboardingException(config,staff,period,uid) {
 }
 
 export async function onboardingIsComplete({staff, period, role, metadata}) {
+  return (await onboardingChecklist({staff,period,role,metadata})).complete;
+}
+
+export async function onboardingChecklist({staff,period,role,metadata}) {
   const documents = roleDocuments(role);
-  if (!documents.length) return false;
-  const completed = await Promise.all(documents.map(async ([key, doc]) => {
+  const items=await Promise.all(documents.map(async ([key,doc])=>{
     const record = await metadata({staff, period, key, restricted: !!doc.restricted});
-    return doc.optional && record?.required !== true || finalStates.has(record?.state);
+    return {key,required:!doc.optional || record?.required===true,state:record?.state||'draft'};
   }));
-  return completed.every(Boolean);
+  return {complete:items.length>0 && items.every(item=>!item.required || finalStates.has(item.state)),items};
 }

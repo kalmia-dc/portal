@@ -34,7 +34,7 @@ test('onboarding states follow the actual gate, required documents and Japan-tim
     if(['pass','drivingLicense','drivingInsurance','employment','withholding'].includes(key))return null;
     return complete?{state:key==='myNumber'?'purged':'accepted',privateValue:'must stay private'}:null;
   };
-  const usage=async()=>(await loadPortalUsages({read,metadata,now,uids:['u']})).s;
+  const usage=async()=>{const {checklist,...result}=(await loadPortalUsages({read,metadata,now,uids:['u']})).s;return result;};
   assert.deepEqual(await usage(),{status:'opening'});
   opened=true;
   assert.deepEqual(await usage(),{status:'documents'});
@@ -71,10 +71,34 @@ test('unavailable staff stays unknown while other accounts remain readable and o
   };
   const metadata=async({key})=>key==='pass'?{required:true,state:'returned'}:{state:'accepted'};
   const result=await loadPortalUsages({read,metadata,now:1,uids:['a','b']});
-  assert.deepEqual(result,{a:{status:'active',administrator:true},b:{status:'documents'}});
-  assert.deepEqual(Object.keys(result.b),['status']);
+  assert.deepEqual(result.a,{status:'active',administrator:true});assert.equal(result.b.status,'documents');
+  assert.ok(result.b.checklist.items.every(item=>Object.keys(item).sort().join(',')==='key,required,state'));
   const broken=await loadPortalUsages({read:async path=>{if(path==='staffLifecycle/b')throw Error('unavailable');return read(path);},metadata,now:1,uids:['a','b']});
   assert.equal(broken.a.status,'active');
   assert.equal(broken.b.status,'unknown');
   await assert.rejects(loadPortalUsages({read:async()=>{throw Error('unavailable');},metadata,now:1,uids:['a']}),/unavailable/);
+});
+
+test('individual access permission retains the outstanding document checklist until actual review',async()=>{
+  let opened=false,completed=false;
+  const grant={uid:'u',waiveDocuments:true,source:'explicit-user-request',approvedAt:1};
+  const read=async path=>{
+    if(path==='portalAccess/users/u')return {staffId:'s',staffRole:'DR',role:'staff',active:true};
+    if(path==='onboardingAccess/u')return {staff:'s',period:'p',pending:false};
+    if(path==='onboardingV1/cases/s/p')return opened?{role:'DR'}:null;
+    return null;
+  };
+  const query=()=>loadPortalUsages({read,metadata:async()=>completed?{state:'accepted',privateContent:'never returned'}:null,
+    now:1,uids:['u'],config:{portalExceptions:{s:{p:grant}}}});
+  let result=(await query()).s;
+  assert.equal(result.status,'active');assert.equal(result.exception,true);
+  assert.equal(result.checklist.opened,false);assert.equal(result.checklist.complete,false);
+  assert.equal(result.checklist.items.filter(item=>item.required).length,11);
+  opened=true;
+  result=(await query()).s;
+  assert.equal(result.checklist.opened,true);assert.equal(result.checklist.complete,false);
+  completed=true;
+  result=(await query()).s;
+  assert.equal(result.checklist.complete,true);
+  assert.equal(JSON.stringify(result).includes('privateContent'),false);
 });
