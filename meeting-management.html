@@ -1103,7 +1103,7 @@ import {createPageLifecycle} from './portal-page-lifecycle.mjs';
 import {canUseStaff,canAssignStaff} from './portal-staff-usage.mjs?v=20261024-usage';
 import {loadBusinessRoster} from './portal-business-roster.mjs?v=20261024-usage';
 import { startPortalAuth } from './portal-auth.js?v=labor-20261014-2';
-import {mountIncidentReports} from './incident-report-ui.mjs?v=legacy-time-20261113';
+import {mountIncidentReports} from './incident-report-ui.mjs?v=legacy-full-import-20261120';
 import {classification} from './incident-report-core.mjs';
 import { canEditOwnIncident, ownerPayload } from './incident-owner-policy.mjs';
 
@@ -2395,7 +2395,7 @@ function ensureTesseract() {
 
 function parseIncidentHtmlReport(html, sourceFileName) {
   const doc = new DOMParser().parseFromString(html, 'text/html');
-  const bodyText = normalizeImportedText(doc.body?.innerText || '');
+  const bodyText = normalizeImportedText(doc.body?.textContent || '');
   const reportNumber = extractReportNumber(bodyText);
   const typeText = cleanImportedText(doc.querySelector('.report-header .badge')?.textContent || doc.title || bodyText);
   const info = extractIncidentInfoGrid(doc);
@@ -2403,22 +2403,29 @@ function parseIncidentHtmlReport(html, sourceFileName) {
   const situation = incidentSection(doc, '状況');
   const categoryText = sectionValue(incidentSection(doc, '事象の種類')) || extractLabeledText(bodyText, ['事象の種類'], ['状況', 'どんな場面']);
   const levelText = cleanImportedText(situation?.querySelector('.level-badges')?.textContent || bodyText);
+  const selectedRisk = [...(situation?.querySelectorAll('.level-badge') || [])]
+    .map(badge => badge.textContent.trim())
+    .find(label => /^☑/.test(label));
   const meeting = incidentSection(doc, 'ミーティングへの申し送り');
   return {
     source:'html',
     sourceFileName,
     reportNumber,
     type: explicitIncidentType(typeText) || inferIncidentType({ rawText:bodyText }),
+    sourceType: doc.querySelector('.report-header .badge')?.textContent.trim(),
     occurredDate: occurred.date,
     occurredTime: occurred.time,
+    sourceOccurredDateTime: info['発生日時'],
     entryDate: parseLooseDate(info['記入日']),
+    sourceEntryDate: info['記入日'],
     reporterName: info['記入者名'] || '',
     discovererName: info['発見者名'] || '',
     category: parseCategoryCodes(categoryText),
     categoryText,
     scene: fieldValue(situation, 'どんな場面'),
     eventImpact: fieldValue(situation, 'どうなりそう') || fieldValue(situation, '発生した実害'),
-    level: /レベルA|ゾッ/.test(levelText) && /☑\s*レベルA|active-a|ゾッ/.test(html + levelText) ? 'A' : 'B',
+    level: selectedRisk ? (/レベルA/.test(selectedRisk) ? 'A' : 'B') : (/レベルA|ゾッ/.test(levelText) && /☑\s*レベルA|active-a/.test(html) ? 'A' : 'B'),
+    sourceRisk: selectedRisk?.replace(/^☑\s*/, ''),
     details: fieldValue(situation, '具体的な内容') || fieldValue(situation, '具体的内容'),
     goodPoint: sectionValue(incidentSection(doc, 'なぜ防げたか')),
     causeHuman: causeValue(incidentSection(doc, '振り返り'), '人・行動'),
@@ -4294,7 +4301,7 @@ function incidentSection(doc, titlePart) {
 function sectionValue(section) {
   if (!section) return '';
   const value = section.querySelector('.field-value');
-  return cleanImportedText(value?.textContent || '');
+  return (value?.textContent || '').trim();
 }
 
 function fieldValue(section, labelPart) {
@@ -4302,7 +4309,7 @@ function fieldValue(section, labelPart) {
   const group = Array.from(section.querySelectorAll('.field-group')).find(item => {
     return cleanImportedText(item.querySelector('.field-label')?.textContent || '').includes(labelPart);
   });
-  return cleanImportedText(group?.querySelector('.field-value')?.textContent || '');
+  return (group?.querySelector('.field-value')?.textContent || '').trim();
 }
 
 function causeValue(section, labelPart) {
@@ -4310,7 +4317,7 @@ function causeValue(section, labelPart) {
   const box = Array.from(section.querySelectorAll('.cause-box')).find(item => {
     return cleanImportedText(item.querySelector('.cause-label')?.textContent || '').includes(labelPart);
   });
-  return cleanImportedText(box?.querySelector('.cause-value')?.textContent || '');
+  return (box?.querySelector('.cause-value')?.textContent || '').trim();
 }
 
 function extractLabeledText(text, labels, nextLabels) {

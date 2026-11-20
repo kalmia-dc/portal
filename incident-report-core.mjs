@@ -82,9 +82,25 @@ export function parseHTML(html,Parser=globalThis.DOMParser){
 }
 export function fromLegacy(old,id=globalThis.crypto.randomUUID()){
   const r=newReport(id);r.reporterName=old.reporterName||'';r.occurredDate=old.occurredDate||'';r.place=old.occurredPlace||'';r.work=old.workContent||'';r.details=old.details||'';r.handoff=old.handoff||'';
+  r.reportNumber=old.reportNumber||'';
+  r.roles=old.discovererName?`発見者：${old.discovererName}`:'';
   const originalTime=String(old.occurredTime||'').trim();
   const clock=originalTime.normalize('NFKC').match(/^([01]?\d|2[0-3]):([0-5]\d)\s*(?:ごろ|頃)?$/);
   r.occurredTime=clock?`${clock[1].padStart(2,'0')}:${clock[2]}`:'';
-  const timeNote=originalTime&&originalTime!==r.occurredTime?`旧形式の発生時刻：${originalTime}`:'';
-  r.supplement=[timeNote,old.eventImpact&&`旧形式の影響欄（実際・潜在の区別は未確認）：${old.eventImpact}`,old.goodPoint&&`旧形式の防止理由：${old.goodPoint}`,old.causeHuman&&`旧形式の人・行動欄：${old.causeHuman}`,old.causeEnvironment&&`旧形式の環境・連携欄：${old.causeEnvironment}`].filter(Boolean).join('\n');return normalizeReport(r);
+  r.supplement=[
+    ['発生日時',old.sourceOccurredDateTime],
+    ['発生時刻',!old.sourceOccurredDateTime&&originalTime!==r.occurredTime&&originalTime],
+    ['記入日',old.sourceEntryDate||old.entryDate],
+    ['区分',old.sourceType],
+    ['危険度',old.sourceRisk],
+    ['事象の種類',old.categoryText],
+    ['場面',old.scene],
+    ['影響欄（実際・潜在の区別は未確認）',old.eventImpact],
+    ['防止理由',old.goodPoint],
+    ['人・行動欄',old.causeHuman],
+    ['環境・連携欄',old.causeEnvironment],
+    ['対策',old.countermeasure],
+    ['ミーティング報告日',old.meetingReportDate]
+  ].filter(([,value])=>value).map(([label,value])=>`旧形式の${label}：${value}`).join('\n\n');
+  return normalizeReport(r);
 }
