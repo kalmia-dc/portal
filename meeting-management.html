@@ -1102,6 +1102,7 @@ import { getDatabase, ref, push, set, update, remove, onValue as firebaseOnValue
 import {createPageLifecycle} from './portal-page-lifecycle.mjs';
 import {canUseStaff,canAssignStaff} from './portal-staff-usage.mjs?v=20261024-usage';
 import {loadBusinessRoster} from './portal-business-roster.mjs?v=20261024-usage';
+import {buildNoticeTargets} from './meeting-notice-targets.mjs?v=20261126';
 import { startPortalAuth } from './portal-auth.js?v=labor-20261014-2';
 import {mountIncidentReports} from './incident-report-ui.mjs?v=legacy-full-import-20261120';
 import {classification} from './incident-report-core.mjs';
@@ -1161,14 +1162,15 @@ const NOTICE_TARGETS = {
 };
 const NOTICE_TARGET_IDS = Object.keys(NOTICE_TARGETS);
 // Keep the legacy denominator for records created before target snapshots existed.
-const currentNoticeTargets = Object.fromEntries(businessRoster.members.filter(member => canUseStaff(member.id) && member.id !== DIRECTOR_ID && member.availability !== 'stopped').map(member => [member.id, {name:member.label || member.name, role:member.role}]));
-const currentNoticeTargetIds = Object.keys(currentNoticeTargets);
+const currentTaskTargets = Object.fromEntries(businessRoster.members.filter(member => canUseStaff(member.id) && member.id !== DIRECTOR_ID && member.availability !== 'stopped').map(member => [member.id, {name:member.label || member.name, role:member.role}]));
+const currentNoticeTargets = buildNoticeTargets(businessRoster.members,{canUseStaff,directorId:DIRECTOR_ID});
 function targetIdsFor(item) {
   return Array.isArray(item?.targetStaffIds) ? item.targetStaffIds : NOTICE_TARGET_IDS;
 }
-function targetSnapshot() {
-  if (!businessRoster.complete || !currentNoticeTargetIds.length) throw new Error('職員名簿と確認対象者を再確認してください');
-  return {targetStaffIds:[...currentNoticeTargetIds], targetStaffNames:Object.fromEntries(currentNoticeTargetIds.map(id => [id,currentNoticeTargets[id].name]))};
+function targetSnapshot(targets=currentTaskTargets) {
+  const ids=Object.keys(targets);
+  if (!businessRoster.complete || !ids.length) throw new Error('職員名簿と確認対象者を再確認してください');
+  return {targetStaffIds:ids, targetStaffNames:Object.fromEntries(ids.map(id => [id,targets[id].name]))};
 }
 Object.assign(STAFF_NAMES,Object.fromEntries(businessRoster.members.map(member => [member.id,member.label])));
 const STATUS_LABELS = {
@@ -1790,7 +1792,7 @@ async function saveNotice(event) {
       showToast('お知らせを更新しました');
     } else {
       await set(push(ref(db, PATHS.notices)), {
-        ...targetSnapshot(),
+        ...targetSnapshot(currentNoticeTargets),
         ...payload,
         createdAt: Date.now(),
         createdBy: currentUser.name,
@@ -4115,7 +4117,7 @@ async function saveRoutedDraft(kind) {
     const now = Date.now();
     const target = push(ref(db, PATHS[kind]));
     const item = {
-      ...targetSnapshot(),
+      ...targetSnapshot(kind==='notices'?currentNoticeTargets:currentTaskTargets),
       title, images, sourceIncidentId:reportId,
       sourceIncidentNumber:report.reportNumber || buildIncidentReportNumber(report),
       createdAt:now, createdBy:currentUser.name, createdById:currentUser.staffId,
