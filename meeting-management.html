@@ -1103,6 +1103,7 @@ import {createPageLifecycle} from './portal-page-lifecycle.mjs';
 import {canUseStaff,canAssignStaff} from './portal-staff-usage.mjs?v=20261024-usage';
 import {loadBusinessRoster} from './portal-business-roster.mjs?v=20261024-usage';
 import {buildNoticeTargets} from './meeting-notice-targets.mjs?v=20261126';
+import {createNoticeLoader,isInitialNoticeLink} from './meeting-notice-loader.mjs?v=20261126';
 import { startPortalAuth } from './portal-auth.js?v=labor-20261014-2';
 import {mountIncidentReports} from './incident-report-ui.mjs?v=legacy-full-import-20261120';
 import {classification} from './incident-report-core.mjs';
@@ -1345,6 +1346,20 @@ const state = {
   incidentPeriodYear:todayKey().slice(0, 4)
 };
 
+let pendingNoticeId = null;
+const noticeLoader = createNoticeLoader({
+  isActive:()=>pageLifecycle.active&&canSeeNotices(),
+  subscribe:(ok,fail)=>onValue(ref(db, PATHS.notices),ok,fail),
+  receive:snap=>{
+    state.notices=toList(snap.val()).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+    if(currentTab()==='notices')renderNotices();
+    renderIncidentReports();
+    openInitialCase();
+    if(pendingNoticeId){const id=pendingNoticeId;pendingNoticeId=null;if(currentTab()==='notices')openRelatedCase('notices',id);}
+  },
+  failed:()=>{if(currentTab()==='notices')renderNotices();}
+});
+
 if (!currentUser?.staffId) {
   document.getElementById('guard').hidden = false;
 } else {
@@ -1479,6 +1494,7 @@ function activateTab(tab) {
   document.querySelectorAll('.section').forEach(sec => sec.classList.remove('active'));
   document.getElementById(`${tab}Section`).classList.add('active');
   updateSearchPlaceholder();
+  if (tab === 'notices') noticeLoader.start();
   renderActiveTab();
 }
 
@@ -1648,18 +1664,14 @@ function openInitialCase(){
  if(state[kind].some(x=>x.id===id)){initialCaseOpened=true;openRelatedCase(kind,id);}
 }
 function attachDataListeners() {
+  if (isInitialNoticeLink(location.search,canSeeNotices())) noticeLoader.start();
   onValue(ref(db, PATHS.tasks), snap => {
     state.tasks = toList(snap.val()).sort(sortTasks);
     renderTasks();
     renderIncidentReports();
     openInitialCase();
   });
-  onValue(ref(db, PATHS.notices), snap => {
-    state.notices = toList(snap.val()).sort((a,b) => (b.createdAt || 0) - (a.createdAt || 0));
-    if (canSeeNotices()) renderNotices();
-    renderIncidentReports();
-    openInitialCase();
-  });
+
   if (canSeeOpinions()) {
     onValue(ref(db, PATHS.opinions), snap => {
       state.opinions = toList(snap.val()).sort((a,b) => (b.createdAt || 0) - (a.createdAt || 0));
@@ -2788,6 +2800,7 @@ async function handleActions(event) {
   const id = btn.dataset.id;
   const action = btn.dataset.action;
   if (action === 'open-related') return openRelatedCase(btn.dataset.kind, id);
+  if (action === 'retry-notices') { noticeLoader.start(); renderNotices(); return; }
   if (isReadOnlyTerminal()) return;
   if (action === 'route-notice') return startRoutingDraft(id, 'notices');
   if (action === 'route-task') return startRoutingDraft(id, 'tasks');
@@ -3385,6 +3398,13 @@ function taskReadSummaryHtml(task) {
 }
 
 function renderNotices() {
+  if(noticeLoader.status!=='ready'){
+    document.getElementById('noticeCount').textContent='';
+    document.getElementById('noticeList').innerHTML=noticeLoader.status==='error'
+      ? '<div class="empty">お知らせを取得できませんでした。<button type="button" data-action="retry-notices">再読み込み</button></div>'
+      : '<div class="empty" role="status">お知らせを読み込んでいます…</div>';
+    return;
+  }
   const visible = state.notices.filter(notice => isNoticeFullyRead(notice) === state.showNoticeHistory);
   const notices = filterBySearch(visible, noticeSearchText);
   document.getElementById('noticeCount').textContent = countText(notices.length, visible.length);
@@ -4014,7 +4034,7 @@ function reportWorkflowLabel(report) {
   }
   if (report.linkedNoticeId) {
     const notice = state.notices.find(item => item.id === report.linkedNoticeId);
-    return notice ? (isNoticeFullyRead(notice) ? 'お知らせ：全員確認済み' : 'お知らせ：確認待ち') : '関連するお知らせを確認できません';
+    return notice ? (isNoticeFullyRead(notice) ? 'お知らせ：全員確認済み' : 'お知らせ：確認待ち') : (noticeLoader.status==='ready'?'関連するお知らせを確認できません':'お知らせ側で確認状況を表示');
   }
   return INCIDENT_STATUS_LABELS[report.counterStatus || 'pending'] || '未対応';
 }
@@ -4033,6 +4053,7 @@ function openRelatedCase(kind, id) {
   const items = kind === 'incidents' ? state.incidentReports : state[kind];
   if (!['tasks', 'notices', 'incidents'].includes(kind) || !Array.isArray(items)) return;
   if (kind === 'notices' && !canSeeNotices()) return showToast('このお知らせを表示する権限がありません');
+  if (kind === 'notices' && noticeLoader.status !== 'ready') { pendingNoticeId = id; activateTab('notices'); return; }
   const item = items.find(entry => entry.id === id);
   if (!item) return showToast('関連する内容を確認できません。主任に確認してください');
   state.searchQuery = '';
