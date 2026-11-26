@@ -619,19 +619,13 @@ function renderMaterials() {
 }
 
 function renderMaterialPreview(item) {
-  if (item.inlineImage && item.url) {
-    return `
-      <button class="material-preview" type="button" onclick="openMaterialImage('${escAttr(item.id)}')" aria-label="${escAttr(item.title || item.fileName || '画像')}を表示">
-        <img src="${escAttr(item.url)}" alt="">
-      </button>
-    `;
-  }
+  if (item.inlineImage && item.url) return ''; // The existing Open button shows the image.
   const youtubeId = youtubeVideoId(item.url || item.linkUrl || '');
   if (youtubeId) {
     const url = escAttr(item.url || item.linkUrl || '#');
     return `
       <a class="material-preview" href="${url}" target="_blank" rel="noopener" aria-label="${escAttr(item.title || 'YouTube')}を開く">
-        <img src="${escAttr(youtubeThumbnailUrl(youtubeId))}" alt="">
+        <img src="${escAttr(youtubeThumbnailUrl(youtubeId))}" alt="" loading="lazy" decoding="async">
         <span class="youtube-play" aria-hidden="true"></span>
       </a>
     `;

@@ -477,8 +477,8 @@ button{cursor:pointer}
 .image-thumb{
   display:block;
   width:100%;
-  aspect-ratio:16/10;
-  padding:0;
+  min-height:44px;
+  padding:8px 12px;
   border:1px solid var(--line);
   border-radius:8px;
   overflow:hidden;
@@ -1360,6 +1360,16 @@ const noticeLoader = createNoticeLoader({
   failed:()=>{if(currentTab()==='notices')renderNotices();}
 });
 
+const opinionLoader = createNoticeLoader({
+  isActive:()=>pageLifecycle.active&&canSeeOpinions(),
+  subscribe:(ok,fail)=>onValue(ref(db, PATHS.opinions),ok,fail),
+  receive:snap=>{
+    state.opinions=toList(snap.val()).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+    if(currentTab()==='opinions')renderOpinions();
+  },
+  failed:()=>{if(currentTab()==='opinions')renderOpinions();}
+});
+
 if (!currentUser?.staffId) {
   document.getElementById('guard').hidden = false;
 } else {
@@ -1495,6 +1505,7 @@ function activateTab(tab) {
   document.getElementById(`${tab}Section`).classList.add('active');
   updateSearchPlaceholder();
   if (tab === 'notices') noticeLoader.start();
+  if (tab === 'opinions') opinionLoader.start();
   renderActiveTab();
 }
 
@@ -1646,9 +1657,10 @@ function setupForms() {
 
 function setupViewer() {
   const viewer = document.getElementById('viewer');
-  document.getElementById('viewerClose').addEventListener('click', () => viewer.classList.remove('open'));
+  const close=()=>{viewer.classList.remove('open');document.getElementById('viewerImage').removeAttribute('src');};
+  document.getElementById('viewerClose').addEventListener('click', close);
   viewer.addEventListener('click', e => {
-    if (e.target === viewer) viewer.classList.remove('open');
+    if (e.target === viewer) close();
   });
 }
 
@@ -1672,12 +1684,6 @@ function attachDataListeners() {
     openInitialCase();
   });
 
-  if (canSeeOpinions()) {
-    onValue(ref(db, PATHS.opinions), snap => {
-      state.opinions = toList(snap.val()).sort((a,b) => (b.createdAt || 0) - (a.createdAt || 0));
-      renderOpinions();
-    });
-  }
   onValue(ref(db, PATHS.incidentReports), snap => {
     state.legacyIncidentReports = toList(snap.val()).sort(sortIncidentReports);
     state.incidentReports = [...state.legacyIncidentReports,...state.v2IncidentReports];
@@ -2789,8 +2795,9 @@ async function handleActions(event) {
   if (!pageLifecycle.active) return;
   const imageBtn = event.target.closest('.image-thumb');
   if (imageBtn) {
-    const img = imageBtn.querySelector('img');
-    document.getElementById('viewerImage').src = img.src;
+    const source = imageBtn.dataset.imageSrc;
+    if (!source) return;
+    document.getElementById('viewerImage').src = source;
     document.getElementById('viewer').classList.add('open');
     return;
   }
@@ -2801,6 +2808,7 @@ async function handleActions(event) {
   const action = btn.dataset.action;
   if (action === 'open-related') return openRelatedCase(btn.dataset.kind, id);
   if (action === 'retry-notices') { noticeLoader.start(); renderNotices(); return; }
+  if (action === 'retry-opinions' && canSeeOpinions()) { opinionLoader.start(); renderOpinions(); return; }
   if (isReadOnlyTerminal()) return;
   if (action === 'route-notice') return startRoutingDraft(id, 'notices');
   if (action === 'route-task') return startRoutingDraft(id, 'tasks');
@@ -4211,6 +4219,13 @@ async function deleteIncidentReport(id) {
 }
 
 function renderOpinions() {
+  if(opinionLoader.status !== 'ready'){
+    document.getElementById('opinionCount').textContent='';
+    document.getElementById('opinionList').innerHTML=opinionLoader.status==='error'
+      ? '<div class="empty">意見・提案を取得できませんでした。<button type="button" data-action="retry-opinions">再読み込み</button></div>'
+      : '<div class="empty" role="status">意見・提案を読み込んでいます…</div>';
+    return;
+  }
   const opinions = filterBySearch(state.opinions, opinionSearchText);
   document.getElementById('opinionCount').textContent = countText(opinions.length, state.opinions.length);
   const list = document.getElementById('opinionList');
@@ -4515,8 +4530,8 @@ function imagesHtml(images = []) {
   return `
     <div class="image-grid">
       ${images.map((image, index) => `
-        <button class="image-thumb" type="button" aria-label="添付画像${index + 1}">
-          <img src="${escAttr(image.data || image)}" alt="">
+        <button class="image-thumb" type="button" data-image-src="${escAttr(image.data || image)}">
+          添付画像${index + 1}を開く
         </button>
       `).join('')}
     </div>
